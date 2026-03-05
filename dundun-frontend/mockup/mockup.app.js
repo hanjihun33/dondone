@@ -948,7 +948,9 @@ function renderDocs() {
         return 'fa-file-lines text-slate-600 bg-slate-100';
     };
 
-    list.innerHTML = state.docs.map(doc => {
+    list.innerHTML = state.docs
+        .filter(doc => doc.type !== 'TRANSFER_RECEIPT')
+        .map(doc => {
         const klass = iconFor(doc.type).split(' ');
         const icon = klass[0];
         const iconColor = klass[1];
