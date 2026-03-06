@@ -756,25 +756,20 @@ public interface CopilotService {
 
 #### 이슈 계층(권장)
 - **Epic**: 기능 축 단위
-- **Story**: 사용자 흐름 또는 기능 단위
-- **Sub-task**: 사람별 세부 작업
+- **Story**: 실제 구현/추적 단위
 
-> 권장 원칙: **Epic은 기능 기준**, **Story는 사용자 흐름/기능 기준**으로 관리한다.  
+> 권장 원칙: **Epic은 기능 기준**, **Story는 실제 구현/추적 기준**으로 관리한다.  
 > 즉, Epic에 `[ANDROID]`, `[BACKEND]`, `[BLC]`를 직접 붙이기보다  
 > Epic은 `[WRK]`, `[WAGE]`, `[DOC]`, `[BLC]`, `[INFRA]`처럼 **기능/영역 기준**으로 만들고,  
-> Story는 prefix 없이 **무엇을 할 수 있는지 / 무엇을 만든는지**가 바로 보이게 작성하는 편이 추적에 유리하다.
+> Story는 prefix 없이 **실제 해야 할 구현 작업**이 바로 보이게 작성하는 편이 추적에 유리하다.
 
 #### Prefix 규칙(권장)
 - **Epic prefix**: 기능/도메인 기준, 대문자 고정
   - 예: `[AUTH]`, `[WRK]`, `[ADV]`, `[WAGE]`, `[DOC]`, `[BLC]`, `[INFRA]`, `[COP]`
-- **Story 제목**: prefix 없이 사용자 관점 또는 기능 관점으로 작성
-  - 예: `Jenkins 빌드 파이프라인을 구성한다`
-  - 예: `사용자는 급여 차이를 확인할 수 있다`
-  - 예: `근거 자료 묶음을 생성하고 공유할 수 있다`
-- **Sub-task 제목**: 기술 담당 기준 prefix 사용 가능
-  - 예: `[ANDROID] 금융 홈 Hero 카드 UI 구현`
-  - 예: `[BACKEND] 급여 차이 계산 API 구현`
-  - 예: `[INFRA] Jenkinsfile 작성`
+- **Story 제목**: prefix 없이 실제 구현 작업 기준으로 작성
+  - 예: `Jenkins 빌드 파이프라인 구성`
+  - 예: `실제 입금액 입력 화면 구현`
+  - 예: `근거 자료 묶음 PDF 생성 기능 구현`
 
 #### 워크플로우(권장)
 - `Backlog -> Selected for Dev -> In Progress -> In Review -> Done`
@@ -893,20 +888,22 @@ public interface CopilotService {
 
 ### 13.7 Jira Story 작성 예시
 
-| Epic | Story 제목 예시 | Sub-task 예시 |
-|---|---|---|
-| `[INFRA] CI/CD` | `Jenkins 빌드 파이프라인을 구성한다` | `[INFRA] Jenkinsfile 작성`, `[INFRA] 배포 스크립트 정리` |
-| `[WRK] 근무 기록` | `사용자는 출근/퇴근을 기록할 수 있다` | `[ANDROID] 출근/퇴근 화면 구현`, `[BACKEND] 근무 기록 API 구현` |
-| `[WAGE] 급여 점검` | `사용자는 실제 입금액을 입력하고 차이를 확인할 수 있다` | `[ANDROID] 입금 입력 화면 구현`, `[BACKEND] 급여 차이 계산 API 구현` |
-| `[DOC] 문서/근거 자료` | `사용자는 근거 자료 묶음을 생성하고 공유할 수 있다` | `[BACKEND] PDF 생성 기능 구현`, `[ANDROID] 문서 공유 UI 연결` |
-| `[BLC] 토큰 전송&송금` | `사용자는 테스트넷으로 송금하고 상태를 확인할 수 있다` | `[BLC] 송금 요청 구현`, `[BLC] 상태 조회 구현` |
-| `[DEMO] 타임 트래블` | `데모 사용자는 기준일을 바꿔 상태를 재생할 수 있다` | `[ANDROID] 슬라이더 UI 구현`, `[BACKEND] asOf 상태 응답 구현` |
-| `[COP] 코파일럿` | `사용자는 현재 화면의 이유를 설명받을 수 있다` | `[BACKEND] explain API 구현`, `[ANDROID] 질문 칩 UI 구현` |
+| Epic | Story 제목 예시 |
+|---|---|
+| `[INFRA] CI/CD` | `Jenkins 빌드 파이프라인 구성` |
+| `[WRK] 근무 기록` | `출근/퇴근 기록 화면 구현` |
+| `[WRK] 근무 기록` | `근무 기록 생성/조회 API 구현` |
+| `[WAGE] 급여 점검` | `실제 입금액 입력 화면 구현` |
+| `[WAGE] 급여 점검` | `급여 차이 계산 API 구현` |
+| `[DOC] 문서/근거 자료` | `근거 자료 묶음 PDF 생성 기능 구현` |
+| `[BLC] 토큰 전송&송금` | `테스트넷 송금 요청/상태 조회 구현` |
+| `[DEMO] 타임 트래블` | `asOf 기준 상태 재렌더 UI 연결` |
+| `[COP] 코파일럿` | `facts 기반 설명 API 구현` |
 
 ### 13.8 Jira 운영 팁
-- Epic은 기능 축으로 끊고, Story는 prefix 없이 사용자 흐름이나 기능 단위로 쓴다.
-- `[ANDROID]`, `[BACKEND]`, `[BLC]`, `[INFRA]` prefix는 Sub-task에서만 쓰는 것을 권장한다.
-- Story 하나는 가능하면 **기획적으로 닫히는 단위**로 두고, 구현 분리는 Sub-task로 내린다.
+- Epic은 기능 축으로 끊고, Story는 prefix 없이 실제 구현 단위로 쓴다.
+- 기술 구분은 Story 제목이 아니라 담당자, 컴포넌트, 라벨로 관리하는 것을 권장한다.
+- Story 하나는 가능하면 **한 사람이 책임지고 완료 여부를 판단할 수 있는 수준**으로 자른다.
 - `Blocked` 사유는 반드시 외부 의존성(API, RPC, PDF, env) 중 무엇인지 명시한다.
 - 매주 말에는 `데모 완주 기준`으로 Done 여부를 판단한다.
 
