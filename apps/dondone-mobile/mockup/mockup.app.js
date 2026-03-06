@@ -220,7 +220,7 @@ function renderOnboarding() {
     }
     if (mapBtn) {
         const cls = onboarding.mapVerified
-            ? 'w-full py-3 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-black'
+            ? 'w-full py-3 rounded-2xl border border-slate-200 bg-brand-soft text-brand text-xs font-black'
             : 'w-full py-3 rounded-2xl border border-slate-200 bg-white text-slate-800 text-xs font-black';
         mapBtn.className = cls;
         mapBtn.innerHTML = onboarding.mapVerified
@@ -482,21 +482,161 @@ function getSelectedRecipient() {
     return state.remittance.recipients.find(r => r.id === state.remittance.selectedRecipientId) || null;
 }
 
+function roundDownStep(value, step = 10000) {
+    const safe = Math.max(0, Number(value || 0));
+    if (step <= 0) return Math.floor(safe);
+    return Math.floor(safe / step) * step;
+}
+
+function getDepositStatus() {
+    const paydayDay = Number(state.wage.paydayDay || 27);
+    const recordedDay = Number(state.wage.actualDepositRecordedDay || 0);
+    const actualValue = Math.max(0, Number(state.wage.actualDeposit || 0));
+    const recorded = actualValue > 0 && recordedDay > 0 && state.demo.asOfDay >= recordedDay;
+
+    if (recorded) {
+        return {
+            phase: 'recorded',
+            recorded: true,
+            paydayDay,
+            recordedDay,
+            actualValue
+        };
+    }
+
+    if (state.demo.asOfDay < paydayDay) {
+        return {
+            phase: 'upcoming',
+            recorded: false,
+            paydayDay,
+            recordedDay,
+            actualValue: 0,
+            daysUntilPayday: paydayDay - state.demo.asOfDay
+        };
+    }
+
+    if (state.demo.asOfDay === paydayDay) {
+        return {
+            phase: 'due',
+            recorded: false,
+            paydayDay,
+            recordedDay,
+            actualValue: 0,
+            overdueDays: 0
+        };
+    }
+
+    return {
+        phase: 'overdue',
+        recorded: false,
+        paydayDay,
+        recordedDay,
+        actualValue: 0,
+        overdueDays: state.demo.asOfDay - paydayDay
+    };
+}
+
+function getAdvanceUnlockSnapshot() {
+    const advance = computeAdvanceSnapshot();
+    const tiers = [
+        { name: 'T0', minDays: 0, cap: 200000 },
+        { name: 'T1', minDays: 10, cap: 300000 },
+        { name: 'T2', minDays: 15, cap: 400000 },
+        { name: 'T3', minDays: 20, cap: 500000 }
+    ];
+    const currentIndex = Math.max(0, tiers.findIndex(tier => tier.name === advance.tierName));
+    const currentTier = tiers[currentIndex];
+    const nextTier = tiers[currentIndex + 1] || null;
+    const progressPercent = nextTier
+        ? Math.max(0, Math.min(100, ((advance.verifiedDays - currentTier.minDays) / (nextTier.minDays - currentTier.minDays)) * 100))
+        : 100;
+    const daysToNext = nextTier ? Math.max(0, nextTier.minDays - advance.verifiedDays) : 0;
+    const nextCapDelta = nextTier ? Math.max(0, nextTier.cap - currentTier.cap) : 0;
+
+    return {
+        ...advance,
+        currentTier,
+        nextTier,
+        progressPercent,
+        daysToNext,
+        nextCapDelta
+    };
+}
+
+function computeMoneySplitPlan({ ctx, sendableAmount }) {
+    const base = Math.max(0, Number(ctx.hasActual ? ctx.actual : ctx.est.total));
+    const family = roundDownStep(Math.min(base * 0.15, sendableAmount || 0), 10000);
+    const keep = roundDownStep(base * 0.2, 10000);
+    const living = Math.max(0, base - family - keep);
+
+    return {
+        base,
+        basisKey: ctx.hasActual ? 'money_split_basis_actual' : 'money_split_basis_estimated',
+        living,
+        family,
+        keep
+    };
+}
+
+function getHomeWorkImpact(unlock) {
+    const hasClockIn = !!state.workproof.today.clockIn;
+    const hasClockOut = !!state.workproof.today.clockOut;
+    if (!hasClockIn) return tr('home_work_impact_ready', '오늘 기록을 남기면 미리받기 한도와 월급 확인 근거가 쌓여요.');
+    if (hasClockIn && !hasClockOut) return tr('home_work_impact_pending', '퇴근까지 기록되면 다음 반영에서 빠지지 않도록 확인할 수 있어요.');
+    if (unlock.daysToNext > 0) return tr('home_work_impact_done', '오늘 기록이 저장되어 다음 반영 후보에 포함돼요.');
+    return tr('home_work_impact_max', '이번 달 근무 근거가 충분히 쌓였어요.');
+}
+
+function focusActualDepositInput() {
+    const focusInput = () => {
+        const input = document.getElementById('actual-deposit');
+        if (!input) return;
+        input.focus();
+        input.select();
+    };
+
+    switchTab(Route.WAGE);
+    window.setTimeout(focusInput, 60);
+}
+
 function getFlowContext() {
     const est = computeWageEstimate();
-    const actual = state.wage.actualDeposit || 0;
-    const diff = Math.max(0, est.total - actual);
+    const deposit = getDepositStatus();
+    const actual = deposit.recorded ? deposit.actualValue : 0;
     const threshold = anomalyThreshold(est.total);
-    const isAnomaly = diff >= threshold;
+    const hasActual = deposit.recorded;
+    const diff = hasActual ? Math.max(0, est.total - actual) : 0;
+    const isAnomaly = hasActual && diff >= threshold;
     const proof = getDocByType('PROOF_PACK');
     const claimKit = getDocByType('CLAIM_KIT');
     const selected = getSelectedRecipient();
     const remittanceBlocked = false;
 
-    return { est, actual, diff, threshold, isAnomaly, proof, claimKit, selected, remittanceBlocked };
+    return { est, actual, diff, threshold, isAnomaly, hasActual, deposit, proof, claimKit, selected, remittanceBlocked };
 }
 
 function resolveNextAction(ctx = getFlowContext()) {
+    if (!ctx.hasActual) {
+        if (ctx.deposit.phase === 'upcoming') {
+            return {
+                id: 'open_send',
+                textKey: 'home_next_track_finance',
+                textFallback: 'Before payday, would you like to review this month’s plan and advance limit first?',
+                ctaKey: 'cta_open_finance',
+                ctaFallback: 'Open finance',
+                step: 1
+            };
+        }
+        return {
+            id: 'open_wage',
+            textKey: 'home_next_enter_deposit',
+            textFallback: 'Enter the actual deposit first so we can show the right money status for this month.',
+            ctaKey: 'cta_record_deposit',
+            ctaFallback: 'Record deposit',
+            step: 1
+        };
+    }
+
     if (ctx.isAnomaly) {
         if (ctx.proof?.status !== 'READY') {
             return { id: 'make_proofpack', textKey: 'home_next_make_proofpack', textFallback: 'Would you like to organize evidence with Proof Pack first?', ctaKey: 'cta_make_proofpack', ctaFallback: 'Proof Pack', step: 1 };
@@ -520,7 +660,65 @@ function resolveNextAction(ctx = getFlowContext()) {
     return { id: 'open_send', textKey: 'home_next_send_ready', textFallback: 'You can transfer to an allow-list recipient when ready.', ctaKey: 'cta_open_send', ctaFallback: 'Review transfer', step: 3 };
 }
 
+function resolveHomeNextAction(ctx = getFlowContext()) {
+    if (!ctx.hasActual) {
+        if (ctx.deposit.phase === 'upcoming') {
+            return {
+                id: 'open_send',
+                textKey: 'home_next_track_finance',
+                textFallback: 'Before payday, would you like to review this month’s plan and advance limit first?',
+                ctaKey: 'cta_open_finance',
+                ctaFallback: 'Open finance',
+                step: 1
+            };
+        }
+        return {
+            id: 'open_wage',
+            textKey: 'home_next_enter_deposit',
+            textFallback: 'Enter the actual deposit first so we can show the right money status for this month.',
+            ctaKey: 'cta_record_deposit',
+            ctaFallback: 'Record deposit',
+            step: 1
+        };
+    }
+
+    if (ctx.isAnomaly) {
+        return {
+            id: 'open_wage',
+            textKey: 'home_next_review_wage',
+            textFallback: 'A review-worthy difference is visible. Would you like to open wage check first?',
+            ctaKey: 'finance_go_wage',
+            ctaFallback: 'Open wage check',
+            step: 2
+        };
+    }
+
+    if (state.remittance.status === 'CONFIRMED') {
+        return {
+            id: 'open_docs',
+            textKey: 'home_next_done',
+            textFallback: 'Flow complete. You can review receipts/documents anytime.',
+            ctaKey: 'cta_open_docs',
+            ctaFallback: 'Docs',
+            step: 3
+        };
+    }
+
+    return {
+        id: 'open_send',
+        textKey: 'home_next_no_anomaly',
+        textFallback: 'No anomaly now; you can move to docs/remittance flow.',
+        ctaKey: 'cta_open_finance',
+        ctaFallback: 'Open finance',
+        step: 2
+    };
+}
+
 function runFlowAction(actionId) {
+    if (actionId === 'open_wage') {
+        focusActualDepositInput();
+        return;
+    }
     if (actionId === 'make_proofpack') {
         switchTab(Route.WAGE);
         requestDoc('proof');
@@ -543,6 +741,12 @@ function runFlowAction(actionId) {
     switchTab(Route.FINANCE);
 }
 
+function runHomeDepositAction() {
+    const btn = document.getElementById('home-payday-btn');
+    const actionId = btn?.dataset.action || 'open_wage';
+    runFlowAction(actionId);
+}
+
 function runHomeNextAction() {
     const btn = document.getElementById('home-next-action-btn');
     const actionId = btn?.dataset.action || 'open_send';
@@ -555,6 +759,10 @@ function runWagePrimaryAction() {
     runFlowAction(actionId);
 }
 
+function runWageDepositAction() {
+    focusActualDepositInput();
+}
+
 function setFlowStatus(elementId, tone, label) {
     const el = document.getElementById(elementId);
     if (!el) return;
@@ -564,10 +772,11 @@ function setFlowStatus(elementId, tone, label) {
 
 function renderHome() {
     const ctx = getFlowContext();
-    const selectedRecipient = ctx.selected;
     const selectedAccount = getSelectedAccount();
     const accountBalance = selectedAccount ? selectedAccount.balance : (ctx.actual || 0);
     const sendableAmount = Math.floor((accountBalance || 0) * 0.3);
+    const deposit = ctx.deposit;
+    const unlock = getAdvanceUnlockSnapshot();
 
     const accountBalanceEl = document.getElementById('home-account-balance');
     if (accountBalanceEl) accountBalanceEl.textContent = formatKRW(accountBalance);
@@ -591,59 +800,183 @@ function renderHome() {
     if (homeClockInEl) homeClockInEl.textContent = state.workproof.today.clockIn || '-';
     const homeClockOutEl = document.getElementById('home-clock-out-time');
     if (homeClockOutEl) homeClockOutEl.textContent = state.workproof.today.clockOut || '-';
+    const homeWorkImpactEl = document.getElementById('home-work-impact');
+    if (homeWorkImpactEl) homeWorkImpactEl.textContent = getHomeWorkImpact(unlock);
+
+    const estimatedEl = document.getElementById('home-estimated');
+    if (estimatedEl) estimatedEl.textContent = formatKRW(ctx.est.total);
 
     const actualEl = document.getElementById('home-actual');
-    if (actualEl) actualEl.textContent = formatKRW(ctx.actual);
+    if (actualEl) {
+        actualEl.textContent = ctx.hasActual
+            ? formatKRW(ctx.actual)
+            : tr('home_actual_pending', '미입력');
+        actualEl.classList.toggle('text-slate-500', !ctx.hasActual);
+    }
     const briefEl = document.getElementById('home-money-brief');
     if (briefEl) {
-        briefEl.textContent = `${tr('estimated', '추정')} ${formatKRW(ctx.est.total)} · ${tr('actual', '실제')} ${formatKRW(ctx.actual)}`;
+        if (ctx.hasActual) {
+            briefEl.textContent = `${tr('estimated', '추정')} ${formatKRW(ctx.est.total)} · ${tr('actual', '실제')} ${formatKRW(ctx.actual)}`;
+        } else if (deposit.phase === 'upcoming') {
+            briefEl.textContent = tr('home_summary_sub', '실입금과 참고용 추정을 비교해 현재 상태를 보여줍니다.');
+        } else {
+            briefEl.textContent = tr('deposit_phase_due_desc', '실제 입금액을 입력하면 차이 확인, 송금, 보관 계획이 더 정확해져요.');
+        }
     }
 
     const asofLabelEl = document.getElementById('asof-label');
     if (asofLabelEl) asofLabelEl.textContent = formatDate(state.demo.asOfDay);
     document.getElementById('wage-month').textContent = `${state.demo.year}-${String(state.demo.month).padStart(2, '0')}`;
 
-    const isAnomaly = ctx.isAnomaly;
+    const isAnomaly = ctx.hasActual && ctx.isAnomaly;
     const moneyStatusEl = document.getElementById('home-money-status');
     if (moneyStatusEl) {
         moneyStatusEl.className = `home-money-status ${isAnomaly ? 'alert' : 'ok'}`;
-        moneyStatusEl.textContent = isAnomaly
-            ? tr('diff_anomaly_title', 'Difference to review')
-            : tr('diff_ok_title', 'No anomaly');
+        moneyStatusEl.textContent = !ctx.hasActual
+            ? (deposit.phase === 'upcoming'
+                ? tr('home_money_estimate_status', '예상 기준')
+                : tr('home_money_pending_status', '입금 확인 전'))
+            : isAnomaly
+                ? tr('diff_anomaly_title', 'Difference to review')
+                : tr('diff_ok_title', 'No anomaly');
     }
 
     const moneyKickerEl = document.getElementById('home-money-kicker');
     if (moneyKickerEl) {
-        moneyKickerEl.textContent = isAnomaly
-            ? tr('diff_anomaly_kicker', 'REVIEW DIFF')
-            : tr('diff_ok_kicker', 'NO ANOMALY');
+        moneyKickerEl.textContent = !ctx.hasActual
+            ? (deposit.phase === 'upcoming'
+                ? tr('home_summary_kicker', '이번 달 정산')
+                : tr('deposit_kicker', 'PAYDAY CHECK'))
+            : isAnomaly
+                ? tr('diff_anomaly_kicker', 'REVIEW DIFF')
+                : tr('diff_ok_kicker', 'NO ANOMALY');
     }
 
     const diffEl = document.getElementById('home-diff');
     if (diffEl) {
-        diffEl.textContent = formatKRW(ctx.diff);
-        diffEl.classList.toggle('text-rose-600', isAnomaly);
-        diffEl.classList.toggle('text-emerald-600', !isAnomaly);
+        diffEl.textContent = ctx.hasActual
+            ? formatKRW(ctx.diff)
+            : (deposit.phase === 'upcoming'
+                ? tr('home_diff_before_payday', '입금 전')
+                : tr('home_diff_pending', '확인 전'));
+        diffEl.classList.remove('text-amber-700', 'text-brand', 'text-slate-500');
+        if (!ctx.hasActual) {
+            diffEl.classList.add('text-slate-500');
+        } else {
+            diffEl.classList.toggle('text-amber-700', isAnomaly);
+            diffEl.classList.toggle('text-brand', !isAnomaly);
+        }
     }
 
-    const next = resolveNextAction(ctx);
+    const next = resolveHomeNextAction(ctx);
     const nextCard = document.getElementById('home-next-card');
-    const urgentActions = ['make_proofpack'];
-    const showNextAction = urgentActions.includes(next.id);
-    if (nextCard) {
-        nextCard.classList.toggle('hidden', !showNextAction);
-    }
+    if (nextCard) nextCard.classList.remove('hidden');
 
     const nextActionEl = document.getElementById('home-next-action');
-    if (nextActionEl && showNextAction) {
+    if (nextActionEl) {
         nextActionEl.textContent = tr(next.textKey, next.textFallback);
     }
 
     const nextBtn = document.getElementById('home-next-action-btn');
-    if (nextBtn && showNextAction) {
+    if (nextBtn) {
         nextBtn.dataset.action = next.id;
         nextBtn.textContent = tr(next.ctaKey, next.ctaFallback);
         nextBtn.className = 'primary-btn action-cta w-full py-3 text-xs font-black';
+    }
+
+    let depositTitleKey = 'deposit_phase_recorded_title';
+    let depositTitleFallback = 'This month’s deposit is already reflected';
+    let depositDescKey = 'deposit_phase_recorded_desc';
+    let depositDescFallback = 'Now you can review the difference and plan how to split the money.';
+    let depositMeta = `${tr('deposit_meta_recorded', 'Deposit recorded')} · ${formatDate(deposit.recordedDay || state.demo.asOfDay)}`;
+    let depositBtnKey = 'deposit_cta_review';
+    let depositBtnFallback = 'Open wage check';
+    let depositTone = {
+        card: 'mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4',
+        iconWrap: 'w-11 h-11 rounded-2xl bg-white text-brand flex items-center justify-center',
+        icon: 'fa-solid fa-circle-check'
+    };
+
+    if (deposit.phase === 'upcoming') {
+        depositTitleKey = 'deposit_phase_upcoming_title';
+        depositTitleFallback = 'Get ready to record your actual deposit';
+        depositDescKey = 'deposit_phase_upcoming_desc';
+        depositDescFallback = 'Once pay arrives, entering it quickly unlocks a clearer money view for the month.';
+        depositMeta = `${formatDate(state.demo.asOfDay)} · ${tr('deposit_meta_payday_in', 'Until payday')} ${deposit.daysUntilPayday}${tr('days', 'days')}`;
+        depositBtnKey = 'deposit_cta_enter';
+        depositBtnFallback = 'Enter deposit';
+        depositTone = {
+            card: 'mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4',
+            iconWrap: 'w-11 h-11 rounded-2xl bg-brand-soft text-brand flex items-center justify-center',
+            icon: 'fa-solid fa-calendar-day'
+        };
+    } else if (deposit.phase === 'due') {
+        depositTitleKey = 'deposit_phase_due_title';
+        depositTitleFallback = 'Please confirm today’s actual deposit';
+        depositDescKey = 'deposit_phase_due_desc';
+        depositDescFallback = 'Recording the real deposit makes your wage check, transfer plan, and saving plan more accurate.';
+        depositMeta = `${formatDate(state.demo.asOfDay)} · ${tr('deposit_meta_payday_today', 'Payday is today')}`;
+        depositBtnKey = 'deposit_cta_enter';
+        depositBtnFallback = 'Enter deposit';
+        depositTone = {
+            card: 'mt-4 rounded-3xl border border-amber-100 bg-amber-50/60 p-4',
+            iconWrap: 'w-11 h-11 rounded-2xl bg-white text-amber-700 flex items-center justify-center',
+            icon: 'fa-solid fa-wallet'
+        };
+    } else if (deposit.phase === 'overdue') {
+        depositTitleKey = 'deposit_phase_overdue_title';
+        depositTitleFallback = 'Your actual deposit still needs to be entered';
+        depositDescKey = 'deposit_phase_overdue_desc';
+        depositDescFallback = 'Enter the deposited amount so we can show the right difference and next money actions.';
+        depositMeta = `${formatDate(state.demo.asOfDay)} · ${tr('deposit_meta_payday_overdue', 'After payday')} ${deposit.overdueDays}${tr('days', 'days')}`;
+        depositBtnKey = 'deposit_cta_enter';
+        depositBtnFallback = 'Enter deposit';
+        depositTone = {
+            card: 'mt-4 rounded-3xl border border-amber-100 bg-amber-50/60 p-4',
+            iconWrap: 'w-11 h-11 rounded-2xl bg-white text-amber-700 flex items-center justify-center',
+            icon: 'fa-solid fa-triangle-exclamation'
+        };
+    }
+
+    const paydayCard = document.getElementById('home-payday-card');
+    const shouldShowPaydayCard = !ctx.hasActual && (deposit.phase === 'due' || deposit.phase === 'overdue' || (deposit.phase === 'upcoming' && deposit.daysUntilPayday <= 2));
+    if (paydayCard) {
+        paydayCard.className = depositTone.card;
+        paydayCard.hidden = !shouldShowPaydayCard;
+    }
+    const paydayIconWrap = document.getElementById('home-payday-icon-wrap');
+    if (paydayIconWrap) paydayIconWrap.className = depositTone.iconWrap;
+    const paydayIcon = document.getElementById('home-payday-icon');
+    if (paydayIcon) paydayIcon.className = depositTone.icon;
+    const paydayTitleEl = document.getElementById('home-payday-title');
+    if (paydayTitleEl) paydayTitleEl.textContent = tr(depositTitleKey, depositTitleFallback);
+    const paydayDescEl = document.getElementById('home-payday-desc');
+    if (paydayDescEl) paydayDescEl.textContent = tr(depositDescKey, depositDescFallback);
+    const paydayMetaEl = document.getElementById('home-payday-meta');
+    if (paydayMetaEl) paydayMetaEl.textContent = depositMeta;
+    const paydayBtn = document.getElementById('home-payday-btn');
+    if (paydayBtn) {
+        paydayBtn.dataset.action = 'open_wage';
+        paydayBtn.textContent = tr(depositBtnKey, depositBtnFallback);
+    }
+
+    const homeAdvanceAvailableEl = document.getElementById('home-advance-available');
+    if (homeAdvanceAvailableEl) homeAdvanceAvailableEl.textContent = formatKRW(unlock.available);
+    const homeAdvanceProgressLabelEl = document.getElementById('home-advance-progress-label');
+    if (homeAdvanceProgressLabelEl) {
+        homeAdvanceProgressLabelEl.textContent = unlock.nextTier
+            ? `${unlock.verifiedDays}${tr('days', 'days')} / ${unlock.nextTier.minDays}${tr('days', 'days')}`
+            : tr('advance_progress_max', 'Top tier reached');
+    }
+    const homeAdvanceProgressBarEl = document.getElementById('home-advance-progress-bar');
+    if (homeAdvanceProgressBarEl) {
+        homeAdvanceProgressBarEl.style.width = `${unlock.progressPercent}%`;
+    }
+    const homeAdvanceNextEl = document.getElementById('home-advance-next');
+    if (homeAdvanceNextEl) {
+        homeAdvanceNextEl.textContent = unlock.nextTier
+            ? `${tr('advance_progress_to_next', 'Until next tier')} ${unlock.daysToNext}${tr('days', 'days')} · ${tr('advance_gain_next', 'Expected increase at next tier')} ${formatKRW(unlock.nextCapDelta)}`
+            : tr('advance_progress_done', 'You have reached the top tier for this month');
     }
 }
 
@@ -810,6 +1143,7 @@ function renderWorkproof() {
 function renderWage() {
     const ctx = getFlowContext();
     const est = ctx.est;
+    const deposit = ctx.deposit;
     document.getElementById('wage-base').textContent = formatKRW(est.base);
     document.getElementById('wage-ot-premium').textContent = formatKRW(est.otPremium);
     document.getElementById('wage-night-premium').textContent = formatKRW(est.nightPremium);
@@ -819,34 +1153,110 @@ function renderWage() {
     const diff = ctx.diff;
 
     document.getElementById('diff-estimated').textContent = formatKRW(est.total);
-    document.getElementById('diff-actual').textContent = formatKRW(actual);
-    document.getElementById('diff-amount').textContent = formatKRW(diff);
+    document.getElementById('diff-actual').textContent = ctx.hasActual ? formatKRW(actual) : tr('home_actual_pending', '미입력');
+    document.getElementById('diff-amount').textContent = ctx.hasActual ? formatKRW(diff) : tr('home_diff_pending', '확인 전');
 
-    const isAnomaly = ctx.isAnomaly;
+    const isAnomaly = ctx.hasActual && ctx.isAnomaly;
 
     const kicker = document.getElementById('diff-kicker');
     const iconWrap = document.getElementById('diff-icon-wrap');
     const icon = document.getElementById('diff-icon');
     const title = document.getElementById('diff-title');
     const desc = document.getElementById('diff-desc');
-    if (isAnomaly) {
+    if (!ctx.hasActual) {
+        if (deposit.phase === 'upcoming') {
+            kicker.textContent = tr('diff_upcoming_kicker', 'ESTIMATE MODE');
+            kicker.className = 'text-[10px] font-black tracking-widest uppercase text-brand';
+            iconWrap.className = 'w-12 h-12 rounded-2xl bg-brand-soft flex items-center justify-center text-brand';
+            icon.className = 'fa-solid fa-calendar-day text-xl';
+            if (title) title.textContent = tr('diff_upcoming_title', 'Before payday, we only show the reference estimate');
+            if (desc) desc.textContent = tr('diff_upcoming_desc', 'Once the actual deposit lands, you can review the difference and evidence together.');
+        } else {
+            kicker.textContent = tr('diff_pending_kicker', 'PAYDAY CHECK');
+            kicker.className = 'text-[10px] font-black tracking-widest uppercase text-amber-700';
+            iconWrap.className = 'w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-700';
+            icon.className = 'fa-solid fa-wallet text-xl';
+            if (title) title.textContent = tr('diff_pending_title', 'Please confirm the actual deposit first');
+            if (desc) desc.textContent = tr('diff_pending_desc', 'Once the deposit is entered, we can show the difference and evidence together.');
+        }
+    } else if (isAnomaly) {
         kicker.textContent = tr('diff_anomaly_kicker', 'REVIEW DIFF');
-        kicker.className = 'text-[10px] font-black tracking-widest uppercase text-rose-600';
-        iconWrap.className = 'w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600';
+        kicker.className = 'text-[10px] font-black tracking-widest uppercase text-amber-700';
+        iconWrap.className = 'w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-700';
         icon.className = 'fa-solid fa-triangle-exclamation text-xl';
         if (title) title.textContent = tr('diff_anomaly_title', 'Difference to review');
         if (desc) desc.textContent = tr('diff_anomaly_desc', 'There seems to be a difference between estimate and actual deposit. Want to review evidence first?');
     } else {
         kicker.textContent = tr('diff_ok_kicker', 'NO ANOMALY');
-        kicker.className = 'text-[10px] font-black tracking-widest uppercase text-emerald-600';
-        iconWrap.className = 'w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600';
+        kicker.className = 'text-[10px] font-black tracking-widest uppercase text-brand';
+        iconWrap.className = 'w-12 h-12 rounded-2xl bg-brand-soft flex items-center justify-center text-brand';
         icon.className = 'fa-solid fa-circle-check text-xl';
         if (title) title.textContent = tr('diff_ok_title', 'No anomaly');
         if (desc) desc.textContent = tr('diff_ok_desc', 'No clear anomaly based on current inputs.');
     }
 
+    const wageDepositCard = document.getElementById('wage-deposit-card');
+    const wageDepositTitle = document.getElementById('wage-deposit-title');
+    const wageDepositDesc = document.getElementById('wage-deposit-desc');
+    const wageDepositMeta = document.getElementById('wage-deposit-meta');
+    const wageDepositBtn = document.getElementById('wage-deposit-btn');
+    if (wageDepositCard) {
+        wageDepositCard.className = deposit.phase === 'recorded'
+            ? 'bg-slate-50 border border-slate-200 rounded-3xl p-4 mb-4'
+            : deposit.phase === 'upcoming'
+                ? 'bg-slate-50 border border-slate-200 rounded-3xl p-4 mb-4'
+                : 'bg-amber-50/60 border border-amber-100 rounded-3xl p-4 mb-4';
+    }
+    if (wageDepositTitle) {
+        const titleKey = deposit.phase === 'recorded' ? 'deposit_phase_recorded_title' : deposit.phase === 'upcoming'
+            ? 'deposit_phase_upcoming_title'
+            : deposit.phase === 'due'
+                ? 'deposit_phase_due_title'
+                : 'deposit_phase_overdue_title';
+        const fallback = deposit.phase === 'recorded'
+            ? 'This month’s deposit is already reflected'
+            : deposit.phase === 'upcoming'
+                ? 'Get ready to record your actual deposit'
+                : deposit.phase === 'due'
+                    ? 'Please confirm today’s actual deposit'
+                    : 'Your actual deposit still needs to be entered';
+        wageDepositTitle.textContent = tr(titleKey, fallback);
+    }
+    if (wageDepositDesc) {
+        const descKey = deposit.phase === 'recorded' ? 'deposit_phase_recorded_desc' : deposit.phase === 'upcoming'
+            ? 'deposit_phase_upcoming_desc'
+            : deposit.phase === 'due'
+                ? 'deposit_phase_due_desc'
+                : 'deposit_phase_overdue_desc';
+        const fallback = deposit.phase === 'recorded'
+            ? 'Now you can review the difference and plan how to split the money.'
+            : deposit.phase === 'upcoming'
+                ? 'Once pay arrives, entering it quickly unlocks a clearer money view for the month.'
+                : deposit.phase === 'due'
+                    ? 'Recording the real deposit makes your wage check, transfer plan, and saving plan more accurate.'
+                    : 'Enter the deposited amount so we can show the right difference and next money actions.';
+        wageDepositDesc.textContent = tr(descKey, fallback);
+    }
+    if (wageDepositMeta) {
+        wageDepositMeta.textContent = deposit.phase === 'recorded'
+            ? `${tr('deposit_meta_recorded', 'Deposit recorded')} · ${formatDate(deposit.recordedDay || state.demo.asOfDay)}`
+            : deposit.phase === 'upcoming'
+                ? `${tr('deposit_meta_payday_in', 'Until payday')} ${deposit.daysUntilPayday}${tr('days', 'days')}`
+                : deposit.phase === 'due'
+                    ? tr('deposit_meta_payday_today', 'Payday is today')
+                    : `${tr('deposit_meta_payday_overdue', 'After payday')} ${deposit.overdueDays}${tr('days', 'days')}`;
+    }
+    if (wageDepositBtn) {
+        wageDepositBtn.textContent = deposit.phase === 'recorded'
+            ? tr('deposit_cta_edit', 'Edit deposit')
+            : tr('deposit_cta_enter', 'Enter deposit');
+    }
+
     const input = document.getElementById('actual-deposit');
-    if (input && Number(input.value) !== actual) input.value = String(actual);
+    if (input) {
+        const nextValue = ctx.hasActual ? String(actual) : '';
+        if (input.value !== nextValue) input.value = nextValue;
+    }
 
     const modCount = state.workproof.records.filter(r => r.modified).length;
     const modEl = document.getElementById('wage-modcount');
@@ -878,6 +1288,7 @@ function renderWage() {
     }
 
     const next = resolveNextAction(ctx);
+    const hasActual = ctx.hasActual;
     const primaryDesc = document.getElementById('wage-primary-desc');
     if (primaryDesc) primaryDesc.textContent = tr(next.textKey, next.textFallback);
 
@@ -891,10 +1302,18 @@ function renderWage() {
         primaryBtn.className = 'primary-btn action-cta w-full py-4 text-xs font-black';
     }
 
+    const actionPending = document.getElementById('wage-action-pending');
+    if (actionPending) actionPending.classList.toggle('hidden', hasActual);
+    const actionSequenceWrap = document.getElementById('wage-action-sequence-wrap');
+    if (actionSequenceWrap) actionSequenceWrap.classList.toggle('hidden', !hasActual);
+    const primaryActionWrap = document.getElementById('wage-primary-action-wrap');
+    if (primaryActionWrap) primaryActionWrap.classList.toggle('hidden', !hasActual);
+
     const secondaryWrap = document.getElementById('wage-secondary-actions');
-    if (secondaryWrap) secondaryWrap.classList.toggle('hidden', !state.wage.showSecondaryActions);
+    if (secondaryWrap) secondaryWrap.classList.toggle('hidden', !hasActual || !state.wage.showSecondaryActions);
     const secondaryToggle = document.getElementById('wage-secondary-toggle');
     if (secondaryToggle) {
+        secondaryToggle.classList.toggle('hidden', !hasActual);
         secondaryToggle.textContent = state.wage.showSecondaryActions
             ? tr('wage_hide_actions', 'Hide actions')
             : tr('wage_more_actions', 'More actions');
@@ -942,7 +1361,7 @@ function renderDocs() {
     };
 
     const iconFor = (type) => {
-        if (type === 'PROOF_PACK') return 'fa-file-shield text-emerald-600 bg-emerald-50';
+        if (type === 'PROOF_PACK') return 'fa-file-shield text-brand bg-brand-soft';
         if (type === 'CLAIM_KIT') return 'fa-box-archive text-slate-700 bg-slate-100';
         if (type === 'TRANSFER_RECEIPT') return 'fa-receipt text-brand bg-brand-soft';
         return 'fa-file-lines text-slate-600 bg-slate-100';
@@ -973,7 +1392,7 @@ function renderDocs() {
                     </div>
                     <div class="grid grid-cols-2 gap-3 mt-4">
                         <button ${isReady ? '' : 'disabled'} class="py-3 rounded-2xl bg-slate-100 text-slate-800 text-xs font-black ${isReady ? '' : passive}"><i class="fa-solid fa-share-nodes mr-2"></i>${tr('cta_share', 'Share')}</button>
-                        <button ${isReady ? '' : 'disabled'} class="py-3 rounded-2xl bg-brand-soft text-brand border border-indigo-100 text-xs font-black ${isReady ? '' : passive}"><i class="fa-solid fa-download mr-2"></i>${tr('cta_download', 'Download')}</button>
+          <button ${isReady ? '' : 'disabled'} class="py-3 rounded-2xl bg-brand-soft text-brand border border-brand-soft text-xs font-black ${isReady ? '' : passive}"><i class="fa-solid fa-download mr-2"></i>${tr('cta_download', 'Download')}</button>
                     </div>
                 </div>
             </div>
@@ -984,6 +1403,7 @@ function renderDocs() {
 
 function renderSend() {
     const selectedAccount = getSelectedAccount();
+    const ctx = getFlowContext();
 
     const financeBalanceEl = document.getElementById('finance-account-balance');
     const financeAccountEl = document.getElementById('finance-send-account');
@@ -996,33 +1416,66 @@ function renderSend() {
         financeAvailableEl.textContent = formatKRW(sendableAmount);
     }
 
-    const ctx = getFlowContext();
+    const financeSplitCard = document.getElementById('finance-split-card');
+    if (financeSplitCard) financeSplitCard.classList.toggle('hidden', !ctx.hasActual);
+
+    const splitPlan = computeMoneySplitPlan({ ctx, sendableAmount });
+    const financeSplitBasisEl = document.getElementById('finance-split-basis');
+    const financeSplitLivingEl = document.getElementById('finance-split-living');
+    const financeSplitFamilyEl = document.getElementById('finance-split-family');
+    const financeSplitSaveEl = document.getElementById('finance-split-save');
+    if (financeSplitBasisEl) financeSplitBasisEl.textContent = tr(splitPlan.basisKey, splitPlan.basisKey);
+    if (financeSplitLivingEl) financeSplitLivingEl.textContent = formatKRW(splitPlan.living);
+    if (financeSplitFamilyEl) financeSplitFamilyEl.textContent = formatKRW(splitPlan.family);
+    if (financeSplitSaveEl) financeSplitSaveEl.textContent = formatKRW(splitPlan.keep);
+
     const financeEstimated = document.getElementById('finance-estimated');
     const financeActual = document.getElementById('finance-actual');
     const financeDiff = document.getElementById('finance-diff');
     const financeDiffStatus = document.getElementById('finance-diff-status');
     if (financeEstimated) financeEstimated.textContent = formatKRW(ctx.est.total);
-    if (financeActual) financeActual.textContent = formatKRW(ctx.actual);
-    if (financeDiff) financeDiff.textContent = formatKRW(ctx.diff);
+    if (financeActual) financeActual.textContent = ctx.hasActual ? formatKRW(ctx.actual) : tr('home_actual_pending', '미입력');
+    if (financeDiff) financeDiff.textContent = ctx.hasActual ? formatKRW(ctx.diff) : tr('home_diff_pending', '확인 전');
     if (financeDiff) {
-        financeDiff.classList.toggle('text-rose-600', ctx.isAnomaly);
-        financeDiff.classList.toggle('text-emerald-600', !ctx.isAnomaly);
+        financeDiff.classList.remove('text-amber-700', 'text-brand', 'text-slate-500');
+        if (!ctx.hasActual) {
+            financeDiff.classList.add('text-slate-500');
+        } else {
+            financeDiff.classList.toggle('text-amber-700', ctx.isAnomaly);
+            financeDiff.classList.toggle('text-brand', !ctx.isAnomaly);
+        }
     }
     if (financeDiffStatus) {
-        financeDiffStatus.textContent = ctx.isAnomaly
+        financeDiffStatus.textContent = !ctx.hasActual
+            ? tr('finance_wage_pending_desc', 'Before the deposit is entered, we only show readiness instead of a difference.')
+            : ctx.isAnomaly
             ? tr('diff_anomaly_desc', 'There seems to be a difference between estimate and actual deposit. Want to review evidence first?')
             : tr('diff_ok_desc', 'No clear anomaly based on current inputs.');
     }
 
-    const advance = computeAdvanceSnapshot();
+    const advance = getAdvanceUnlockSnapshot();
     const advanceBasis = getAdvanceCalendarSnapshot();
     const cardAdvanceAvailable = document.getElementById('finance-advance-available');
     const cardAdvanceRepayDate = document.getElementById('finance-advance-repay-date');
     const cardAdvanceProof = document.getElementById('finance-advance-proof');
+    const cardAdvanceProgressLabel = document.getElementById('finance-advance-progress-label');
+    const cardAdvanceProgressBar = document.getElementById('finance-advance-progress-bar');
+    const cardAdvanceNext = document.getElementById('finance-advance-next');
     if (cardAdvanceAvailable) cardAdvanceAvailable.textContent = formatKRW(advance.available);
     if (cardAdvanceRepayDate) cardAdvanceRepayDate.textContent = advance.repayDate;
     if (cardAdvanceProof) {
         cardAdvanceProof.textContent = `${tr('advance_card_reflected', '근무 반영')} ${advanceBasis.reflected}${tr('days', '일')} · ${tr('advance_review_label', '확인 필요')} ${advanceBasis.review}${tr('days', '일')}`;
+    }
+    if (cardAdvanceProgressLabel) {
+        cardAdvanceProgressLabel.textContent = advance.nextTier
+            ? `${advance.verifiedDays}${tr('days', 'days')} / ${advance.nextTier.minDays}${tr('days', 'days')}`
+            : tr('advance_progress_max', 'Top tier reached');
+    }
+    if (cardAdvanceProgressBar) cardAdvanceProgressBar.style.width = `${advance.progressPercent}%`;
+    if (cardAdvanceNext) {
+        cardAdvanceNext.textContent = advance.nextTier
+            ? `${tr('advance_progress_to_next', 'Until next tier')} ${advance.daysToNext}${tr('days', 'days')} · ${tr('advance_gain_next', 'Expected increase at next tier')} ${formatKRW(advance.nextCapDelta)}`
+            : tr('advance_progress_done', 'You have reached the top tier for this month');
     }
 
     const yieldInfo = computeYieldSnapshot();
@@ -1352,6 +1805,11 @@ function applyActualDeposit() {
     const v = Number(input.value);
     if (!Number.isFinite(v) || v <= 0) return;
     state.wage.actualDeposit = Math.floor(v);
+    state.wage.actualDepositRecordedDay = state.demo.asOfDay;
+    const selectedAccount = getSelectedAccount();
+    if (selectedAccount) {
+        selectedAccount.balance = Math.floor(v);
+    }
     renderAll();
 }
 
@@ -1435,12 +1893,12 @@ function renderClaimOverlay() {
     const claimCheckIcon = document.getElementById('claim-check-claim-icon');
     if (proofCheckIcon) {
         proofCheckIcon.className = proof.status === 'READY'
-            ? 'fa-solid fa-circle-check text-emerald-500'
+            ? 'fa-solid fa-circle-check text-brand'
             : (proof.status === 'QUEUED' ? 'fa-solid fa-circle-notch text-brand animate-spin' : 'fa-solid fa-circle-info text-brand');
     }
     if (claimCheckIcon) {
         claimCheckIcon.className = claim.status === 'READY'
-            ? 'fa-solid fa-circle-check text-emerald-500'
+            ? 'fa-solid fa-circle-check text-brand'
             : (claim.status === 'QUEUED' ? 'fa-solid fa-circle-notch text-brand animate-spin' : 'fa-solid fa-circle-info text-brand');
     }
 
@@ -1479,9 +1937,9 @@ function openDocFromClaim(type) {
 function docShareLink(type) {
     const doc = getDocByType(type);
     const stamp = encodeURIComponent(String(Date.now()).slice(-6));
-    if (type === 'PROOF_PACK') return `https://s3.example.com/dawndone/proof-pack-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
-    if (type === 'CLAIM_KIT') return `https://s3.example.com/dawndone/claim-kit-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
-    return `https://s3.example.com/dawndone/document.pdf?demo=1&sig=${stamp}`;
+    if (type === 'PROOF_PACK') return `https://s3.example.com/dondone/proof-pack-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
+    if (type === 'CLAIM_KIT') return `https://s3.example.com/dondone/claim-kit-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
+    return `https://s3.example.com/dondone/document.pdf?demo=1&sig=${stamp}`;
 }
 
 async function copyText(text, toastMessage) {
@@ -1992,7 +2450,7 @@ function startTransfer() {
     if (submittedSub) submittedSub.textContent = tr('transfer_submitted_to_network', 'Submitted to network');
     if (confirmedSub) confirmedSub.textContent = tr('transfer_confirming', 'Confirming...');
     if (submittedIcon) {
-        submittedIcon.className = 'w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100';
+        submittedIcon.className = 'w-12 h-12 rounded-full bg-brand flex items-center justify-center text-white shadow-lg shadow-brand-soft';
         submittedIcon.innerHTML = '<i class="fa-solid fa-check text-lg"></i>';
     }
     if (confirmedIcon) {
@@ -2007,7 +2465,7 @@ function startTransfer() {
             transferAccount.balance = Math.max(0, transferAccount.balance - transferAmount);
         }
         if (confirmedIcon) {
-            confirmedIcon.className = 'w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100';
+            confirmedIcon.className = 'w-12 h-12 rounded-full bg-brand flex items-center justify-center text-white shadow-lg shadow-brand-soft';
             confirmedIcon.innerHTML = '<i class="fa-solid fa-check text-lg"></i>';
         }
         if (confirmedSub) confirmedSub.textContent = tr('transfer_confirmed_sub', 'Confirmed');

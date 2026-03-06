@@ -1,11 +1,11 @@
-# DawnDone Agent Guide
+# DonDone Agent Guide
 
 ## Goal
-Implement DawnDone (`S14P21C202`) as a demo-ready MVP based on `docs/WorkProofPay_PRD_v1.4.md`, with delivery quality suitable for team collaboration and review.
+Implement DonDone (`S14P21C202`) as a demo-ready MVP based on `docs/DonDone_PRD_v1.5.md`, with delivery quality suitable for team collaboration and review.
 
 ## Repository Scope
-- `dundun-backend/`: Spring Boot backend (feature-first skeleton + auth baseline)
-- `dundun-frontend/`: frontend app
+- `apps/dondone-backend/`: Spring Boot backend (feature-first skeleton + auth baseline)
+- `apps/dondone-mobile/`: mobile mockup and Android app workspace
 - `docs/`: PRD and project documentation
 - `S14P11C205/`: reference repository (read-only, for patterns only)
 
@@ -19,8 +19,8 @@ Before implementing changes, remove ambiguity first. Confirm:
 
 If requirements remain ambiguous, state assumptions explicitly before coding.
 
-## Product Constraints (PRD v1.4)
-- Public product name: **DawnDone**
+## Product Constraints (PRD v1.5)
+- Public product name: **DonDone**
 - MVP focus: `P0` first (WorkProof -> Wage Shield -> Docs/Claim -> Testnet Remittance)
 - Policy: testnet/demo scope only; do not implement real-money settlement behavior
 - Wage result positioning: anomaly detection + evidence-first, not legal/financial final judgment
@@ -66,12 +66,11 @@ If requirements remain ambiguous, state assumptions explicitly before coding.
 
 ## Local Run Quick Commands
 - Backend:
-  - `cd dundun-backend`
+  - `cd apps/dondone-backend`
   - `./gradlew bootRun`
-- Frontend:
-  - `cd dundun-frontend`
-  - `npm install`
-  - `npm run dev`
+- Mobile mockup:
+  - `cd apps/dondone-mobile/mockup`
+  - `python -m http.server 4173`
 
 ## Delivery Checklist
 1. Implementation matches PRD scope (`P0` prioritized).
@@ -82,5 +81,5 @@ If requirements remain ambiguous, state assumptions explicitly before coding.
 
 ## Reference Policy (`S14P11C205`)
 - Reuse only proven patterns (workflow, conventions, structure).
-- Adapt naming and behavior to DawnDone PRD.
+- Adapt naming and behavior to DonDone PRD.
 - Do not copy legacy domain logic that is out of current MVP scope.

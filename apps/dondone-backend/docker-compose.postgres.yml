@@ -2,19 +2,19 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16
-    container_name: dawndone-postgres
+    container_name: dondone-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: dawndone
-      POSTGRES_USER: dawndone
-      POSTGRES_PASSWORD: dawndone
+      POSTGRES_DB: dondone
+      POSTGRES_USER: dondone
+      POSTGRES_PASSWORD: dondone
       TZ: Asia/Seoul
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dawndone -d dawndone"]
+      test: ["CMD-SHELL", "pg_isready -U dondone -d dondone"]
       interval: 10s
       timeout: 5s
       retries: 10
