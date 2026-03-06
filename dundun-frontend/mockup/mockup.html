@@ -11,17 +11,17 @@
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css');
 
         :root {
-            --primary: #7C6AEF;
-            --primary-dark: #6554D4;
-            --primary-soft: #F5F0FF;
-            --secondary: #10b981;
-            --secondary-soft: #ecfdf5;
-            --bg-main: #F8F6FF;
+            --primary: #7c6aef;
+            --primary-dark: #6554d4;
+            --primary-soft: #f5f0ff;
+            --secondary: #5f53c7;
+            --secondary-soft: #f2edff;
+            --bg-main: #f7f4fe;
             --text-main: #191f28;
             --text-sub: #4e5968;
             --text-light: #8b95a1;
             --white: #ffffff;
-            --dawn-gradient: linear-gradient(135deg, #7C6AEF 0%, #E8739E 100%);
+            --dawn-gradient: linear-gradient(135deg, #7c6aef 0%, #b28cff 58%, #f09db8 100%);
         }
 
         html {
@@ -33,9 +33,9 @@
             font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
             margin: 0;
             background:
-                radial-gradient(1200px 420px at 8% -10%, rgba(124, 106, 239, 0.15), transparent 50%),
-                radial-gradient(920px 480px at 100% 110%, rgba(232, 115, 158, 0.11), transparent 56%),
-                #f3f1fb;
+                radial-gradient(1180px 420px at 10% -10%, rgba(124, 106, 239, 0.16), transparent 52%),
+                radial-gradient(960px 520px at 100% 110%, rgba(240, 157, 184, 0.11), transparent 58%),
+                #f3f0fb;
             color: var(--text-main);
             -webkit-font-smoothing: antialiased;
             text-rendering: optimizeLegibility;
@@ -106,6 +106,54 @@
             letter-spacing: 0;
         }
 
+        .card-kicker {
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            line-height: 1.2;
+            text-transform: uppercase;
+            color: var(--primary);
+        }
+
+        .card-title-lg {
+            font-size: 20px;
+            font-weight: 900;
+            line-height: 1.18;
+            letter-spacing: -0.032em;
+            color: #0f172a;
+        }
+
+        .card-title-md {
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 1.24;
+            letter-spacing: -0.024em;
+            color: #0f172a;
+        }
+
+        .card-subtext {
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.55;
+            letter-spacing: -0.012em;
+            color: #667085;
+        }
+
+        .card-meta {
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.45;
+            letter-spacing: -0.01em;
+            color: #667085;
+        }
+
+        .card-link-btn {
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 1.25;
+            color: var(--primary);
+        }
+
         #home-next-action,
         #wage-primary-desc,
         #diff-desc,
@@ -120,13 +168,13 @@
             max-width: 414px;
             margin: 22px auto;
             background:
-                linear-gradient(180deg, #f8f6ff 0%, #f2effb 34%, #f8f7ff 100%);
+                linear-gradient(180deg, #faf7ff 0%, #f3eefb 34%, #f9f7ff 100%);
             min-height: calc(100vh - 40px);
             height: calc(100vh - 40px);
             position: relative;
             box-shadow:
-                0 38px 78px -30px rgba(15, 23, 42, 0.4),
-                inset 0 0 0 1px rgba(124, 106, 239, 0.07);
+                0 34px 72px -34px rgba(30, 17, 66, 0.36),
+                inset 0 0 0 1px rgba(124, 106, 239, 0.06);
             border-radius: 40px;
             overflow: hidden;
             border: 8px solid #1A1030;
@@ -148,15 +196,15 @@
             padding: 20px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow:
-                0 8px 26px rgba(124, 106, 239, 0.07),
+                0 10px 26px rgba(124, 106, 239, 0.08),
                 0 1px 0 rgba(255, 255, 255, 0.8) inset;
-            border: 1px solid rgba(124, 106, 239, 0.09);
+            border: 1px solid rgba(124, 106, 239, 0.1);
             backdrop-filter: blur(8px);
         }
 
         .toss-card:hover {
             transform: translateY(-1px);
-            box-shadow: 0 10px 30px rgba(124, 106, 239, 0.12);
+            box-shadow: 0 12px 30px rgba(124, 106, 239, 0.12);
         }
 
         .toss-card:active {
@@ -200,11 +248,11 @@
             border-radius: 18px;
             font-weight: 800;
             transition: all 0.2s;
-            box-shadow: 0 4px 16px -2px rgba(124, 106, 239, 0.3);
+            box-shadow: 0 8px 20px -10px rgba(124, 106, 239, 0.5);
         }
 
         .primary-btn:hover {
-            box-shadow: 0 6px 24px -2px rgba(124, 106, 239, 0.45);
+            box-shadow: 0 12px 28px -10px rgba(124, 106, 239, 0.58);
         }
 
         .primary-btn:active {
@@ -258,9 +306,9 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            border: 1px solid rgba(124, 106, 239, 0.12);
+            border: 1px solid rgba(124, 106, 239, 0.14);
             background: var(--primary-soft);
-            color: #5B4CC4;
+            color: var(--primary-dark);
             user-select: none;
             white-space: nowrap;
             line-height: 1;
@@ -269,13 +317,13 @@
         .badge-ok {
             background: var(--secondary-soft);
             color: var(--secondary);
-            border-color: rgba(16, 185, 129, 0.2);
+            border-color: rgba(95, 83, 199, 0.18);
         }
 
         .badge-warn {
-            background: #fff1f2;
-            color: #e11d48;
-            border-color: rgba(225, 29, 72, 0.15);
+            background: #fbf7ef;
+            color: #94612a;
+            border-color: rgba(148, 97, 42, 0.16);
         }
 
         .chip {
@@ -285,7 +333,7 @@
             font-weight: 800;
             background: var(--primary-soft);
             color: var(--primary);
-            border: 1px solid rgba(124, 106, 239, 0.15);
+            border: 1px solid rgba(124, 106, 239, 0.14);
             white-space: nowrap;
             transition: all 0.2s;
         }
@@ -301,7 +349,7 @@
         /* Icon containers: subtle glow on brand icons */
         .w-12.h-12.rounded-2xl.bg-brand-soft,
         .w-10.h-10.rounded-2xl.bg-brand-soft {
-            box-shadow: 0 4px 16px rgba(124, 106, 239, 0.12);
+            box-shadow: 0 4px 14px rgba(124, 106, 239, 0.12);
             transition: box-shadow 0.3s;
         }
 
@@ -354,8 +402,8 @@
         }
 
         #home-header {
-            background: rgba(255, 255, 255, 0.95);
-            border-bottom: 1px solid rgba(124, 106, 239, 0.09);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 245, 255, 0.94) 100%);
+            border-bottom: 1px solid rgba(124, 106, 239, 0.1);
         }
 
         #home-header h2 {
@@ -395,8 +443,8 @@
         }
 
         .flow-row:hover {
-            border-color: rgba(124, 106, 239, 0.24);
-            background: #fbfaff;
+            border-color: rgba(124, 106, 239, 0.2);
+            background: #fbf8ff;
         }
 
         .flow-row .step-order {
@@ -408,9 +456,9 @@
             justify-content: center;
             font-size: 10px;
             font-weight: 900;
-            color: #5d56c7;
-            background: #efebff;
-            border: 1px solid rgba(124, 106, 239, 0.2);
+            color: var(--primary-dark);
+            background: var(--primary-soft);
+            border: 1px solid rgba(124, 106, 239, 0.18);
             flex-shrink: 0;
         }
 
@@ -439,39 +487,40 @@
         }
 
         .flow-status.progress {
-            color: #5b4cc4;
-            background: #f1ecff;
-            border-color: rgba(124, 106, 239, 0.24);
+            color: var(--primary-dark);
+            background: var(--primary-soft);
+            border-color: rgba(124, 106, 239, 0.18);
         }
 
         .flow-status.done {
-            color: #059669;
-            background: #ecfdf5;
-            border-color: rgba(16, 185, 129, 0.24);
+            color: var(--primary-dark);
+            background: #efe9ff;
+            border-color: rgba(124, 106, 239, 0.2);
         }
 
         .flow-status.alert {
-            color: #be123c;
-            background: #fff1f2;
-            border-color: rgba(244, 63, 94, 0.24);
+            color: #94612a;
+            background: #fbf7ef;
+            border-color: rgba(148, 97, 42, 0.16);
         }
 
         .flow-status.blocked {
-            color: #b91c1c;
-            background: #fef2f2;
-            border-color: rgba(248, 113, 113, 0.24);
+            color: #8f4e4e;
+            background: #faf4f4;
+            border-color: rgba(143, 78, 78, 0.14);
         }
 
         .home-next-wrap {
-            background: #f8fafc;
-            border: 1px solid #e8edf5;
+            background: #ffffff;
+            border: 1px solid rgba(124, 106, 239, 0.12);
             border-radius: 16px;
-            padding: 14px 14px 13px;
+            padding: 16px 16px 15px;
         }
 
         .action-copy {
             display: block;
-            line-height: 1.6;
+            font-size: 12px;
+            line-height: 1.58;
             letter-spacing: -0.007em;
             padding: 2px 0;
         }
@@ -491,15 +540,15 @@
         }
 
         .home-money-status.ok {
-            color: #059669;
-            background: #ecfdf5;
-            border-color: rgba(16, 185, 129, 0.24);
+            color: var(--primary-dark);
+            background: var(--primary-soft);
+            border-color: rgba(124, 106, 239, 0.18);
         }
 
         .home-money-status.alert {
-            color: #be123c;
-            background: #fff1f2;
-            border-color: rgba(244, 63, 94, 0.24);
+            color: #94612a;
+            background: #fbf7ef;
+            border-color: rgba(148, 97, 42, 0.16);
         }
 
         .home-money-grid {
@@ -510,10 +559,10 @@
         }
 
         .home-money-item {
-            background: #f8fafc;
-            border: 1px solid #e8edf5;
-            border-radius: 14px;
-            padding: 11px 10px;
+            background: #ffffff;
+            border: 1px solid #ece5ff;
+            border-radius: 16px;
+            padding: 12px 11px;
         }
 
         .home-money-item p {
@@ -528,39 +577,35 @@
         }
 
         .home-money-item .value {
-            margin-top: 6px;
-            font-size: 13px;
+            margin-top: 7px;
+            font-size: 14px;
             font-weight: 900;
             color: #0f172a;
             letter-spacing: -0.02em;
             line-height: 1.2;
         }
 
-        .home-money-item.diff .value {
-            color: #b91c1c;
-        }
-
         .home-account-balance {
-            margin-top: 12px;
-            font-size: 28px;
+            margin-top: 14px;
+            font-size: 31px;
             font-weight: 900;
             color: #0f172a;
             letter-spacing: -0.03em;
-            line-height: 1.15;
+            line-height: 1.08;
         }
 
         .home-account-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px;
-            margin-top: 12px;
+            gap: 10px;
+            margin-top: 14px;
         }
 
         .home-account-item {
-            background: #f8fafc;
-            border: 1px solid #e8edf5;
-            border-radius: 12px;
-            padding: 10px;
+            background: #ffffff;
+            border: 1px solid #ece5ff;
+            border-radius: 16px;
+            padding: 12px 11px;
         }
 
         .home-account-item p {
@@ -575,12 +620,12 @@
         }
 
         .home-account-item .value {
-            margin-top: 5px;
-            font-size: 12px;
+            margin-top: 7px;
+            font-size: 13px;
             font-weight: 900;
             color: #0f172a;
-            line-height: 1.25;
-            letter-spacing: -0.01em;
+            line-height: 1.3;
+            letter-spacing: -0.015em;
         }
 
         .home-evidence-grid {
@@ -662,7 +707,7 @@
             border-radius: 12px;
             border: 1px solid #e9edf4;
             background: #fff;
-            padding: 8px 10px;
+            padding: 10px 12px;
         }
 
         .wage-seq-title {
@@ -670,10 +715,10 @@
             align-items: center;
             gap: 8px;
             min-width: 0;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 800;
             color: #334155;
-            line-height: 1.25;
+            line-height: 1.3;
         }
 
         .wage-seq-order {
@@ -691,14 +736,14 @@
         }
 
         .wage-primary-action {
-            border: 1px solid #dce6f8;
+            border: 1px solid rgba(124, 106, 239, 0.14);
             border-radius: 16px;
-            background: #f8fbff;
-            padding: 12px;
+            background: #ffffff;
+            padding: 14px;
         }
 
         .wage-secondary-btn {
-            border: 1px solid #dbe3ef;
+            border: 1px solid #e6def8;
             background: #ffffff;
             color: #334155;
             border-radius: 12px;
@@ -710,8 +755,8 @@
 
         .wage-secondary-btn:hover {
             border-color: rgba(124, 106, 239, 0.24);
-            background: #f8f6ff;
-            color: #5b4cc4;
+            background: #faf6ff;
+            color: var(--primary-dark);
         }
 
         .doc-title {
@@ -993,26 +1038,33 @@
         .confirm-item {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             font-size: 12px;
             font-weight: 700;
             color: #334155;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 10px 12px;
+            background: #ffffff;
+            border: 1px solid #ece5ff;
+            border-radius: 14px;
+            padding: 11px 12px;
         }
 
         .app-main {
-            padding-top: 22px;
+            padding-top: 18px;
+            padding-bottom: 108px !important;
         }
 
         .app-nav {
-            bottom: 0;
-            border: 1px solid rgba(124, 106, 239, 0.11);
+            bottom: 12px;
+            width: 338px !important;
+            height: 68px !important;
+            padding-inline: 22px !important;
+            background: rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(124, 106, 239, 0.14);
             box-shadow:
-                0 14px 26px -20px rgba(29, 19, 74, 0.45),
-                inset 0 1px 0 rgba(255, 255, 255, 0.72);
+                0 18px 36px -24px rgba(29, 19, 74, 0.44),
+                inset 0 1px 0 rgba(255, 255, 255, 0.76);
         }
 
         .app-nav .nav-btn {
@@ -1157,13 +1209,14 @@
         /* Smooth scroll behavior */
         #screen-scroll {
             scroll-behavior: smooth;
+            padding-bottom: 116px;
             background:
                 radial-gradient(120% 34% at 12% 0%, rgba(124, 106, 239, 0.1), transparent 48%),
                 linear-gradient(180deg, #f5f3fc 0%, #f2f0fa 28%, #f7f6ff 100%);
         }
 
         .landing-intro-bg {
-            background: linear-gradient(180deg, #9a8df5 0%, #7868d9 100%);
+            background: #8a79f1;
         }
 
         .landing-logo {
@@ -1173,6 +1226,10 @@
 
         .landing-login-btn {
             box-shadow: 0 16px 30px -18px rgba(13, 20, 78, 0.75);
+        }
+
+        input[type="range"] {
+            accent-color: var(--primary);
         }
     </style>
 </head>
@@ -1217,13 +1274,13 @@
             <main class="app-main px-5 py-6 pb-8 space-y-6">
 
                 <!-- HOME: Core status first -->
-                <div id="home" class="tab-content active space-y-4">
+                <div id="home" class="tab-content active space-y-5">
                     <div class="toss-card hero-summary border border-brand-soft shadow-sm">
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <p class="text-[10px] font-black tracking-widest text-brand uppercase"
+                                <p class="card-kicker"
                                     data-i18n="home_account_kicker">ACCOUNT</p>
-                                <h3 class="text-lg font-black text-slate-900 mt-1" data-i18n="home_account_title">내 계좌
+                                <h3 class="card-title-lg mt-1" data-i18n="home_account_title">내 계좌
                                 </h3>
                             </div>
                         </div>
@@ -1248,47 +1305,77 @@
                                 class="bg-slate-100 text-slate-700 py-3.5 rounded-2xl text-sm font-black border border-slate-200"
                                 data-i18n="transfer_open_cta">송금하기</button>
                         </div>
-                        <p class="text-[10px] text-slate-500 mt-2 font-medium" data-i18n="home_transfer_path_hint">계좌를
+                        <p class="card-meta mt-2" data-i18n="home_transfer_path_hint">계좌를
                             먼저 확인한 뒤 송금을 시작해볼까요?</p>
                     </div>
 
-                    <div class="toss-card shadow-sm border border-white">
-                        <div class="flex items-center justify-between gap-3">
+                    <div id="home-advance-card" class="toss-card border border-brand-soft shadow-sm">
+                        <div class="flex items-start justify-between gap-3">
                             <div>
-                                <p class="text-sm font-black text-slate-900" data-i18n="home_clock_title">오늘 출퇴근</p>
-                                <p class="text-[11px] text-slate-500 mt-1 font-medium">
+                                <p class="card-kicker"
+                                    data-i18n="home_work_kicker">TODAY WORK</p>
+                                <h4 class="card-title-lg mt-1" data-i18n="home_clock_title">오늘 출퇴근</h4>
+                                <p class="card-meta mt-1">
                                     <span id="today-date">2026-03-28</span> · <span id="today-place">Green Farm</span> ·
                                     <span id="today-status" data-i18n="status_ready">READY</span>
                                 </p>
-                                <p class="text-[11px] text-slate-500 mt-2 font-medium" data-i18n="finance_advance_desc">
-                                    근무 기록 기준 한도로 급여일 전에 일부를 미리 받습니다.</p>
                             </div>
+                            <button onclick="switchTab('workproof')" class="card-link-btn"
+                                data-i18n="cta_view_records">기록 보기</button>
                         </div>
-                        <div class="grid grid-cols-2 gap-2 mt-3">
-                            <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                                <p class="text-[10px] text-slate-500 font-black" data-i18n="label_in">출근</p>
-                                <p id="home-clock-in-time" class="text-sm font-black text-slate-900 mt-1">-</p>
-                            </div>
-                            <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                                <p class="text-[10px] text-slate-500 font-black" data-i18n="label_out">퇴근</p>
-                                <p id="home-clock-out-time" class="text-sm font-black text-slate-900 mt-1">-</p>
-                            </div>
-                        </div>
+
                         <div class="grid grid-cols-2 gap-2 mt-4">
-                            <button id="btn-clockin-home" onclick="clockIn()" class="primary-btn py-3 text-xs">
+                            <button id="btn-clockin-home" onclick="clockIn()" class="primary-btn py-3.5 text-xs">
                                 <i class="fa-solid fa-arrow-right-to-bracket mr-1.5"></i><span
                                     data-i18n="cta_clock_in">출근</span>
                             </button>
                             <button id="btn-clockout-home" onclick="clockOut()"
-                                class="bg-brand-soft text-brand py-3 rounded-2xl text-xs font-black border border-indigo-100">
+                                class="bg-brand-soft text-brand py-3.5 rounded-2xl text-xs font-black border border-slate-200">
                                 <i class="fa-solid fa-arrow-right-from-bracket mr-1.5"></i><span
                                     data-i18n="cta_clock_out">퇴근</span>
                             </button>
                         </div>
-                        <div class="mt-2">
-                            <button onclick="switchTab('workproof')"
-                                class="w-full bg-slate-100 text-slate-700 py-3 rounded-2xl text-xs font-black border border-slate-200"
-                                data-i18n="cta_view_records">기록 보기</button>
+
+                        <div class="mt-3 bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                            <div class="flex items-center justify-between gap-3 text-[11px] font-black text-slate-700">
+                                <span><span data-i18n="label_in">출근</span> <span id="home-clock-in-time">-</span></span>
+                                <span class="text-slate-300">·</span>
+                                <span><span data-i18n="label_out">퇴근</span> <span id="home-clock-out-time">-</span></span>
+                            </div>
+                            <p id="home-work-impact" class="text-[11px] text-brand mt-3 font-black leading-relaxed"></p>
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t border-slate-100">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="card-kicker"
+                                        data-i18n="home_advance_kicker">미리받기 진행도</p>
+                                    <h4 class="card-title-md mt-1" data-i18n="home_advance_title">일한 만큼
+                                        한도가 열리고 있어요</h4>
+                                    <p class="card-subtext mt-2"
+                                        data-i18n="home_advance_desc">근무가 더 반영될수록 다음 미리받기 구간이 열립니다.</p>
+                                </div>
+                                <button onclick="openAdvanceOverlay()" class="card-link-btn"
+                                    data-i18n="finance_advance_open">자세히</button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 mt-4">
+                                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                                    <p class="text-[10px] text-slate-500 font-black" data-i18n="advance_available_label">지금 가능 금액</p>
+                                    <p id="home-advance-available" class="text-lg font-black text-slate-900 mt-1">₩0</p>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                                    <p class="text-[10px] text-slate-500 font-black" data-i18n="advance_progress_label">다음 구간 진행도</p>
+                                    <p id="home-advance-progress-label" class="text-sm font-black text-slate-900 mt-1">0%</p>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                                    <div id="home-advance-progress-bar"
+                                        class="h-full rounded-full bg-brand transition-all duration-500"
+                                        style="width: 0%"></div>
+                                </div>
+                                <p id="home-advance-next" class="text-[11px] text-slate-500 mt-2 font-medium"></p>
+                            </div>
                         </div>
                     </div>
 
@@ -1296,55 +1383,62 @@
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <p id="home-money-kicker"
-                                    class="text-[10px] font-black tracking-widest text-brand uppercase"
+                                    class="card-kicker"
                                     data-i18n="home_summary_kicker">SETTLEMENT</p>
-                                <h3 class="text-lg font-black text-slate-900 mt-1" data-i18n="home_summary_title">이번 달
+                                <h3 class="card-title-lg mt-1" data-i18n="home_summary_title">이번 달
                                     정산 상태</h3>
-                                <p id="home-money-brief" class="text-xs text-slate-500 mt-1 leading-relaxed"></p>
+                                <p id="home-money-brief" class="card-subtext mt-1"></p>
                             </div>
                             <span id="home-money-status" class="home-money-status ok" data-i18n="diff_ok_title">이상
                                 없음</span>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-2 mt-4">
+                        <div class="grid grid-cols-3 gap-2 mt-4">
                             <div class="home-money-item">
-                                <p class="label" data-i18n="difference">차액</p>
-                                <p class="value" id="home-diff">₩72,000</p>
+                                <p class="label" data-i18n="estimated">추정</p>
+                                <p class="value" id="home-estimated">₩1,812,000</p>
                             </div>
                             <div class="home-money-item">
                                 <p class="label" data-i18n="actual">실제</p>
                                 <p class="value" id="home-actual">₩1,740,000</p>
                             </div>
+                            <div class="home-money-item">
+                                <p class="label" data-i18n="difference">차액</p>
+                                <p class="value" id="home-diff">₩72,000</p>
+                            </div>
                         </div>
 
-                        <div id="home-next-card" class="home-next-wrap mt-3 hidden">
+                        <div id="home-payday-card" class="mt-4 rounded-3xl border border-slate-100 bg-slate-50 p-4" hidden>
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p id="home-payday-kicker"
+                                        class="card-kicker"
+                                        data-i18n="deposit_kicker">급여일 체크</p>
+                                    <h4 id="home-payday-title" class="card-title-md mt-1">이번 달 실입금이 반영됐어요</h4>
+                                    <p id="home-payday-desc" class="card-subtext mt-2"></p>
+                                </div>
+                                <div id="home-payday-icon-wrap"
+                                    class="w-11 h-11 rounded-2xl bg-brand-soft text-brand flex items-center justify-center">
+                                    <i id="home-payday-icon" class="fa-solid fa-wallet"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="text-[10px] text-slate-500 font-black" data-i18n="asof_label">기준일</p>
+                                    <p id="home-payday-meta" class="text-xs font-black text-slate-900 mt-1">2026-03-28</p>
+                                </div>
+                                <button id="home-payday-btn" onclick="runHomeDepositAction()"
+                                    class="primary-btn px-4 py-3 text-xs font-black"></button>
+                            </div>
+                        </div>
+
+                        <div id="home-next-card" class="home-next-wrap mt-3">
                             <p id="home-next-action" class="text-[11px] text-slate-600 font-bold action-copy"></p>
                             <button id="home-next-action-btn" onclick="runHomeNextAction()"
                                 class="primary-btn action-cta w-full py-3 text-xs font-black"></button>
                         </div>
                     </div>
 
-                    <div class="toss-card border border-white shadow-sm">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-sm font-black text-slate-900" data-i18n="menu_services_title">서비스</p>
-                                <p class="text-xs text-slate-500 mt-1 leading-relaxed" data-i18n="home_quick_desc">자주 쓰는
-                                    기능으로 바로 이동할 수 있어요.</p>
-                            </div>
-                            <button onclick="switchTab('wage')" class="text-brand text-[11px] font-black"
-                                data-i18n="finance_go_wage">급여 점검</button>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 mt-4">
-                            <button onclick="switchTab('send')" class="wage-secondary-btn"
-                                data-i18n="remittance_title">금융</button>
-                            <button onclick="switchTab('workproof')" class="wage-secondary-btn"
-                                data-i18n="workproof_title">근무 일지</button>
-                            <button onclick="openAdvanceOverlay()" class="wage-secondary-btn"
-                                data-i18n="finance_advance_title">미리받기</button>
-                            <button onclick="openInterestOverlay()" class="wage-secondary-btn"
-                                data-i18n="finance_interest_title">예치 이자</button>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- WORKPROOF: Focus on frequent action -->
@@ -1373,7 +1467,7 @@
                             <button id="btn-clockin" onclick="clockIn()" class="primary-btn py-4 text-xs"><span
                                     data-i18n="cta_clock_in">출근</span></button>
                             <button id="btn-clockout" onclick="clockOut()"
-                                class="bg-brand-soft text-brand py-4 rounded-2xl text-xs font-black border border-indigo-100"><span
+                                class="bg-brand-soft text-brand py-4 rounded-2xl text-xs font-black border border-brand-soft"><span
                                     data-i18n="cta_clock_out">퇴근</span></button>
                         </div>
 
@@ -1462,14 +1556,14 @@
                 </div>
 
                 <!-- WAGE: Wage Shield + Actions -->
-                <div id="wage" class="tab-content space-y-6 hidden">
+                <div id="wage" class="tab-content space-y-5 hidden">
                     <div class="px-1">
                         <div class="flex items-start justify-between">
                             <div>
                                 <h3 class="text-2xl font-black text-slate-900" data-i18n="wage_title">Wage Shield</h3>
                             </div>
                             <button onclick="openCopilot('wage_explain')"
-                                class="px-3 py-2 rounded-2xl bg-brand-soft text-brand text-[11px] font-black border border-indigo-100">
+                                class="px-3 py-2 rounded-2xl bg-brand-soft text-brand text-[11px] font-black border border-slate-200">
                                 <i class="fa-solid fa-wand-magic-sparkles mr-1"></i><span data-i18n="copilot_explain">이
                                     화면 설명해줘</span>
                             </button>
@@ -1499,13 +1593,13 @@
                     </div>
 
                     <div class="bg-white rounded-[32px] overflow-hidden border border-brand-soft shadow-sm">
-                        <div class="p-6 border-b border-slate-100">
+                        <div class="p-6 border-b border-slate-100 space-y-4">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-[10px] font-black tracking-widest text-brand uppercase"
                                         id="wage-month">2026-03</p>
-                                    <h4 class="text-lg font-black text-slate-900 mt-1" data-i18n="wage_overview">월간 요약
-                                    </h4>
+                                    <h4 class="card-title-lg mt-1" data-i18n="wage_check_title">이번 달 급여 확인</h4>
+                                    <p class="card-subtext mt-1" data-i18n="wage_check_desc">먼저 실입금을 입력한 뒤 예상과 비교해 보세요.</p>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <span class="badge" title="modified records"><i
@@ -1517,6 +1611,47 @@
                                 </div>
                             </div>
 
+                            <div id="wage-deposit-card" class="bg-slate-50 border border-slate-100 rounded-3xl p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p id="wage-deposit-kicker" class="text-[10px] font-black tracking-widest text-brand uppercase"
+                                            data-i18n="deposit_kicker">급여일 체크</p>
+                                        <p id="wage-deposit-title" class="card-title-md mt-1">실제 입금액을 먼저 확인해 주세요</p>
+                                        <p id="wage-deposit-desc" class="card-subtext mt-2"></p>
+                                    </div>
+                                    <button id="wage-deposit-btn" onclick="runWageDepositAction()"
+                                        class="primary-btn px-4 py-3 text-xs font-black whitespace-nowrap"></button>
+                                </div>
+                                <p id="wage-deposit-meta" class="text-[10px] text-slate-400 font-black mt-3"></p>
+                            </div>
+
+                            <div>
+                                <label class="text-[11px] font-black text-slate-600" for="actual-deposit"
+                                    data-i18n="actual_deposit">실제 입금액(실수령)</label>
+                                <div class="mt-2 flex gap-2">
+                                    <input id="actual-deposit" type="number" inputmode="numeric"
+                                        class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                        placeholder="예: 1740000">
+                                    <button onclick="applyActualDeposit()"
+                                        class="px-4 py-3 rounded-2xl bg-slate-900 text-white text-xs font-black"
+                                        data-i18n="apply">적용</button>
+                                </div>
+                                <p class="card-subtext mt-2" data-i18n="wage_input_helper">입금 전에는 차이와 다음 행동이 잠겨 있고, 입력 후에 바로 이어집니다.</p>
+                                <div class="mt-3 flex items-center gap-2">
+                                    <span class="badge" id="deduction-badge"><i class="fa-solid fa-tag"></i><span
+                                            data-i18n="deduction_unknown">공제 미반영</span></span>
+                                    <span class="text-[11px] text-slate-400 font-black"
+                                        data-i18n="threshold_relaxed">임계값 완화 적용</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-6 border-b border-slate-100">
+                            <div class="flex items-center justify-between">
+                                <p class="card-title-md" data-i18n="wage_overview">월간 요약</p>
+                                <span class="text-[11px] text-slate-400 font-black" data-i18n="evidence_based">근거
+                                    자료(WorkProof) 기반</span>
+                            </div>
                             <div class="grid grid-cols-3 gap-3 mt-4">
                                 <div class="bg-slate-50 p-4 rounded-2xl">
                                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest"
@@ -1539,7 +1674,7 @@
 
                         <div class="p-6 space-y-4">
                             <div class="flex items-center justify-between">
-                                <p class="text-sm font-black text-slate-800" data-i18n="estimate_title">참고용 추정 급여</p>
+                                <p class="card-title-md" data-i18n="estimate_title">참고용 추정 급여</p>
                                 <span class="text-[11px] text-slate-400 font-black" data-i18n="evidence_based">근거
                                     자료(WorkProof)
                                     기반</span>
@@ -1573,7 +1708,7 @@
                                 </div>
 
                                 <div
-                                    class="flex justify-between items-center bg-brand-soft p-4 rounded-2xl border border-indigo-100">
+                                    class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200">
                                     <div class="flex items-center gap-3">
                                         <i class="fa-solid fa-equals text-brand"></i>
                                         <span class="text-xs font-black text-slate-700" data-i18n="estimated_total">추정
@@ -1583,24 +1718,6 @@
                                 </div>
                             </div>
 
-                            <div class="pt-2">
-                                <label class="text-[11px] font-black text-slate-600" for="actual-deposit"
-                                    data-i18n="actual_deposit">실제 입금액(실수령)</label>
-                                <div class="mt-2 flex gap-2">
-                                    <input id="actual-deposit" type="number" inputmode="numeric"
-                                        class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                        placeholder="예: 1740000">
-                                    <button onclick="applyActualDeposit()"
-                                        class="px-4 py-3 rounded-2xl bg-slate-900 text-white text-xs font-black"
-                                        data-i18n="apply">적용</button>
-                                </div>
-                                <div class="mt-3 flex items-center gap-2">
-                                    <span class="badge" id="deduction-badge"><i class="fa-solid fa-tag"></i><span
-                                            data-i18n="deduction_unknown">공제 미반영</span></span>
-                                    <span class="text-[11px] text-slate-400 font-black"
-                                        data-i18n="threshold_relaxed">임계값 완화 적용</span>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -1608,13 +1725,13 @@
                     <div id="diff-card" class="toss-card shadow-sm border border-white">
                         <div class="flex items-start justify-between">
                             <div>
-                                <p class="text-[10px] font-black tracking-widest uppercase text-rose-600"
+                                <p class="text-[10px] font-black tracking-widest uppercase text-amber-700"
                                     id="diff-kicker">REVIEW DIFF</p>
-                                <h4 class="text-lg font-black mt-1 text-slate-900" id="diff-title">확인 필요한 차이</h4>
-                                <p class="text-xs text-slate-500 mt-1 leading-relaxed" id="diff-desc">예상 대비 실입금이 낮아요.
+                                <h4 class="card-title-lg mt-1" id="diff-title">확인 필요한 차이</h4>
+                                <p class="card-subtext mt-1" id="diff-desc">예상 대비 실입금이 낮아요.
                                     근거와 함께 다음 행동으로 연결할 수 있어요.</p>
                             </div>
-                            <div class="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600"
+                            <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-700"
                                 id="diff-icon-wrap">
                                 <i class="fa-solid fa-triangle-exclamation text-xl" id="diff-icon"></i>
                             </div>
@@ -1645,7 +1762,12 @@
                             </ul>
                         </div>
 
-                        <div class="mt-4 bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                        <div id="wage-action-pending" class="mt-4 bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200 hidden">
+                            <p class="text-[11px] font-black text-slate-700" data-i18n="wage_action_locked_title">실입금을 입력하면 다음 행동이 열려요</p>
+                            <p class="text-[11px] text-slate-500 mt-1 leading-relaxed" data-i18n="wage_action_locked_desc">입금액을 입력한 뒤 차이 확인, 문서 생성, 신고 준비를 이어서 진행할 수 있어요.</p>
+                        </div>
+
+                        <div id="wage-action-sequence-wrap" class="mt-4 bg-slate-50 rounded-2xl p-3 border border-slate-100">
                             <p class="text-[11px] font-black text-slate-600 px-1" data-i18n="wage_action_sequence">추천
                                 경로(선택)</p>
                             <div class="grid grid-cols-1 gap-2 mt-2">
@@ -1673,7 +1795,7 @@
                             </div>
                         </div>
 
-                        <div class="mt-5 wage-primary-action">
+                        <div id="wage-primary-action-wrap" class="mt-5 wage-primary-action">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <p class="text-[10px] font-black tracking-widest text-brand uppercase"
@@ -1708,7 +1830,7 @@
                 </div>
 
                 <!-- SEND: Finance -->
-                <div id="send" class="tab-content space-y-4 hidden">
+                <div id="send" class="tab-content space-y-5 hidden">
                     <div class="px-1 space-y-3">
                         <div>
                             <div>
@@ -1720,7 +1842,7 @@
                     <div class="bg-white rounded-[32px] overflow-hidden border border-brand-soft shadow-sm">
                         <div class="p-6 space-y-4">
                             <div class="flex items-center justify-between">
-                                <p class="text-sm font-black text-slate-900" data-i18n="finance_send_title">내 계좌</p>
+                                <p class="card-title-md" data-i18n="finance_send_title">내 계좌</p>
                             </div>
 
                             <p class="text-[10px] text-slate-500 font-black tracking-wide"
@@ -1756,17 +1878,53 @@
                     </div>
 
                     <div class="space-y-3">
+                        <div id="finance-split-card" class="toss-card border border-white shadow-sm">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-[10px] font-black tracking-widest text-brand uppercase"
+                                        data-i18n="finance_split_kicker">돈 나누기</p>
+                                    <p class="card-title-md mt-1" data-i18n="finance_split_title">이번 달 돈을 바로 나눠보세요</p>
+                                    <p class="card-subtext mt-2" data-i18n="finance_split_desc">입금이 들어오면 생활비, 가족 송금, 보관 금액을 바로 정리할 수 있어요.</p>
+                                </div>
+                                <span id="finance-split-basis"
+                                    class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-black text-slate-600">실입금 기준</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 mt-4">
+                                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                                    <p class="text-[10px] text-slate-500 font-black" data-i18n="money_split_living">생활비</p>
+                                    <p id="finance-split-living" class="text-sm font-black text-slate-900 mt-1">₩0</p>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                                    <p class="text-[10px] text-slate-500 font-black" data-i18n="money_split_family">가족 송금</p>
+                                    <p id="finance-split-family" class="text-sm font-black text-slate-900 mt-1">₩0</p>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                                    <p class="text-[10px] text-slate-500 font-black" data-i18n="money_split_save">보관 / 이자</p>
+                                    <p id="finance-split-save" class="text-sm font-black text-slate-900 mt-1">₩0</p>
+                                </div>
+                            </div>
+                            <p id="finance-split-hint" class="text-[11px] text-slate-500 mt-3 leading-relaxed"
+                                data-i18n="money_split_hint">원터치 자동 분배가 아니라, 이번 달 계획을 빠르게 잡기 위한 제안 카드예요.</p>
+                            <div class="grid grid-cols-2 gap-2 mt-3">
+                                <button onclick="openTransferSheet()" class="primary-btn py-3 text-xs"
+                                    data-i18n="finance_split_cta_send">가족 송금 열기</button>
+                                <button onclick="openInterestOverlay()"
+                                    class="bg-slate-100 text-slate-700 py-3 rounded-2xl text-xs font-black border border-slate-200"
+                                    data-i18n="finance_split_cta_interest">보관 보기</button>
+                            </div>
+                        </div>
+
                         <div class="toss-card border border-brand-soft shadow-sm">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <p class="text-[10px] font-black tracking-widest text-brand uppercase"
                                         data-i18n="finance_advance_kicker">PAYCHECK ADVANCE</p>
-                                    <p class="text-sm font-black text-slate-900 mt-1" data-i18n="finance_advance_title">
+                                    <p class="card-title-md mt-1" data-i18n="finance_advance_title">
                                         미리받기</p>
-                                    <p id="finance-advance-proof" class="text-[11px] text-slate-500 mt-2 font-black">근무
+                                    <p id="finance-advance-proof" class="card-meta mt-2">근무
                                         반영 0일 · 확인 필요 0일</p>
                                 </div>
-                                <button onclick="openAdvanceOverlay()" class="text-brand text-[11px] font-black"
+                                <button onclick="openAdvanceOverlay()" class="card-link-btn"
                                     data-i18n="finance_advance_open">자세히</button>
                             </div>
                             <div class="grid grid-cols-2 gap-2 mt-3">
@@ -1783,6 +1941,18 @@
                                     </p>
                                 </div>
                             </div>
+                            <div class="mt-3 bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-[10px] text-slate-500 font-black" data-i18n="advance_progress_label">다음 구간 진행도</p>
+                                    <p id="finance-advance-progress-label" class="text-[11px] font-black text-slate-900">0%</p>
+                                </div>
+                                <div class="mt-2 h-2 rounded-full bg-white overflow-hidden">
+                                    <div id="finance-advance-progress-bar"
+                                        class="h-full rounded-full bg-brand transition-all duration-500"
+                                        style="width: 0%"></div>
+                                </div>
+                                <p id="finance-advance-next" class="text-[11px] text-slate-500 mt-2 leading-relaxed"></p>
+                            </div>
                             <button onclick="openAdvanceOverlay()" class="primary-btn w-full py-3 text-xs mt-3"
                                 data-i18n="advance_cta_request">미리받기 신청</button>
                         </div>
@@ -1792,13 +1962,13 @@
                                 <div>
                                     <p class="text-[10px] font-black tracking-widest text-brand uppercase"
                                         data-i18n="finance_interest_kicker">VAULT YIELD</p>
-                                    <p class="text-sm font-black text-slate-900 mt-1"
+                                    <p class="card-title-md mt-1"
                                         data-i18n="finance_interest_title">예치 이자</p>
-                                    <p id="finance-interest-status" class="text-[10px] text-slate-500 mt-2 font-black"
+                                    <p id="finance-interest-status" class="card-meta mt-2"
                                         data-i18n="interest_status_not_enrolled">아직 예치를 시작하지 않았어요.</p>
                                 </div>
                                 <button id="finance-interest-open-btn" onclick="openInterestOverlay()"
-                                    class="text-brand text-[11px] font-black"
+                                    class="card-link-btn"
                                     data-i18n="finance_interest_open">상세</button>
                             </div>
                             <div class="grid grid-cols-2 gap-2 mt-3">
@@ -1828,14 +1998,14 @@
                                 <div>
                                     <p class="text-[10px] font-black tracking-widest text-brand uppercase"
                                         data-i18n="finance_wage_kicker">WAGE CHECK</p>
-                                    <p class="text-sm font-black text-slate-900 mt-1" data-i18n="finance_wage_title">급여
+                                    <p class="card-title-md mt-1" data-i18n="finance_wage_title">급여
                                         점검 요약</p>
                                 </div>
-                                <button onclick="switchTab('wage')" class="text-brand text-[11px] font-black"
+                                <button onclick="switchTab('wage')" class="card-link-btn"
                                     data-i18n="finance_go_wage">급여 점검</button>
                             </div>
                             <p class="text-[10px] text-slate-500 font-black mt-3" data-i18n="difference">차액</p>
-                            <p id="finance-diff" class="text-2xl font-black text-rose-600 mt-1">₩0</p>
+                            <p id="finance-diff" class="text-2xl font-black text-amber-700 mt-1">₩0</p>
                             <p id="finance-diff-status" class="text-[11px] text-slate-500 mt-1"
                                 data-i18n="diff_anomaly_desc">예상 대비 실입금 차이를 확인해 보세요.</p>
                             <p class="text-[11px] text-slate-500 mt-1">
@@ -2051,7 +2221,7 @@
 
                         <div class="mt-4 space-y-2">
                             <div class="confirm-item">
-                                <i class="fa-solid fa-user-shield text-emerald-500"></i>
+                                <i class="fa-solid fa-user-shield text-brand"></i>
                                 <span data-i18n="send_confirm_check_allow">허용 목록 수신자만 전송 가능</span>
                             </div>
                             <div class="confirm-item">
@@ -2087,7 +2257,7 @@
                         </div>
 
                         <div
-                            class="h-64 bg-brand-soft rounded-[40px] relative overflow-hidden flex items-center justify-center border border-indigo-50">
+                                    class="h-64 bg-brand-soft rounded-[40px] relative overflow-hidden flex items-center justify-center border border-brand-soft">
                             <svg viewBox="0 0 400 200" class="w-full px-10">
                                 <path d="M 50 140 Q 200 10 350 80" fill="none" stroke="#a29df2" stroke-width="4"
                                     stroke-dasharray="12 6" stroke-linecap="round"></path>
@@ -2227,7 +2397,7 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="flex items-start gap-3">
                                             <div
-                                                class="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                                                class="w-10 h-10 rounded-2xl bg-brand-soft flex items-center justify-center text-brand shrink-0">
                                                 <i class="fa-solid fa-file-shield"></i>
                                             </div>
                                             <div>
@@ -2331,7 +2501,7 @@
                                     class="flex items-start justify-between gap-3 bg-slate-50 border border-slate-100 rounded-2xl p-4">
                                     <div class="flex items-start gap-3">
                                         <div
-                                            class="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                                            class="w-10 h-10 rounded-2xl bg-brand-soft flex items-center justify-center text-brand shrink-0">
                                             <i class="fa-solid fa-building"></i>
                                         </div>
                                         <div>
@@ -2355,14 +2525,14 @@
                                 <div
                                     class="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl p-4">
                                     <i id="claim-check-proof-icon"
-                                        class="fa-solid fa-circle-check text-emerald-500"></i>
+                                        class="fa-solid fa-circle-check text-brand"></i>
                                     <span class="font-black text-slate-800" data-i18n="check_proofpack">Proof Pack
                                         준비</span>
                                 </div>
                                 <div
                                     class="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl p-4">
                                     <i id="claim-check-claim-icon"
-                                        class="fa-solid fa-circle-check text-emerald-500"></i>
+                                        class="fa-solid fa-circle-check text-brand"></i>
                                     <span class="font-black text-slate-800" data-i18n="check_claimkit">근거 자료 묶음
                                         준비</span>
                                 </div>
@@ -2512,7 +2682,7 @@
                             </button>
                         </div>
 
-                        <div class="mt-5 bg-brand-soft border border-indigo-100 rounded-2xl p-4">
+                        <div class="mt-5 bg-brand-soft border border-brand-soft rounded-2xl p-4">
                             <p class="text-[11px] text-slate-500 font-black" data-i18n="advance_available_label">지금 가능 금액
                             </p>
                             <p id="advance-sheet-available" class="text-2xl font-black text-slate-900 mt-1">₩0</p>
@@ -2540,14 +2710,14 @@
                             </div>
 
                             <div class="grid grid-cols-3 gap-2 mt-3">
-                                <div class="rounded-xl bg-white border border-emerald-100 px-2.5 py-2">
-                                    <p class="text-[10px] text-emerald-700 font-black" data-i18n="advance_card_reflected">근무
+                                <div class="rounded-xl bg-white border border-brand-soft px-2.5 py-2">
+                                    <p class="text-[10px] text-brand font-black" data-i18n="advance_card_reflected">근무
                                         반영</p>
                                     <p id="advance-sheet-reflected-days" class="text-[13px] text-slate-900 font-black mt-1">0일
                                     </p>
                                 </div>
-                                <div class="rounded-xl bg-white border border-rose-100 px-2.5 py-2">
-                                    <p class="text-[10px] text-rose-700 font-black" data-i18n="advance_review_label">확인 필요
+                                <div class="rounded-xl bg-white border border-amber-100 px-2.5 py-2">
+                                    <p class="text-[10px] text-amber-700 font-black" data-i18n="advance_review_label">확인 필요
                                     </p>
                                     <p id="advance-sheet-review-days" class="text-[13px] text-slate-900 font-black mt-1">0일
                                     </p>
@@ -2569,7 +2739,7 @@
                             <div id="advance-amount-chips" class="grid grid-cols-4 gap-2 mt-2"></div>
                         </div>
 
-                        <div class="mt-4 bg-brand-soft border border-indigo-100 rounded-2xl p-4 space-y-2">
+                        <div class="mt-4 bg-brand-soft border border-brand-soft rounded-2xl p-4 space-y-2">
                             <div class="flex items-center justify-between text-xs">
                                 <span class="font-black text-slate-600" data-i18n="advance_receive_label">이번 수령
                                     예정</span>
@@ -2633,7 +2803,7 @@
                                 <div id="interest-apply-chips" class="grid grid-cols-4 gap-2 mt-2"></div>
                             </div>
 
-                            <div class="mt-4 bg-brand-soft border border-indigo-100 rounded-2xl p-4 space-y-2">
+                        <div class="mt-4 bg-brand-soft border border-brand-soft rounded-2xl p-4 space-y-2">
                                 <div class="flex items-center justify-between text-xs">
                                     <span class="font-black text-slate-600" data-i18n="interest_apr_label">예상 연이율</span>
                                     <span id="interest-apply-apr" class="font-black text-slate-900">0%</span>
@@ -2677,7 +2847,7 @@
                                 </div>
                             </div>
 
-                            <div class="mt-4 bg-brand-soft border border-indigo-100 rounded-2xl p-4 space-y-2">
+                        <div class="mt-4 bg-brand-soft border border-brand-soft rounded-2xl p-4 space-y-2">
                                 <div class="flex items-center justify-between text-xs">
                                     <span class="font-black text-slate-600" data-i18n="interest_accrued_label">누적
                                         이자(추정)</span>
@@ -2725,7 +2895,7 @@
                                         <span id="interest-defi-ratio">70%</span>
                                     </div>
                                     <div class="h-2 rounded-full bg-slate-200 overflow-hidden">
-                                        <div id="interest-defi-bar" class="h-2 bg-emerald-500" style="width:70%"></div>
+                                        <div id="interest-defi-bar" class="h-2 bg-brand" style="width:70%"></div>
                                     </div>
                                 </div>
                                 <div>
@@ -2798,7 +2968,7 @@
                                     class="px-4 py-2 rounded-full bg-slate-100 text-slate-800 text-xs font-black">ON</button>
                             </div>
                             <div id="demo-controls"
-                                class="hidden bg-brand-soft rounded-2xl px-4 py-3 border border-indigo-100">
+                            class="hidden bg-brand-soft rounded-2xl px-4 py-3 border border-brand-soft">
                                 <div class="flex items-center justify-between">
                                     <p class="text-xs font-black text-slate-700">
                                         <span data-i18n="asof_label">기준일</span>: <span id="asof-label">2026-03-28</span>
@@ -2809,7 +2979,7 @@
                                     </button>
                                 </div>
                                 <input id="asof-slider" type="range" min="1" max="31" value="28"
-                                    class="w-full mt-3 accent-indigo-500">
+                            class="w-full mt-3">
                             </div>
                         </div>
                     </div>
@@ -2820,7 +2990,7 @@
 
         <!-- Bottom Navigation Bar -->
         <nav id="bottom-nav"
-            class="app-nav absolute left-1/2 -translate-x-1/2 w-[350px] glass-nav rounded-[24px] shadow-2xl shadow-indigo-100 h-[74px] flex items-center justify-between px-6 z-[55]">
+            class="app-nav absolute left-1/2 -translate-x-1/2 w-[338px] glass-nav rounded-[24px] shadow-2xl h-[68px] flex items-center justify-between px-[22px] z-[55]">
             <button onclick="switchTab('home')" class="nav-btn flex flex-col items-center transition-all text-brand"
                 id="btn-home">
                 <i class="fa-solid fa-house-user text-xl"></i>
