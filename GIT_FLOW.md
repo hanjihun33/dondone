@@ -1,6 +1,6 @@
-# Git Flow & Commit Convention (DawnDone)
+# Git Flow & Commit Convention (DonDone)
 
-이 문서는 `S14P11C205/GIT_FLOW.md`를 참고해 DawnDone(`S14P21C202`) 프로젝트에 맞게 정리한 Git 운영 가이드입니다.
+이 문서는 `S14P11C205/GIT_FLOW.md`를 참고해 DonDone(`S14P21C202`) 프로젝트에 맞게 정리한 Git 운영 가이드입니다.
 
 ## 1. 브랜치 전략
 
