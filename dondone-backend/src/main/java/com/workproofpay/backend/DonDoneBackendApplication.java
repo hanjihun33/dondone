@@ -4,9 +4,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class DawnDoneBackendApplication {
+public class DonDoneBackendApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(DawnDoneBackendApplication.class, args);
+        SpringApplication.run(DonDoneBackendApplication.class, args);
     }
 }

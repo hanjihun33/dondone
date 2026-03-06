@@ -1,7 +1,7 @@
-# DawnDone Frontend Agent Guide
+# DonDone Frontend Agent Guide
 
 ## Goal
-Implement DawnDone frontend flows that align with PRD P0 journey:
+Implement DonDone frontend flows that align with PRD P0 journey:
 workproof -> wage check -> action (Proof Pack / Claim Kit / Instant Claim) -> remittance.
 
 ## Rules

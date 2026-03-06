@@ -1,6 +1,6 @@
-# DawnDone Backend (Skeleton + Auth)
+# DonDone Backend (Skeleton + Auth)
 
-`docs/WorkProofPay_PRD_v1.4.md` 기준으로 초기 백엔드 스켈레톤과 로그인 기능을 구성했습니다.
+`docs/DonDone_PRD_v1.5.md` 기준으로 초기 백엔드 스켈레톤과 로그인 기능을 구성했습니다.
 
 ## Stack
 - Java 17
@@ -41,11 +41,11 @@ docker compose -f docker-compose.postgres.yml up -d
 기본 DB 설정은 아래 환경변수를 사용합니다.
 
 - `DB_URL` 또는 `SPRING_DATASOURCE_URL`
-  - default: `jdbc:postgresql://localhost:5432/dawndone`
+- default: `jdbc:postgresql://localhost:5432/dondone`
 - `DB_USERNAME` 또는 `SPRING_DATASOURCE_USERNAME`
-  - default: `dawndone`
+- default: `dondone`
 - `DB_PASSWORD` 또는 `SPRING_DATASOURCE_PASSWORD`
-  - default: `dawndone`
+- default: `dondone`
 
 - API: `http://localhost:8080`
 - Swagger: `http://localhost:8080/swagger-ui.html`

@@ -1,4 +1,4 @@
-# DawnDone Git Guide
+# DonDone Git Guide
 
 상세 규칙은 루트의 [`GIT_FLOW.md`](../GIT_FLOW.md)를 따릅니다.
 

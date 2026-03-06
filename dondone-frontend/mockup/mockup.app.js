@@ -1937,9 +1937,9 @@ function openDocFromClaim(type) {
 function docShareLink(type) {
     const doc = getDocByType(type);
     const stamp = encodeURIComponent(String(Date.now()).slice(-6));
-    if (type === 'PROOF_PACK') return `https://s3.example.com/dawndone/proof-pack-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
-    if (type === 'CLAIM_KIT') return `https://s3.example.com/dawndone/claim-kit-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
-    return `https://s3.example.com/dawndone/document.pdf?demo=1&sig=${stamp}`;
+    if (type === 'PROOF_PACK') return `https://s3.example.com/dondone/proof-pack-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
+    if (type === 'CLAIM_KIT') return `https://s3.example.com/dondone/claim-kit-${doc?.month || '2026-03'}.pdf?demo=1&sig=${stamp}`;
+    return `https://s3.example.com/dondone/document.pdf?demo=1&sig=${stamp}`;
 }
 
 async function copyText(text, toastMessage) {
