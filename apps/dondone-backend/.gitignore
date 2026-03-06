@@ -9,6 +9,7 @@ out/
 # Environment and secrets
 .env
 .env.local
+local.properties
 *.key
 *.pem
 *-key.json

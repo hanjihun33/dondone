@@ -1,6 +1,6 @@
 # DonDone Git Guide
 
-상세 규칙은 루트의 [`GIT_FLOW.md`](../GIT_FLOW.md)를 따릅니다.
+상세 규칙은 같은 폴더의 [`GIT_FLOW.md`](./GIT_FLOW.md)를 따릅니다.
 
 ## 빠른 요약
 - 기준 브랜치: `main`, `develop`

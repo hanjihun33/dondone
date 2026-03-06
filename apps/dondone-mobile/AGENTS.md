@@ -1,7 +1,7 @@
-# DonDone Frontend Agent Guide
+# DonDone Mobile Agent Guide
 
 ## Goal
-Implement DonDone frontend flows that align with PRD P0 journey:
+Implement DonDone mobile flows that align with PRD P0 journey:
 workproof -> wage check -> action (Proof Pack / Claim Kit / Instant Claim) -> remittance.
 
 ## Rules
@@ -11,5 +11,5 @@ workproof -> wage check -> action (Proof Pack / Claim Kit / Instant Claim) -> re
 - Avoid adding dependencies unless required.
 
 ## Run
-- `npm install`
-- `npm run dev`
+- Mockup: `cd mockup && python -m http.server 4173`
+- Android app: `cd android` after the project is created

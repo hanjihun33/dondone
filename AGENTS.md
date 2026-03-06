@@ -4,8 +4,8 @@
 Implement DonDone (`S14P21C202`) as a demo-ready MVP based on `docs/DonDone_PRD_v1.5.md`, with delivery quality suitable for team collaboration and review.
 
 ## Repository Scope
-- `dondone-backend/`: Spring Boot backend (feature-first skeleton + auth baseline)
-- `dondone-frontend/`: frontend app
+- `apps/dondone-backend/`: Spring Boot backend (feature-first skeleton + auth baseline)
+- `apps/dondone-mobile/`: mobile mockup and Android app workspace
 - `docs/`: PRD and project documentation
 - `S14P11C205/`: reference repository (read-only, for patterns only)
 
@@ -19,7 +19,7 @@ Before implementing changes, remove ambiguity first. Confirm:
 
 If requirements remain ambiguous, state assumptions explicitly before coding.
 
-## Product Constraints (PRD v1.4)
+## Product Constraints (PRD v1.5)
 - Public product name: **DonDone**
 - MVP focus: `P0` first (WorkProof -> Wage Shield -> Docs/Claim -> Testnet Remittance)
 - Policy: testnet/demo scope only; do not implement real-money settlement behavior
@@ -66,12 +66,11 @@ If requirements remain ambiguous, state assumptions explicitly before coding.
 
 ## Local Run Quick Commands
 - Backend:
-  - `cd dondone-backend`
+  - `cd apps/dondone-backend`
   - `./gradlew bootRun`
-- Frontend:
-  - `cd dondone-frontend`
-  - `npm install`
-  - `npm run dev`
+- Mobile mockup:
+  - `cd apps/dondone-mobile/mockup`
+  - `python -m http.server 4173`
 
 ## Delivery Checklist
 1. Implementation matches PRD scope (`P0` prioritized).
