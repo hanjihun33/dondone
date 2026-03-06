@@ -756,9 +756,25 @@ public interface CopilotService {
 
 #### 이슈 계층(권장)
 - **Epic**: 기능 축 단위
-- **Story**: 사용자 흐름 단위
-- **Task**: 구현 단위
+- **Story**: 사용자 흐름 또는 기능 단위
 - **Sub-task**: 사람별 세부 작업
+
+> 권장 원칙: **Epic은 기능 기준**, **Story는 사용자 흐름/기능 기준**으로 관리한다.  
+> 즉, Epic에 `[ANDROID]`, `[BACKEND]`, `[BLC]`를 직접 붙이기보다  
+> Epic은 `[WRK]`, `[WAGE]`, `[DOC]`, `[BLC]`, `[INFRA]`처럼 **기능/영역 기준**으로 만들고,  
+> Story는 prefix 없이 **무엇을 할 수 있는지 / 무엇을 만든는지**가 바로 보이게 작성하는 편이 추적에 유리하다.
+
+#### Prefix 규칙(권장)
+- **Epic prefix**: 기능/도메인 기준, 대문자 고정
+  - 예: `[AUTH]`, `[WRK]`, `[ADV]`, `[WAGE]`, `[DOC]`, `[BLC]`, `[INFRA]`, `[COP]`
+- **Story 제목**: prefix 없이 사용자 관점 또는 기능 관점으로 작성
+  - 예: `Jenkins 빌드 파이프라인을 구성한다`
+  - 예: `사용자는 급여 차이를 확인할 수 있다`
+  - 예: `근거 자료 묶음을 생성하고 공유할 수 있다`
+- **Sub-task 제목**: 기술 담당 기준 prefix 사용 가능
+  - 예: `[ANDROID] 금융 홈 Hero 카드 UI 구현`
+  - 예: `[BACKEND] 급여 차이 계산 API 구현`
+  - 예: `[INFRA] Jenkinsfile 작성`
 
 #### 워크플로우(권장)
 - `Backlog -> Selected for Dev -> In Progress -> In Review -> Done`
@@ -778,14 +794,14 @@ public interface CopilotService {
 
 | Epic | 범위 | 주 담당 |
 |---|---|---|
-| `P0-EPIC-01 WorkProof` | 출근/퇴근, 상세, 수정(W4), 근무 집계 | 풀스택 + 서버 |
-| `P0-EPIC-02 WageShield` | 월간 요약, 예상, 입금 입력, 차액 감지 | 풀스택 + 서버 |
-| `P0-EPIC-03 Evidence` | Proof Pack / Claim Kit / 문서 저장 | 풀스택 + 서버/인프라 |
-| `P0-EPIC-04 Remit` | 테스트넷 송금, 상태, 영수증, SafePay | 블록체인 + 풀스택 |
-| `P0-EPIC-05 Instant Claim` | 체크리스트, 문장, 경로 안내 | 풀스택 + 서버 |
-| `P0-EPIC-06 Demo Time Travel` | seed, asOf, 상태 재렌더, 데모 모드 | 풀스택 + 서버 + 블록체인 |
-| `P0-EPIC-07 Copilot` | explain / claim-summary / facts-only 가드레일 | 풀스택 + 서버 |
-| `P0-EPIC-08 Platform` | CI/CD, env, logging, demo/dev 분리 | 서버/인프라 |
+| `[WRK] 근무 기록` | 출근/퇴근, 상세, 수정(W4), 근무 집계 | 풀스택 + 서버 |
+| `[WAGE] 급여 점검` | 월간 요약, 예상, 입금 입력, 차액 감지 | 풀스택 + 서버 |
+| `[DOC] 문서/근거 자료` | 증빙 리포트 / 근거 자료 묶음 / 문서 저장 | 풀스택 + 서버/인프라 |
+| `[BLC] 토큰 전송&송금` | 테스트넷 송금, 상태, 영수증, SafePay | 블록체인 + 풀스택 |
+| `[CLAIM] 신고 준비` | 체크리스트, 문장, 경로 안내 | 풀스택 + 서버 |
+| `[DEMO] 타임 트래블` | seed, asOf, 상태 재렌더, 데모 모드 | 풀스택 + 서버 + 블록체인 |
+| `[COP] 코파일럿` | explain / claim-summary / facts-only 가드레일 | 풀스택 + 서버 |
+| `[INFRA] CI/CD` | CI/CD, env, logging, demo/dev 분리 | 서버/인프라 |
 
 ### 13.4 1주차: 기본 플로우 뼈대 + 테스트넷 송금 PoC + 데모 모드 틀
 
@@ -879,16 +895,18 @@ public interface CopilotService {
 
 | Epic | Story 제목 예시 | Sub-task 예시 |
 |---|---|---|
-| WorkProof | `사용자는 출근/퇴근을 기록할 수 있다` | 프론트 UI, API, DB, 시드 데이터 |
-| WageShield | `사용자는 실제 입금액을 입력하고 차이를 확인할 수 있다` | 입력 UI, 계산 엔진, 근거 DTO |
-| Evidence | `사용자는 Proof Pack을 생성하고 공유할 수 있다` | PDF 템플릿, 저장, 다운로드 링크 |
-| Remit | `사용자는 테스트넷으로 송금하고 상태를 볼 수 있다` | tx submit, poll, receipt UI |
-| Demo Time Travel | `데모 사용자는 asOf 날짜를 바꿔 상태를 재생할 수 있다` | slider UI, demo API, seed/reset |
-| Copilot | `사용자는 현재 화면의 이유를 설명받을 수 있다` | chips UI, explain API, guardrail |
+| `[INFRA] CI/CD` | `Jenkins 빌드 파이프라인을 구성한다` | `[INFRA] Jenkinsfile 작성`, `[INFRA] 배포 스크립트 정리` |
+| `[WRK] 근무 기록` | `사용자는 출근/퇴근을 기록할 수 있다` | `[ANDROID] 출근/퇴근 화면 구현`, `[BACKEND] 근무 기록 API 구현` |
+| `[WAGE] 급여 점검` | `사용자는 실제 입금액을 입력하고 차이를 확인할 수 있다` | `[ANDROID] 입금 입력 화면 구현`, `[BACKEND] 급여 차이 계산 API 구현` |
+| `[DOC] 문서/근거 자료` | `사용자는 근거 자료 묶음을 생성하고 공유할 수 있다` | `[BACKEND] PDF 생성 기능 구현`, `[ANDROID] 문서 공유 UI 연결` |
+| `[BLC] 토큰 전송&송금` | `사용자는 테스트넷으로 송금하고 상태를 확인할 수 있다` | `[BLC] 송금 요청 구현`, `[BLC] 상태 조회 구현` |
+| `[DEMO] 타임 트래블` | `데모 사용자는 기준일을 바꿔 상태를 재생할 수 있다` | `[ANDROID] 슬라이더 UI 구현`, `[BACKEND] asOf 상태 응답 구현` |
+| `[COP] 코파일럿` | `사용자는 현재 화면의 이유를 설명받을 수 있다` | `[BACKEND] explain API 구현`, `[ANDROID] 질문 칩 UI 구현` |
 
 ### 13.8 Jira 운영 팁
-- Epic은 기능 축으로 끊고, Story는 발표 동선 기준으로 만든다.
-- Story 하나는 가능하면 **프론트 + 서버 + 데모 재현 기준**까지 포함해서 닫는다.
+- Epic은 기능 축으로 끊고, Story는 prefix 없이 사용자 흐름이나 기능 단위로 쓴다.
+- `[ANDROID]`, `[BACKEND]`, `[BLC]`, `[INFRA]` prefix는 Sub-task에서만 쓰는 것을 권장한다.
+- Story 하나는 가능하면 **기획적으로 닫히는 단위**로 두고, 구현 분리는 Sub-task로 내린다.
 - `Blocked` 사유는 반드시 외부 의존성(API, RPC, PDF, env) 중 무엇인지 명시한다.
 - 매주 말에는 `데모 완주 기준`으로 Done 여부를 판단한다.
 
