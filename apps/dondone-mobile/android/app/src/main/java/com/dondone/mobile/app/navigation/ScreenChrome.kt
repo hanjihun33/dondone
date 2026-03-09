@@ -21,7 +21,11 @@ fun resolveScreenChrome(
     } else {
         ScreenChrome(
             title = when (route) {
-                Route.TRANSFER -> if (transferStep == TransferFlowStep.AMOUNT) "금액 입력" else "받는 사람 선택"
+                Route.TRANSFER -> when (transferStep) {
+                    TransferFlowStep.ACCOUNT -> "계좌 선택"
+                    TransferFlowStep.RECIPIENT -> "받는 사람 선택"
+                    TransferFlowStep.AMOUNT -> "금액 입력"
+                }
                 else -> routeTitle(route)
             },
             showRootTabs = false,

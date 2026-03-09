@@ -1,0 +1,10 @@
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Stay in exploration mode.
+Do not edit files.
+Map concrete code paths, affected modules, DTOs, endpoints, and security touchpoints.
+Return concise evidence with file references and unresolved risks.
+Prefer using repo guidance and workflow skills over inventing a new process.
+"""

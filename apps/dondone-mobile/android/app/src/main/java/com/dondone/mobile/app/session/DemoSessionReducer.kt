@@ -23,16 +23,31 @@ object DemoSessionReducer {
     }
 
     fun selectAccount(state: DemoState, accountId: String): DemoState {
-        return state.copy(remittance = state.remittance.copy(selectedAccountId = accountId))
+        val nextStep = if (state.remittance.flowStep == TransferFlowStep.ACCOUNT) {
+            TransferFlowStep.RECIPIENT
+        } else {
+            state.remittance.flowStep
+        }
+        return state.copy(
+            remittance = state.remittance.copy(
+                selectedAccountId = accountId,
+                flowStep = nextStep,
+                status = TransferStatus.IDLE
+            )
+        )
     }
 
     fun openTransferFlow(state: DemoState): DemoState {
         return state.copy(
             remittance = state.remittance.copy(
-                flowStep = TransferFlowStep.RECIPIENT,
+                flowStep = TransferFlowStep.ACCOUNT,
                 status = TransferStatus.IDLE
             )
         )
+    }
+
+    fun showAccountStep(state: DemoState): DemoState {
+        return state.copy(remittance = state.remittance.copy(flowStep = TransferFlowStep.ACCOUNT))
     }
 
     fun showRecipientStep(state: DemoState): DemoState {
@@ -119,7 +134,7 @@ object DemoSessionReducer {
         return state.copy(
             remittance = state.remittance.copy(
                 status = TransferStatus.IDLE,
-                flowStep = TransferFlowStep.RECIPIENT
+                flowStep = TransferFlowStep.ACCOUNT
             )
         )
     }

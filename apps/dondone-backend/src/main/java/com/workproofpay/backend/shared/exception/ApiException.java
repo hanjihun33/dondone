@@ -1,23 +1,19 @@
 package com.workproofpay.backend.shared.exception;
 
-import org.springframework.http.HttpStatus;
+import lombok.Getter;
 
+@Getter
 public class ApiException extends RuntimeException {
 
-    private final HttpStatus status;
-    private final String code;
+    private final ErrorCode errorCode;
 
-    public ApiException(HttpStatus status, String code, String message) {
+    public ApiException(ErrorCode errorCode) {
+        super(errorCode.getMessage());
+        this.errorCode = errorCode;
+    }
+
+    public ApiException(ErrorCode errorCode, String message) {
         super(message);
-        this.status = status;
-        this.code = code;
-    }
-
-    public HttpStatus getStatus() {
-        return status;
-    }
-
-    public String getCode() {
-        return code;
+        this.errorCode = errorCode;
     }
 }
