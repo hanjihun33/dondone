@@ -1,2 +1,19 @@
 .idea/
 S14P11C205/
+
+# environment
+.env
+.env.local
+.env.dev
+.env.demo
+.env.*.local
+
+# keys and certs
+*.pem
+*.key
+*.crt
+
+# local data
+postgres_data/
+redis_data/
+minio_data/
