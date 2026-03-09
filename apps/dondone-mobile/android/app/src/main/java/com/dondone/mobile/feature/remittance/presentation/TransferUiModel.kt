@@ -6,6 +6,14 @@ import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 
+data class TransferAccountUiModel(
+    val id: String,
+    val name: String,
+    val number: String,
+    val balanceText: String,
+    val selected: Boolean
+)
+
 data class TransferRecipientUiModel(
     val id: String,
     val name: String,
@@ -19,9 +27,6 @@ data class TransferStatusUiModel(
 )
 
 data class TransferUiModel(
-    val stepTitle: String,
-    val stepDescription: String,
-    val stepBadgeText: String,
     val flowStep: TransferFlowStep,
     val transferStatus: TransferStatus,
     val selectedAccountName: String,
@@ -31,9 +36,11 @@ data class TransferUiModel(
     val selectedRecipientAddress: String,
     val amountUsd: String,
     val amountSummaryText: String,
+    val accountStepHintText: String,
     val canSubmit: Boolean,
     val showStatusCard: Boolean,
     val primaryActionText: String,
+    val accounts: List<TransferAccountUiModel>,
     val recipients: List<TransferRecipientUiModel>,
     val status: TransferStatusUiModel,
     val txHash: String
@@ -47,13 +54,6 @@ fun DemoState.toTransferUiModel(): TransferUiModel {
     val canSubmit = amountUsd > 0 && amountKrw <= selectedAccount.balance
 
     return TransferUiModel(
-        stepTitle = if (remittance.flowStep == TransferFlowStep.RECIPIENT) "받는 사람 선택" else "금액 입력",
-        stepDescription = if (remittance.flowStep == TransferFlowStep.RECIPIENT) {
-            "등록된 수신자 중 한 명을 고르면 금액 입력으로 이어집니다."
-        } else {
-            "받는 사람, 보내는 계좌, 금액을 함께 확인한 뒤 테스트넷 송금을 진행합니다."
-        },
-        stepBadgeText = if (remittance.flowStep == TransferFlowStep.RECIPIENT) "STEP 2" else "STEP 3",
         flowStep = remittance.flowStep,
         transferStatus = remittance.status,
         selectedAccountName = selectedAccount.name,
@@ -63,12 +63,22 @@ fun DemoState.toTransferUiModel(): TransferUiModel {
         selectedRecipientAddress = selectedRecipient?.address ?: "등록된 수신자를 선택해 주세요",
         amountUsd = amountUsd.toString(),
         amountSummaryText = "${selectedAccount.name} → ${selectedRecipient?.name ?: "선택 전"} · ${formatKrw(amountKrw)}",
+        accountStepHintText = "먼저 송금에 사용할 계좌를 선택해 주세요.",
         canSubmit = canSubmit,
         showStatusCard = remittance.status != TransferStatus.IDLE,
         primaryActionText = when (remittance.status) {
             TransferStatus.IDLE -> "송금 제출"
             TransferStatus.SUBMITTED -> "확인 완료로 전환"
             TransferStatus.CONFIRMED -> "새 송금 준비"
+        },
+        accounts = remittance.accounts.map { account ->
+            TransferAccountUiModel(
+                id = account.id,
+                name = account.name,
+                number = account.number,
+                balanceText = formatKrw(account.balance),
+                selected = account.id == remittance.selectedAccountId
+            )
         },
         recipients = remittance.recipients.map { recipient ->
             TransferRecipientUiModel(

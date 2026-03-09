@@ -39,7 +39,10 @@ fun DonDoneNavGraph(
         composable(Route.HOME) {
             HomeScreen(
                 uiModel = uiState.toHomeUiModel(),
-                onOpenTransfer = { navController.navigate(Route.ACCOUNT) },
+                onOpenTransfer = {
+                    viewModel.openTransferFlow()
+                    navController.navigate(Route.TRANSFER)
+                },
                 onOpenAccount = { navController.navigate(Route.ACCOUNT) },
                 onOpenWage = { navController.navigate(Route.WAGE) },
                 onOpenWorkproof = { navController.navigate(Route.WORKPROOF) },
@@ -58,7 +61,10 @@ fun DonDoneNavGraph(
             FinanceHomeScreen(
                 uiModel = uiState.toFinanceHomeUiModel(),
                 onOpenWage = { navController.navigate(Route.WAGE) },
-                onOpenTransfer = { navController.navigate(Route.ACCOUNT) },
+                onOpenTransfer = {
+                    viewModel.openTransferFlow()
+                    navController.navigate(Route.TRANSFER)
+                },
                 onOpenAccount = { navController.navigate(Route.ACCOUNT) }
             )
         }
@@ -68,16 +74,20 @@ fun DonDoneNavGraph(
                 onRecordDeposit = { viewModel.recordActualDeposit() },
                 onIncreaseDeposit = { viewModel.adjustActualDeposit(50_000) },
                 onDecreaseDeposit = { viewModel.adjustActualDeposit(-50_000) },
-                onOpenTransfer = { navController.navigate(Route.ACCOUNT) }
+                onOpenTransfer = {
+                    viewModel.openTransferFlow()
+                    navController.navigate(Route.TRANSFER)
+                }
             )
         }
         composable(Route.TRANSFER) {
             TransferScreen(
                 uiModel = uiState.toTransferUiModel(),
+                onSelectAccount = viewModel::selectAccount,
                 onSelectRecipient = viewModel::selectRecipient,
                 onUpdateAmount = viewModel::updateTransferAmount,
                 onChangeRecipient = viewModel::showRecipientStep,
-                onChangeAccount = { navController.navigate(Route.ACCOUNT) },
+                onChangeAccount = viewModel::showAccountStep,
                 onSubmitTransfer = viewModel::submitTransfer,
                 onConfirmTransfer = viewModel::confirmTransfer,
                 onResetTransfer = viewModel::resetTransfer
@@ -86,11 +96,7 @@ fun DonDoneNavGraph(
         composable(Route.ACCOUNT) {
             AccountManageScreen(
                 uiModel = uiState.toAccountManageUiModel(),
-                onSelectAccount = viewModel::selectAccount,
-                onContinue = {
-                    viewModel.openTransferFlow()
-                    navController.navigate(Route.TRANSFER)
-                }
+                onSelectAccount = viewModel::selectAccount
             )
         }
         composable(Route.MENU) {

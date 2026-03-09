@@ -31,8 +31,8 @@ fun isRootRoute(route: String): Boolean = route in setOf(
 
 fun routeTitle(route: String): String = when (route) {
     Route.WAGE -> "급여 점검"
-    Route.TRANSFER -> "받는 사람 선택"
-    Route.ACCOUNT -> "계좌 선택"
+    Route.TRANSFER -> "송금"
+    Route.ACCOUNT -> "계좌·지갑 관리"
     Route.WORKPROOF -> "근무 일지"
     Route.FINANCE_HOME -> "금융"
     Route.MENU -> "메뉴"

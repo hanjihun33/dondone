@@ -11,22 +11,20 @@ data class TransferAccountOptionUiModel(
     val selected: Boolean
 )
 
+data class RecipientWalletUiModel(
+    val id: String,
+    val name: String,
+    val address: String,
+    val selected: Boolean
+)
+
 data class AccountManageUiModel(
-    val selectedAccountName: String,
-    val selectedAccountNumber: String,
-    val selectedBalanceText: String,
-    val draftAmountText: String,
-    val accounts: List<TransferAccountOptionUiModel>
+    val accounts: List<TransferAccountOptionUiModel>,
+    val recipientWallets: List<RecipientWalletUiModel>
 )
 
 fun DemoState.toAccountManageUiModel(): AccountManageUiModel {
-    val selectedAccount = remittance.selectedAccount()
-
     return AccountManageUiModel(
-        selectedAccountName = selectedAccount.name,
-        selectedAccountNumber = selectedAccount.number,
-        selectedBalanceText = formatKrw(selectedAccount.balance),
-        draftAmountText = "$${remittance.draftAmountUsd}",
         accounts = remittance.accounts.map { account ->
             TransferAccountOptionUiModel(
                 id = account.id,
@@ -34,6 +32,14 @@ fun DemoState.toAccountManageUiModel(): AccountManageUiModel {
                 number = account.number,
                 balanceText = formatKrw(account.balance),
                 selected = account.id == remittance.selectedAccountId
+            )
+        },
+        recipientWallets = remittance.recipients.map { recipient ->
+            RecipientWalletUiModel(
+                id = recipient.id,
+                name = recipient.name,
+                address = recipient.address,
+                selected = recipient.id == remittance.selectedRecipientId
             )
         }
     )
