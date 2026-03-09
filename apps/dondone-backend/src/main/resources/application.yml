@@ -1,6 +1,6 @@
 spring:
   application:
-  name: dondone-backend
+    name: dondone-backend
   datasource:
     url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dondone}}
     driver-class-name: org.postgresql.Driver
@@ -20,7 +20,7 @@ server:
   port: 8080
 
 jwt:
-    secret: ${JWT_SECRET:dondone-local-secret-key-change-this-at-least-32chars}
+  secret: ${JWT_SECRET:dondone-local-secret-key-change-this-at-least-32chars}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:86400000}
 
 springdoc:
