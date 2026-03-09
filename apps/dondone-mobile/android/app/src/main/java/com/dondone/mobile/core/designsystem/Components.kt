@@ -203,10 +203,11 @@ fun DonDoneProgressBar(progress: Float) {
 fun PrimaryActionButton(
     text: String,
     onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier
 ) {
     Button(
-        modifier = Modifier
+        modifier = modifier
             .defaultMinSize(minHeight = 44.dp)
             .sizeIn(minWidth = 96.dp),
         enabled = enabled,
@@ -222,10 +223,11 @@ fun PrimaryActionButton(
 fun SecondaryActionButton(
     text: String,
     onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier
 ) {
     OutlinedButton(
-        modifier = Modifier
+        modifier = modifier
             .defaultMinSize(minHeight = 44.dp)
             .sizeIn(minWidth = 96.dp),
         enabled = enabled,

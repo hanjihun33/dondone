@@ -31,10 +31,14 @@ dependencies {
 
     runtimeOnly("org.postgresql:postgresql")
 
+    compileOnly("org.projectlombok:lombok")
     annotationProcessor("com.querydsl:querydsl-apt:5.1.0:jakarta")
     annotationProcessor("jakarta.annotation:jakarta.annotation-api")
     annotationProcessor("jakarta.persistence:jakarta.persistence-api")
+    annotationProcessor("org.projectlombok:lombok")
 
+    testCompileOnly("org.projectlombok:lombok")
+    testAnnotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:junit-jupiter")

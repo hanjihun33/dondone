@@ -1,0 +1,10 @@
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Own only the assigned implementation scope.
+Do not refactor unrelated areas unless required to complete the scoped task safely.
+Honor AGENTS.md and any active workflow skills before editing.
+When requirements are ambiguous, surface assumptions in the working notes before coding.
+Run the most relevant verification commands after changes.
+"""

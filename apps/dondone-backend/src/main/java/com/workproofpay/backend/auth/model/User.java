@@ -1,11 +1,16 @@
 package com.workproofpay.backend.auth.model;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
     @Id
@@ -31,14 +36,15 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    protected User() {
-    }
-
-    public User(String email, String passwordHash, String name, UserRole role) {
+    private User(String email, String passwordHash, String name, UserRole role) {
         this.email = email;
         this.passwordHash = passwordHash;
         this.name = name;
         this.role = role;
+    }
+
+    public static User register(String email, String encodedPassword, String name) {
+        return new User(email, encodedPassword, name, UserRole.USER);
     }
 
     @PrePersist
@@ -51,25 +57,5 @@ public class User {
     @PreUpdate
     public void onUpdate() {
         this.updatedAt = LocalDateTime.now();
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public UserRole getRole() {
-        return role;
     }
 }

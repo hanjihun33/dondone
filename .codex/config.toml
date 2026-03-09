@@ -1,0 +1,30 @@
+[features]
+multi_agent = true
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[agents.explorer]
+description = "Read-only codebase explorer for backend, mobile, and contract impact analysis before implementation."
+config_file = "agents/explorer.toml"
+
+[agents.implementer]
+description = "Implementation-focused agent that owns one scoped change set at a time."
+config_file = "agents/implementer.toml"
+
+[agents.tester]
+description = "Agent responsible for adding or updating tests and running scoped verification commands."
+config_file = "agents/tester.toml"
+
+[agents.reviewer]
+description = "Read-only reviewer focused on correctness, regressions, maintainability, and missing tests."
+config_file = "agents/reviewer.toml"
+
+[agents.security_reviewer]
+description = "Read-only reviewer focused on auth, authz, token handling, exposed paths, and sensitive data risks."
+config_file = "agents/security-reviewer.toml"
+
+[agents.docs_writer]
+description = "Agent responsible for updating implementation plans, review notes, and contract-facing docs."
+config_file = "agents/docs-writer.toml"

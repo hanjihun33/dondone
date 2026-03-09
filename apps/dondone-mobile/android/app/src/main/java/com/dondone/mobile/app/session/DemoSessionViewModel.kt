@@ -25,6 +25,10 @@ class DemoSessionViewModel : ViewModel() {
         _uiState.update { state -> DemoSessionReducer.openTransferFlow(state) }
     }
 
+    fun showAccountStep() {
+        _uiState.update { state -> DemoSessionReducer.showAccountStep(state) }
+    }
+
     fun showRecipientStep() {
         _uiState.update { state -> DemoSessionReducer.showRecipientStep(state) }
     }

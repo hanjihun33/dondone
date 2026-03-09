@@ -69,7 +69,7 @@ enum class TransferStatus {
 }
 
 enum class TransferFlowStep {
-    RECIPIENT, AMOUNT
+    ACCOUNT, RECIPIENT, AMOUNT
 }
 
 data class RemittanceData(
