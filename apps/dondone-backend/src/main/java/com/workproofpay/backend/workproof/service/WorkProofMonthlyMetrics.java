@@ -15,4 +15,18 @@ public record WorkProofMonthlyMetrics(
         int pendingRecordCount,
         List<Long> reflectedWorkProofIds
 ) {
+    public static WorkProofMonthlyMetrics empty(String yearMonth, LocalDate asOf) {
+        return new WorkProofMonthlyMetrics(
+                yearMonth,
+                asOf,
+                0,
+                0L,
+                0L,
+                0L,
+                0,
+                0,
+                0,
+                List.of()
+        );
+    }
 }

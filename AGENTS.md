@@ -91,6 +91,13 @@ If requirements remain ambiguous, state assumptions explicitly before coding.
   - `commit-grouping`
 - Keep agent roles thin and use skills as the detailed playbooks.
 - Use multi-agent exploration/review before or after implementation, not as an excuse to skip a scoped plan.
+- For non-trivial feature work, explicitly use `explorer` sub-agents to separate backend, mobile, and cross-cutting contract impact before implementation starts.
+- Use a separate `tester` sub-agent when the change affects DTO/API contracts, auth behavior, validation logic, or significant UI state transitions.
+- For non-trivial reviews, explicitly use sub-agents instead of doing all review work in the main thread.
+- Default review split:
+  - `reviewer` for correctness, regressions, contracts, and maintainability
+  - `security_reviewer` when auth, token, exposed-path, or sensitive-data impact exists
+- Use `docs_writer` when execution plans or review notes need durable cleanup or when the task materially changes documented contracts or workflow guidance.
 - Parallel implementation is allowed only after the execution plan explicitly marks the task as worktree-safe.
 - Do not split work across parallel lanes when shared DTOs, auth/security rules, shared entities, or common response contracts are still moving.
 - Record implementation plans in `docs/execplans/` and review findings or follow-up notes in `docs/reviews/` when the task is large enough to need them.

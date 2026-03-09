@@ -42,18 +42,7 @@ public class DemoStateService {
         WorkProofMonthlyMetrics metrics = workProofService.getMonthlyMetrics(userId, effectiveYearMonth, asOf);
         List<WorkProofResponse> workProofs = workProofService.getWorkProofs(userId, effectiveYearMonth, asOf);
         WageSummaryResponse wageSummary = wageService.getSummary(userId, effectiveYearMonth, asOf, normalizedHourlyWage, paydayDay);
-        WorkProofMonthlySummaryResponse workProofSummary = new WorkProofMonthlySummaryResponse(
-                metrics.yearMonth(),
-                metrics.asOf(),
-                metrics.totalWorkDays(),
-                metrics.totalWorkedMinutes(),
-                metrics.totalOvertimeMinutes(),
-                metrics.totalNightMinutes(),
-                metrics.editedRecordCount(),
-                metrics.reflectedRecordCount(),
-                metrics.pendingRecordCount(),
-                metrics.reflectedWorkProofIds()
-        );
+        WorkProofMonthlySummaryResponse workProofSummary = WorkProofMonthlySummaryResponse.from(metrics);
 
         return new DemoStateResponse(asOf, effectiveYearMonth, workProofSummary, workProofs, wageSummary);
     }

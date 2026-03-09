@@ -44,13 +44,22 @@ public class WageDeposit {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public WageDeposit(User user, String yearMonth, LocalDate depositDate, Long actualDepositAmount, boolean deductionsKnown, String note) {
+    private WageDeposit(User user, String yearMonth, LocalDate depositDate, Long actualDepositAmount, boolean deductionsKnown, String note) {
         this.user = user;
         this.yearMonth = yearMonth;
         this.depositDate = depositDate;
         this.actualDepositAmount = actualDepositAmount;
         this.deductionsKnown = deductionsKnown;
         this.note = note;
+    }
+
+    public static WageDeposit record(User user,
+                                     String yearMonth,
+                                     LocalDate depositDate,
+                                     Long actualDepositAmount,
+                                     boolean deductionsKnown,
+                                     String note) {
+        return new WageDeposit(user, yearMonth, depositDate, actualDepositAmount, deductionsKnown, note);
     }
 
     @PrePersist

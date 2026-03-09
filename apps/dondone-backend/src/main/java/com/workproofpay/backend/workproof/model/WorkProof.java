@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -75,22 +76,22 @@ public class WorkProof {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public WorkProof(User user,
-                     LocalDate workDate,
-                     LocalDateTime clockInAt,
-                     LocalDateTime clockOutAt,
-                     LocalDateTime deviceClockInAt,
-                     LocalDateTime deviceClockOutAt,
-                     LocalDateTime serverClockInAt,
-                     LocalDateTime serverClockOutAt,
-                     Double clockInLatitude,
-                     Double clockInLongitude,
-                     Double clockOutLatitude,
-                     Double clockOutLongitude,
-                     String memo,
-                     String editReason,
-                     int attachmentCount,
-                     WorkProofFinancialStatus financialStatus) {
+    private WorkProof(User user,
+                      LocalDate workDate,
+                      LocalDateTime clockInAt,
+                      LocalDateTime clockOutAt,
+                      LocalDateTime deviceClockInAt,
+                      LocalDateTime deviceClockOutAt,
+                      LocalDateTime serverClockInAt,
+                      LocalDateTime serverClockOutAt,
+                      Double clockInLatitude,
+                      Double clockInLongitude,
+                      Double clockOutLatitude,
+                      Double clockOutLongitude,
+                      String memo,
+                      String editReason,
+                      int attachmentCount,
+                      WorkProofFinancialStatus financialStatus) {
         this.user = user;
         this.workDate = workDate;
         this.clockInAt = clockInAt;
@@ -107,6 +108,55 @@ public class WorkProof {
         this.editReason = editReason;
         this.attachmentCount = attachmentCount;
         this.financialStatus = financialStatus;
+    }
+
+    public static WorkProof record(User user,
+                                   LocalDate workDate,
+                                   LocalDateTime clockInAt,
+                                   LocalDateTime clockOutAt,
+                                   LocalDateTime deviceClockInAt,
+                                   LocalDateTime deviceClockOutAt,
+                                   LocalDateTime serverRecordedAt,
+                                   Double clockInLatitude,
+                                   Double clockInLongitude,
+                                   Double clockOutLatitude,
+                                   Double clockOutLongitude,
+                                   String memo,
+                                   String editReason,
+                                   Integer attachmentCount) {
+        return new WorkProof(
+                user,
+                workDate,
+                clockInAt,
+                clockOutAt,
+                deviceClockInAt,
+                deviceClockOutAt,
+                serverRecordedAt,
+                clockOutAt == null ? null : serverRecordedAt,
+                clockInLatitude,
+                clockInLongitude,
+                clockOutLatitude,
+                clockOutLongitude,
+                memo,
+                editReason,
+                attachmentCount == null ? 0 : attachmentCount,
+                clockOutAt == null ? WorkProofFinancialStatus.PENDING : WorkProofFinancialStatus.REFLECTED
+        );
+    }
+
+    public boolean isReflected() {
+        return financialStatus == WorkProofFinancialStatus.REFLECTED && clockOutAt != null;
+    }
+
+    public boolean isEdited() {
+        return (editReason != null && !editReason.isBlank()) || attachmentCount > 0;
+    }
+
+    public long workedMinutes() {
+        if (clockOutAt == null) {
+            return 0L;
+        }
+        return Duration.between(clockInAt, clockOutAt).toMinutes();
     }
 
     @PrePersist
