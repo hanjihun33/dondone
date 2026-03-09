@@ -4,6 +4,8 @@ plugins {
     id("io.spring.dependency-management") version "1.1.4"
 }
 
+import org.gradle.api.tasks.testing.Test
+
 group = "com.workproofpay"
 version = "0.1.0-SNAPSHOT"
 
@@ -35,16 +37,23 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
 }
 
-sourceSets {
-    main {
-        java {
-            srcDir("build/generated/sources/annotationProcessor/java/main")
-        }
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("integration")
     }
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+tasks.register<Test>("integrationTest") {
+    description = "Runs Docker-based integration tests."
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    shouldRunAfter(tasks.named("test"))
+    useJUnitPlatform {
+        includeTags("integration")
+    }
 }

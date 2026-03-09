@@ -2,6 +2,7 @@ package com.workproofpay.backend.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workproofpay.backend.auth.api.dto.request.LoginRequest;
+import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -15,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class AuthLoginIntegrationTest {
+class AuthLoginIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

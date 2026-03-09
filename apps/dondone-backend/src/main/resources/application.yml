@@ -2,7 +2,7 @@ spring:
   application:
     name: dondone-backend
   datasource:
-    url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dondone}}
+    url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:dondone}}}
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:${SPRING_DATASOURCE_USERNAME:dondone}}
     password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:dondone}}
