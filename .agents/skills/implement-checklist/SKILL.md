@@ -27,6 +27,13 @@ Use this skill while coding, not for planning.
 - Keep UI states explicit for frontend/mobile changes: loading, empty, error, success.
 - Preserve backend/mobile contract consistency and required disclaimer messaging.
 - Prefer the smallest defensible design that keeps responsibilities clear.
+- Replace magic numbers and hardcoded domain values with named constants or clearly owned configuration when that improves readability and change safety.
+- Avoid unexplained hardcoded strings for statuses, keys, or messages when they are reused or domain-significant.
+- Keep names intention-revealing enough that the next maintainer can understand the role of a function, field, or component quickly.
+- Avoid mixing domain logic with transport, framework, or UI glue when one layer can own it clearly.
+- Prefer simpler control flow over deep nesting when restructuring is low-risk and improves clarity.
+- Do not increase coupling between modules or layers without a clear need.
+- Keep the resulting structure testable; avoid designs that make business logic hard to exercise in isolation.
 - Avoid spreading one business rule across multiple layers when one owner can hold it clearly.
 - Reduce duplication only when it improves clarity for this scoped change; do not perform broad cleanup work.
 - Leave brief comments only where future readers would otherwise miss an important constraint or non-obvious tradeoff.

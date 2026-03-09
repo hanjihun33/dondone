@@ -22,13 +22,26 @@ Agents do not need to read this for routine feature implementation unless the ta
 ## Default Flow
 
 1. Run `prd-breakdown` on the target PRD scope.
-2. Use `explorer` agents to gather backend, mobile, and contract impact as needed.
+2. Use `explorer` sub-agents to gather backend, mobile, and contract impact when the task is non-trivial.
+   - split at least by backend and mobile when both surfaces are affected
+   - add a cross-cutting exploration pass when DTO, auth, security, or shared contract risk exists
 3. Write an execution plan with `execplan-writer`.
 4. Decide whether the task is single-lane or safe for parallel worktrees.
-5. Implement with `implementer`, using `implement-checklist`.
-6. Add or update verification with `tester`, using `test-checklist`.
-7. Review with `reviewer` and, when needed, `security_reviewer`, using `review-checklist`.
-8. Prepare focused commits with `commit-grouping`.
+5. Implement:
+   - use the main thread for small, clearly local changes
+   - use `implementer` when a scoped implementation owner should work independently, especially in worktree-based parallel lanes
+   - always follow `implement-checklist`
+6. Add or update verification:
+   - use `tester` as a separate sub-agent when DTO/API contracts, auth, validation, or major UI state transitions changed
+   - otherwise a narrow verification pass in the implementation lane is acceptable
+   - always follow `test-checklist`
+7. Review with sub-agents:
+   - always use `reviewer` for non-trivial review
+   - additionally use `security_reviewer` when auth, authz, token, exposed-path, or sensitive-data impact exists
+   - when both are used, wait for both results and merge the findings in the main thread
+   - use `review-checklist` as the review playbook for each review agent
+8. Use `docs_writer` when execution plans, review notes, or contract-facing docs need structured updates after implementation or review.
+9. Prepare focused commits with `commit-grouping`.
 
 ## Document Lifecycle
 
