@@ -41,7 +41,9 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toHomeUiModel(),
                 onOpenTransfer = { navController.navigate(Route.ACCOUNT) },
                 onOpenAccount = { navController.navigate(Route.ACCOUNT) },
+                onOpenFinance = { navController.navigate(Route.FINANCE_HOME) },
                 onOpenWage = { navController.navigate(Route.WAGE) },
+                onOpenMenu = { navController.navigate(Route.MENU) },
                 onOpenWorkproof = { navController.navigate(Route.WORKPROOF) },
                 onClockIn = viewModel::clockIn,
                 onClockOut = viewModel::clockOut
@@ -68,7 +70,9 @@ fun DonDoneNavGraph(
                 onRecordDeposit = { viewModel.recordActualDeposit() },
                 onIncreaseDeposit = { viewModel.adjustActualDeposit(50_000) },
                 onDecreaseDeposit = { viewModel.adjustActualDeposit(-50_000) },
-                onOpenTransfer = { navController.navigate(Route.ACCOUNT) }
+                onOpenTransfer = { navController.navigate(Route.ACCOUNT) },
+                onOpenWorkproof = { navController.navigate(Route.WORKPROOF) },
+                onOpenMenu = { navController.navigate(Route.MENU) }
             )
         }
         composable(Route.TRANSFER) {

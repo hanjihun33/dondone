@@ -24,10 +24,46 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@Composable
+fun DonDoneWordmark(
+    modifier: Modifier = Modifier
+) {
+    val logoText = buildAnnotatedString {
+        withStyle(SpanStyle(brush = Brush.linearGradient(colors = DawnLogoGradient))) {
+            append("Don")
+        }
+        withStyle(SpanStyle(color = DawnText)) {
+            append("Done")
+        }
+    }
+
+    Text(
+        text = logoText,
+        modifier = modifier,
+        style = MaterialTheme.typography.headlineSmall.copy(
+            fontWeight = FontWeight.Black,
+            letterSpacing = (-0.72).sp,
+            shadow = Shadow(
+                color = Color(0x33171E5F),
+                offset = Offset(0f, 10f),
+                blurRadius = 24f
+            )
+        ),
+        maxLines = 1
+    )
+}
 
 @Composable
 fun DonDoneCard(

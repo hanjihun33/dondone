@@ -52,6 +52,7 @@ import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSecondary
 import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.designsystem.DonDoneWordmark
 
 @Composable
 fun DonDoneApp(
@@ -82,15 +83,19 @@ fun DonDoneApp(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = chrome.title,
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                            Text(
-                                text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = DawnTextSubtle
-                            )
+                            if (currentRoute == Route.HOME) {
+                                DonDoneWordmark()
+                            } else {
+                                Text(
+                                    text = chrome.title,
+                                    style = MaterialTheme.typography.headlineSmall
+                                )
+                                Text(
+                                    text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = DawnTextSubtle
+                                )
+                            }
                         }
                         if (chrome.showSettingsAction) {
                             IconButton(onClick = { navController.navigate(Route.MENU) }) {
