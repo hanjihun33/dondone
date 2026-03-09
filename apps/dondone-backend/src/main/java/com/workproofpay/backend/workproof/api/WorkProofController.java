@@ -59,18 +59,6 @@ public class WorkProofController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf
     ) {
         WorkProofMonthlyMetrics metrics = workProofService.getMonthlyMetrics(user.userId(), yearMonth, asOf);
-        WorkProofMonthlySummaryResponse response = new WorkProofMonthlySummaryResponse(
-                metrics.yearMonth(),
-                metrics.asOf(),
-                metrics.totalWorkDays(),
-                metrics.totalWorkedMinutes(),
-                metrics.totalOvertimeMinutes(),
-                metrics.totalNightMinutes(),
-                metrics.editedRecordCount(),
-                metrics.reflectedRecordCount(),
-                metrics.pendingRecordCount(),
-                metrics.reflectedWorkProofIds()
-        );
-        return ApiResponse.success(response);
+        return ApiResponse.success(WorkProofMonthlySummaryResponse.from(metrics));
     }
 }
