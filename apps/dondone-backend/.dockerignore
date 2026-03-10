@@ -1,0 +1,23 @@
+# 빌드 클래스 및 컴파일 출력물
+build/
+.gradle/
+bin/
+target/
+.mvn/
+
+# IDE 및 OS 시스템 파일
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+*.iml
+.DS_Store
+
+# 로그
+logs/
+*.log
+
+# Git
+.git/
+.gitignore
