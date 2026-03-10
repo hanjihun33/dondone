@@ -4,7 +4,7 @@
 - 작성일: 2026-03-09
 - 기준 문서: `docs/DonDone_PRD_v1.5.md`
 - 상태: Draft v0
-- 목적: PRD P0 범위를 기준으로, 모바일/프론트와 백엔드가 같은 계약을 보고 병렬 구현을 시작할 수 있게 한다.
+- 목적: PRD P0 전체를 같은 문서 안에서 읽을 수 있게 정리하고, 이미 비교적 안정적인 계약과 아직 최소 스케치 수준인 계약의 차이를 함께 드러낸다.
 
 ## 표기 메모
 - `배경`: 왜 이 모양의 API로 두었는지 공유용으로 짧게 설명한다.
@@ -16,15 +16,16 @@
 
 | 항목 | 이번 문서 기준 |
 | --- | --- |
-| expected behavior | PRD P0 기준 `auth`, `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault` API 초안을 정의한다. |
-| exact scope | `home`, `copilot`, `time travel`은 이번 문서에서 제외한다. `auth`는 기존 구현을 반영하고, 나머지는 신규 계약 초안으로 정의한다. |
-| contract changes | 공통 응답 envelope은 `ApiResponse<T>` 형식의 `data`를 유지한다. 중복 비용이 큰 API는 `Idempotency-Key` 규칙을 포함한다. |
-| security impact | `/api/auth/login`, `/api/auth/signup`, `/health`, Swagger 외 나머지 API는 JWT 보호 대상으로 본다. 타인 리소스는 `404`로 숨긴다. |
-| non-functional impact | 문서 생성과 송금은 비동기 처리로 설계하고 `202 Accepted`를 사용한다. P0는 데모/테스트넷 기준이며 실거래/실정산을 다루지 않는다. |
+| expected behavior | PRD P0 기준 `home`, `auth`, `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault`, `copilot`, `demo` API 초안을 같은 문서에서 읽을 수 있게 한다. 덜 굳은 항목은 최소 계약 스케치로 포함한다. |
+| exact scope | `home`, `auth`, `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault`, `copilot`, `demo time travel`을 다룬다. |
+| contract changes | 공통 응답 envelope은 `ApiResponse<T>` 형식의 `data`를 유지한다. 중복 비용이 큰 API는 `Idempotency-Key` 규칙을 포함한다. 이번 정리에는 `home`, `copilot`, `demo` 최소 계약 스케치가 추가된다. |
+| security impact | `/api/auth/login`, `/api/auth/signup`, `/health`, Swagger 외 나머지 API는 JWT 보호 대상으로 본다. 타인 리소스는 `404`로 숨긴다. Copilot은 facts-only, Demo Time Travel은 demo account 전용으로 둔다. |
+| non-functional impact | 문서 생성과 송금은 비동기 처리로 설계하고 `202 Accepted`를 사용한다. P0는 데모/테스트넷 기준이며 실거래/실정산을 다루지 않는다. Demo 모드는 `X-Demo-AsOf` 기준 재현성을 우선한다. |
 
 ## 범위
 
 ### 포함
+- Money Home
 - Auth
 - WorkProof
 - Advance
@@ -34,17 +35,19 @@
 - Remittance
 - SafePay
 - Vault
+- Copilot
+- Demo Time Travel
 
 ### 제외
-- Home API
-- Copilot API
-- Demo Time Travel / `X-Demo-AsOf`
 - P1 범위 전부
+- 실거래/실정산/실수익 보장
+- Copilot 자유 대화형 확장
+- 릴리스 빌드용 Demo Time Travel 노출
 
 공유 초안 메모:
-- 이번 문서는 PRD P0 전체 중 구현 우선 검토가 필요한 핵심 API만 먼저 담는다.
-- Home / Copilot / Demo Time Travel은 P0에 존재하지만, 이 초안에서는 별도 문서 후보로 분리한다.
-
+- 이번 문서는 PRD P0 전체를 같은 문서 안에 담는다.
+- `Money Home`, `Copilot`, `Demo Time Travel`은 현재 세부 계약이 비교적 얇아도 제외하지 않고 최소 스케치로 유지한다.
+- `W7 WorkProof Integrity`는 WorkProof 하위 규칙으로 포함하고, 별도 top-level 도메인으로 분리하지 않는다.
 ## 계약 안정도 구분
 
 ### 1. 확정
@@ -52,14 +55,16 @@
 - 공통 응답 envelope은 `success`, `code`, `message`, `data`, `timestamp`를 사용한다.
 - 공통 에러 형식도 같은 envelope을 사용한다.
 - `auth`는 현재 백엔드 구현을 기준으로 문서에 반영한다.
-- P0 도메인은 `auth -> workproof -> advance -> wage -> documents -> claim -> remittance -> safepay -> vault` 순서로 정리한다.
+- P0 범위는 문서에서 숨기지 않고 모두 같은 문서 안에 유지한다.
 - 중복 비용이 큰 신청/전송/문서 생성 API는 `Idempotency-Key`를 사용한다.
 - 문서 생성과 송금은 비동기 처리 전제를 둔다.
 - 제품 정책은 테스트넷/데모 기준이며, 실거래/실정산을 의미하지 않는다.
+- Copilot은 facts-only, 숫자 재계산 금지 원칙을 유지한다.
 
 ### 2. v0 가정
 - `DAILY`는 미지정 시 `480분`을 기본값으로 두고, `MONTHLY`는 시스템 기본값을 제공한 뒤 조정 가능하게 둔다.
 - WorkProof 누락 기록은 기존 record 수정과 분리한 provisional API로 먼저 둔다.
+- WorkProof Integrity(W7)는 별도 독립 endpoint보다 record detail / monthly summary / advance eligibility 같은 응답 안에 녹여 노출한다.
 - Advance 데모 상한은 `500,000 KRW` 기본값으로 둔다.
 - Wage 차액 감지 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 시 `50,000원 또는 3%`로 둔다.
 - WorkProof 동일 날짜 다중 근무는 후속 확장 전까지 허용하지 않는 방향으로 시작한다.
@@ -68,22 +73,26 @@
 - Vault는 순수 시뮬레이션이며 실제 온체인 예치/수익 실현을 하지 않는다.
 - Claim 요약 문장은 facts 기반 템플릿/생성 결과를 반환하는 것으로 둔다.
 - WorkProof 첨부는 `attachmentId` 참조 방식으로 설계하고, 업로드는 같은 도메인에서 선행 처리한다.
+- Money Home은 현재 월 기준 단일 summary 응답을 우선 사용한다.
+- Copilot은 하나의 intent 기반 endpoint로 설명 / 제출용 요약 / 번역을 함께 처리하는 방향을 우선 사용한다.
+- Demo Time Travel은 `POST /api/demo/seed`, `POST /api/demo/reset`, `GET /api/demo/state`, `X-Demo-AsOf` 조합을 우선 사용한다.
 
 ### 3. 후속 확장
-- Home 조합 API
-- Copilot 전용 API
-- Demo Time Travel API
+- Home 카드 단위 분리 API
+- Home 개인화 추천 고도화
+- Copilot RAG-lite / FAQ 연동
+- Demo Time Travel 장면 스크립트/세부 제어 확장
 - P1 범위 전부
 - 다중 근무지 동시 활성 계약
 - WorkProof 자동 지오펜스
 - Wage 명세서 자동 파싱
 - Remittance 정기 송금
 - Vault 실제 메인넷 연동
-
 ## 공통 규칙
 
 ### Base Path
 - `auth`: `/api/auth`
+- `home`: `/api/home`
 - `workproof`: `/api/workproof`
 - `advance`: `/api/advance`
 - `wage`: `/api/wage`
@@ -92,6 +101,8 @@
 - `remittance`: `/api/remittance`
 - `safepay`: `/api/safepay`
 - `vault`: `/api/vault`
+- `copilot`: `/api/copilot`
+- `demo`: `/api/demo`
 
 ### 인증
 - 기본값: `Authorization: Bearer {accessToken}` 필요
@@ -104,7 +115,13 @@
 | `Authorization` | 보호 API만 필수 | JWT access token |
 | `Idempotency-Key` | 일부 POST 필수, 일부 권장 | 중복 비용이 큰 요청 방지 키 |
 | `Accept-Language` | 선택 | 다국어 안내 문구/정책 문구 출력 언어 |
+| `X-Demo-AsOf` | demo mode 읽기 API에서 선택 | 데모 모드 기준일 고정 렌더(`YYYY-MM-DD`) |
 
+### 공통 데모 모드 규칙
+- `X-Demo-AsOf`는 demo account / demo mode에서만 유효하다.
+- 우선 지원 대상은 `home`, `workproof`, `advance`, `wage`, `remittance`, `vault`, `copilot` 같은 읽기 API다.
+- mutating API는 별도 명시가 없으면 `X-Demo-AsOf`를 무시한다.
+- 일반 계정이나 릴리스 빌드에서는 이 헤더를 무시하거나 `403`으로 차단한다.
 ### 공통 응답 Envelope
 
 ```json
@@ -238,9 +255,46 @@ Response `200 OK`:
 | `name` | - |
 | `role` | - |
 
+## 1A. Home
+
+> PRD 7A 기준. 상태: `P0-초안`. 메인 홈 조합 응답의 최소 계약만 정의한다.
+
+### 주요 엔드포인트
+
+| Method | Path | 설명 |
+| --- | --- | --- |
+| `GET` | `/api/home/summary` | 이번 달 내 돈 상태, 다음 행동, 빠른 금융 액션 조회 |
+
+### 1A.1 `GET /api/home/summary`
+
+배경: 홈은 기록 목록보다 `이번 달 내 돈 상태`를 먼저 보여주는 핀테크 메인 화면이어야 한다.
+v0 메모: 카드 분리 API 전에 hero/CTA/quick actions/today work를 하나의 조합 응답으로 먼저 묶는다.
+확장 메모: 후속에 카드 단위 endpoint 또는 personalization layer로 분리할 수 있다.
+
+Query:
+| 필드 | 설명 |
+| --- | --- |
+| `month` | 선택. 미지정 시 현재 월(`YYYY-MM`) |
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `asOf` | 현재 해석 기준일. demo mode면 `X-Demo-AsOf` 반영 |
+| `hero` | object. 하위 필드: estimatedWageAmount, actualIncomeStatus, advanceEligibleAmount, transferableAmount, statusReasonCode |
+| `nextAction` | object. 하위 필드: actionKey, title, description, route, emphasis |
+| `quickActions[]` | array<object>. 배열 항목: actionKey, title, route, enabled, badge |
+| `todayWorkCard` | object 또는 null. 하위 필드: headline, supportText, reflectionStatus, actionLabel, route |
+| `disclaimer` | - |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | month 포맷 오류 |
+
 ## 2. WorkProof
 
-> PRD 7B 기준. W1, W2, W3, W4, W5, W6를 API 관점에서 풀어 쓴다.
+> PRD 7B 기준. W1, W2, W3, W4, W5, W6를 API 관점에서 풀어 쓰고, W7 Integrity는 WorkProof 내부 상태/요약 필드로 반영한다.
 
 ### 주요 엔드포인트
 
@@ -569,6 +623,7 @@ Response:
 | `nightMinutes` | - |
 | `modifiedRecordCount` | - |
 | `reflection` | object. 하위 필드: reflectedRecordCount, needsReviewRecordCount, excludedRecordCount |
+| `integrity` | object. 하위 필드: recordedWorkDays, reflectedWorkDays, verifiedMinutes, pendingMinutes, workproofRiskFlags[] |
 | `financeReadiness` | object. 하위 필드: advanceEligibleWorkDays, wageUsableWorkDays |
 
 ## 3. Advance
@@ -596,9 +651,13 @@ Response:
 | `availableAmount` | - |
 | `maxCap` | - |
 | `policyRate` | - |
+| `repaymentTier` | - |
 | `reflectedWorkDays` | - |
 | `reflectedWorkMinutes` | - |
+| `verifiedMinutes` | - |
+| `pendingMinutes` | - |
 | `needsReviewRecordCount` | - |
+| `blockReasonCodes[]` | array<string>. 차단 또는 제한 사유 코드 |
 | `nextTierRemainingMinutes` | - |
 | `estimatedFee` | - |
 | `estimatedRepaymentDate` | - |
@@ -1234,17 +1293,142 @@ Response:
 | `availableToTransferAmount` | - |
 | `simulatedAt` | - |
 
+## 10. Copilot
+
+> PRD 8 기준. 상태: `P0-초안`. facts-only 보조 응답의 최소 계약을 정의한다.
+
+### 주요 엔드포인트
+
+| Method | Path | 설명 |
+| --- | --- | --- |
+| `POST` | `/api/copilot/answers` | 화면 facts 기반 설명 / 제출용 요약 / 번역 생성 |
+
+### 10.1 `POST /api/copilot/answers`
+
+배경: Copilot은 자유 대화보다 `현재 화면을 더 쉽게 이해하고 행동하게 돕는 보조 응답`을 우선한다.
+v0 메모: 설명 / 제출용 요약 / 번역을 하나의 intent 기반 endpoint로 먼저 묶는다.
+확장 메모: explain / claim-summary / translate 분리 endpoint로 재편할 수 있다.
+
+Request:
+| 필드 | 설명 |
+| --- | --- |
+| `intent` | `EXPLAIN_SCREEN`, `DRAFT_CLAIM_SUMMARY`, `TRANSLATE_FACTS` |
+| `screenType` | `HOME`, `WAGE_VERIFICATION`, `SAFEPAY`, `CLAIM_PREPARATION` |
+| `question` | 선택 |
+| `locale` | 선택 |
+| `targetLocale` | 번역 시 선택 |
+| `tone` | 선택. `PLAIN`, `POLITE`, `SHORT` |
+| `facts` | object. 서버 facts 스냅샷 |
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `intent` | - |
+| `answerText` | - |
+| `evidenceFacts[]` | array<object>. 배열 항목: label, value, sourceKey |
+| `suggestedQuestions[]` | array<string> |
+| `disclaimer` | `이 안내는 화면에 표시된 사실을 바탕으로 작성된 참고 문장입니다.` |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `400` | `FACTS_REQUIRED` | facts 누락 |
+| `400` | `UNSUPPORTED_COPILOT_INTENT` | 지원하지 않는 intent |
+| `403` | `COPILOT_NOT_AVAILABLE` | 현재 화면/계정에서 비활성 |
+
+## 11. Demo Time Travel
+
+> PRD 9 기준. 상태: `P0-초안`. demo account 전용 재현 장치의 최소 계약을 정의한다.
+
+### 주요 엔드포인트
+
+| Method | Path | 설명 |
+| --- | --- | --- |
+| `POST` | `/api/demo/seed` | 고정 demo seed 준비 |
+| `POST` | `/api/demo/reset` | demo state reset |
+| `GET` | `/api/demo/state?asOf=YYYY-MM-DD` | 현재 demo meta/state 조회 |
+
+### 11.1 `POST /api/demo/seed`
+
+배경: 데모 시작 전 고정 시드 데이터를 한 번 주입해 슬라이더 재생 시나리오를 안정화한다.
+v0 메모: 소수의 고정 scenario key로 시작한다.
+
+Request:
+| 필드 | 설명 |
+| --- | --- |
+| `scenarioKey` | 선택. 예: `DEFAULT_MONTH_JOURNEY`, `WAGE_GAP_CASE` |
+
+Response `202 Accepted`:
+| 필드 | 설명 |
+| --- | --- |
+| `seedId` | - |
+| `scenarioKey` | - |
+| `defaultAsOf` | - |
+| `minAsOf` | - |
+| `maxAsOf` | - |
+| `enabled` | - |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `403` | `DEMO_MODE_DISABLED` | demo mode 비활성 |
+| `409` | `DEMO_SEED_ALREADY_ACTIVE` | 활성 seed 존재 |
+
+### 11.2 `POST /api/demo/reset`
+
+배경: 데모 재시작을 빠르게 하기 위해 현재 demo state를 초기화한다.
+
+Response `202 Accepted`:
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `status` | `QUEUED` 또는 `DONE` |
+| `pollUrl` | - |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `403` | `DEMO_MODE_DISABLED` | - |
+
+### 11.3 `GET /api/demo/state?asOf=YYYY-MM-DD`
+
+배경: 슬라이더/재생 UI가 현재 demo range와 scene 구간을 읽을 수 있게 하는 메타 조회다.
+v0 메모: 개별 도메인 화면은 별도 demo endpoint보다 기존 읽기 API + `X-Demo-AsOf`를 우선 사용한다.
+
+Query:
+| 필드 | 설명 |
+| --- | --- |
+| `asOf` | 선택. 미지정 시 현재 demo 기준일 |
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `enabled` | - |
+| `seedId` | - |
+| `currentAsOf` | - |
+| `minAsOf` | - |
+| `maxAsOf` | - |
+| `scenes[]` | array<object>. 배열 항목: sceneKey, label, from, to |
+| `notes[]` | array<string>. 현재 장면 설명 또는 안내 문구 |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | asOf 포맷 오류 |
+| `403` | `DEMO_MODE_DISABLED` | demo mode 비활성 |
+
 ## 공통 구현 메모
 - `auth`는 현재 구현을 기준으로 유지한다.
-- `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault`는 feature-first 구조를 유지한다.
+- `home`, `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault`, `copilot`, `demo`는 feature-first 구조를 유지한다.
 - 문서 생성과 송금은 비동기 job 모델을 따른다.
+- Demo Time Travel 공통 해석은 `demo` 또는 shared resolver에서 처리하되, 실제 계산은 각 도메인 서비스가 맡는다.
+- Copilot은 raw user prompt만 보지 않고 서버 facts 스냅샷을 입력으로 받는다.
 - 외부 연동은 `adapter` 인터페이스 뒤에 둔다.
 - 공유용 초안에서는 각 API에 짧은 `배경` / `v0 메모`를 붙여 결정 이유와 조정 가능 지점을 함께 보여준다.
-- PRD 전체 P0 기준 문서지만, `v0 가정` 영역은 후속 조정 가능성을 열어둔다.
+- PRD 전체 P0 기준 문서이므로, 덜 굳은 항목도 최소 스케치 상태로 문서 안에 남긴다.
 
 ## 다음 보강 후보
-- `home` 조합 응답 초안
-- `copilot` facts API 초안
-- `time travel` / `X-Demo-AsOf` 규칙 초안
+- `summary`, `relatedDocuments[]`, `checklist[]`, `relatedLinks[]` 같은 중첩 object의 최소 의미 정의 보강
+- Home / Copilot / Demo Time Travel 예시 JSON 추가
 - domain별 DTO field-level validation 상세화
-- domain별 예시 JSON 확장
+- W7 Integrity 결과 필드의 명확한 노출 위치 정리
