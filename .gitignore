@@ -1,6 +1,9 @@
 .idea/
 S14P11C205/
 
+# backend IDE/build output
+apps/dondone-backend/bin/
+
 # environment
 .env
 .env.local
