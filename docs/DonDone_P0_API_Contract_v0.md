@@ -6,13 +6,19 @@
 - 상태: Draft v0
 - 목적: PRD P0 범위를 기준으로, 모바일/프론트와 백엔드가 같은 계약을 보고 병렬 구현을 시작할 수 있게 한다.
 
+## 표기 메모
+- `배경`: 왜 이 모양의 API로 두었는지 공유용으로 짧게 설명한다.
+- `v0 메모`: 현재 초안 기준 기본값, 임시 정책, 구현 중 조정 가능 지점을 적는다.
+- `확장 메모`: 후속 분리, 별도 정책 문서화, P1 확장 가능성을 가볍게 남긴다.
+- 요청/응답은 공통 객체 참조보다 self-contained 표기를 우선하고, 중첩 객체는 각 API 안에서 최소 필드를 읽을 수 있게 적는다.
+
 ## 요구사항 확인
 
 | 항목 | 이번 문서 기준 |
 | --- | --- |
 | expected behavior | PRD P0 기준 `auth`, `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault` API 초안을 정의한다. |
 | exact scope | `home`, `copilot`, `time travel`은 이번 문서에서 제외한다. `auth`는 기존 구현을 반영하고, 나머지는 신규 계약 초안으로 정의한다. |
-| contract changes | 공통 응답 envelope은 `ApiResponse<T>` 형식의 `data`를 유지한다. 중복 요청 위험이 있는 API는 `Idempotency-Key` 규칙을 포함한다. |
+| contract changes | 공통 응답 envelope은 `ApiResponse<T>` 형식의 `data`를 유지한다. 중복 비용이 큰 API는 `Idempotency-Key` 규칙을 포함한다. |
 | security impact | `/api/auth/login`, `/api/auth/signup`, `/health`, Swagger 외 나머지 API는 JWT 보호 대상으로 본다. 타인 리소스는 `404`로 숨긴다. |
 | non-functional impact | 문서 생성과 송금은 비동기 처리로 설계하고 `202 Accepted`를 사용한다. P0는 데모/테스트넷 기준이며 실거래/실정산을 다루지 않는다. |
 
@@ -35,6 +41,10 @@
 - Demo Time Travel / `X-Demo-AsOf`
 - P1 범위 전부
 
+공유 초안 메모:
+- 이번 문서는 PRD P0 전체 중 구현 우선 검토가 필요한 핵심 API만 먼저 담는다.
+- Home / Copilot / Demo Time Travel은 P0에 존재하지만, 이 초안에서는 별도 문서 후보로 분리한다.
+
 ## 계약 안정도 구분
 
 ### 1. 확정
@@ -43,12 +53,15 @@
 - 공통 에러 형식도 같은 envelope을 사용한다.
 - `auth`는 현재 백엔드 구현을 기준으로 문서에 반영한다.
 - P0 도메인은 `auth -> workproof -> advance -> wage -> documents -> claim -> remittance -> safepay -> vault` 순서로 정리한다.
-- 중복 요청 위험이 큰 생성/신청/전송/문서 API는 `Idempotency-Key`를 사용한다.
+- 중복 비용이 큰 신청/전송/문서 생성 API는 `Idempotency-Key`를 사용한다.
 - 문서 생성과 송금은 비동기 처리 전제를 둔다.
 - 제품 정책은 테스트넷/데모 기준이며, 실거래/실정산을 의미하지 않는다.
 
 ### 2. v0 가정
-- `DAILY`, `MONTHLY` 기준 시간의 기본값 책임은 아직 열어둔다.
+- `DAILY`는 미지정 시 `480분`을 기본값으로 두고, `MONTHLY`는 시스템 기본값을 제공한 뒤 조정 가능하게 둔다.
+- WorkProof 누락 기록은 기존 record 수정과 분리한 provisional API로 먼저 둔다.
+- Advance 데모 상한은 `500,000 KRW` 기본값으로 둔다.
+- Wage 차액 감지 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 시 `50,000원 또는 3%`로 둔다.
 - WorkProof 동일 날짜 다중 근무는 후속 확장 전까지 허용하지 않는 방향으로 시작한다.
 - Wage 계산 경계는 연장 `일별 480분 초과`, 야간 `22:00~06:00` 겹침 분으로 둔다.
 - SafePay 고액 추가 확인 기준은 절대/상대값 혼합 정책으로 두되, 세부 임계값은 후속 정책 문서에서 고정한다.
@@ -89,7 +102,7 @@
 | 헤더 | 필수 | 설명 |
 | --- | --- | --- |
 | `Authorization` | 보호 API만 필수 | JWT access token |
-| `Idempotency-Key` | 일부 POST 필수 | 중복 요청 방지 키 |
+| `Idempotency-Key` | 일부 POST 필수, 일부 권장 | 중복 비용이 큰 요청 방지 키 |
 | `Accept-Language` | 선택 | 다국어 안내 문구/정책 문구 출력 언어 |
 
 ### 공통 응답 Envelope
@@ -131,6 +144,7 @@
   - `requestId`
   - `status`
   - `pollUrl`
+- 여기서 `status`는 비동기 job 상태를 뜻하고, 실제 문서/송금 리소스 상태는 각 도메인 섹션에서 별도로 정의한다.
 - 상태 enum 초안
   - `QUEUED`
   - `RUNNING`
@@ -163,50 +177,70 @@
 
 ### `POST /api/auth/signup`
 
+배경: 현재 백엔드 auth baseline을 그대로 반영해 초기 연동 차이를 줄인다.
+
 Request:
-- `email`: string
-- `password`: string, 최소 8자
-- `name`: string, 최대 100자
+| 필드 | 설명 |
+| --- | --- |
+| `email` | string |
+| `password` | string, 최소 8자 |
+| `name` | string, 최대 100자 |
 
 Response `201 Created`:
-- `userId`
-- `email`
-- `name`
-- `role`
+| 필드 | 설명 |
+| --- | --- |
+| `userId` | - |
+| `email` | - |
+| `name` | - |
+| `role` | - |
 
 주요 에러:
-- `409 EMAIL_ALREADY_EXISTS`
-- `400 VALIDATION_ERROR`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `409` | `EMAIL_ALREADY_EXISTS` | - |
+| `400` | `VALIDATION_ERROR` | - |
 
 ### `POST /api/auth/login`
 
+배경: JWT 발급 규칙은 기존 구현을 유지해 보안 설정과 문서가 어긋나지 않게 한다.
+
 Request:
-- `email`
-- `password`
+| 필드 | 설명 |
+| --- | --- |
+| `email` | - |
+| `password` | - |
 
 Response `200 OK`:
-- `accessToken`
-- `tokenType`
-- `expiresIn`
-- `userId`
-- `email`
-- `name`
+| 필드 | 설명 |
+| --- | --- |
+| `accessToken` | - |
+| `tokenType` | - |
+| `expiresIn` | - |
+| `userId` | - |
+| `email` | - |
+| `name` | - |
 
 주요 에러:
-- `401 INVALID_CREDENTIALS`
-- `400 VALIDATION_ERROR`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `401` | `INVALID_CREDENTIALS` | - |
+| `400` | `VALIDATION_ERROR` | - |
 
 ### `GET /api/auth/me`
 
+배경: 보호 화면 진입 시 현재 사용자 컨텍스트를 가장 단순하게 복구하기 위한 조회다.
+
 Response `200 OK`:
-- `userId`
-- `email`
-- `name`
-- `role`
+| 필드 | 설명 |
+| --- | --- |
+| `userId` | - |
+| `email` | - |
+| `name` | - |
+| `role` | - |
 
 ## 2. WorkProof
 
-> PRD 7B 기준. W1, W2, W3, W4, W5, W6을 API 관점에서 풀어 쓴다.
+> PRD 7B 기준. W1, W2, W3, W4, W5, W6를 API 관점에서 풀어 쓴다.
 
 ### 주요 엔드포인트
 
@@ -219,178 +253,264 @@ Response `200 OK`:
 | `POST` | `/api/workproof/attachments` | 수정 첨부 업로드 |
 | `POST` | `/api/workproof/records/check-in` | 출근 기록 생성 |
 | `POST` | `/api/workproof/records/check-out` | 퇴근 기록 확정 |
-| `POST` | `/api/workproof/records/{recordId}/modifications` | 근무 기록 수정 |
+| `POST` | `/api/workproof/records/missing` | 누락 근무 기록 생성(초안) |
+| `POST` | `/api/workproof/records/{recordId}/modifications` | 기존 근무 기록 수정 |
 | `GET` | `/api/workproof/records?month=YYYY-MM&workplaceId={id}` | 월별 기록 목록 |
 | `GET` | `/api/workproof/records/{recordId}` | 기록 상세 |
 | `GET` | `/api/workproof/monthly-summary?month=YYYY-MM&workplaceId={id}` | 월간 요약/반영 상태 |
 
 ### 2.1 `POST /api/workproof/workplaces`
 
+배경: WorkProof는 workplace를 기준축으로 잡아 이후 contract와 record 해석이 흔들리지 않게 한다.
+
 Request:
-- `name`: 1~100자
-- `address`: 1~255자
-- `mapLabel`: 선택
-- `latitude`: 필수
-- `longitude`: 필수
+| 필드 | 설명 |
+| --- | --- |
+| `name` | 1~100자 |
+| `address` | 1~255자 |
+| `mapLabel` | 선택 |
+| `latitude` | 필수 |
+| `longitude` | 필수 |
 
 Response:
-- `workplaceId`
-- `name`
-- `address`
-- `mapLabel`
-- `latitude`
-- `longitude`
-- `createdAt`
+| 필드 | 설명 |
+| --- | --- |
+| `workplaceId` | - |
+| `name` | - |
+| `address` | - |
+| `mapLabel` | - |
+| `latitude` | - |
+| `longitude` | - |
+| `createdAt` | - |
 
 주요 에러:
-- `400 VALIDATION_ERROR`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | - |
 
 ### 2.2 `GET /api/workproof/workplaces`
 
+배경: 출근 화면과 월간 화면이 같은 근무지 목록을 재사용할 수 있게 단순 목록으로 둔다.
+
 Response:
-- `workplaces[]`
-  - `workplaceId`
-  - `name`
-  - `address`
-  - `mapLabel`
-  - `latitude`
-  - `longitude`
-  - `hasActiveContract`
+| 필드 | 설명 |
+| --- | --- |
+| `workplaces[]` | array<object>. 배열 항목: workplaceId, name, address, mapLabel, latitude, longitude, hasActiveContract |
 
 ### 2.3 `POST /api/workproof/contracts`
 
+배경: 급여 입력은 단순 UI로 유지하되, 서버는 환산 시급 기준으로 재사용 가능한 계약을 만든다.
+v0 메모: `DAILY`는 `dailyWorkMinutes` 미지정 시 `480`, `MONTHLY`는 `monthlyWorkMinutes` 미지정 시 시스템 기본값을 사용한다.
+
 Request:
-- `workplaceId`
-- `payUnit`: `HOURLY`, `DAILY`, `MONTHLY`
-- `basePayAmount`
-- `dailyWorkMinutes`: `DAILY`일 때 필요
-- `monthlyWorkMinutes`: `MONTHLY`일 때 필요
-- `effectiveFrom`: 선택, 미지정 시 오늘
+| 필드 | 설명 |
+| --- | --- |
+| `workplaceId` | - |
+| `payUnit` | `HOURLY`, `DAILY`, `MONTHLY` |
+| `basePayAmount` | - |
+| `dailyWorkMinutes` | `DAILY`일 때 선택, 미지정 시 `480` |
+| `monthlyWorkMinutes` | `MONTHLY`일 때 선택, 미지정 시 시스템 기본값 사용 |
+| `effectiveFrom` | 선택, 미지정 시 오늘 |
 
 Response:
-- `contractId`
-- `workplaceId`
-- `payUnit`
-- `basePayAmount`
-- `dailyWorkMinutes`
-- `monthlyWorkMinutes`
-- `normalizedHourlyWage`
-- `effectiveFrom`
-- `isActive`
+| 필드 | 설명 |
+| --- | --- |
+| `contractId` | - |
+| `workplaceId` | - |
+| `payUnit` | - |
+| `basePayAmount` | - |
+| `dailyWorkMinutes` | - |
+| `monthlyWorkMinutes` | - |
+| `normalizedHourlyWage` | - |
+| `effectiveFrom` | - |
+| `isActive` | - |
 
 주요 에러:
-- `404 WORKPLACE_NOT_FOUND`
-- `409 ACTIVE_CONTRACT_EXISTS`
-- `400 VALIDATION_ERROR`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `WORKPLACE_NOT_FOUND` | - |
+| `409` | `ACTIVE_CONTRACT_EXISTS` | - |
+| `400` | `VALIDATION_ERROR` | - |
 
 ### 2.4 `GET /api/workproof/contracts/current?workplaceId={id}`
 
+배경: 체크인, 월간 집계, Wage 계산이 모두 같은 현재 활성 계약을 공통으로 참조한다.
+
 Response:
-- `contractId`
-- `workplaceId`
-- `payUnit`
-- `basePayAmount`
-- `dailyWorkMinutes`
-- `monthlyWorkMinutes`
-- `normalizedHourlyWage`
-- `effectiveFrom`
-- `effectiveTo`
-- `isActive`
+| 필드 | 설명 |
+| --- | --- |
+| `contractId` | - |
+| `workplaceId` | - |
+| `payUnit` | - |
+| `basePayAmount` | - |
+| `dailyWorkMinutes` | - |
+| `monthlyWorkMinutes` | - |
+| `normalizedHourlyWage` | - |
+| `effectiveFrom` | - |
+| `effectiveTo` | - |
+| `isActive` | - |
 
 주요 에러:
-- `404 ACTIVE_CONTRACT_NOT_FOUND`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `ACTIVE_CONTRACT_NOT_FOUND` | - |
 
 ### 2.5 `POST /api/workproof/attachments`
 
+배경: 수정 증빙과 문서 묶음에서 같은 첨부를 재사용하기 위해 선행 업로드로 둔다.
+
 Request:
-- `multipart/form-data`
-- `file`
-- `kind`: `PHOTO`, `MEMO_IMAGE`, `SCHEDULE_IMAGE`, `OTHER`
+| 필드 | 설명 |
+| --- | --- |
+| `multipart/form-data` | - |
+| `file` | - |
+| `kind` | `PHOTO`, `MEMO_IMAGE`, `SCHEDULE_IMAGE`, `OTHER` |
 
 Response:
-- `attachmentId`
-- `fileName`
-- `contentType`
-- `size`
-- `uploadedAt`
+| 필드 | 설명 |
+| --- | --- |
+| `attachmentId` | - |
+| `fileName` | - |
+| `contentType` | - |
+| `size` | - |
+| `uploadedAt` | - |
 
 주요 에러:
-- `400 UNSUPPORTED_FILE_TYPE`
-- `413 FILE_TOO_LARGE`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `400` | `UNSUPPORTED_FILE_TYPE` | - |
+| `413` | `FILE_TOO_LARGE` | - |
 
 ### 2.6 `POST /api/workproof/records/check-in`
 
+배경: 원탭 UX를 위해 사용자는 `workplaceId`만 보내고 서버가 활성 계약을 해석한다.
+
 Request:
-- `workplaceId`
-- `deviceAt`
-- `latitude`
-- `longitude`
-- `locationLabel`
+| 필드 | 설명 |
+| --- | --- |
+| `workplaceId` | - |
+| `deviceAt` | - |
+| `latitude` | - |
+| `longitude` | - |
+| `locationLabel` | - |
 
 Response:
-- `recordId`
-- `workDate`
-- `status`: `CHECKED_IN`
-- `workplace`
-- `contract`
-- `checkIn`
-- `checkOut`: `null`
-- `reflectionStatus`: `PENDING`
+| 필드 | 설명 |
+| --- | --- |
+| `recordId` | - |
+| `workDate` | - |
+| `status` | `CHECKED_IN` |
+| `workplace` | object. 하위 필드: workplaceId, name, address, mapLabel, latitude, longitude |
+| `contract` | object. 하위 필드: contractId, payUnit, basePayAmount, dailyWorkMinutes, monthlyWorkMinutes, normalizedHourlyWage, effectiveFrom, isActive |
+| `checkIn` | object. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
+| `checkOut` | `null` |
+| `reflectionStatus` | `PENDING` |
 
 주요 에러:
-- `404 WORKPLACE_NOT_FOUND`
-- `409 ACTIVE_CONTRACT_REQUIRED`
-- `409 ACTIVE_WORKPROOF_EXISTS`
-- `409 WORK_DATE_ALREADY_EXISTS`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `WORKPLACE_NOT_FOUND` | - |
+| `409` | `ACTIVE_CONTRACT_REQUIRED` | - |
+| `409` | `ACTIVE_WORKPROOF_EXISTS` | - |
+| `409` | `WORK_DATE_ALREADY_EXISTS` | - |
 
 ### 2.7 `POST /api/workproof/records/check-out`
 
-Request:
-- `deviceAt`
-- `latitude`
-- `longitude`
-- `locationLabel`
-
-Response:
-- `recordId`
-- `workDate`
-- `status`: `CHECKED_OUT`
-- `checkIn`
-- `checkOut`
-- `workedMinutes`
-- `reflectionStatus`: `REFLECTED` 또는 `NEEDS_REVIEW`
-
-주요 에러:
-- `404 ACTIVE_WORKPROOF_NOT_FOUND`
-- `409 CHECK_OUT_BEFORE_CHECK_IN`
-
-### 2.8 `POST /api/workproof/records/{recordId}/modifications`
+배경: 퇴근도 `recordId` 입력 없이 활성 `CHECKED_IN` 1건을 서버가 찾아 마감한다.
 
 Request:
-- `checkInDeviceAt`: 선택
-- `checkOutDeviceAt`: 선택
-- `reasonCode`: `LATE_TAP`, `OVERTIME`, `BREAK_CHANGED`, `MISSING_RECORD`, `OTHER`
-- `reasonMemo`: 선택
-- `attachmentIds`: 선택
+| 필드 | 설명 |
+| --- | --- |
+| `deviceAt` | - |
+| `latitude` | - |
+| `longitude` | - |
+| `locationLabel` | - |
 
 Response:
-- `recordId`
-- `modificationId`
-- `status`
-- `modified`: `true`
-- `modifiedAt`
-- `reasonCode`
-- `reasonMemo`
-- `attachmentCount`
-- `auditTrail`
-  - `before`
-  - `after`
-  - `at`
+| 필드 | 설명 |
+| --- | --- |
+| `recordId` | - |
+| `workDate` | - |
+| `status` | `CHECKED_OUT` |
+| `checkIn` | object. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
+| `checkOut` | object 또는 null. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
+| `workedMinutes` | - |
+| `reflectionStatus` | `REFLECTED` 또는 `NEEDS_REVIEW` |
 
 주요 에러:
-- `404 WORKPROOF_NOT_FOUND`
-- `400 MODIFICATION_REASON_REQUIRED`
-- `400 INVALID_MODIFICATION_TIME`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `ACTIVE_WORKPROOF_NOT_FOUND` | - |
+| `409` | `CHECK_OUT_BEFORE_CHECK_IN` | - |
+
+### 2.8 `POST /api/workproof/records/missing`
+
+배경: PRD W4의 `기록이 누락됐어요` 케이스는 기존 `recordId` 기반 수정과 성격이 달라 provisional 생성 API로 분리한다.
+v0 메모: 상세 필드와 후속 승인 흐름은 구현 중 조정 가능하다.
+확장 메모: 추후 `manual record` 전용 모델이나 승인 상태로 재분리할 수 있다.
+
+Request:
+| 필드 | 설명 |
+| --- | --- |
+| `workplaceId` | - |
+| `workDate` | - |
+| `checkInDeviceAt` | 선택 |
+| `checkOutDeviceAt` | 선택 |
+| `reasonCode` | `MISSING_RECORD` |
+| `reasonMemo` | - |
+| `attachmentIds` | 선택 |
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `recordId` | - |
+| `workDate` | - |
+| `status` | `NEEDS_REVIEW` |
+| `modified` | `true` |
+| `source` | `MANUAL_MISSING_RECORD` |
+| `createdAt` | - |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `WORKPLACE_NOT_FOUND` | - |
+| `409` | `WORK_DATE_ALREADY_EXISTS` | - |
+| `400` | `MISSING_RECORD_REASON_REQUIRED` | - |
+| `400` | `INVALID_MISSING_RECORD_TIME` | - |
+
+### 2.9 `POST /api/workproof/records/{recordId}/modifications`
+
+배경: 이 API는 기존에 존재하는 record를 설명 가능한 방식으로 고치는 용도로만 둔다.
+확장 메모: 누락 기록 생성은 별도 provisional API에서 먼저 다루고, 후속에 통합 여부를 다시 판단한다.
+
+Request:
+| 필드 | 설명 |
+| --- | --- |
+| `checkInDeviceAt` | 선택 |
+| `checkOutDeviceAt` | 선택 |
+| `reasonCode` | `LATE_TAP`, `OVERTIME`, `BREAK_CHANGED`, `OTHER` |
+| `reasonMemo` | 선택 |
+| `attachmentIds` | 선택 |
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `recordId` | - |
+| `modificationId` | - |
+| `status` | - |
+| `modified` | `true` |
+| `modifiedAt` | - |
+| `reasonCode` | - |
+| `reasonMemo` | - |
+| `attachmentCount` | - |
+| `auditTrail` | object. 하위 필드: before, after, at |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `WORKPROOF_NOT_FOUND` | - |
+| `400` | `MODIFICATION_REASON_REQUIRED` | - |
+| `400` | `INVALID_MODIFICATION_TIME` | - |
 
 예시:
 
@@ -403,53 +523,53 @@ Response:
 }
 ```
 
-### 2.9 `GET /api/workproof/records?month=YYYY-MM&workplaceId={id}`
+### 2.10 `GET /api/workproof/records?month=YYYY-MM&workplaceId={id}`
+
+배경: 월간 검토와 금융 연결 상태 확인이 한 화면에서 가능하도록 리스트를 단순하게 유지한다.
 
 Response:
-- `month`
-- `workplaceId`
-- `records[]`
-  - `recordId`
-  - `workDate`
-  - `status`
-  - `checkInDeviceAt`
-  - `checkOutDeviceAt`
-  - `workedMinutes`
-  - `modified`
-  - `reflectionStatus`
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `workplaceId` | - |
+| `records[]` | array<object>. 배열 항목: recordId, workDate, status, checkInDeviceAt, checkOutDeviceAt, workedMinutes, modified, reflectionStatus |
 
-### 2.10 `GET /api/workproof/records/{recordId}`
+### 2.11 `GET /api/workproof/records/{recordId}`
+
+배경: 기록 상세는 근무 증거와 수정 이력을 함께 보여주는 evidence-first 조회다.
 
 Response:
-- `recordId`
-- `workDate`
-- `status`
-- `workplace`
-- `contract`
-- `checkIn`
-- `checkOut`
-- `workedMinutes`
-- `modified`
-- `modifications[]`
-- `attachments[]`
+| 필드 | 설명 |
+| --- | --- |
+| `recordId` | - |
+| `workDate` | - |
+| `status` | - |
+| `workplace` | object. 하위 필드: workplaceId, name, address, mapLabel, latitude, longitude |
+| `contract` | object. 하위 필드: contractId, payUnit, basePayAmount, dailyWorkMinutes, monthlyWorkMinutes, normalizedHourlyWage, effectiveFrom, isActive |
+| `checkIn` | object. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
+| `checkOut` | object 또는 null. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
+| `workedMinutes` | - |
+| `modified` | - |
+| `modifications[]` | array<object>. 배열 항목: modificationId, status, reasonCode, reasonMemo, modifiedAt, attachmentCount |
+| `attachments[]` | array<object>. 배열 항목: attachmentId, fileName, contentType, size, uploadedAt |
 
-### 2.11 `GET /api/workproof/monthly-summary?month=YYYY-MM&workplaceId={id}`
+### 2.12 `GET /api/workproof/monthly-summary?month=YYYY-MM&workplaceId={id}`
+
+배경: Advance와 Wage가 직접 raw record를 다시 읽지 않도록 WorkProof 쪽에서 금융용 요약을 먼저 만든다.
+v0 메모: 월간 요약은 별도 snapshot 저장 없이 조회 시 계산한다.
 
 Response:
-- `month`
-- `workplaceId`
-- `workDayCount`
-- `totalWorkMinutes`
-- `overtimeMinutes`
-- `nightMinutes`
-- `modifiedRecordCount`
-- `reflection`
-  - `reflectedRecordCount`
-  - `needsReviewRecordCount`
-  - `excludedRecordCount`
-- `financeReadiness`
-  - `advanceEligibleWorkDays`
-  - `wageUsableWorkDays`
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `workplaceId` | - |
+| `workDayCount` | - |
+| `totalWorkMinutes` | - |
+| `overtimeMinutes` | - |
+| `nightMinutes` | - |
+| `modifiedRecordCount` | - |
+| `reflection` | object. 하위 필드: reflectedRecordCount, needsReviewRecordCount, excludedRecordCount |
+| `financeReadiness` | object. 하위 필드: advanceEligibleWorkDays, wageUsableWorkDays |
 
 ## 3. Advance
 
@@ -466,67 +586,84 @@ Response:
 
 ### 3.1 `GET /api/advance/eligibility?workplaceId={id}`
 
+배경: 사용자가 `왜 이 금액이 가능한지`를 먼저 이해하도록 근거 설명 API를 분리한다.
+v0 메모: `maxCap`는 데모 기본값 `500,000 KRW`를 사용한다.
+
 Response:
-- `workplaceId`
-- `availableAmount`
-- `maxCap`
-- `policyRate`
-- `reflectedWorkDays`
-- `reflectedWorkMinutes`
-- `needsReviewRecordCount`
-- `nextTierRemainingMinutes`
-- `estimatedFee`
-- `estimatedRepaymentDate`
-- `disclaimer`
+| 필드 | 설명 |
+| --- | --- |
+| `workplaceId` | - |
+| `availableAmount` | - |
+| `maxCap` | - |
+| `policyRate` | - |
+| `reflectedWorkDays` | - |
+| `reflectedWorkMinutes` | - |
+| `needsReviewRecordCount` | - |
+| `nextTierRemainingMinutes` | - |
+| `estimatedFee` | - |
+| `estimatedRepaymentDate` | - |
+| `disclaimer` | - |
 
 ### 3.2 `POST /api/advance/requests`
 
+배경: 신청 계열은 중복 호출 시 혼선이 커서 `Idempotency-Key`를 필수로 둔다.
+v0 메모: 실제 대출 집행이 아니라 데모 시뮬레이션 승인/거절 결과를 돌려준다.
+
 Headers:
-- `Idempotency-Key`: 필수
+| 헤더 | 규칙 | 설명 |
+| --- | --- | --- |
+| `Idempotency-Key` | - | 필수 |
 
 Request:
-- `workplaceId`
-- `requestedAmount`
-- `requestedAt`
+| 필드 | 설명 |
+| --- | --- |
+| `workplaceId` | - |
+| `requestedAmount` | - |
+| `requestedAt` | - |
 
 Response `201 Created`:
-- `requestId`
-- `status`: `SUBMITTED`, `APPROVED`, `REJECTED`, `NEEDS_REVIEW`
-- `approvedAmount`
-- `feeAmount`
-- `repaymentDueDate`
-- `eligibilitySnapshot`
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `status` | `SUBMITTED`, `APPROVED`, `REJECTED`, `NEEDS_REVIEW` |
+| `approvedAmount` | - |
+| `feeAmount` | - |
+| `repaymentDueDate` | - |
+| `eligibilitySnapshot` | object. 하위 필드: availableAmount, maxCap, policyRate, reflectedWorkDays, reflectedWorkMinutes, needsReviewRecordCount |
 
 주요 에러:
-- `409 ADVANCE_DUPLICATE_REQUEST`
-- `409 ADVANCE_NOT_ELIGIBLE`
-- `400 REQUEST_AMOUNT_EXCEEDS_LIMIT`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `409` | `ADVANCE_DUPLICATE_REQUEST` | - |
+| `409` | `ADVANCE_NOT_ELIGIBLE` | - |
+| `400` | `REQUEST_AMOUNT_EXCEEDS_LIMIT` | - |
 
 ### 3.3 `GET /api/advance/requests?month=YYYY-MM`
 
+배경: 이번 달 신청 흐름을 월 단위로 가볍게 되짚어보는 이력 조회다.
+
 Response:
-- `month`
-- `requests[]`
-  - `requestId`
-  - `workplaceId`
-  - `requestedAmount`
-  - `approvedAmount`
-  - `status`
-  - `repaymentDueDate`
-  - `requestedAt`
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `requests[]` | array<object>. 배열 항목: requestId, workplaceId, requestedAmount, approvedAmount, status, repaymentDueDate, requestedAt |
 
 ### 3.4 `GET /api/advance/requests/{requestId}`
 
+배경: 상세 조회는 신청 당시 근거와 결과를 다시 설명하기 위한 용도다.
+
 Response:
-- `requestId`
-- `workplaceId`
-- `requestedAmount`
-- `approvedAmount`
-- `feeAmount`
-- `status`
-- `repaymentDueDate`
-- `eligibilitySnapshot`
-- `createdAt`
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `workplaceId` | - |
+| `requestedAmount` | - |
+| `approvedAmount` | - |
+| `feeAmount` | - |
+| `status` | - |
+| `repaymentDueDate` | - |
+| `eligibilitySnapshot` | object. 하위 필드: availableAmount, maxCap, policyRate, reflectedWorkDays, reflectedWorkMinutes, needsReviewRecordCount |
+| `createdAt` | - |
 
 ## 4. Wage Shield
 
@@ -543,68 +680,72 @@ Response:
 
 ### 4.1 `GET /api/wage/monthly-summary?month=YYYY-MM&workplaceId={id}`
 
+배경: Wage 화면에서도 WorkProof 기반 집계 근거를 바로 재사용할 수 있게 별도 요약을 둔다.
+
 Response:
-- `month`
-- `workplaceId`
-- `contractId`
-- `payUnit`
-- `normalizedHourlyWage`
-- `workDayCount`
-- `verifiedWorkMinutes`
-- `overtimeMinutes`
-- `nightMinutes`
-- `modifiedRecordCount`
-- `includedRecordIds`
-- `excludedPendingRecordCount`
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `workplaceId` | - |
+| `contractId` | - |
+| `payUnit` | - |
+| `normalizedHourlyWage` | - |
+| `workDayCount` | - |
+| `verifiedWorkMinutes` | - |
+| `overtimeMinutes` | - |
+| `nightMinutes` | - |
+| `modifiedRecordCount` | - |
+| `includedRecordIds` | - |
+| `excludedPendingRecordCount` | - |
 
 ### 4.2 `GET /api/wage/estimate?month=YYYY-MM&workplaceId={id}`
 
+배경: 이 API는 정답 계산이 아니라 참고용 추정과 근거 설명을 위한 조회다.
+v0 메모: 연장은 일별 `480분` 초과, 야간은 `22:00~06:00` 겹침 분, 휴일 가산은 제외한다.
+
 Response:
-- `month`
-- `workplaceId`
-- `contract`
-- `summary`
-- `estimate`
-  - `baseEstimate`
-  - `overtimePremium`
-  - `nightPremium`
-  - `estimatedTotal`
-- `disclaimer`
-- `ruleVersion`
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `workplaceId` | - |
+| `contract` | object. 하위 필드: contractId, payUnit, basePayAmount, dailyWorkMinutes, monthlyWorkMinutes, normalizedHourlyWage, effectiveFrom, isActive |
+| `summary` | object. 하위 필드: workDayCount, verifiedWorkMinutes, overtimeMinutes, nightMinutes, modifiedRecordCount |
+| `estimate` | object. 하위 필드: baseEstimate, overtimePremium, nightPremium, estimatedTotal |
+| `disclaimer` | - |
+| `ruleVersion` | - |
 
 ### 4.3 `POST /api/wage/verifications`
 
+배경: 실제 입금액과 추정액을 비교해 `이상 징후`를 잡는 P0 핵심 액션이다.
+v0 메모: 차액 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 시 `50,000원 또는 3%`를 사용한다.
+
 Request:
-- `month`
-- `workplaceId`
-- `actualDepositAmount`
-- `deductionsKnown`: boolean
-- `memo`: 선택
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `workplaceId` | - |
+| `actualDepositAmount` | - |
+| `deductionsKnown` | boolean |
+| `memo` | 선택 |
 
 Response `201 Created`:
-- `verificationId`
-- `status`: `MATCHED`, `REVIEW_REQUIRED`
-- `estimatedTotal`
-- `actualDepositAmount`
-- `differenceAmount`
-- `differenceRate`
-- `threshold`
-  - `absoluteWon`
-  - `relativePercent`
-  - `deductionRelaxed`
-- `possibleCauses[]`
-  - `code`
-  - `title`
-  - `detail`
-- `evidence`
-  - `overtimeMinutes`
-  - `nightMinutes`
-  - `modifiedRecordCount`
-  - `recordIds`
+| 필드 | 설명 |
+| --- | --- |
+| `verificationId` | - |
+| `status` | `MATCHED`, `REVIEW_REQUIRED` |
+| `estimatedTotal` | - |
+| `actualDepositAmount` | - |
+| `differenceAmount` | - |
+| `differenceRate` | - |
+| `threshold` | object. 하위 필드: absoluteWon, relativePercent, deductionRelaxed |
+| `possibleCauses[]` | array<object>. 배열 항목: code, title, detail |
+| `evidence` | object. 하위 필드: overtimeMinutes, nightMinutes, modifiedRecordCount, recordIds |
 
 주요 에러:
-- `404 ACTIVE_CONTRACT_REQUIRED`
-- `400 ACTUAL_DEPOSIT_REQUIRED`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `ACTIVE_CONTRACT_REQUIRED` | - |
+| `400` | `ACTUAL_DEPOSIT_REQUIRED` | - |
 
 예시:
 
@@ -619,21 +760,22 @@ Response `201 Created`:
 
 ### 4.4 `GET /api/wage/verifications/{verificationId}`
 
+배경: 문서 생성과 Claim 준비가 이 결과를 다시 참조할 수 있게 상세 조회를 분리한다.
+
 Response:
-- `verificationId`
-- `month`
-- `workplaceId`
-- `status`
-- `estimated`
-- `actual`
-- `difference`
-- `threshold`
-- `possibleCauses[]`
-- `evidence`
-- `relatedActions`
-  - `proofPackReady`
-  - `claimKitReady`
-  - `instantClaimAvailable`
+| 필드 | 설명 |
+| --- | --- |
+| `verificationId` | - |
+| `month` | - |
+| `workplaceId` | - |
+| `status` | - |
+| `estimated` | object. 하위 필드: baseEstimate, overtimePremium, nightPremium, estimatedTotal |
+| `actual` | object. 하위 필드: actualDepositAmount, deductionsKnown |
+| `difference` | object. 하위 필드: differenceAmount, differenceRate, thresholdApplied |
+| `threshold` | object. 하위 필드: absoluteWon, relativePercent, deductionRelaxed |
+| `possibleCauses[]` | array<object>. 배열 항목: code, title, detail |
+| `evidence` | object. 하위 필드: overtimeMinutes, nightMinutes, modifiedRecordCount, recordIds |
+| `relatedActions` | object. 하위 필드: proofPackReady, claimKitReady, instantClaimAvailable |
 
 ## 5. Documents
 
@@ -657,96 +799,132 @@ Response:
 
 ### 5.1 `GET /api/documents`
 
+배경: 문서는 개별 기능 화면 밖에서도 한 번에 다시 찾을 수 있는 공통 inbox 성격을 가진다.
+
 Query:
-- `type`: 선택
-- `status`: 선택
-- `month`: 선택
+| 파라미터 | 설명 |
+| --- | --- |
+| `type` | 선택 |
+| `status` | 선택 |
+| `month` | 선택 |
 
 Response:
-- `documents[]`
-  - `documentId`
-  - `type`
-  - `status`: `QUEUED`, `RUNNING`, `READY`, `FAILED`
-  - `title`
-  - `relatedEntityType`
-  - `relatedEntityId`
-  - `updatedAt`
+| 필드 | 설명 |
+| --- | --- |
+| `documents[]` | array<object>. 배열 항목: documentId, type, status (`QUEUED`, `RUNNING`, `READY`, `FAILED`), title, relatedEntityType, relatedEntityId, updatedAt |
 
 ### 5.2 `GET /api/documents/{documentId}`
 
+배경: 문서 상세는 요약과 관련 링크를 같이 보여 다음 행동으로 이어지게 한다.
+
 Response:
-- `documentId`
-- `type`
-- `status`
-- `title`
-- `summary`
-- `relatedLinks[]`
-- `createdAt`
-- `updatedAt`
-- `downloadable`
+| 필드 | 설명 |
+| --- | --- |
+| `documentId` | - |
+| `type` | - |
+| `status` | - |
+| `title` | - |
+| `summary` | 문서 요약 텍스트 또는 요약 블록 |
+| `relatedLinks[]` | 문서와 함께 노출할 액션 링크 목록 |
+| `createdAt` | - |
+| `updatedAt` | - |
+| `downloadable` | - |
 
 ### 5.3 `GET /api/documents/{documentId}/download-url`
 
+배경: 실제 파일 접근은 별도 다운로드 URL 발급으로 분리해 보안과 만료 정책을 단순화한다.
+
 Response:
-- `documentId`
-- `downloadUrl`
-- `expiresAt`
+| 필드 | 설명 |
+| --- | --- |
+| `documentId` | - |
+| `downloadUrl` | - |
+| `expiresAt` | - |
 
 ### 5.4 `POST /api/documents/proof-packs`
 
+배경: Wage 확인 결과를 설명하거나 제출할 때 바로 꺼낼 수 있는 증빙 리포트를 만든다.
+v0 메모: 월간 요약, WorkProof 상세표, 급여 추정 근거, 수정 이력표, 첨부 목록(있으면)을 기본 포함 대상으로 본다.
+
 Headers:
-- `Idempotency-Key`: 필수
+| 헤더 | 규칙 | 설명 |
+| --- | --- | --- |
+| `Idempotency-Key` | - | 필수 |
 
 Request:
-- `month`
-- `workplaceId`
-- `wageVerificationId`
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `workplaceId` | - |
+| `wageVerificationId` | - |
 
 Response `202 Accepted`:
-- `requestId`
-- `documentType`: `PROOF_PACK`
-- `status`
-- `pollUrl`
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `documentType` | `PROOF_PACK` |
+| `status` | - |
+| `pollUrl` | - |
 
 주요 에러:
-- `409 DOCUMENT_DUPLICATE_REQUEST`
-- `404 WAGE_VERIFICATION_NOT_FOUND`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `409` | `DOCUMENT_DUPLICATE_REQUEST` | - |
+| `404` | `WAGE_VERIFICATION_NOT_FOUND` | - |
 
 ### 5.5 `POST /api/documents/claim-kits`
 
+배경: 신고/상담 준비에서 필요한 자료를 한 번에 공유하기 위한 묶음 생성 요청이다.
+v0 메모: Proof Pack + 제출용 요약 + 체크리스트를 기본으로 묶고, 첨부가 많으면 `ZIP`을 허용한다.
+
 Headers:
-- `Idempotency-Key`: 필수
+| 헤더 | 규칙 | 설명 |
+| --- | --- | --- |
+| `Idempotency-Key` | - | 필수 |
 
 Request:
-- `month`
-- `workplaceId`
-- `wageVerificationId`
-- `includeAttachments`: boolean
-- `format`: `PDF`, `ZIP`
+| 필드 | 설명 |
+| --- | --- |
+| `month` | - |
+| `workplaceId` | - |
+| `wageVerificationId` | - |
+| `includeAttachments` | boolean |
+| `format` | `PDF`, `ZIP` |
 
 Response `202 Accepted`:
-- `requestId`
-- `documentType`: `CLAIM_KIT`
-- `status`
-- `pollUrl`
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `documentType` | `CLAIM_KIT` |
+| `status` | - |
+| `pollUrl` | - |
 
 ### 5.6 `POST /api/documents/transfer-receipts`
 
+배경: 송금 상세 화면에서 바로 다시 열 수 있는 영수증 문서를 생성한다.
+v0 메모: Tx Hash와 송금 상태 요약을 문서 재사용 기준으로 포함한다.
+
 Headers:
-- `Idempotency-Key`: 필수
+| 헤더 | 규칙 | 설명 |
+| --- | --- | --- |
+| `Idempotency-Key` | - | 필수 |
 
 Request:
-- `transferId`
+| 필드 | 설명 |
+| --- | --- |
+| `transferId` | - |
 
 Response `202 Accepted`:
-- `requestId`
-- `documentType`: `TRANSFER_RECEIPT`
-- `status`
-- `pollUrl`
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `documentType` | `TRANSFER_RECEIPT` |
+| `status` | - |
+| `pollUrl` | - |
 
 ## 6. Instant Claim
 
-> PRD 7H D3 기준. 자동 제출이 아니라 반자동 준비 흐름이다.
+> PRD 7H D3 기준. 자동 제출이 아니라 반자동 지원 흐름이다.
 
 ### 주요 엔드포인트
 
@@ -758,48 +936,62 @@ Response `202 Accepted`:
 
 ### 6.1 `GET /api/claim/routes?locale=ko-KR`
 
+배경: Instant Claim v0는 자동 제출이 아니라 제출 경로 안내를 우선하는 반자동 지원 흐름이다.
+
 Response:
-- `locale`
-- `routes[]`
-  - `channel`: `ONLINE`, `PHONE`, `VISIT`
-  - `title`
-  - `description`
-  - `contact`
-  - `link`
+| 필드 | 설명 |
+| --- | --- |
+| `locale` | - |
+| `routes[]` | array<object>. 배열 항목: channel (`ONLINE`, `PHONE`, `VISIT`), title, description, contact, link |
 
 ### 6.2 `POST /api/claim/preparations`
 
+배경: 제출 자체를 대신하지 않고, 사용자가 복사·공유·바로가기를 쉽게 하도록 준비 데이터를 만든다.
+v0 메모: `Idempotency-Key`는 현재 권장으로 두고, 구현 중 비용/캐시 전략을 보며 필수 전환 가능성을 연다.
+
 Headers:
-- `Idempotency-Key`: 권장
+| 헤더 | 규칙 | 설명 |
+| --- | --- | --- |
+| `Idempotency-Key` | - | 권장 |
 
 Request:
-- `wageVerificationId`
-- `claimKitDocumentId`: 선택
-- `locale`
-- `tone`: `DEFAULT`, `POLITE`, `SHORT`
+| 필드 | 설명 |
+| --- | --- |
+| `wageVerificationId` | - |
+| `claimKitDocumentId` | 선택 |
+| `locale` | - |
+| `tone` | `DEFAULT`, `POLITE`, `SHORT` |
 
 Response `201 Created`:
-- `preparationId`
-- `status`: `READY`
-- `summaryText`
-- `checklist[]`
-- `suggestedRoutes[]`
-- `relatedDocuments[]`
+| 필드 | 설명 |
+| --- | --- |
+| `preparationId` | - |
+| `status` | `READY` |
+| `summaryText` | - |
+| `checklist[]` | 제출 전에 확인할 체크리스트 목록 |
+| `suggestedRoutes[]` | 추천 신고/상담 경로 목록 |
+| `relatedDocuments[]` | 연결된 문서 목록 |
 
 주요 에러:
-- `404 WAGE_VERIFICATION_NOT_FOUND`
-- `404 CLAIM_KIT_NOT_FOUND`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `404` | `WAGE_VERIFICATION_NOT_FOUND` | - |
+| `404` | `CLAIM_KIT_NOT_FOUND` | - |
 
 ### 6.3 `GET /api/claim/preparations/{preparationId}`
 
+배경: 생성된 요약 문구와 체크리스트를 다시 열어보는 재조회 API다.
+
 Response:
-- `preparationId`
-- `status`
-- `summaryText`
-- `checklist[]`
-- `suggestedRoutes[]`
-- `relatedDocuments[]`
-- `createdAt`
+| 필드 | 설명 |
+| --- | --- |
+| `preparationId` | - |
+| `status` | - |
+| `summaryText` | - |
+| `checklist[]` | 제출 전에 확인할 체크리스트 목록 |
+| `suggestedRoutes[]` | 추천 신고/상담 경로 목록 |
+| `relatedDocuments[]` | 연결된 문서 목록 |
+| `createdAt` | - |
 
 ## 7. Remittance
 
@@ -817,74 +1009,91 @@ Response:
 
 ### 7.1 `GET /api/remittance/recipients`
 
+배경: 송금은 허용 목록 기반으로만 움직인다는 SafePay 전제를 화면에서 먼저 확인하게 한다.
+
 Response:
-- `recipients[]`
-  - `recipientId`
-  - `name`
-  - `alias`
-  - `relationship`
-  - `walletAddress`
-  - `photoUrl`
-  - `isFavorite`
-  - `cooldownUntil`
+| 필드 | 설명 |
+| --- | --- |
+| `recipients[]` | array<object>. 배열 항목: recipientId, name, alias, relationship, walletAddress, photoUrl, isFavorite, cooldownUntil |
 
 ### 7.2 `POST /api/remittance/recipients`
 
+배경: 수신자 등록은 송금 실행보다 먼저 거치는 allowlist 관리 단계다.
+
 Request:
-- `name`
-- `alias`
-- `relationship`
-- `walletAddress`
-- `photoUrl`: 선택
+| 필드 | 설명 |
+| --- | --- |
+| `name` | - |
+| `alias` | - |
+| `relationship` | - |
+| `walletAddress` | - |
+| `photoUrl` | 선택 |
 
 Response:
-- `recipientId`
-- `name`
-- `alias`
-- `relationship`
-- `walletAddress`
-- `cooldownUntil`
+| 필드 | 설명 |
+| --- | --- |
+| `recipientId` | - |
+| `name` | - |
+| `alias` | - |
+| `relationship` | - |
+| `walletAddress` | - |
+| `cooldownUntil` | - |
 
 주요 에러:
-- `409 RECIPIENT_ALREADY_EXISTS`
-- `400 INVALID_WALLET_ADDRESS`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `409` | `RECIPIENT_ALREADY_EXISTS` | - |
+| `400` | `INVALID_WALLET_ADDRESS` | - |
 
 ### 7.3 `GET /api/remittance/transfers`
 
+배경: 송금 상세로 다시 들어가기 전, 월별 상태 추적을 빠르게 보는 목록이다.
+
 Query:
-- `month`
-- `status`
+| 파라미터 | 설명 |
+| --- | --- |
+| `month` | - |
+| `status` | - |
 
 Response:
-- `transfers[]`
-  - `transferId`
-  - `recipientId`
-  - `amount`
-  - `status`: `SUBMITTED`, `CONFIRMED`, `FAILED`, `BLOCKED`
-  - `txHash`
-  - `createdAt`
+| 필드 | 설명 |
+| --- | --- |
+| `transfers[]` | array<object>. 배열 항목: transferId, recipientId, amount, status (`SUBMITTED`, `CONFIRMED`, `FAILED`, `BLOCKED`), txHash, createdAt |
 
 ### 7.4 `POST /api/remittance/transfers`
 
+배경: SafePay 검사와 비동기 전송 상태 추적을 전제로 한 테스트넷 송금 요청이다.
+v0 메모: `transferId`는 생성 직후 부여하고, 실제 전송 진행은 `pollUrl`과 상세 조회로 확인한다.
+확장 메모: 정기/자동 송금은 P1에서 별도 흐름으로 분리한다.
+
 Headers:
-- `Idempotency-Key`: 필수
+| 헤더 | 규칙 | 설명 |
+| --- | --- | --- |
+| `Idempotency-Key` | - | 필수 |
 
 Request:
-- `recipientId`
-- `tokenSymbol`
-- `amount`
-- `memo`: 선택
+| 필드 | 설명 |
+| --- | --- |
+| `recipientId` | - |
+| `tokenSymbol` | - |
+| `amount` | - |
+| `memo` | 선택 |
 
 Response `202 Accepted`:
-- `transferId`
-- `status`
-- `safepayDecision`
-- `pollUrl`
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `transferId` | - |
+| `status` | - |
+| `safepayDecision` | - |
+| `pollUrl` | - |
 
 주요 에러:
-- `409 DUPLICATE_TRANSFER_REQUEST`
-- `403 SAFEPAY_BLOCKED`
-- `404 RECIPIENT_NOT_FOUND`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `409` | `DUPLICATE_TRANSFER_REQUEST` | - |
+| `403` | `SAFEPAY_BLOCKED` | - |
+| `404` | `RECIPIENT_NOT_FOUND` | - |
 
 예시:
 
@@ -899,17 +1108,21 @@ Response `202 Accepted`:
 
 ### 7.5 `GET /api/remittance/transfers/{transferId}`
 
+배경: 송금 상세는 상태, Tx Hash, 영수증 연결까지 한 번에 다시 열 수 있어야 한다.
+
 Response:
-- `transferId`
-- `recipient`
-- `amount`
-- `status`
-- `txHash`
-- `failureReason`
-- `safepay`
-- `receiptDocumentId`
-- `createdAt`
-- `updatedAt`
+| 필드 | 설명 |
+| --- | --- |
+| `transferId` | - |
+| `recipient` | object. 하위 필드: recipientId, name, alias, relationship, walletAddress |
+| `amount` | - |
+| `status` | - |
+| `txHash` | - |
+| `failureReason` | - |
+| `safepay` | object. 하위 필드: decision, reasonCodes, userMessage, requiresAdditionalConfirm, cooldownUntil |
+| `receiptDocumentId` | - |
+| `createdAt` | - |
+| `updatedAt` | - |
 
 ## 8. SafePay
 
@@ -923,23 +1136,32 @@ Response:
 
 ### 8.1 `POST /api/safepay/transfer-checks`
 
+배경: SafePay는 차단만 하는 모듈이 아니라 `왜 막혔는지`를 사용자 언어로 설명하는 전처리 API다.
+v0 메모: 절대/상대 혼합 기준 수치는 후속 정책 문서에서 조정 가능하다.
+
 Request:
-- `recipientId`
-- `amount`
-- `tokenSymbol`
+| 필드 | 설명 |
+| --- | --- |
+| `recipientId` | - |
+| `amount` | - |
+| `tokenSymbol` | - |
 
 Response:
-- `decision`: `ALLOW`, `WARN`, `BLOCK`
-- `reasonCodes[]`
-- `userMessage`
-- `cooldownUntil`
-- `requiresAdditionalConfirm`
+| 필드 | 설명 |
+| --- | --- |
+| `decision` | `ALLOW`, `WARN`, `BLOCK` |
+| `reasonCodes[]` | array<string>. 차단/경고 사유 코드 목록 |
+| `userMessage` | - |
+| `cooldownUntil` | - |
+| `requiresAdditionalConfirm` | - |
 
 주요 이유 코드 예시:
-- `RECIPIENT_IN_COOLDOWN`
-- `AMOUNT_TOO_HIGH`
-- `RECIPIENT_NOT_ALLOWLISTED`
-- `DUPLICATE_TRANSFER_SUSPECTED`
+| 코드 | 설명 |
+| --- | --- |
+| `RECIPIENT_IN_COOLDOWN` | - |
+| `AMOUNT_TOO_HIGH` | - |
+| `RECIPIENT_NOT_ALLOWLISTED` | - |
+| `DUPLICATE_TRANSFER_SUSPECTED` | - |
 
 ## 9. Vault
 
@@ -955,50 +1177,69 @@ Response:
 
 ### 9.1 `GET /api/vault/summary`
 
+배경: Vault는 남는 돈을 따로 보관해보는 데모 시뮬레이션 요약 화면을 위한 조회다.
+v0 메모: 예시 이자는 시뮬레이션 값이며 수익 보장을 의미하지 않는다.
+
 Response:
-- `storedAmount`
-- `availableToStoreAmount`
-- `availableToTransferAmount`
-- `interestPreview`
-  - `daily`
-  - `monthly`
-  - `apr`
-- `disclaimer`
+| 필드 | 설명 |
+| --- | --- |
+| `storedAmount` | - |
+| `availableToStoreAmount` | - |
+| `availableToTransferAmount` | - |
+| `interestPreview` | object. 하위 필드: daily, monthly, apr |
+| `disclaimer` | - |
 
 ### 9.2 `POST /api/vault/allocations`
 
+배경: 사용 가능한 잔액 중 일부를 `보관 중` 상태로 옮겨보는 데모 액션이다.
+v0 메모: 실제 온체인 예치나 락업은 수행하지 않는다.
+
 Request:
-- `amount`
+| 필드 | 설명 |
+| --- | --- |
+| `amount` | - |
 
 Response:
-- `allocationId`
-- `storedAmount`
-- `availableToStoreAmount`
-- `interestPreview`
-- `simulatedAt`
+| 필드 | 설명 |
+| --- | --- |
+| `allocationId` | - |
+| `storedAmount` | - |
+| `availableToStoreAmount` | - |
+| `interestPreview` | object. 하위 필드: daily, monthly, apr |
+| `simulatedAt` | - |
 
 주요 에러:
-- `400 INVALID_ALLOCATION_AMOUNT`
-- `409 INSUFFICIENT_AVAILABLE_BALANCE`
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `400` | `INVALID_ALLOCATION_AMOUNT` | - |
+| `409` | `INSUFFICIENT_AVAILABLE_BALANCE` | - |
 
 ### 9.3 `POST /api/vault/releases`
 
+배경: 보관 중 금액을 다시 생활비 또는 송금 가능 금액으로 되돌리는 데모 액션이다.
+v0 메모: `target` 분기는 화면 표현과 시뮬레이션 잔액 해석을 위한 값이다.
+
 Request:
-- `amount`
-- `target`: `SPENDABLE`, `TRANSFERABLE`
+| 필드 | 설명 |
+| --- | --- |
+| `amount` | - |
+| `target` | `SPENDABLE`, `TRANSFERABLE` |
 
 Response:
-- `releaseId`
-- `storedAmount`
-- `releasedAmount`
-- `availableToTransferAmount`
-- `simulatedAt`
+| 필드 | 설명 |
+| --- | --- |
+| `releaseId` | - |
+| `storedAmount` | - |
+| `releasedAmount` | - |
+| `availableToTransferAmount` | - |
+| `simulatedAt` | - |
 
 ## 공통 구현 메모
 - `auth`는 현재 구현을 기준으로 유지한다.
 - `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault`는 feature-first 구조를 유지한다.
 - 문서 생성과 송금은 비동기 job 모델을 따른다.
 - 외부 연동은 `adapter` 인터페이스 뒤에 둔다.
+- 공유용 초안에서는 각 API에 짧은 `배경` / `v0 메모`를 붙여 결정 이유와 조정 가능 지점을 함께 보여준다.
 - PRD 전체 P0 기준 문서지만, `v0 가정` 영역은 후속 조정 가능성을 열어둔다.
 
 ## 다음 보강 후보
