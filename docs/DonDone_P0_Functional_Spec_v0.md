@@ -6,21 +6,22 @@
   - `docs/DonDone_PRD_v1.5.md`
   - `docs/DonDone_P0_API_Contract_v0.md`
 - 상태: Draft v0
-- 목적: PRD v1.5와 P0 API 계약 초안 v0의 공통 범위를 기준으로, 구현 착수 전에 팀이 기능 범위와 흐름을 빠르게 합의할 수 있는 상위 기능 명세를 제공한다.
+- 목적: PRD v1.5 기준 P0 전체를 한 문서 안에서 읽을 수 있게 정리하고, 구현 계약이 이미 비교적 안정적인 항목과 아직 최소 스케치만 있는 항목의 차이를 함께 드러낸다.
 
 ## 요구사항 확인
 
 | 항목 | 이번 문서 기준 |
 | --- | --- |
 | expected behavior | API 초안을 반복해서 읽지 않아도 P0 기능의 목표, 핵심 흐름, 포함/제외 범위, 구현 우선 논점을 이해할 수 있어야 한다. |
-| exact scope | `auth`, `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault`를 다룬다. |
-| contract changes | 이번 문서는 기능 명세 초안이며 API/DTO/DB 스키마를 새로 변경하지 않는다. 계약은 `docs/DonDone_P0_API_Contract_v0.md`를 기준으로 유지한다. |
-| security impact | 기존 JWT 보호 원칙, 타인 리소스 은닉, `testnet/demo only` 제약, evidence-first 문구를 그대로 반영한다. |
-| non-functional impact | 문서 생성과 송금은 비동기 처리 전제를 유지하고, Wage는 anomaly detection 중심, Vault/Advance/Remittance는 시뮬레이션 또는 testnet 범위만 다룬다. |
+| exact scope | `home`, `auth`, `workproof`, `advance`, `wage`, `documents`, `claim`, `remittance`, `safepay`, `vault`, `copilot`, `demo time travel`를 다룬다. |
+| contract changes | 이번 문서는 기능 명세 초안이며 구현 코드를 바꾸지 않는다. 다만 PRD P0 전체를 맞추기 위해 `Money Home`, `Copilot`, `Demo Time Travel`의 최소 기능 스케치를 포함한다. |
+| security impact | 기존 JWT 보호 원칙, 타인 리소스 은닉, `testnet/demo only` 제약, facts-only Copilot 원칙, demo account 한정 Time Travel 조건을 그대로 반영한다. |
+| non-functional impact | 문서 생성과 송금은 비동기 처리 전제를 유지하고, Wage는 anomaly detection 중심, Vault/Advance/Remittance는 시뮬레이션 또는 testnet 범위만 다룬다. Demo Time Travel은 `asOf` 재현성을 우선한다. |
 
 ## 범위
 
 ### 포함
+- Money Home
 - Auth
 - WorkProof
 - Advance
@@ -30,20 +31,19 @@
 - Remittance
 - SafePay
 - Vault
-
-### 제외
-- Money Home
 - Copilot
 - Demo Time Travel
-- P1 범위 전체
 
-### 범위 판단 원칙
-- 이 문서는 PRD P0 전체가 아니라 `PRD P0`와 `P0 API 계약 초안 v0`의 공통 범위를 정리한다.
-- PRD에는 있으나 이번 API 초안에서 의도적으로 제외된 항목은 각 기능의 `범위 제외` 또는 문서 하단 메모에 명시한다.
-- 문서 표현은 아래 세 가지 경계를 드러내는 것을 목표로 한다.
-  - 확정: 현재 공유 문서 기준으로 바로 구현 기준으로 삼을 수 있는 항목
-  - v0 가정: 초안 기준 기본값 또는 임시 정책이지만 추후 조정 가능성이 있는 항목
-  - 열린 질문: 구현 직전 또는 구현 중 다시 좁혀야 하는 항목
+### 제외
+- P1 범위 전체
+- 실거래/실정산/실제 수익 보장
+- Copilot 자유 대화형 확장
+- Demo Time Travel의 릴리스 빌드 노출
+
+## 기능 상태 표기
+- `P0-확정`: 현재 공유 문서 기준으로 바로 구현 기준으로 삼기 쉬운 항목
+- `P0-초안`: P0에는 포함하지만 세부 계약/DTO는 아직 최소 스케치 수준인 항목
+- `P0-후속 세부화`: P0 핵심 규칙이지만 판정 기준이나 노출 방식은 구현 직전에 더 좁혀야 하는 항목
 
 ## 공통 원칙
 - 제품명은 `DonDone`를 사용한다.
@@ -52,15 +52,69 @@
 - `/api/auth/signup`, `/api/auth/login`, `/health`, Swagger 외 나머지 기능은 JWT 보호 대상이다.
 - 타인 리소스 접근은 허용하지 않으며, 필요 시 `404`로 숨기는 현재 API 초안 원칙을 유지한다.
 - 문서 생성과 송금은 비동기 처리 전제를 유지한다.
-- 이 문서는 기능 설명을 우선하므로, API 상세 필드 표를 반복 복제하지 않고 `핵심 흐름 / 주요 규칙 / API 매핑` 중심으로 정리한다.
+- Copilot은 `facts-only`, `숫자 재계산 금지`, `추정 금지`를 기본 원칙으로 둔다.
+- Demo Time Travel은 demo account / demo mode 한정 기능으로 두고, 일반 사용자 흐름과 릴리스 빌드에서는 비활성화한다.
+- 이 문서는 기능 설명을 우선하므로, API 상세 필드 표를 반복 복제하지 않고 `상태 / 핵심 흐름 / 주요 규칙 / API 매핑` 중심으로 정리한다.
 
 ## 도메인 간 연결
-- WorkProof는 Advance와 Wage Shield의 근거 데이터다.
+- Money Home은 Advance, Wage Shield, Remittance, Vault의 상태를 한 화면에서 재조합한다.
+- WorkProof는 Advance와 Wage Shield의 근거 데이터이며, W7 Integrity는 이 연결의 신뢰 기준이다.
 - Wage Shield의 verification 결과는 Documents와 Instant Claim의 입력이 된다.
 - Remittance는 SafePay 사전 점검과 Documents 영수증 생성 흐름을 함께 가진다.
 - Vault는 Remittance와 잔액 해석을 공유하지만, P0에서는 독립적인 시뮬레이션 기능으로 취급한다.
+- Copilot은 독립 판단 엔진이 아니라 각 화면 facts를 다시 설명하는 보조 계층이다.
+- Demo Time Travel은 Home, WorkProof, Advance, Wage, Remittance, Vault 같은 읽기 흐름을 `asOf` 기준으로 다시 렌더하는 가로축 기능이다.
 
-## 1. Auth
+## 1. Money Home
+
+### 상태
+- `P0-초안`
+
+### 목표
+- 앱 첫 화면이 `근무 기록 앱`보다 `이번 달 내 돈 상태를 보여주는 핀테크 홈`으로 읽히게 한다.
+
+### 범위
+- 메인 hero 카드
+- 상태 기반 다음 행동 CTA 1개
+- 빠른 금융 액션 묶음
+- 오늘 근무 보조 카드
+- loading / empty / error / success 상태 분리
+
+### 범위 제외
+- 개인화 추천 고도화
+- 푸시/리마인드 엔진
+- 카드 단위 독립 API 분리 확정
+- P1용 장기 분석/리포트 홈
+
+### 핵심 흐름
+1. 사용자가 홈에 진입하면 이번 달 기준 돈 상태를 한 번에 조회한다.
+2. 시스템은 예상 급여, 실제 입금 상태, 미리받기 가능 금액, 지금 보낼 수 있는 금액을 hero 카드에 조합한다.
+3. 시스템은 현재 상태에 맞는 `다음 행동 CTA` 1개를 우선 노출한다.
+4. 사용자는 빠른 금융 액션을 통해 Advance, Wage, Remittance, Vault로 이동한다.
+5. 오늘 근무 카드는 보조 정보로 남기되, 근무 기록 그 자체보다 금융 연결 메시지를 강조한다.
+
+### 주요 규칙
+- 홈의 첫 인상은 `금융 중심`이어야 한다.
+- 금액이 비어 있거나 잠겨 있어도 `왜 없는지`와 `다음 행동`을 함께 설명해야 한다.
+- 오늘 근무 카드는 핵심 카드가 아니라 보조 카드다.
+- 홈 값은 독립 정책 계산이 아니라 다른 도메인 결과를 재조합한 표현이다.
+- Demo Time Travel이 활성화되면 홈도 `asOf` 기준 상태를 반영해야 한다.
+
+### API 매핑
+- `GET /api/home/summary`
+
+### v0 가정
+- 현재 월 기준 단일 조합 응답을 우선 사용한다.
+- 추천 행동은 개인화 모델이 아니라 현재 도메인 상태 규칙으로 정한다.
+- 빠른 액션과 today work 카드는 하나의 summary 응답 안에 함께 포함한다.
+
+### 열린 질문
+- Home 조합 응답을 이후 카드 단위로 분리할지 여부
+
+## 2. Auth
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - 기존 backend auth baseline을 그대로 사용해 P0 보호 기능 진입에 필요한 최소 인증 컨텍스트를 제공한다.
@@ -99,7 +153,10 @@
 ### 열린 질문
 - 없음
 
-## 2. WorkProof
+## 3. WorkProof
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - Wage Shield, Advance, Documents로 이어질 수 있는 신뢰 가능한 근무 증거를 남긴다.
@@ -115,12 +172,13 @@
 - 월별 목록 조회
 - 기록 상세 조회
 - 월간 요약 조회
+- WorkProof Integrity 판정에 필요한 상태 구분과 근거 해석
 
 ### 범위 제외
 - 지오펜스 자동 알림
 - 동시 다중 근무지 활성 계약 운영
 - 동일 날짜 다중 근무 허용
-- WorkProof Integrity 전용 판정 흐름(W7)
+- 복잡한 부정 탐지 모델
 - 문서 자동 반영 세부 규칙의 완전한 고정
 - 누락 기록/수정 기록의 승인 워크플로 상세화
 
@@ -129,7 +187,7 @@
 2. 출근 시 `workplaceId`와 GPS 좌표를 보내면 서버가 활성 계약을 선택해 기록을 만든다.
 3. 퇴근 시 서버가 활성 `CHECKED_IN` 기록 1건을 찾아 같은 기록을 마감한다.
 4. 누락되었거나 잘못된 기록이 있으면 provisional 누락 생성 또는 기존 기록 수정으로 보완한다.
-5. 사용자는 월별 목록과 상세를 확인하고, WorkProof 월간 요약은 Advance/Wage 입력으로 재사용된다.
+5. 사용자는 월별 목록과 상세를 확인하고, 월간 요약은 `기록된 근무 / 반영 근무 / 검증 완료 근무 / 선지급 가능 근무` 구분까지 포함해 Advance/Wage/Home 입력으로 재사용된다.
 
 ### 주요 규칙
 - contract는 user 단독이 아니라 workplace 종속 모델로 관리한다.
@@ -142,6 +200,22 @@
 - 퇴근 API는 `recordId`를 받지 않고 서버가 활성 `CHECKED_IN` 기록을 찾는다.
 - 본인 기록만 조회/수정할 수 있다.
 - 누락 기록은 기존 modification API와 분리된 provisional 생성 API로 다룬다.
+
+### W7. WorkProof Integrity 판정
+- 상태: `P0-후속 세부화`
+- WorkProof는 단순 기록 저장이 아니라 `이 근무를 금융 판단에 써도 되는가`를 가르는 근거다.
+- P0에서는 아래 상태를 구분한다.
+  - 기록된 근무
+  - 반영 근무
+  - 검증 완료 근무
+  - 선지급 가능 근무
+- 판정 근거 예시는 아래를 포함한다.
+  - 출근/퇴근 위치 스냅샷
+  - 기기 시간 / 서버 수신 시간
+  - 수정 횟수 / 수정 사유 / 첨부 유무
+  - 기기 일관성 및 demo용 위험 플래그
+- Home, Advance, Wage는 W7 결과를 직접 점수화된 모델보다 `설명 가능한 규칙 + 감사 로그` 기준으로 사용한다.
+- `verified_hours`, `pending_hours`, `workproofRiskFlags` 같은 결과값은 WorkProof 내부 계산 결과로 유지하되, 별도 독립 기능처럼 보이기보다 WorkProof 하위 규칙으로 다룬다.
 
 ### API 매핑
 - `POST /api/workproof/workplaces`
@@ -162,14 +236,18 @@
 - `MONTHLY` 계약은 `monthlyWorkMinutes` 미지정 시 시스템 기본값을 사용한다.
 - 월간 요약은 snapshot 저장 없이 조회 시 계산한다.
 - 첨부는 `attachmentId` 참조 방식으로 사용한다.
+- W7 결과는 별도 독립 API보다 record detail / monthly summary에 내장하는 방향을 우선 사용한다.
 - 누락 기록 필드와 승인 정책은 구현 중 조정 가능하다.
 
 ### 열린 질문
-- W7 Integrity를 별도 API/판정 모델로 분리할지 여부
+- W7 결과를 월간 요약 안에만 둘지, 별도 세부 조회가 필요한지 여부
 - 누락 기록과 수정 기록의 승인 정책을 어느 수준까지 v0에서 고정할지 여부
-- 자정 경계가 걸리는 근무를 월 집계에 어떻게 드러낼지 여부
+- 자정 경계가 걸리는 근무를 월 집계와 W7 노출에 어떻게 드러낼지 여부
 
-## 3. Advance
+## 4. Advance
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - 검증 가능한 근무 반영 데이터를 바탕으로 `얼마까지 왜 가능한지`를 먼저 설명하고, 그 다음에 데모 신청을 받는다.
@@ -198,6 +276,7 @@
 - 신청 계열 API는 중복 호출 위험이 커서 `Idempotency-Key`를 필수로 둔다.
 - 적격성은 workplace 컨텍스트와 근무 반영 데이터를 기준으로 판단한다.
 - Repayment Confidence와 Hard Stop Rules는 사용자에게 결과와 이유를 설명하는 수준으로 노출한다.
+- WorkProof W7 결과 중 `verified_hours`, `pending_hours`, 위험 플래그가 Advance 근거 설명의 핵심 입력이다.
 
 ### API 매핑
 - `GET /api/advance/eligibility?workplaceId={id}`
@@ -213,7 +292,10 @@
 ### 열린 질문
 - eligibility 화면에서 `verified_hours`, `pending_hours`, `block_reason_codes`를 어느 정도까지 직접 노출할지 여부
 
-## 4. Wage Shield
+## 5. Wage Shield
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - 월간 근무 요약과 실제 입금액 비교를 통해 `정답 계산`이 아니라 `이상 징후와 근거`를 보여준다.
@@ -263,7 +345,10 @@
 - 자정 경계 근무를 Wage 계산 근거에 어떻게 표시할지 여부
 - 수정 기록을 verification 상세에서 개수 중심으로 볼지, 개별 근거 목록으로 더 강조할지 여부
 
-## 5. Documents
+## 6. Documents
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - WorkProof, Wage, Remittance 결과를 제출·공유 가능한 문서로 재조합해 사용자가 근거를 다시 정리하지 않게 한다.
@@ -313,7 +398,10 @@
 - 제출용 문서 톤을 `공식 제출용`에 더 맞출지, `읽기 쉬운 설명형`에 더 맞출지 여부
 - `summary`, `relatedLinks[]`를 기능 명세 수준에서 어디까지 고정할지 여부
 
-## 6. Instant Claim
+## 7. Instant Claim
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - 자동 제출이 아니라 `준비를 반자동으로 줄여주는` 방식으로 신고/상담 진입 장벽을 낮춘다.
@@ -354,7 +442,10 @@
 ### 열린 질문
 - claim preparation 생성 비용과 캐시 전략이 정해지면 `Idempotency-Key`를 필수로 전환할지 여부
 
-## 7. Remittance
+## 8. Remittance
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - 허용된 수신자에게만 testnet 송금을 수행하고, 상태 추적과 영수증까지 이어지는 흐름을 제공한다.
@@ -400,7 +491,10 @@
 ### 열린 질문
 - 없음
 
-## 8. SafePay
+## 9. SafePay
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - 송금을 막는 것에서 끝내지 않고, `왜 막혔는지`를 사용자 언어로 먼저 설명하는 보호 계층이 된다.
@@ -437,7 +531,10 @@
 ### 열린 질문
 - SafePay 고액 기준을 절대값과 상대값 중 어떤 조합으로 고정할지 여부
 
-## 9. Vault
+## 10. Vault
+
+### 상태
+- `P0-확정`
 
 ### 목표
 - 남는 돈을 `보관해본다`는 경험과 예상 이자 미리보기를 제공하되, 실제 수익 상품처럼 보이지 않게 한다.
@@ -476,13 +573,106 @@
 ### 열린 질문
 - Vault의 기본 preview yield 수치를 어떤 값으로 둘지 여부
 
-## PRD 대비 의도적 제외 메모
-- PRD P0에 포함된 Money Home은 이번 API 초안 범위에 없으므로 본 문서에서도 제외한다.
-- Copilot과 Demo Time Travel은 P0 PRD에는 존재하지만 별도 문서 후보로 분리되어 이번 기능 명세에는 포함하지 않는다.
-- WorkProof의 Integrity 판정(W7)은 기능 개념은 남기되, 전용 계약과 판정 기준은 이번 공통 범위에서 제외한다.
-- Wage의 문서 자동 파싱(WS5), Advance의 상용화(A5), Vault의 목표 저축/실제 연동(V3, V4)은 P1 또는 후속 범위로 남긴다.
+## 11. Copilot
+
+### 상태
+- `P0-초안`
+
+### 목표
+- 자유 대화형 챗봇이 아니라, 현재 화면을 더 쉽게 이해하고 설명 가능한 다음 행동을 고르게 돕는 화면 보조 계층이 된다.
+
+### 범위
+- 화면 설명 생성
+- 추천 질문 칩 제공
+- 제출용/공유용 요약 문장 생성
+- facts 기반 번역과 쉬운 표현 변환
+
+### 범위 제외
+- 자유 주제 대화형 챗봇
+- 새로운 숫자 계산 또는 정책 판정
+- 법률·재무 조언
+- 대규모 RAG 지식봇
+
+### 핵심 흐름
+1. 사용자가 홈, Wage, SafePay, Instant Claim 같은 핵심 화면에서 `이 화면 설명해줘` 또는 추천 질문 칩을 선택한다.
+2. 화면은 서버 facts와 현재 화면 종류를 Copilot에 전달한다.
+3. Copilot은 facts를 재구성해 설명, 제출용 문장, 번역 중 하나를 생성한다.
+4. 사용자는 답변과 근거 facts, 추가 질문 칩, 공통 디스클레이머를 함께 본다.
+
+### 주요 규칙
+- Copilot은 `설명 / 번역 / 문장 생성`만 수행한다.
+- 서버가 내려준 facts 밖의 내용을 추정하거나 숫자를 새로 계산하지 않는다.
+- 필요한 facts가 없으면 `확인할 수 없음` 또는 `추정 불가`로 답해야 한다.
+- 모든 응답에는 `이 안내는 화면에 표시된 사실을 바탕으로 작성된 참고 문장입니다.` 문구를 함께 보여준다.
+- Copilot은 서버 룰 결과를 덮어쓰지 않고, 기존 화면 판단을 더 읽기 쉽게 다시 쓰는 역할만 한다.
+
+### API 매핑
+- `POST /api/copilot/answers`
+
+### v0 가정
+- 하나의 intent 기반 endpoint가 `설명 / 제출용 요약 / 번역` 세 가지를 처리하는 방향을 우선 사용한다.
+- 추천 질문 칩은 화면 유형과 locale 기준으로 응답 안에 같이 반환할 수 있다.
+- RAG는 필수 범위가 아니며, 화면 facts만으로 해결되지 않는 짧은 용어 설명 정도만 후속 후보로 남긴다.
+
+### 열린 질문
+- Copilot을 intent 기반 단일 endpoint로 둘지, explain / claim-summary / translate 분리 endpoint로 둘지 여부
+- 추천 질문 칩을 서버가 완전히 내려줄지, 화면별 고정 세트를 프론트에서 일부 들고갈지 여부
+
+## 12. Demo Time Travel
+
+### 상태
+- `P0-초안`
+
+### 목표
+- 실제 한 달 사용자 여정을 `15~30초` 안에 보여주기 위해, 고정 시드와 `asOf` 날짜만 바꿔도 핵심 화면 상태가 자연스럽게 이어지는 데모 장치를 제공한다.
+
+### 범위
+- demo seed 주입
+- demo reset
+- `asOf` 기준 상태 재렌더
+- demo mode meta/state 조회
+- 읽기 API의 `X-Demo-AsOf` 반영 규칙
+
+### 범위 제외
+- 일반 사용자용 기능 노출
+- 릴리스 빌드 노출
+- 실제 운영 데이터 되감기 기능
+- 발표 스크립트 자체 자동화
+
+### 핵심 흐름
+1. 데모 시작 전 고정 시드 데이터를 주입한다.
+2. 사용자는 슬라이더나 재생 버튼으로 `asOf` 날짜를 바꾼다.
+3. 시스템은 기준일 이전 데이터만 반영해 Home, WorkProof, Advance, Wage, Remittance, Vault 같은 읽기 화면을 다시 계산한다.
+4. 데모 상태 조회는 현재 seed, 허용 날짜 범위, 현재 `asOf`를 돌려주고, 일반 읽기 API는 `X-Demo-AsOf`를 통해 같은 시점을 해석한다.
+
+### 주요 규칙
+- 시드 데이터는 고정하되, 집계/계산/판정 로직은 실제 로직을 사용한다.
+- Demo Time Travel은 demo account / demo mode에서만 활성화한다.
+- `X-Demo-AsOf`는 demo mode에서만 유효하고, 일반 계정이나 릴리스 빌드에서는 무시하거나 차단한다.
+- `asOf`가 바뀌면 화면 일부가 아니라 전체 사용자 여정이 자연스럽게 이어져야 한다.
+- 데모용 기능이더라도 Home, Advance, Wage 같은 기존 도메인 결과를 우회해서 임의 값만 보여주면 안 된다.
+
+### API 매핑
+- `POST /api/demo/seed`
+- `POST /api/demo/reset`
+- `GET /api/demo/state?asOf=YYYY-MM-DD`
+- 공통 헤더: `X-Demo-AsOf: YYYY-MM-DD`
+
+### v0 가정
+- `asOf`는 날짜 단위로만 다루고 시간 단위 이동은 후속 범위로 남긴다.
+- 데모 시나리오는 고정된 seed 세트 중심으로 운용한다.
+- 개별 도메인 화면은 별도 demo 전용 API보다 기존 읽기 API + `X-Demo-AsOf`를 우선 사용한다.
+
+### 열린 질문
+- `GET /api/demo/state`가 메타만 돌려줄지, 조합 상태까지 같이 줄지 여부
+- `X-Demo-AsOf`를 어떤 읽기 API까지 공통 지원 대상으로 둘지 여부
+
+## P0 상태 메모
+- `Money Home`, `Copilot`, `Demo Time Travel`은 PRD P0에 맞춰 문서에 포함하되, 현재는 `P0-초안` 상태의 최소 스케치로 남긴다.
+- `W7 WorkProof Integrity`는 별도 top-level 기능으로 분리하지 않고 WorkProof 하위 `P0-후속 세부화` 규칙으로 포함한다.
+- `WS5`, `A5`, `Vault V3/V4`처럼 PRD상 P1 또는 후속 범위는 여전히 제외한다.
 
 ## 다음 보강 후보
 - `summary`, `relatedDocuments[]`, `checklist[]`, `relatedLinks[]` 같은 중첩 object의 최소 의미 정의 보강
-- 구현 우선순위용 최소 DTO/엔드포인트 집합 재절단
+- Home / Copilot / Demo Time Travel의 최소 DTO와 상태 필드 우선순위 좁히기
 - backend DTO / validation / error code 구체화로 연결되는 다음 문서 초안 작성
