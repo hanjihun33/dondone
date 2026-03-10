@@ -66,6 +66,10 @@ public class WorkProof {
     @Column(name = "attachment_count", nullable = false)
     private int attachmentCount;
 
+    @Lob
+    @Column(name = "attachment_metadata_json", columnDefinition = "TEXT")
+    private String attachmentMetadataJson;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "financial_status", nullable = false, length = 20)
     private WorkProofFinancialStatus financialStatus;
@@ -91,6 +95,7 @@ public class WorkProof {
                       String memo,
                       String editReason,
                       int attachmentCount,
+                      String attachmentMetadataJson,
                       WorkProofFinancialStatus financialStatus) {
         this.user = user;
         this.workDate = workDate;
@@ -107,6 +112,7 @@ public class WorkProof {
         this.memo = memo;
         this.editReason = editReason;
         this.attachmentCount = attachmentCount;
+        this.attachmentMetadataJson = attachmentMetadataJson;
         this.financialStatus = financialStatus;
     }
 
@@ -140,6 +146,7 @@ public class WorkProof {
                 memo,
                 editReason,
                 attachmentCount == null ? 0 : attachmentCount,
+                null,
                 clockOutAt == null ? WorkProofFinancialStatus.PENDING : WorkProofFinancialStatus.REFLECTED
         );
     }
@@ -157,6 +164,21 @@ public class WorkProof {
             return 0L;
         }
         return Duration.between(clockInAt, clockOutAt).toMinutes();
+    }
+
+    public void updateTimes(LocalDateTime clockInAt,
+                            LocalDateTime clockOutAt,
+                            String editReason,
+                            String memo,
+                            int attachmentCount,
+                            String attachmentMetadataJson) {
+        this.clockInAt = clockInAt;
+        this.clockOutAt = clockOutAt;
+        this.editReason = editReason;
+        this.memo = memo != null ? memo : this.memo;
+        this.attachmentCount = attachmentCount;
+        this.attachmentMetadataJson = attachmentMetadataJson;
+        this.financialStatus = WorkProofFinancialStatus.REFLECTED;
     }
 
     @PrePersist

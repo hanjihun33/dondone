@@ -23,6 +23,7 @@ public enum ErrorCode {
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "WorkProof not found"),
+    WORKPROOF_EDIT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Only reflected WorkProof can be edited"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
 
