@@ -1,5 +1,7 @@
 package com.dondone.mobile.feature.finance.presentation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,24 +10,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.dondone.mobile.core.designsystem.BadgeTone
-import com.dondone.mobile.core.designsystem.DonDoneCard
-import com.dondone.mobile.core.designsystem.MetricRow
-import com.dondone.mobile.core.designsystem.PrimaryActionButton
-import com.dondone.mobile.core.designsystem.SectionPanel
-import com.dondone.mobile.core.designsystem.StatusBadge
+import com.dondone.mobile.core.designsystem.DawnBorder
+import com.dondone.mobile.core.designsystem.DawnPrimary
+import com.dondone.mobile.core.designsystem.DawnSurface
+import com.dondone.mobile.core.designsystem.DawnTextSubtle
 
 @Composable
 fun AccountManageScreen(
     uiModel: AccountManageUiModel,
-    onSelectAccount: (String) -> Unit,
-    onContinue: () -> Unit
+    onSelectAccount: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -34,65 +35,100 @@ fun AccountManageScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        DonDoneCard(kicker = "송금", title = "계좌 선택") {
-            Text(
-                text = "송금에 사용할 계좌를 먼저 고른 뒤 받는 사람 선택으로 넘어갑니다.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            SectionPanel {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(text = "현재 선택", style = MaterialTheme.typography.labelMedium)
-                        Text(text = uiModel.selectedAccountName, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = uiModel.selectedAccountNumber,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    StatusBadge(text = "STEP 1", tone = BadgeTone.Info)
-                }
-                MetricRow(
-                    leftLabel = "잔액",
-                    leftValue = uiModel.selectedBalanceText,
-                    rightLabel = "송금 초안",
-                    rightValue = uiModel.draftAmountText
+        ManageSection(
+            title = "내 계좌",
+            actionText = "계좌 추가"
+        ) {
+            uiModel.accounts.forEach { account ->
+                ManageRow(
+                    title = account.name,
+                    subtitle = "${account.number} · ${account.balanceText}",
+                    selected = account.selected,
+                    onClick = { onSelectAccount(account.id) }
                 )
             }
         }
 
-        DonDoneCard(kicker = "보내는 계좌", title = "계좌 목록") {
-            uiModel.accounts.forEach { account ->
-                SectionPanel(
-                    modifier = Modifier.clickable { onSelectAccount(account.id) }
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(text = account.name, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = account.number,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "잔액 ${account.balanceText}",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                        if (account.selected) {
-                            StatusBadge(text = "선택됨", tone = BadgeTone.Info)
-                        }
-                    }
-                }
+        ManageSection(
+            title = "수신 지갑",
+            actionText = "지갑 추가"
+        ) {
+            uiModel.recipientWallets.forEach { wallet ->
+                ManageRow(
+                    title = wallet.name,
+                    subtitle = wallet.address,
+                    selected = wallet.selected,
+                    onClick = {}
+                )
             }
-            PrimaryActionButton(text = "다음: 받는 사람", onClick = onContinue)
+        }
+    }
+}
+
+@Composable
+private fun ManageSection(
+    title: String,
+    actionText: String,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(28.dp))
+            .border(1.dp, DawnBorder, RoundedCornerShape(28.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = DawnTextSubtle
+            )
+            Text(
+                text = actionText,
+                style = MaterialTheme.typography.labelLarge,
+                color = DawnPrimary
+            )
+        }
+        content()
+    }
+}
+
+@Composable
+private fun ManageRow(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(DawnSurface, RoundedCornerShape(22.dp))
+            .border(
+                width = 1.dp,
+                color = if (selected) DawnPrimary.copy(alpha = 0.7f) else DawnBorder,
+                shape = RoundedCornerShape(22.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 15.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (selected) DawnPrimary else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = DawnTextSubtle
+            )
         }
     }
 }

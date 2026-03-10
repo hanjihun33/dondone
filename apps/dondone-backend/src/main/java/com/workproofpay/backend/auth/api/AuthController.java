@@ -4,6 +4,7 @@ import com.workproofpay.backend.auth.api.dto.request.LoginRequest;
 import com.workproofpay.backend.auth.api.dto.request.SignupRequest;
 import com.workproofpay.backend.auth.api.dto.response.LoginResponse;
 import com.workproofpay.backend.auth.api.dto.response.MeResponse;
+import com.workproofpay.backend.shared.api.ApiResponse;
 import com.workproofpay.backend.auth.service.AuthService;
 import com.workproofpay.backend.shared.config.OpenApiConfig;
 import com.workproofpay.backend.shared.security.AuthenticatedUser;
@@ -11,11 +12,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -23,13 +24,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Auth", description = "JWT authentication and current user endpoints")
+@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
-
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
 
     @PostMapping("/signup")
     @Operation(
@@ -38,18 +36,18 @@ public class AuthController {
             security = {}
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Signup succeeded"),
-            @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
-            @ApiResponse(responseCode = "409", description = "Email already exists", content = @Content)
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Signup succeeded"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email already exists", content = @Content)
     })
-    public ResponseEntity<com.workproofpay.backend.shared.api.ApiResponse<MeResponse>> signup(
+    public ResponseEntity<ApiResponse<MeResponse>> signup(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Signup payload",
                     required = true,
                     content = @Content(schema = @Schema(implementation = SignupRequest.class))
             )
             @Valid @RequestBody SignupRequest request) {
-        return ResponseEntity.status(201).body(com.workproofpay.backend.shared.api.ApiResponse.success(authService.signup(request)));
+        return ApiResponse.created(authService.signup(request));
     }
 
     @PostMapping("/login")
@@ -65,11 +63,11 @@ public class AuthController {
             security = {}
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Login succeeded"),
-            @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials", content = @Content)
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login succeeded"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid credentials", content = @Content)
     })
-    public ResponseEntity<com.workproofpay.backend.shared.api.ApiResponse<LoginResponse>> login(
+    public ResponseEntity<ApiResponse<LoginResponse>> login(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Login payload",
                     required = true,
@@ -87,7 +85,7 @@ public class AuthController {
                     )
             )
             @Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(com.workproofpay.backend.shared.api.ApiResponse.success(authService.login(request)));
+        return ApiResponse.success(authService.login(request));
     }
 
     @GetMapping("/me")
@@ -97,10 +95,10 @@ public class AuthController {
             security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Current user returned"),
-            @ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content)
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Current user returned"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content)
     })
-    public ResponseEntity<com.workproofpay.backend.shared.api.ApiResponse<MeResponse>> me(@AuthenticationPrincipal AuthenticatedUser user) {
-        return ResponseEntity.ok(com.workproofpay.backend.shared.api.ApiResponse.success(authService.getMe(user.userId())));
+    public ResponseEntity<ApiResponse<MeResponse>> me(@AuthenticationPrincipal AuthenticatedUser user) {
+        return ApiResponse.success(authService.getMe(user.userId()));
     }
 }

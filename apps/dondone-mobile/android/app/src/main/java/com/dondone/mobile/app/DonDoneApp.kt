@@ -1,5 +1,6 @@
 package com.dondone.mobile.app
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,6 +53,9 @@ import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSecondary
 import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.designsystem.DonDoneWordmark
+import com.dondone.mobile.domain.model.TransferFlowStep
+import com.dondone.mobile.domain.model.TransferStatus
 
 @Composable
 fun DonDoneApp(
@@ -62,7 +66,44 @@ fun DonDoneApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val currentRoute = currentDestination?.route.orEmpty()
-    val chrome = resolveScreenChrome(currentRoute, uiState.remittance.flowStep)
+    val chrome = resolveScreenChrome(
+        route = currentRoute,
+        transferStep = uiState.remittance.flowStep,
+        transferStatus = uiState.remittance.status
+    )
+    val handleBack: () -> Unit = {
+        if (currentRoute == Route.TRANSFER) {
+            when {
+                uiState.remittance.status == TransferStatus.REVIEWING -> {
+                    viewModel.dismissTransferConfirmation()
+                }
+                uiState.remittance.status == TransferStatus.SUBMITTED ||
+                    uiState.remittance.status == TransferStatus.CONFIRMED -> navController.navigateUp()
+                uiState.remittance.flowStep == TransferFlowStep.AMOUNT -> viewModel.showRecipientStep()
+                uiState.remittance.flowStep == TransferFlowStep.RECIPIENT -> {
+                    if (uiState.remittance.stepReturnTarget == TransferFlowStep.AMOUNT) {
+                        viewModel.showAmountStep()
+                    } else {
+                        viewModel.showAccountStep()
+                    }
+                }
+                uiState.remittance.flowStep == TransferFlowStep.ACCOUNT -> {
+                    when (uiState.remittance.stepReturnTarget) {
+                        TransferFlowStep.RECIPIENT -> viewModel.showRecipientStep()
+                        TransferFlowStep.AMOUNT -> viewModel.showAmountStep()
+                        null -> navController.navigateUp()
+                        TransferFlowStep.ACCOUNT -> navController.navigateUp()
+                    }
+                }
+            }
+        } else {
+            navController.navigateUp()
+        }
+    }
+
+    BackHandler(enabled = currentRoute == Route.TRANSFER) {
+        handleBack()
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -82,15 +123,19 @@ fun DonDoneApp(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = chrome.title,
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                            Text(
-                                text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = DawnTextSubtle
-                            )
+                            if (currentRoute == Route.HOME) {
+                                DonDoneWordmark()
+                            } else {
+                                Text(
+                                    text = chrome.title,
+                                    style = MaterialTheme.typography.headlineSmall
+                                )
+                                Text(
+                                    text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = DawnTextSubtle
+                                )
+                            }
                         }
                         if (chrome.showSettingsAction) {
                             IconButton(onClick = { navController.navigate(Route.MENU) }) {
@@ -113,7 +158,7 @@ fun DonDoneApp(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(DawnSurface)
                                 .border(1.dp, DawnBorder, RoundedCornerShape(16.dp))
-                                .clickable { navController.navigateUp() }
+                                .clickable(onClick = handleBack)
                                 .padding(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Icon(
@@ -124,11 +169,13 @@ fun DonDoneApp(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(text = chrome.title, style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = DawnTextSubtle
-                            )
+                            if (currentRoute != Route.TRANSFER) {
+                                Text(
+                                    text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = DawnTextSubtle
+                                )
+                            }
                         }
                     }
                 }

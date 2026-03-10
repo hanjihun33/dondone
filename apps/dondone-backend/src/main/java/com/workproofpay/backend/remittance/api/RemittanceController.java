@@ -14,6 +14,6 @@ public class RemittanceController {
 
     @GetMapping("/ping")
     public ResponseEntity<ApiResponse<Map<String, String>>> ping() {
-        return ResponseEntity.ok(ApiResponse.success(Map.of("module", "remittance", "status", "skeleton-ready")));
+        return ApiResponse.success(Map.of("module", "remittance", "status", "skeleton-ready"));
     }
 }
