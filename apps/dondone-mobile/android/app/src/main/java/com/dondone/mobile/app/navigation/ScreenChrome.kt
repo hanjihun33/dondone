@@ -1,6 +1,7 @@
 package com.dondone.mobile.app.navigation
 
 import com.dondone.mobile.domain.model.TransferFlowStep
+import com.dondone.mobile.domain.model.TransferStatus
 
 data class ScreenChrome(
     val title: String,
@@ -10,7 +11,8 @@ data class ScreenChrome(
 
 fun resolveScreenChrome(
     route: String,
-    transferStep: TransferFlowStep
+    transferStep: TransferFlowStep,
+    transferStatus: TransferStatus
 ): ScreenChrome {
     return if (isRootRoute(route)) {
         ScreenChrome(
@@ -21,11 +23,18 @@ fun resolveScreenChrome(
     } else {
         ScreenChrome(
             title = when (route) {
-                Route.TRANSFER -> when (transferStep) {
-                    TransferFlowStep.ACCOUNT -> "계좌 선택"
-                    TransferFlowStep.RECIPIENT -> "받는 사람 선택"
-                    TransferFlowStep.AMOUNT -> "금액 입력"
+                Route.TRANSFER -> {
+                    if (transferStatus == TransferStatus.SUBMITTED || transferStatus == TransferStatus.CONFIRMED) {
+                        "송금 상태"
+                    } else {
+                        when (transferStep) {
+                            TransferFlowStep.ACCOUNT -> "계좌 선택"
+                            TransferFlowStep.RECIPIENT -> "받는 사람 선택"
+                            TransferFlowStep.AMOUNT -> "금액 입력"
+                        }
+                    }
                 }
+
                 else -> routeTitle(route)
             },
             showRootTabs = false,
