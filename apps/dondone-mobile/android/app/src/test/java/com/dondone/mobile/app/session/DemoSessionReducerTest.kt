@@ -10,9 +10,40 @@ import org.junit.Test
 
 class DemoSessionReducerTest {
     @Test
+    fun `confirm transfer moves reviewing state into submitted tracker state`() {
+        val baseState = DemoSeedFactory.create().copy(
+            remittance = DemoSeedFactory.create().remittance.copy(status = TransferStatus.REVIEWING)
+        )
+
+        val nextState = DemoSessionReducer.confirmTransfer(baseState)
+
+        assertEquals(TransferStatus.SUBMITTED, nextState.remittance.status)
+        assertEquals(
+            baseState.remittance.selectedAccount().balance,
+            nextState.remittance.selectedAccount().balance
+        )
+    }
+
+    @Test
+    fun `complete transfer confirms and deducts balance once`() {
+        val baseState = DemoSeedFactory.create().copy(
+            remittance = DemoSeedFactory.create().remittance.copy(status = TransferStatus.SUBMITTED)
+        )
+
+        val nextState = DemoSessionReducer.completeTransfer(baseState)
+
+        assertEquals(TransferStatus.CONFIRMED, nextState.remittance.status)
+        assertEquals(
+            baseState.remittance.selectedAccount().balance - (baseState.remittance.draftAmountUsd * 1_450),
+            nextState.remittance.selectedAccount().balance
+        )
+        assertEquals(nextState, DemoSessionReducer.completeTransfer(nextState))
+    }
+
+    @Test
     fun `adjustActualDeposit preserves prior transfer deduction on selected account`() {
         val baseState = DemoSeedFactory.create()
-        val confirmedState = DemoSessionReducer.confirmTransfer(
+        val confirmedState = DemoSessionReducer.completeTransfer(
             baseState.copy(
                 remittance = baseState.remittance.copy(
                     flowStep = TransferFlowStep.AMOUNT,
