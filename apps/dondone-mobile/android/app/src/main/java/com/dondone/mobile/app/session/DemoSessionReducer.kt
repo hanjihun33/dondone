@@ -23,27 +23,87 @@ object DemoSessionReducer {
     }
 
     fun selectAccount(state: DemoState, accountId: String): DemoState {
-        return state.copy(remittance = state.remittance.copy(selectedAccountId = accountId))
+        val nextStep = if (state.remittance.flowStep == TransferFlowStep.ACCOUNT) {
+            state.remittance.stepReturnTarget ?: TransferFlowStep.RECIPIENT
+        } else {
+            state.remittance.flowStep
+        }
+        return state.copy(
+            remittance = state.remittance.copy(
+                selectedAccountId = accountId,
+                flowStep = nextStep,
+                status = TransferStatus.IDLE,
+                stepReturnTarget = null
+            )
+        )
     }
 
     fun openTransferFlow(state: DemoState): DemoState {
         return state.copy(
             remittance = state.remittance.copy(
-                flowStep = TransferFlowStep.RECIPIENT,
-                status = TransferStatus.IDLE
+                flowStep = TransferFlowStep.ACCOUNT,
+                status = TransferStatus.IDLE,
+                stepReturnTarget = null
+            )
+        )
+    }
+
+    fun showAccountStep(state: DemoState): DemoState {
+        return state.copy(
+            remittance = state.remittance.copy(
+                flowStep = TransferFlowStep.ACCOUNT,
+                stepReturnTarget = null
             )
         )
     }
 
     fun showRecipientStep(state: DemoState): DemoState {
-        return state.copy(remittance = state.remittance.copy(flowStep = TransferFlowStep.RECIPIENT))
+        return state.copy(
+            remittance = state.remittance.copy(
+                flowStep = TransferFlowStep.RECIPIENT,
+                stepReturnTarget = null
+            )
+        )
+    }
+
+    fun showAmountStep(state: DemoState): DemoState {
+        return state.copy(
+            remittance = state.remittance.copy(
+                flowStep = TransferFlowStep.AMOUNT,
+                stepReturnTarget = null
+            )
+        )
+    }
+
+    fun showAccountStepForReturn(state: DemoState, returnTarget: TransferFlowStep): DemoState {
+        return state.copy(
+            remittance = state.remittance.copy(
+                flowStep = TransferFlowStep.ACCOUNT,
+                stepReturnTarget = returnTarget
+            )
+        )
+    }
+
+    fun showRecipientStepForReturn(state: DemoState, returnTarget: TransferFlowStep): DemoState {
+        return state.copy(
+            remittance = state.remittance.copy(
+                flowStep = TransferFlowStep.RECIPIENT,
+                stepReturnTarget = returnTarget
+            )
+        )
     }
 
     fun selectRecipient(state: DemoState, recipientId: String): DemoState {
+        val nextStep = if (state.remittance.flowStep == TransferFlowStep.RECIPIENT) {
+            state.remittance.stepReturnTarget ?: TransferFlowStep.AMOUNT
+        } else {
+            state.remittance.flowStep
+        }
         return state.copy(
             remittance = state.remittance.copy(
                 selectedRecipientId = recipientId,
-                flowStep = TransferFlowStep.AMOUNT
+                flowStep = nextStep,
+                stepReturnTarget = null
             )
         )
     }
@@ -103,10 +163,22 @@ object DemoSessionReducer {
     }
 
     fun submitTransfer(state: DemoState): DemoState {
-        return state.copy(remittance = state.remittance.copy(status = TransferStatus.SUBMITTED))
+        return state.copy(remittance = state.remittance.copy(status = TransferStatus.REVIEWING))
+    }
+
+    fun dismissTransferConfirmation(state: DemoState): DemoState {
+        return state.copy(remittance = state.remittance.copy(status = TransferStatus.IDLE))
     }
 
     fun confirmTransfer(state: DemoState): DemoState {
+        if (state.remittance.status != TransferStatus.REVIEWING) return state
+
+        return state.copy(remittance = state.remittance.copy(status = TransferStatus.SUBMITTED))
+    }
+
+    fun completeTransfer(state: DemoState): DemoState {
+        if (state.remittance.status != TransferStatus.SUBMITTED) return state
+
         val debitAmount = state.remittance.draftAmountUsd * 1_450
         return state.copy(
             remittance = state.remittance
@@ -119,7 +191,8 @@ object DemoSessionReducer {
         return state.copy(
             remittance = state.remittance.copy(
                 status = TransferStatus.IDLE,
-                flowStep = TransferFlowStep.RECIPIENT
+                flowStep = TransferFlowStep.ACCOUNT,
+                stepReturnTarget = null
             )
         )
     }

@@ -6,6 +6,11 @@ val DawnPrimary = Color(0xFF7B68EE)
 val DawnPrimaryDeep = Color(0xFF5D45D8)
 val DawnSecondary = Color(0xFFEDE5FF)
 val DawnAccent = Color(0xFFF6D7E7)
+val DawnLogoGradient = listOf(
+    Color(0xFF7C6AEF),
+    Color(0xFFB28CFF),
+    Color(0xFFF09DB8)
+)
 val DawnSurface = Color(0xFFFFFFFF)
 val DawnSurfaceAlt = Color(0xFFF5EFFF)
 val DawnBackground = Color(0xFFF7F3FF)

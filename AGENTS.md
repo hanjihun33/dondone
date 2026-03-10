@@ -79,6 +79,33 @@ If requirements remain ambiguous, state assumptions explicitly before coding.
 4. Docs updated for changed contracts/flows.
 5. No secrets or generated artifacts committed.
 
+## Codex Workflow
+- Before coding, produce or update an execution plan under `docs/execplans/` for non-trivial work.
+- For tasks that change workflow tooling or process guidance under `.codex/`, `.agents/`, or `docs/CODEX_WORKFLOW.md`, read `docs/CODEX_WORKFLOW.md` first.
+- Prefer repository skills for repeatable steps:
+  - `prd-breakdown`
+  - `execplan-writer`
+  - `implement-checklist`
+  - `test-checklist`
+  - `review-checklist`
+  - `commit-grouping`
+- Keep agent roles thin and use skills as the detailed playbooks.
+- Use multi-agent exploration/review before or after implementation, not as an excuse to skip a scoped plan.
+- For non-trivial feature work, explicitly use `explorer` sub-agents to separate backend, mobile, and cross-cutting contract impact before implementation starts.
+- Use a separate `tester` sub-agent when the change affects DTO/API contracts, auth behavior, validation logic, or significant UI state transitions.
+- For non-trivial reviews, explicitly use sub-agents instead of doing all review work in the main thread.
+- Default review split:
+  - `reviewer` for correctness, regressions, contracts, and maintainability
+  - `security_reviewer` when auth, token, exposed-path, or sensitive-data impact exists
+- Use `docs_writer` when execution plans or review notes need durable cleanup or when the task materially changes documented contracts or workflow guidance.
+- Parallel implementation is allowed only after the execution plan explicitly marks the task as worktree-safe.
+- Do not split work across parallel lanes when shared DTOs, auth/security rules, shared entities, or common response contracts are still moving.
+- Record implementation plans in `docs/execplans/` and review findings or follow-up notes in `docs/reviews/` when the task is large enough to need them.
+- Keep plan and review documents organized by lifecycle:
+  - active work in `docs/execplans/active/` and `docs/reviews/active/`
+  - finished or stale artifacts moved to `archive/`
+- Use date-prefixed filenames such as `2026-03-09-workproof-backend.md` when creating new plan or review documents.
+
 ## Reference Policy (`S14P11C205`)
 - Reuse only proven patterns (workflow, conventions, structure).
 - Adapt naming and behavior to DonDone PRD.

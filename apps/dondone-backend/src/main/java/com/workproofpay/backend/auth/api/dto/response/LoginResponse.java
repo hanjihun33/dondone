@@ -1,5 +1,6 @@
 package com.workproofpay.backend.auth.api.dto.response;
 
+import com.workproofpay.backend.auth.model.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record LoginResponse(
@@ -16,4 +17,14 @@ public record LoginResponse(
         @Schema(description = "Authenticated user display name", example = "Test User")
         String name
 ) {
+    public static LoginResponse of(String accessToken, long expiresIn, User user) {
+        return new LoginResponse(
+                accessToken,
+                "Bearer",
+                expiresIn,
+                user.getId(),
+                user.getEmail(),
+                user.getName()
+        );
+    }
 }

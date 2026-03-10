@@ -65,11 +65,11 @@ data class Recipient(
 )
 
 enum class TransferStatus {
-    IDLE, SUBMITTED, CONFIRMED
+    IDLE, REVIEWING, SUBMITTED, CONFIRMED
 }
 
 enum class TransferFlowStep {
-    RECIPIENT, AMOUNT
+    ACCOUNT, RECIPIENT, AMOUNT
 }
 
 data class RemittanceData(
@@ -80,7 +80,8 @@ data class RemittanceData(
     val draftAmountUsd: Int,
     val txHash: String,
     val status: TransferStatus,
-    val flowStep: TransferFlowStep
+    val flowStep: TransferFlowStep,
+    val stepReturnTarget: TransferFlowStep? = null
 ) {
     fun selectedAccountOrNull(): Account? = accounts.firstOrNull { it.id == selectedAccountId } ?: accounts.firstOrNull()
 

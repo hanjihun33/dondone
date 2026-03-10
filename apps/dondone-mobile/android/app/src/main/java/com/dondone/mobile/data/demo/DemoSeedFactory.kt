@@ -65,7 +65,8 @@ object DemoSeedFactory {
                 draftAmountUsd = 360,
                 txHash = "0x9f2e3d8b1c0a4e7f6d5c4b3a20e1f0d9c8b7a6f5e4d3c2b1a0",
                 status = TransferStatus.IDLE,
-                flowStep = TransferFlowStep.RECIPIENT
+                flowStep = TransferFlowStep.RECIPIENT,
+                stepReturnTarget = null
             ),
             advance = AdvanceData(
                 maxCap = 500_000,

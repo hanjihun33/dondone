@@ -14,6 +14,6 @@ public class SafePayController {
 
     @GetMapping("/ping")
     public ResponseEntity<ApiResponse<Map<String, String>>> ping() {
-        return ResponseEntity.ok(ApiResponse.success(Map.of("module", "safepay", "status", "skeleton-ready")));
+        return ApiResponse.success(Map.of("module", "safepay", "status", "skeleton-ready"));
     }
 }
