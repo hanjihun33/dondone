@@ -5,12 +5,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.feature.finance.presentation.AccountManageScreen
-import com.dondone.mobile.feature.finance.presentation.toAccountManageUiModel
 import com.dondone.mobile.feature.finance.presentation.FinanceHomeScreen
+import com.dondone.mobile.feature.finance.presentation.toAccountManageUiModel
 import com.dondone.mobile.feature.finance.presentation.toFinanceHomeUiModel
 import com.dondone.mobile.feature.home.presentation.HomeScreen
 import com.dondone.mobile.feature.home.presentation.toHomeUiModel
@@ -73,19 +74,15 @@ fun DonDoneNavGraph(
         composable(Route.WAGE) {
             WageScreen(
                 uiModel = uiState.toWageUiModel(),
-                onRecordDeposit = { viewModel.recordActualDeposit() },
+                onRecordDeposit = viewModel::recordActualDeposit,
                 onIncreaseDeposit = { viewModel.adjustActualDeposit(50_000) },
                 onDecreaseDeposit = { viewModel.adjustActualDeposit(-50_000) },
-<<<<<<< HEAD
-                onOpenTransfer = { navController.navigate(Route.ACCOUNT) },
-                onOpenWorkproof = { navController.navigate(Route.WORKPROOF) },
-                onOpenMenu = { navController.navigate(Route.MENU) }
-=======
                 onOpenTransfer = {
                     viewModel.openTransferFlow()
                     navController.navigate(Route.TRANSFER)
-                }
->>>>>>> develop
+                },
+                onOpenWorkproof = { navController.navigate(Route.WORKPROOF) },
+                onOpenMenu = { navController.navigate(Route.MENU) }
             )
         }
         composable(Route.TRANSFER) {
@@ -94,11 +91,24 @@ fun DonDoneNavGraph(
                 onSelectAccount = viewModel::selectAccount,
                 onSelectRecipient = viewModel::selectRecipient,
                 onUpdateAmount = viewModel::updateTransferAmount,
-                onChangeRecipient = viewModel::showRecipientStep,
-                onChangeAccount = viewModel::showAccountStep,
+                onChangeRecipient = viewModel::showRecipientStepFromAmount,
+                onChangeAccountFromRecipient = viewModel::showAccountStepFromRecipient,
+                onChangeAccountFromAmount = viewModel::showAccountStepFromAmount,
                 onSubmitTransfer = viewModel::submitTransfer,
+                onDismissTransferConfirmation = viewModel::dismissTransferConfirmation,
                 onConfirmTransfer = viewModel::confirmTransfer,
-                onResetTransfer = viewModel::resetTransfer
+                onResetTransfer = {
+                    val returnedHome = navController.popBackStack(Route.HOME, false)
+                    if (!returnedHome) {
+                        navController.navigate(Route.HOME) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
             )
         }
         composable(Route.ACCOUNT) {
