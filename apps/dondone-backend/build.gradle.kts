@@ -1,10 +1,10 @@
+import org.gradle.api.tasks.testing.Test
+
 plugins {
     java
     id("org.springframework.boot") version "3.2.5"
     id("io.spring.dependency-management") version "1.1.4"
 }
-
-import org.gradle.api.tasks.testing.Test
 
 group = "com.workproofpay"
 version = "0.1.0-SNAPSHOT"

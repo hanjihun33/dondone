@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -130,7 +131,14 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.actualDepositAmount").value(80000))
                 .andExpect(jsonPath("$.data.differenceAmount").value(25000))
                 .andExpect(jsonPath("$.data.anomalyDetected").value(true))
-                .andExpect(jsonPath("$.data.status").value("REVIEW_NEEDED"));
+                .andExpect(jsonPath("$.data.status").value("REVIEW_NEEDED"))
+                .andExpect(jsonPath("$.data.reasons[*].code", hasItems(
+                        "OVERTIME_INCLUDED",
+                        "NIGHT_SHIFT_INCLUDED",
+                        "DIFFERENCE_OVER_THRESHOLD"
+                )))
+                .andExpect(jsonPath("$.data.reasons[2].relatedWorkProofIds[0]").value(1))
+                .andExpect(jsonPath("$.data.reasons[2].relatedWorkProofIds[1]").value(2));
 
         mockMvc.perform(get("/api/demo/state")
                         .header("Authorization", bearer(token))
@@ -142,7 +150,8 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.workProofs.length()").value(1))
                 .andExpect(jsonPath("$.data.workProofSummary.totalWorkDays").value(1))
                 .andExpect(jsonPath("$.data.wageSummary.actualDepositAmount").doesNotExist())
-                .andExpect(jsonPath("$.data.wageSummary.status").value("NOT_RECORDED"));
+                .andExpect(jsonPath("$.data.wageSummary.status").value("NOT_RECORDED"))
+                .andExpect(jsonPath("$.data.wageSummary.reasons[*].code", hasItems("DEPOSIT_MISSING")));
     }
 
     @Test
@@ -246,7 +255,8 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.differenceAmount").value(0))
                 .andExpect(jsonPath("$.data.anomalyTriggerAmount").value(1))
                 .andExpect(jsonPath("$.data.anomalyDetected").value(false))
-                .andExpect(jsonPath("$.data.status").value("WITHIN_THRESHOLD"));
+                .andExpect(jsonPath("$.data.status").value("WITHIN_THRESHOLD"))
+                .andExpect(jsonPath("$.data.reasons.length()").value(0));
     }
 
     private String tokenFor(User user) {
