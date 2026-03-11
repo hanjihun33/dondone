@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record WageSummaryResponse(
+        List<WageDifferenceReasonResponse> reasons,
         String yearMonth,
         LocalDate asOf,
         int workDays,
@@ -37,11 +38,30 @@ public record WageSummaryResponse(
         int pendingRecordCount,
         List<Long> relatedWorkProofIds
 ) {
+    public record WageDifferenceReasonResponse(
+            String code,
+            String title,
+            String description,
+            List<Long> relatedWorkProofIds
+    ) {
+        public static WageDifferenceReasonResponse from(WageSummaryCalculator.WageDifferenceReason reason) {
+            return new WageDifferenceReasonResponse(
+                    reason.code(),
+                    reason.title(),
+                    reason.description(),
+                    reason.relatedWorkProofIds()
+            );
+        }
+    }
+
     public static WageSummaryResponse from(WorkProofMonthlyMetrics metrics,
                                            WageSummaryCalculator.WageSummarySnapshot snapshot,
                                            int paydayDay,
                                            String disclaimer) {
         return new WageSummaryResponse(
+                snapshot.reasons().stream()
+                        .map(WageDifferenceReasonResponse::from)
+                        .toList(),
                 metrics.yearMonth(),
                 metrics.asOf(),
                 metrics.totalWorkDays(),

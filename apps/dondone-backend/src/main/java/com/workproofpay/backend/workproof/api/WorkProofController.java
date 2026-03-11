@@ -3,6 +3,7 @@ package com.workproofpay.backend.workproof.api;
 import com.workproofpay.backend.shared.api.ApiResponse;
 import com.workproofpay.backend.shared.security.AuthenticatedUser;
 import com.workproofpay.backend.workproof.api.dto.request.CreateWorkProofRequest;
+import com.workproofpay.backend.workproof.api.dto.request.UpdateWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofResponse;
 import com.workproofpay.backend.workproof.service.WorkProofMonthlyMetrics;
@@ -50,6 +51,15 @@ public class WorkProofController {
             @PathVariable Long workProofId
     ) {
         return ApiResponse.success(workProofService.getWorkProof(user.userId(), workProofId));
+    }
+
+    @PatchMapping("/{workProofId}")
+    public ResponseEntity<ApiResponse<WorkProofResponse>> update(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long workProofId,
+            @Valid @RequestBody UpdateWorkProofRequest request
+    ) {
+        return ApiResponse.success(workProofService.update(user.userId(), workProofId, request));
     }
 
     @GetMapping("/monthly-summary")

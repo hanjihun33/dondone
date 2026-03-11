@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class WageSummaryCalculator {
@@ -35,8 +37,10 @@ public class WageSummaryCalculator {
         String status = actualDepositAmount == null
                 ? "NOT_RECORDED"
                 : anomalyDetected ? "REVIEW_NEEDED" : "WITHIN_THRESHOLD";
+        List<WageDifferenceReason> reasons = buildReasons(metrics, actualDepositAmount, differenceAmount, anomalyDetected);
 
         return new WageSummarySnapshot(
+                reasons,
                 normalizedHourlyWage,
                 minutesToHours(metrics.totalWorkedMinutes()),
                 minutesToHours(metrics.totalOvertimeMinutes()),
@@ -79,7 +83,61 @@ public class WageSummaryCalculator {
                 .longValue();
     }
 
+    private List<WageDifferenceReason> buildReasons(WorkProofMonthlyMetrics metrics,
+                                                    Long actualDepositAmount,
+                                                    Long differenceAmount,
+                                                    boolean anomalyDetected) {
+        List<Long> relatedWorkProofIds = metrics.reflectedWorkProofIds();
+        List<WageDifferenceReason> reasons = new ArrayList<>();
+
+        if (actualDepositAmount == null) {
+            reasons.add(new WageDifferenceReason(
+                    "DEPOSIT_MISSING",
+                    "실입금 입력이 아직 없습니다",
+                    "실제 입금액이 입력되지 않아 차액 판단은 잠겨 있습니다. 먼저 입금 기록을 남긴 뒤 비교를 이어가세요.",
+                    relatedWorkProofIds
+            ));
+        }
+        if (metrics.totalOvertimeMinutes() > 0) {
+            reasons.add(new WageDifferenceReason(
+                    "OVERTIME_INCLUDED",
+                    "연장 근무가 추정에 포함됐습니다",
+                    "하루 8시간을 초과한 reflected 근무가 참고용 추정 급여에 반영됐습니다.",
+                    relatedWorkProofIds
+            ));
+        }
+        if (metrics.totalNightMinutes() > 0) {
+            reasons.add(new WageDifferenceReason(
+                    "NIGHT_SHIFT_INCLUDED",
+                    "야간 근무가 추정에 포함됐습니다",
+                    "22:00-06:00 구간의 reflected 근무가 참고용 추정 급여에 반영됐습니다.",
+                    relatedWorkProofIds
+            ));
+        }
+        if (anomalyDetected && differenceAmount != null) {
+            reasons.add(new WageDifferenceReason(
+                    "DIFFERENCE_OVER_THRESHOLD",
+                    "확인 필요한 차이가 감지됐습니다",
+                    differenceAmount >= 0
+                            ? "참고용 추정 급여가 실제 입금액보다 임계값 이상 크게 계산돼 근거 확인이 필요합니다."
+                            : "실제 입금액과 참고용 추정 급여 사이에 임계값 이상 차이가 있어 근거 확인이 필요합니다.",
+                    relatedWorkProofIds
+            ));
+        }
+
+        return List.copyOf(reasons);
+    }
+
+    public record WageDifferenceReason(
+            String code,
+            String title,
+            String description,
+            List<Long> relatedWorkProofIds
+    ) {
+    }
+
     public record WageSummarySnapshot(
+            List<WageDifferenceReason> reasons,
             long normalizedHourlyWage,
             BigDecimal totalWorkedHours,
             BigDecimal overtimeHours,

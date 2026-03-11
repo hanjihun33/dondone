@@ -1,12 +1,18 @@
 package com.workproofpay.backend.workproof.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.api.dto.request.CreateWorkProofRequest;
+import com.workproofpay.backend.workproof.api.dto.request.UpdateWorkProofRequest;
+import com.workproofpay.backend.workproof.api.dto.request.WorkProofAttachmentMetadataRequest;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofResponse;
 import com.workproofpay.backend.workproof.model.WorkProof;
+import com.workproofpay.backend.workproof.model.WorkProofAuditLog;
+import com.workproofpay.backend.workproof.repo.WorkProofAuditLogRepository;
 import com.workproofpay.backend.workproof.repo.WorkProofRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +33,8 @@ public class WorkProofService {
     private final UserRepository userRepository;
     private final WorkProofRequestValidator workProofRequestValidator;
     private final WorkProofMetricsCalculator workProofMetricsCalculator;
+    private final WorkProofAuditLogRepository workProofAuditLogRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public WorkProofResponse create(Long userId, CreateWorkProofRequest request) {
@@ -63,6 +71,47 @@ public class WorkProofService {
         WorkProof workProof = workProofRepository.findByIdAndUserId(workProofId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.WORKPROOF_NOT_FOUND));
         return toResponse(workProof);
+    }
+
+    @Transactional
+    public WorkProofResponse update(Long userId, Long workProofId, UpdateWorkProofRequest request) {
+        WorkProof workProof = workProofRepository.findByIdAndUserId(workProofId, userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.WORKPROOF_NOT_FOUND));
+        workProofRequestValidator.validateForUpdate(workProof, request);
+        LocalDateTime beforeClockInAt = workProof.getClockInAt();
+        LocalDateTime beforeClockOutAt = workProof.getClockOutAt();
+        String beforeEditReason = workProof.getEditReason();
+        String beforeMemo = workProof.getMemo();
+        int beforeAttachmentCount = workProof.getAttachmentCount();
+        String beforeAttachmentMetadataJson = workProof.getAttachmentMetadataJson();
+        int resolvedAttachmentCount = request.resolvedAttachmentCount(workProof.getAttachmentCount());
+        String resolvedAttachmentMetadataJson = resolveAttachmentMetadataJson(workProof, request);
+        workProof.updateTimes(
+                request.clockInAt(),
+                request.clockOutAt(),
+                request.editReason(),
+                request.memo(),
+                resolvedAttachmentCount,
+                resolvedAttachmentMetadataJson
+        );
+        WorkProof saved = workProofRepository.save(workProof);
+        workProofAuditLogRepository.save(WorkProofAuditLog.record(
+                saved,
+                userId,
+                beforeClockInAt,
+                beforeClockOutAt,
+                saved.getClockInAt(),
+                saved.getClockOutAt(),
+                beforeEditReason,
+                saved.getEditReason(),
+                beforeMemo,
+                saved.getMemo(),
+                beforeAttachmentCount,
+                saved.getAttachmentCount(),
+                beforeAttachmentMetadataJson,
+                saved.getAttachmentMetadataJson()
+        ));
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -133,5 +182,26 @@ public class WorkProofService {
 
     public BigDecimal minutesToHours(long minutes) {
         return workProofMetricsCalculator.minutesToHours(minutes);
+    }
+
+    private String serializeAttachmentMetadata(List<WorkProofAttachmentMetadataRequest> attachments) {
+        if (attachments == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(attachments);
+        } catch (JsonProcessingException e) {
+            throw new ApiException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
+    private String resolveAttachmentMetadataJson(WorkProof workProof, UpdateWorkProofRequest request) {
+        if (request.attachments() != null) {
+            return serializeAttachmentMetadata(request.attachments());
+        }
+        if (request.attachmentCount() != null) {
+            return null;
+        }
+        return workProof.getAttachmentMetadataJson();
     }
 }
