@@ -57,7 +57,7 @@ pipeline {
                 sh '''
                     cd "$DEPLOY_DIR"
                     docker compose build api-server
-                    docker compose up -d api-server nginx
+                    docker compose up -d postgres redis api-server nginx
                 '''
             }
         }

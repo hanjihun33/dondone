@@ -102,8 +102,8 @@ services:
       - /srv/dondone/app:/srv/dondone/app
     environment:
       TZ: Asia/Seoul
-      JAVA_OPTS: "-Xms256m -Xmx512m -Duser.timezone=Asia/Seoul"
-    mem_limit: 768m
+      JAVA_OPTS: "-Xms512m -Xmx1024m -Duser.timezone=Asia/Seoul"
+    mem_limit: 4g
     networks:
       - dondone-network
 
