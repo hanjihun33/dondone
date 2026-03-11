@@ -35,6 +35,7 @@ pipeline {
         stage('Sync Server Repo') {
             steps {
                 sh '''
+                    git config --global --get-all safe.directory | grep -Fx "$DEPLOY_DIR" || git config --global --add safe.directory "$DEPLOY_DIR"
                     cd "$DEPLOY_DIR"
                     git fetch origin
                     git checkout "$TARGET_BRANCH"
