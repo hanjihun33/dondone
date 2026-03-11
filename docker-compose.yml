@@ -88,9 +88,28 @@ services:
     networks:
       - dondone-network
 
+  jenkins:
+    image: jenkins/jenkins:lts-jdk21
+    restart: always
+    user: root
+    ports:
+      - "8081:8080"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+      - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
+      - /srv/dondone/app:/srv/dondone/app
+    environment:
+      JAVA_OPTS: "-Xmx512m"
+    mem_limit: 768m
+    networks:
+      - dondone-network
+
 volumes:
   postgres_data:
   redis_data:
+  jenkins_data:
 
 networks:
   dondone-network:
