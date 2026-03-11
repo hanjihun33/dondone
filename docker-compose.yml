@@ -101,10 +101,12 @@ services:
       - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
       - /srv/dondone/app:/srv/dondone/app
     environment:
-      JAVA_OPTS: "-Xmx512m"
+      TZ: Asia/Seoul
+      JAVA_OPTS: "-Xms256m -Xmx512m -Duser.timezone=Asia/Seoul"
     mem_limit: 768m
     networks:
       - dondone-network
+
 
 volumes:
   postgres_data:

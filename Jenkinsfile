@@ -26,7 +26,7 @@ pipeline {
                     sh '''
                         sed -i 's/\r$//' ./gradlew
                         chmod +x ./gradlew
-                        ./gradlew test --console=plain
+                        ./gradlew test --console=plain --no-daemon
                     '''
                 }
             }
@@ -57,7 +57,7 @@ pipeline {
                 sh '''
                     cd "$DEPLOY_DIR"
                     docker compose build api-server
-                    docker compose up -d
+                    docker compose up -d api-server nginx
                 '''
             }
         }
