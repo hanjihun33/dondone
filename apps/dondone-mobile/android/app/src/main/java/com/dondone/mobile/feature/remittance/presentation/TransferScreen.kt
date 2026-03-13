@@ -147,7 +147,7 @@ private fun AccountStepCard(
     TransferContainerCard {
         Text(
             text = "보내는 계좌",
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = DawnTextSubtle
         )
         uiModel.accounts.forEach { account ->
@@ -160,7 +160,7 @@ private fun AccountStepCard(
         }
         Text(
             text = uiModel.accountStepHintText,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
     }
@@ -175,7 +175,7 @@ private fun RecipientStepCard(
     TransferContainerCard {
         Text(
             text = "받는 사람",
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = DawnTextSubtle
         )
         uiModel.recipients.forEach { recipient ->
@@ -194,7 +194,7 @@ private fun RecipientStepCard(
             Text(
                 text = "수신자를 선택하면 금액 입력으로 이동합니다.",
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 softWrap = false,
                 color = DawnTextSubtle
@@ -413,12 +413,12 @@ private fun TransferTrackerStep(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
                     color = DawnText
                 )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = if (state == TransferTrackerStepState.Pending) {
                         TransferTrackerPendingText
                     } else {
@@ -494,12 +494,12 @@ private fun TransferHashCard(txHash: String) {
     ) {
         Text(
             text = "TX HASH",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
             color = Color.White.copy(alpha = 0.6f)
         )
         Text(
             text = txHash,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
             color = Color.White.copy(alpha = 0.86f)
         )
     }
@@ -526,7 +526,7 @@ private fun TransferInfoCard(
             )
             Text(
                 text = actionText,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                 color = DawnPrimary,
                 modifier = Modifier.clickable(onClick = onAction)
             )
@@ -538,7 +538,7 @@ private fun TransferInfoCard(
         )
         Text(
             text = description,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
     }
@@ -573,11 +573,11 @@ private fun TransferAmountCard(
             suffix = {
                 Text(
                     text = "USDC",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                     color = DawnTextSubtle
                 )
             },
-            textStyle = MaterialTheme.typography.headlineMedium.copy(
+            textStyle = MaterialTheme.typography.displaySmall.copy(
                 fontWeight = FontWeight.Black,
                 color = DawnText
             ),
@@ -597,7 +597,7 @@ private fun TransferAmountCard(
         )
         Text(
             text = amountSummaryText,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
     }
@@ -628,7 +628,7 @@ private fun TransferConfirmationSheet(
                 )
                 Text(
                     text = uiModel.confirmationSubtitleText,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
             }
@@ -730,7 +730,7 @@ private fun TransferConfirmationRow(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelLarge,
                 color = DawnTextSubtle
             )
             Text(
@@ -738,7 +738,7 @@ private fun TransferConfirmationRow(
                 style = if (emphasized) {
                     MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
                 } else {
-                    MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black)
+                    MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
                 },
                 color = DawnText,
                 fontFamily = valueFontFamily,
@@ -768,7 +768,7 @@ private fun TransferCheckItem(
         icon()
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
             color = DawnText
         )
     }

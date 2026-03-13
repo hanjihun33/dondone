@@ -111,6 +111,10 @@ class DemoSessionViewModel : ViewModel() {
         _uiState.update { state -> DemoSessionReducer.adjustActualDeposit(state, delta) }
     }
 
+    fun setActualDeposit(amount: Int) {
+        _uiState.update { state -> DemoSessionReducer.setActualDeposit(state, amount) }
+    }
+
     fun resetSeed() {
         cancelTransferCompletion()
         _uiState.value = initialState

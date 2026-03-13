@@ -74,9 +74,7 @@ fun DonDoneNavGraph(
         composable(Route.WAGE) {
             WageScreen(
                 uiModel = uiState.toWageUiModel(),
-                onRecordDeposit = viewModel::recordActualDeposit,
-                onIncreaseDeposit = { viewModel.adjustActualDeposit(50_000) },
-                onDecreaseDeposit = { viewModel.adjustActualDeposit(-50_000) },
+                onApplyActualDeposit = viewModel::setActualDeposit,
                 onOpenTransfer = {
                     viewModel.openTransferFlow()
                     navController.navigate(Route.TRANSFER)

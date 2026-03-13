@@ -3,6 +3,7 @@ package com.dondone.mobile.feature.wage.presentation
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,23 +26,41 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
@@ -54,17 +74,19 @@ import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DawnWarning
 import com.dondone.mobile.core.designsystem.StatusBadge
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WageScreen(
     uiModel: WageUiModel,
-    onRecordDeposit: () -> Unit,
-    onIncreaseDeposit: () -> Unit,
-    onDecreaseDeposit: () -> Unit,
+    onApplyActualDeposit: (Int) -> Unit,
     onOpenTransfer: () -> Unit,
     onOpenWorkproof: () -> Unit,
     onOpenMenu: () -> Unit
 ) {
+    val copilotSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showSecondaryActions by rememberSaveable { mutableStateOf(false) }
+    var selectedCopilotChipLabel by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedCopilotChip = uiModel.chips.firstOrNull { it.label == selectedCopilotChipLabel }
 
     Column(
         modifier = Modifier
@@ -73,13 +95,15 @@ fun WageScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        WageIntroCard(uiModel = uiModel)
+        WageHeader(
+            uiModel = uiModel,
+            onOpenCopilot = { chip -> selectedCopilotChipLabel = chip.label }
+        )
+        WageNoticeCard(uiModel = uiModel)
 
         WageCheckCard(
             uiModel = uiModel,
-            onRecordDeposit = onRecordDeposit,
-            onIncreaseDeposit = onIncreaseDeposit,
-            onDecreaseDeposit = onDecreaseDeposit
+            onApplyActualDeposit = onApplyActualDeposit
         )
 
         WageDifferenceCard(
@@ -104,28 +128,39 @@ fun WageScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
     }
+
+    if (selectedCopilotChip != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedCopilotChipLabel = null },
+            sheetState = copilotSheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+            dragHandle = null
+        ) {
+            WageCopilotBottomSheet(
+                chip = selectedCopilotChip,
+                onClose = { selectedCopilotChipLabel = null }
+            )
+        }
+    }
 }
 
 @Composable
-private fun WageIntroCard(
-    uiModel: WageUiModel
+private fun WageHeader(
+    uiModel: WageUiModel,
+    onOpenCopilot: (WageCopilotChipUiModel) -> Unit
 ) {
-    WageSurfaceCard(hero = true) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = "급여 점검",
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnPrimaryDeep
-            )
-            Text(
-                text = uiModel.heroTitleText,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
                 color = DawnText
-            )
-            Text(
-                text = uiModel.heroDescriptionText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
             )
         }
 
@@ -135,17 +170,40 @@ private fun WageIntroCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             uiModel.chips.forEach { chip ->
-                WageChip(text = chip)
+                WageChip(
+                    text = chip.label,
+                    onClick = { onOpenCopilot(chip) }
+                )
             }
         }
+    }
+}
 
-        WageInfoPanel {
-            uiModel.disclaimerLines.forEach { line ->
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DawnText
-                )
+@Composable
+private fun WageNoticeCard(uiModel: WageUiModel) {
+    WageInfoPanel {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = DawnTextSubtle,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                uiModel.disclaimerLines.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DawnText
+                    )
+                }
             }
         }
     }
@@ -154,10 +212,15 @@ private fun WageIntroCard(
 @Composable
 private fun WageCheckCard(
     uiModel: WageUiModel,
-    onRecordDeposit: () -> Unit,
-    onIncreaseDeposit: () -> Unit,
-    onDecreaseDeposit: () -> Unit
+    onApplyActualDeposit: (Int) -> Unit
 ) {
+    val focusRequester = remember { FocusRequester() }
+    var actualDepositInput by rememberSaveable(uiModel.deposit.actualDepositText) {
+        mutableStateOf(uiModel.deposit.actualDepositText.filter(Char::isDigit))
+    }
+    val actualDepositValue = actualDepositInput.toIntOrNull()
+    val canApplyDeposit = actualDepositValue != null && actualDepositValue > 0
+
     WageSurfaceCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -168,11 +231,6 @@ private fun WageCheckCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = uiModel.monthText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = DawnPrimaryDeep
-                )
                 Text(
                     text = uiModel.titleText,
                     style = MaterialTheme.typography.titleLarge,
@@ -225,8 +283,8 @@ private fun WageCheckCard(
                 }
                 if (uiModel.deposit.actionButtonText != null) {
                     WageCompactButton(
-                        text = uiModel.deposit.actionButtonText,
-                        onClick = onRecordDeposit
+                        text = "입력",
+                        onClick = { focusRequester.requestFocus() }
                     )
                 } else {
                     StatusBadge(
@@ -248,32 +306,72 @@ private fun WageCheckCard(
                 style = MaterialTheme.typography.labelLarge,
                 color = DawnTextSubtle
             )
-            Text(
-                text = uiModel.deposit.actualDepositText,
-                style = MaterialTheme.typography.headlineSmall,
-                color = DawnText
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                    value = actualDepositInput,
+                    onValueChange = { value ->
+                        actualDepositInput = value.filter(Char::isDigit)
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = {
+                        Text(
+                            text = "예: 1740000",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = DawnTextSubtle
+                        )
+                    },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Black,
+                        color = DawnText
+                    ),
+                    singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFFF8FAFC),
+                        unfocusedContainerColor = Color(0xFFF8FAFC),
+                        disabledContainerColor = Color(0xFFF8FAFC),
+                        focusedBorderColor = DawnPrimary,
+                        unfocusedBorderColor = DawnBorder,
+                        disabledBorderColor = DawnBorder,
+                        focusedTextColor = DawnText,
+                        unfocusedTextColor = DawnText,
+                        cursorColor = DawnPrimary
+                    )
+                )
+                WageCompactButton(
+                    text = "적용",
+                    onClick = {
+                        if (actualDepositValue != null && actualDepositValue > 0) {
+                            onApplyActualDeposit(actualDepositValue)
+                        }
+                    },
+                    enabled = canApplyDeposit
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 WageSecondaryButton(
                     text = "-5만",
-                    onClick = onDecreaseDeposit,
+                    onClick = {
+                        onApplyActualDeposit((actualDepositValue ?: 0).minus(50_000).coerceAtLeast(0))
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 WageSecondaryButton(
                     text = "+5만",
-                    onClick = onIncreaseDeposit,
+                    onClick = {
+                        onApplyActualDeposit((actualDepositValue ?: 0) + 50_000)
+                    },
                     modifier = Modifier.weight(1f)
                 )
-                if (uiModel.deposit.actionButtonText != null) {
-                    WagePrimaryButton(
-                        text = uiModel.deposit.actionButtonText,
-                        onClick = onRecordDeposit,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
             }
             Text(
                 text = uiModel.deposit.inputHelperText,
@@ -350,7 +448,8 @@ private fun WageCheckCard(
                     WageValueRow(
                         label = item.label,
                         value = item.value,
-                        emphasized = item.emphasized
+                        emphasized = item.emphasized,
+                        icon = item.icon?.toImageVector()
                     )
                 }
             }
@@ -411,10 +510,19 @@ private fun WageDifferenceCard(
                     color = DawnTextSubtle
                 )
             }
-            StatusBadge(
-                text = difference.statusText,
-                tone = difference.statusTone
-            )
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(soft),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (difference.statusTone == BadgeTone.Warning) "!" else "✓",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                    color = accent
+                )
+            }
         }
 
         WageSummaryList(
@@ -611,14 +719,67 @@ private fun WageDashedPanel(
 }
 
 @Composable
+private fun WageCopilotBottomSheet(
+    chip: WageCopilotChipUiModel,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        WageMiniBadge(
+            text = chip.label,
+            accent = DawnPrimaryDeep,
+            background = DawnSurfaceAlt
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = chip.title,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+            Text(
+                text = chip.description,
+                style = MaterialTheme.typography.bodyLarge,
+                color = DawnText
+            )
+        }
+
+        WageInfoPanel {
+            Text(
+                text = "설명 근거",
+                style = MaterialTheme.typography.labelLarge,
+                color = DawnPrimaryDeep
+            )
+            chip.detailLines.forEach { line ->
+                WageEvidenceLine(text = line)
+            }
+        }
+
+        WagePrimaryButton(
+            text = "확인했어요",
+            onClick = onClose,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+}
+
+@Composable
 private fun WageChip(
-    text: String
+    text: String,
+    onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(Color.White.copy(alpha = 0.9f))
             .border(BorderStroke(1.dp, DawnBorder), RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
@@ -683,7 +844,8 @@ private fun WageMetricTile(
 private fun WageValueRow(
     label: String,
     value: String,
-    emphasized: Boolean
+    emphasized: Boolean,
+    icon: ImageVector? = null
 ) {
     val background = if (emphasized) Color.White else Color(0xFFF8FAFC)
 
@@ -697,11 +859,32 @@ private fun WageValueRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (emphasized) DawnText else DawnTextSubtle
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (emphasized) DawnSurfaceAlt else Color.White),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (emphasized) DawnPrimaryDeep else DawnTextSubtle,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (emphasized) DawnText else DawnTextSubtle
+            )
+        }
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge.copy(
@@ -871,10 +1054,12 @@ private fun WageSecondaryButton(
 @Composable
 private fun WageCompactButton(
     text: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    enabled: Boolean = true
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(16.dp),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
         colors = ButtonDefaults.buttonColors(
@@ -910,4 +1095,11 @@ private fun resolveAction(
     WageActionTarget.TRANSFER -> onOpenTransfer
     WageActionTarget.WORKPROOF -> onOpenWorkproof
     WageActionTarget.MENU -> onOpenMenu
+}
+
+private fun WageMetricIcon.toImageVector(): ImageVector = when (this) {
+    WageMetricIcon.BASE -> Icons.Default.Description
+    WageMetricIcon.OVERTIME -> Icons.AutoMirrored.Filled.TrendingUp
+    WageMetricIcon.NIGHT -> Icons.Default.NightsStay
+    WageMetricIcon.TOTAL -> Icons.Default.AutoAwesome
 }
