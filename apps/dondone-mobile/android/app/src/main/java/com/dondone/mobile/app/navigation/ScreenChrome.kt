@@ -20,7 +20,7 @@ fun resolveScreenChrome(
             title = if (route == Route.HOME) "DonDone" else routeTitle(route),
             showRootTabs = true,
             showSettingsAction = route == Route.HOME,
-            showDate = route != Route.HOME && route != Route.FINANCE_HOME && route != Route.WORKPROOF
+            showDate = route != Route.HOME && route != Route.FINANCE_HOME && route != Route.WORKPROOF && route != Route.MENU
         )
     } else {
         ScreenChrome(
