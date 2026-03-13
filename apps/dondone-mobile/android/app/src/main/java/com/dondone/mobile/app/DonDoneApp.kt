@@ -49,15 +49,15 @@ import com.dondone.mobile.app.navigation.Route
 import com.dondone.mobile.app.navigation.mainTabs
 import com.dondone.mobile.app.navigation.resolveScreenChrome
 import com.dondone.mobile.app.session.DemoSessionViewModel
-import com.dondone.mobile.core.designsystem.DawnBackground
-import com.dondone.mobile.core.designsystem.DawnBorder
-import com.dondone.mobile.core.designsystem.DawnPrimary
-import com.dondone.mobile.core.designsystem.DawnSecondary
-import com.dondone.mobile.core.designsystem.DawnSurface
-import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DonDoneWordmark
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
+
+private val ChromeTextMuted = Color(0xFF8B95A1)
+private val ChromeAccent = Color(0xFF6D68F5)
+private val ChromeAccentSoft = Color(0xFFF2F3FF)
+private val ChromeBorder = Color(0xFFE8EBF0)
+private val ChromeBackSurface = Color(0xFFF7F8FA)
 
 @Composable
 fun DonDoneApp(
@@ -109,12 +109,12 @@ fun DonDoneApp(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = DawnBackground,
+        containerColor = Color.White,
         topBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(DawnBackground)
+                    .background(Color.White)
                     .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -141,7 +141,7 @@ fun DonDoneApp(
                                     Text(
                                         text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = DawnTextSubtle
+                                        color = ChromeTextMuted
                                     )
                                 }
                             }
@@ -151,7 +151,7 @@ fun DonDoneApp(
                                 Icon(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = "설정",
-                                    tint = DawnTextSubtle
+                                    tint = ChromeTextMuted
                                 )
                             }
                         }
@@ -165,15 +165,15 @@ fun DonDoneApp(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(DawnSurface)
-                                .border(1.dp, DawnBorder, RoundedCornerShape(16.dp))
+                                .background(ChromeBackSurface)
+                                .border(1.dp, ChromeBorder, RoundedCornerShape(16.dp))
                                 .clickable(onClick = handleBack)
                                 .padding(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "뒤로",
-                                tint = DawnTextSubtle
+                                tint = ChromeTextMuted
                             )
                         }
                         if (chrome.title.isNotBlank() || chrome.showDate) {
@@ -185,7 +185,7 @@ fun DonDoneApp(
                                     Text(
                                         text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = DawnTextSubtle
+                                        color = ChromeTextMuted
                                     )
                                 }
                             }
@@ -203,8 +203,8 @@ fun DonDoneApp(
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     shape = RoundedCornerShape(28.dp),
-                    color = DawnSurface,
-                    shadowElevation = 14.dp
+                    color = Color.White,
+                    shadowElevation = 8.dp
                 ) {
                     Row(
                         modifier = Modifier
@@ -230,10 +230,10 @@ fun DonDoneApp(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(if (selected) DawnSecondary else Color.Transparent)
+                                    .background(if (selected) ChromeAccentSoft else Color.Transparent)
                                     .border(
                                         width = if (selected) 1.dp else 0.dp,
-                                        color = if (selected) DawnBorder else Color.Transparent,
+                                        color = if (selected) ChromeBorder else Color.Transparent,
                                         shape = RoundedCornerShape(20.dp)
                                     )
                                     .clickable {
@@ -252,11 +252,11 @@ fun DonDoneApp(
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = tab.label,
-                                    tint = if (selected) DawnPrimary else DawnTextSubtle
+                                    tint = if (selected) ChromeAccent else ChromeTextMuted
                                 )
                                 Text(
                                     text = tab.label,
-                                    color = if (selected) DawnPrimary else DawnTextSubtle,
+                                    color = if (selected) ChromeAccent else ChromeTextMuted,
                                     style = MaterialTheme.typography.labelMedium
                                 )
                             }
