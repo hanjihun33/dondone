@@ -9,10 +9,7 @@ import com.dondone.mobile.domain.model.TransferStatus
 import kotlin.math.abs
 
 data class HomeAccountUiModel(
-    val balanceText: String,
-    val sendableAmountText: String,
-    val selectedAccountText: String,
-    val hintText: String
+    val balanceText: String
 )
 
 data class HomeWorkUiModel(
@@ -59,9 +56,6 @@ data class HomeMoneyUiModel(
     val estimatedText: String,
     val actualText: String,
     val differenceText: String,
-    val assistText: String,
-    val questionChips: List<String>,
-    val noticeLines: List<String>,
     val showPaydayCard: Boolean,
     val payday: HomePaydayUiModel,
     val nextAction: HomeNextActionUiModel
@@ -178,10 +172,7 @@ fun DemoState.toHomeUiModel(): HomeUiModel {
 
     return HomeUiModel(
         account = HomeAccountUiModel(
-            balanceText = formatKrw(selectedAccount.balance),
-            sendableAmountText = formatKrw(remittance.draftAmountUsd * 1_450),
-            selectedAccountText = "${selectedAccount.name} · ${selectedAccount.number}",
-            hintText = "계좌를 먼저 확인한 뒤 송금을 시작해볼까요?"
+            balanceText = formatKrw(selectedAccount.balance)
         ),
         work = HomeWorkUiModel(
             dateText = "${demo.year}-$formattedMonth-${formatDay(demo.asOfDay)} · ${workproof.workplaceName}",
@@ -212,18 +203,6 @@ fun DemoState.toHomeUiModel(): HomeUiModel {
             estimatedText = formatKrw(wageEstimate.total),
             actualText = formatKrw(wage.actualDeposit),
             differenceText = formatKrw(abs(wageEstimate.difference)),
-            assistText = "이 화면 설명해줘",
-            questionChips = listOf("왜 차액이 생겼어?", "어떤 근거야?", "다음 행동은?"),
-            noticeLines = buildList {
-                add("이 급여 계산은 참고용 추정입니다. 실제 지급/공제는 근로계약, 급여명세서, 회사 규정에 따라 달라질 수 있습니다.")
-                add(
-                    if (wage.deductionsKnown) {
-                        "현재 공제 항목이 반영된 기준으로 추정하고 있습니다."
-                    } else {
-                        "공제 항목을 입력하지 않아 공제가 반영되지 않았습니다. (공제 미반영)"
-                    }
-                )
-            },
             showPaydayCard = isDepositRecorded && !hasDifference,
             payday = payday,
             nextAction = nextAction
