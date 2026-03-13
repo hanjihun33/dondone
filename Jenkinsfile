@@ -211,7 +211,6 @@ EOF
                 def branch = rawBranch.replaceFirst(/^origin\//, "")
                 def duration = currentBuild.durationString.replace(' and counting', '')
                 sendMMNotify(true, [
-                    mention : "@here",
                     branch  : branch,
                     commit  : env.COMMIT_MSG ?: "",
                     duration: duration,
