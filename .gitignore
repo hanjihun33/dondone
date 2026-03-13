@@ -3,7 +3,6 @@ S14P11C205/
 .private/
 mockup-*.png
 .tmp-qa/
-
 # backend IDE/build output
 apps/dondone-backend/bin/
 
@@ -23,3 +22,4 @@ apps/dondone-backend/bin/
 postgres_data/
 redis_data/
 minio_data/
+/pdf/

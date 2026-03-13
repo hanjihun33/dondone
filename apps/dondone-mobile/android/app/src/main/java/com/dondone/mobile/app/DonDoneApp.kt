@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -122,19 +124,26 @@ fun DonDoneApp(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 42.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
                             if (currentRoute == Route.HOME) {
                                 DonDoneWordmark()
                             } else {
                                 Text(
                                     text = chrome.title,
-                                    style = MaterialTheme.typography.headlineSmall
+                                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black)
                                 )
-                                Text(
-                                    text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = DawnTextSubtle
-                                )
+                                if (chrome.showDate) {
+                                    Text(
+                                        text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = DawnTextSubtle
+                                    )
+                                }
                             }
                         }
                         if (chrome.showSettingsAction) {
@@ -167,15 +176,21 @@ fun DonDoneApp(
                                 tint = DawnTextSubtle
                             )
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = chrome.title, style = MaterialTheme.typography.titleLarge)
-                            if (currentRoute != Route.TRANSFER) {
-                                Text(
-                                    text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = DawnTextSubtle
-                                )
+                        if (chrome.title.isNotBlank() || chrome.showDate) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (chrome.title.isNotBlank()) {
+                                    Text(text = chrome.title, style = MaterialTheme.typography.titleLarge)
+                                }
+                                if (chrome.showDate) {
+                                    Text(
+                                        text = "${uiState.demo.year}.${uiState.demo.month.toString().padStart(2, '0')}.${uiState.demo.asOfDay.toString().padStart(2, '0')}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = DawnTextSubtle
+                                    )
+                                }
                             }
+                        } else {
+                            Box(modifier = Modifier.weight(1f))
                         }
                     }
                 }

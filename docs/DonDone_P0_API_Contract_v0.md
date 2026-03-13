@@ -66,7 +66,7 @@
 - WorkProof 누락 기록은 기존 record 수정과 분리한 provisional API로 먼저 둔다.
 - WorkProof Integrity(W7)는 별도 독립 endpoint보다 record detail / monthly summary / advance eligibility 같은 응답 안에 녹여 노출한다.
 - Advance 데모 상한은 `500,000 KRW` 기본값으로 둔다.
-- Wage 차액 감지 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 시 `50,000원 또는 3%`로 둔다.
+- Wage 확인 필요 상태 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 시 `50,000원 또는 3%`로 둔다.
 - WorkProof 동일 날짜 다중 근무는 후속 확장 전까지 허용하지 않는 방향으로 시작한다.
 - Wage 계산 경계는 연장 `일별 480분 초과`, 야간 `22:00~06:00` 겹침 분으로 둔다.
 - SafePay 고액 추가 확인 기준은 절대/상대값 혼합 정책으로 두되, 세부 임계값은 후속 정책 문서에서 고정한다.
@@ -726,7 +726,7 @@ Response:
 
 ## 4. Wage Shield
 
-> PRD 7D 기준. 정답 계산기가 아니라 이상 탐지 도구다.
+> PRD 7D 기준. 근로자가 먼저 이번 달 반영 근무와 실제 받은 돈을 확인하고, 필요 시 회사와 1차 확인으로 이어지는 보호 흐름이다. 결과는 최종 판정이 아니라 `확인 필요 상태와 근거`다.
 
 ### 주요 엔드포인트
 
@@ -734,12 +734,12 @@ Response:
 | --- | --- | --- |
 | `GET` | `/api/wage/monthly-summary?month=YYYY-MM&workplaceId={id}` | 월간 근무/집계 요약 |
 | `GET` | `/api/wage/estimate?month=YYYY-MM&workplaceId={id}` | 참고용 예상 급여 |
-| `POST` | `/api/wage/verifications` | 실제 입금액 입력 + 차액 판정 |
-| `GET` | `/api/wage/verifications/{verificationId}` | 차액 감지 상세 |
+| `POST` | `/api/wage/verifications` | 실제 지급 결과 확인 기록 + 확인 필요 상태 판단 |
+| `GET` | `/api/wage/verifications/{verificationId}` | 급여 확인 상세 |
 
 ### 4.1 `GET /api/wage/monthly-summary?month=YYYY-MM&workplaceId={id}`
 
-배경: Wage 화면에서도 WorkProof 기반 집계 근거를 바로 재사용할 수 있게 별도 요약을 둔다.
+배경: Wage 화면에서도 WorkProof 기반 집계 근거를 바로 재사용해, 근로자가 `이번 달 반영 근무`를 먼저 확인할 수 있게 별도 요약을 둔다.
 
 Response:
 | 필드 | 설명 |
@@ -759,7 +759,7 @@ Response:
 
 ### 4.2 `GET /api/wage/estimate?month=YYYY-MM&workplaceId={id}`
 
-배경: 이 API는 정답 계산이 아니라 참고용 추정과 근거 설명을 위한 조회다.
+배경: 이 API는 최종 급여 확정이 아니라 참고용 예상 금액과 근거 설명을 위한 조회다.
 v0 메모: 연장은 일별 `480분` 초과, 야간은 `22:00~06:00` 겹침 분, 휴일 가산은 제외한다.
 
 Response:
@@ -775,30 +775,32 @@ Response:
 
 ### 4.3 `POST /api/wage/verifications`
 
-배경: 실제 입금액과 추정액을 비교해 `이상 징후`를 잡는 P0 핵심 액션이다.
-v0 메모: 차액 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 시 `50,000원 또는 3%`를 사용한다.
+배경: 근로자가 실제 받은 돈을 확인하면, 시스템이 참고용 예상 금액과 비교해 `확인 필요 상태`와 근거를 정리하는 P0 핵심 액션이다.
+v0 메모: 확인 필요 상태 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 시 `50,000원 또는 3%`를 사용한다. 연결된 회사가 있더라도 이 API의 1차 주체는 근로자이며, 회사 참여는 후속 확인 단계에서만 다룬다.
 
 Request:
 | 필드 | 설명 |
 | --- | --- |
-| `month` | - |
-| `workplaceId` | - |
-| `actualDepositAmount` | - |
-| `deductionsKnown` | boolean |
-| `memo` | 선택 |
+| `month` | 확인 대상 월 |
+| `workplaceId` | 확인 대상 근무지 |
+| `actualDepositAmount` | 근로자가 확인한 실수령 금액 |
+| `deductionsKnown` | 근로자가 알고 있는 공제 여부 |
+| `memo` | 선택. 확인 메모 또는 회사 문의 전 참고 메모 |
 
 Response `201 Created`:
 | 필드 | 설명 |
 | --- | --- |
 | `verificationId` | - |
-| `status` | `MATCHED`, `REVIEW_REQUIRED` |
-| `estimatedTotal` | - |
-| `actualDepositAmount` | - |
-| `differenceAmount` | - |
-| `differenceRate` | - |
+| `status` | `MATCHED`, `CHECK_REQUIRED` |
+| `resolutionStage` | `SELF_CHECK`, `EMPLOYER_CONFIRMATION_RECOMMENDED` |
+| `estimatedTotal` | 참고용 예상 금액 |
+| `actualDepositAmount` | 근로자가 확인한 실수령 금액 |
+| `differenceAmount` | 참고용 예상 금액 대비 차이 |
+| `differenceRate` | 예상 금액 대비 차이 비율 |
 | `threshold` | object. 하위 필드: absoluteWon, relativePercent, deductionRelaxed |
 | `possibleCauses[]` | array<object>. 배열 항목: code, title, detail |
 | `evidence` | object. 하위 필드: overtimeMinutes, nightMinutes, modifiedRecordCount, recordIds |
+| `nextActions[]` | array<string>. 예: `VIEW_EVIDENCE`, `REQUEST_EMPLOYER_CONFIRMATION`, `PREPARE_PROOF_PACK` |
 
 주요 에러:
 | HTTP | Code | 설명 |
@@ -819,7 +821,7 @@ Response `201 Created`:
 
 ### 4.4 `GET /api/wage/verifications/{verificationId}`
 
-배경: 문서 생성과 Claim 준비가 이 결과를 다시 참조할 수 있게 상세 조회를 분리한다.
+배경: 문서 생성과 Claim 준비가 이 결과를 다시 참조할 수 있게 상세 조회를 분리한다. 사용자 전면에서는 `급여 확인 결과`로 보이지만, 계약상 식별자는 `verification`을 유지한다.
 
 Response:
 | 필드 | 설명 |
@@ -828,12 +830,14 @@ Response:
 | `month` | - |
 | `workplaceId` | - |
 | `status` | - |
+| `resolutionStage` | `SELF_CHECK`, `EMPLOYER_CONFIRMATION_RECOMMENDED`, `EXTERNAL_HELP_PREPARATION` |
 | `estimated` | object. 하위 필드: baseEstimate, overtimePremium, nightPremium, estimatedTotal |
-| `actual` | object. 하위 필드: actualDepositAmount, deductionsKnown |
+| `actual` | object. 하위 필드: actualDepositAmount, deductionsKnown, submittedBy (`WORKER`) |
 | `difference` | object. 하위 필드: differenceAmount, differenceRate, thresholdApplied |
 | `threshold` | object. 하위 필드: absoluteWon, relativePercent, deductionRelaxed |
 | `possibleCauses[]` | array<object>. 배열 항목: code, title, detail |
 | `evidence` | object. 하위 필드: overtimeMinutes, nightMinutes, modifiedRecordCount, recordIds |
+| `employerSupport` | object. 하위 필드: available, recommended, status (`NOT_REQUESTED`, `REQUEST_RECOMMENDED`, `PENDING_RESPONSE`, `RESOLVED`) |
 | `relatedActions` | object. 하위 필드: proofPackReady, claimKitReady, instantClaimAvailable |
 
 ## 5. Documents
@@ -902,7 +906,7 @@ Response:
 
 ### 5.4 `POST /api/documents/proof-packs`
 
-배경: Wage 확인 결과를 설명하거나 제출할 때 바로 꺼낼 수 있는 증빙 리포트를 만든다.
+배경: Wage 확인 결과를 설명하거나 회사/외부 기관과 공유할 때 바로 꺼낼 수 있는 증빙 리포트를 만든다.
 v0 메모: 월간 요약, WorkProof 상세표, 급여 추정 근거, 수정 이력표, 첨부 목록(있으면)을 기본 포함 대상으로 본다.
 
 Headers:

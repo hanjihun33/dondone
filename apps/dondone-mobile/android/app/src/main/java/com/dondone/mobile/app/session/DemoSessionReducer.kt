@@ -4,6 +4,7 @@ import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TodayWork
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.domain.model.WorkAudit
 import com.dondone.mobile.domain.model.WorkRecord
 
 private const val CLOCK_IN_TIME = "09:02"
@@ -162,6 +163,52 @@ object DemoSessionReducer {
         )
     }
 
+    fun saveWorkproofEdit(
+        state: DemoState,
+        recordId: String,
+        reason: String,
+        memo: String,
+        addAttachment: Boolean
+    ): DemoState {
+        val record = state.workproof.records.firstOrNull { it.id == recordId } ?: return state
+        if (reason.isBlank()) return state
+
+        val nextAttachments = if (addAttachment) {
+            maxOf(record.attachments, 1)
+        } else {
+            record.attachments
+        }
+        val nextReason = if (memo.isBlank()) {
+            reason
+        } else {
+            "$reason / $memo"
+        }
+        val nextRecord = record.copy(
+            modified = true,
+            attachments = nextAttachments
+        )
+        val monthText = state.demo.month.toString().padStart(2, '0')
+        val dayText = state.demo.asOfDay.toString().padStart(2, '0')
+        val timeRange = "${record.inTime}-${record.outTime}"
+        val nextAudit = WorkAudit(
+            id = record.id,
+            before = timeRange,
+            after = timeRange,
+            reason = nextReason,
+            attachments = nextAttachments,
+            at = "${state.demo.year}-$monthText-$dayText 12:34"
+        )
+
+        return state.copy(
+            workproof = state.workproof.copy(
+                records = state.workproof.records.map { current ->
+                    if (current.id == recordId) nextRecord else current
+                },
+                audit = listOf(nextAudit) + state.workproof.audit
+            )
+        )
+    }
+
     fun submitTransfer(state: DemoState): DemoState {
         return state.copy(remittance = state.remittance.copy(status = TransferStatus.REVIEWING))
     }
@@ -213,6 +260,19 @@ object DemoSessionReducer {
             wage = state.wage.copy(
                 actualDeposit = nextDeposit,
                 actualDepositRecordedDay = state.wage.actualDepositRecordedDay ?: state.demo.asOfDay
+            ),
+            remittance = state.remittance.changeSelectedAccountBalanceBy(balanceDelta)
+        )
+    }
+
+    fun setActualDeposit(state: DemoState, amount: Int): DemoState {
+        val nextDeposit = amount.coerceAtLeast(0)
+        val balanceDelta = nextDeposit - state.wage.actualDeposit
+
+        return state.copy(
+            wage = state.wage.copy(
+                actualDeposit = nextDeposit,
+                actualDepositRecordedDay = state.demo.asOfDay
             ),
             remittance = state.remittance.changeSelectedAccountBalanceBy(balanceDelta)
         )

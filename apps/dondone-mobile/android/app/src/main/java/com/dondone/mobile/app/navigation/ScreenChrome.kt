@@ -6,7 +6,8 @@ import com.dondone.mobile.domain.model.TransferStatus
 data class ScreenChrome(
     val title: String,
     val showRootTabs: Boolean,
-    val showSettingsAction: Boolean
+    val showSettingsAction: Boolean,
+    val showDate: Boolean
 )
 
 fun resolveScreenChrome(
@@ -18,11 +19,13 @@ fun resolveScreenChrome(
         ScreenChrome(
             title = if (route == Route.HOME) "DonDone" else routeTitle(route),
             showRootTabs = true,
-            showSettingsAction = route == Route.HOME
+            showSettingsAction = route == Route.HOME,
+            showDate = route != Route.HOME && route != Route.FINANCE_HOME && route != Route.WORKPROOF
         )
     } else {
         ScreenChrome(
             title = when (route) {
+                Route.WAGE -> ""
                 Route.TRANSFER -> {
                     if (transferStatus == TransferStatus.SUBMITTED || transferStatus == TransferStatus.CONFIRMED) {
                         "송금 상태"
@@ -38,7 +41,8 @@ fun resolveScreenChrome(
                 else -> routeTitle(route)
             },
             showRootTabs = false,
-            showSettingsAction = false
+            showSettingsAction = false,
+            showDate = route != Route.TRANSFER && route != Route.WAGE
         )
     }
 }

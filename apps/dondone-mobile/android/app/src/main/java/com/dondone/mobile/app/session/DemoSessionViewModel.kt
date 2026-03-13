@@ -111,6 +111,22 @@ class DemoSessionViewModel : ViewModel() {
         _uiState.update { state -> DemoSessionReducer.adjustActualDeposit(state, delta) }
     }
 
+    fun setActualDeposit(amount: Int) {
+        _uiState.update { state -> DemoSessionReducer.setActualDeposit(state, amount) }
+    }
+
+    fun saveWorkproofEdit(recordId: String, reason: String, memo: String, addAttachment: Boolean) {
+        _uiState.update { state ->
+            DemoSessionReducer.saveWorkproofEdit(
+                state,
+                recordId = recordId,
+                reason = reason,
+                memo = memo,
+                addAttachment = addAttachment
+            )
+        }
+    }
+
     fun resetSeed() {
         cancelTransferCompletion()
         _uiState.value = initialState
