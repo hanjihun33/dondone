@@ -57,7 +57,8 @@ fun DonDoneNavGraph(
             WorkproofScreen(
                 uiModel = uiState.toWorkproofUiModel(),
                 onClockIn = viewModel::clockIn,
-                onClockOut = viewModel::clockOut
+                onClockOut = viewModel::clockOut,
+                onSaveEdit = viewModel::saveWorkproofEdit
             )
         }
         composable(Route.FINANCE_HOME) {
