@@ -218,6 +218,19 @@ object DemoSessionReducer {
         )
     }
 
+    fun setActualDeposit(state: DemoState, amount: Int): DemoState {
+        val nextDeposit = amount.coerceAtLeast(0)
+        val balanceDelta = nextDeposit - state.wage.actualDeposit
+
+        return state.copy(
+            wage = state.wage.copy(
+                actualDeposit = nextDeposit,
+                actualDepositRecordedDay = state.demo.asOfDay
+            ),
+            remittance = state.remittance.changeSelectedAccountBalanceBy(balanceDelta)
+        )
+    }
+
     private fun upsertTodayRecord(
         state: DemoState,
         recordBuilder: (WorkRecord?) -> WorkRecord
