@@ -9,7 +9,7 @@ pipeline {
 
     environment {
         DEPLOY_DIR = '/srv/dondone/app'
-        TARGET_BRANCH = 'feature/infra-setup'
+        TARGET_BRANCH = 'develop'
         HEALTHCHECK_URL = 'https://dondone.duckdns.org/health'
     }
 
