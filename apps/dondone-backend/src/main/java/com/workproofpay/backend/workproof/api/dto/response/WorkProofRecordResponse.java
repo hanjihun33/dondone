@@ -4,6 +4,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 근무 증거를 evidence-first 관점으로 펼쳐 보여주는 WorkProof lane 1 상세 응답이다.
+ */
 public record WorkProofRecordResponse(
         Long recordId,
         LocalDate workDate,
