@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 @Table(name = "work_proofs")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+/**
+ * 기존 CRUD형 근무 기록과 lane 1 출퇴근 흐름을 함께 담는 근무 증거 엔티티다.
+ */
 public class WorkProof {
 
     @Id
@@ -23,6 +26,14 @@ public class WorkProof {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workplace_id")
+    private Workplace workplace;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contract_id")
+    private WorkContract contract;
 
     @Column(name = "work_date", nullable = false)
     private LocalDate workDate;
@@ -57,6 +68,12 @@ public class WorkProof {
     @Column(name = "clock_out_longitude")
     private Double clockOutLongitude;
 
+    @Column(name = "clock_in_location_label", length = 100)
+    private String clockInLocationLabel;
+
+    @Column(name = "clock_out_location_label", length = 100)
+    private String clockOutLocationLabel;
+
     @Column(length = 500)
     private String memo;
 
@@ -81,6 +98,8 @@ public class WorkProof {
     private LocalDateTime updatedAt;
 
     private WorkProof(User user,
+                      Workplace workplace,
+                      WorkContract contract,
                       LocalDate workDate,
                       LocalDateTime clockInAt,
                       LocalDateTime clockOutAt,
@@ -92,12 +111,16 @@ public class WorkProof {
                       Double clockInLongitude,
                       Double clockOutLatitude,
                       Double clockOutLongitude,
+                      String clockInLocationLabel,
+                      String clockOutLocationLabel,
                       String memo,
                       String editReason,
                       int attachmentCount,
                       String attachmentMetadataJson,
                       WorkProofFinancialStatus financialStatus) {
         this.user = user;
+        this.workplace = workplace;
+        this.contract = contract;
         this.workDate = workDate;
         this.clockInAt = clockInAt;
         this.clockOutAt = clockOutAt;
@@ -109,6 +132,8 @@ public class WorkProof {
         this.clockInLongitude = clockInLongitude;
         this.clockOutLatitude = clockOutLatitude;
         this.clockOutLongitude = clockOutLongitude;
+        this.clockInLocationLabel = clockInLocationLabel;
+        this.clockOutLocationLabel = clockOutLocationLabel;
         this.memo = memo;
         this.editReason = editReason;
         this.attachmentCount = attachmentCount;
@@ -132,6 +157,8 @@ public class WorkProof {
                                    Integer attachmentCount) {
         return new WorkProof(
                 user,
+                null,
+                null,
                 workDate,
                 clockInAt,
                 clockOutAt,
@@ -143,11 +170,46 @@ public class WorkProof {
                 clockInLongitude,
                 clockOutLatitude,
                 clockOutLongitude,
+                null,
+                null,
                 memo,
                 editReason,
                 attachmentCount == null ? 0 : attachmentCount,
                 null,
                 clockOutAt == null ? WorkProofFinancialStatus.PENDING : WorkProofFinancialStatus.REFLECTED
+        );
+    }
+
+    public static WorkProof checkIn(User user,
+                                    Workplace workplace,
+                                    WorkContract contract,
+                                    LocalDateTime deviceAt,
+                                    LocalDateTime serverAt,
+                                    Double latitude,
+                                    Double longitude,
+                                    String locationLabel) {
+        return new WorkProof(
+                user,
+                workplace,
+                contract,
+                deviceAt.toLocalDate(),
+                deviceAt,
+                null,
+                deviceAt,
+                null,
+                serverAt,
+                null,
+                latitude,
+                longitude,
+                null,
+                null,
+                locationLabel,
+                null,
+                null,
+                null,
+                0,
+                null,
+                WorkProofFinancialStatus.PENDING
         );
     }
 
@@ -157,6 +219,10 @@ public class WorkProof {
 
     public boolean isEdited() {
         return (editReason != null && !editReason.isBlank()) || attachmentCount > 0;
+    }
+
+    public boolean isCheckedIn() {
+        return clockOutAt == null;
     }
 
     public long workedMinutes() {
@@ -178,6 +244,20 @@ public class WorkProof {
         this.memo = memo != null ? memo : this.memo;
         this.attachmentCount = attachmentCount;
         this.attachmentMetadataJson = attachmentMetadataJson;
+        this.financialStatus = WorkProofFinancialStatus.REFLECTED;
+    }
+
+    public void completeCheckOut(LocalDateTime deviceAt,
+                                 LocalDateTime serverAt,
+                                 Double latitude,
+                                 Double longitude,
+                                 String locationLabel) {
+        this.clockOutAt = deviceAt;
+        this.deviceClockOutAt = deviceAt;
+        this.serverClockOutAt = serverAt;
+        this.clockOutLatitude = latitude;
+        this.clockOutLongitude = longitude;
+        this.clockOutLocationLabel = locationLabel;
         this.financialStatus = WorkProofFinancialStatus.REFLECTED;
     }
 
