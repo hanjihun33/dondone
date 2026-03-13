@@ -59,7 +59,7 @@
 ## 도메인 간 연결
 - Money Home은 Advance, Wage Shield, Remittance, Vault의 상태를 한 화면에서 재조합한다.
 - WorkProof는 Advance와 Wage Shield의 근거 데이터이며, W7 Integrity는 이 연결의 신뢰 기준이다.
-- Wage Shield의 verification 결과는 Documents와 Instant Claim의 입력이 된다.
+- Wage Shield의 급여 확인 결과(계약상 verification)는 Documents와 Instant Claim의 입력이 된다.
 - Remittance는 SafePay 사전 점검과 Documents 영수증 생성 흐름을 함께 가진다.
 - Vault는 Remittance와 잔액 해석을 공유하지만, P0에서는 독립적인 시뮬레이션 기능으로 취급한다.
 - Copilot은 독립 판단 엔진이 아니라 각 화면 facts를 다시 설명하는 보조 계층이다.
@@ -298,12 +298,12 @@
 - `P0-확정`
 
 ### 목표
-- 월간 근무 요약과 실제 입금액 비교를 통해 `정답 계산`이 아니라 `이상 징후와 근거`를 보여준다.
+- 월간 반영 근무와 실제 받은 돈 확인을 통해 `정답 계산`이 아니라 `확인 필요 상태와 근거`를 보여준다.
 
 ### 범위
 - 월간 근무 요약 조회
 - 참고용 예상 급여 조회
-- 실제 입금액 기반 verification 생성
+- 실제 지급 결과 확인 기반 verification 생성
 - verification 상세 조회
 - Documents/Claim로 이어질 수 있는 다음 액션 상태 제공
 
@@ -315,9 +315,9 @@
 
 ### 핵심 흐름
 1. 사용자가 `month + workplaceId` 기준으로 월간 요약과 예상 급여를 조회한다.
-2. 사용자가 실제 입금액을 입력해 verification을 생성한다.
-3. 시스템이 차액과 이상 징후를 계산한다.
-4. 사용자는 근거 항목, 포함 기록, 수정 기록 개수, 다음 액션 가능 여부를 확인한다.
+2. 사용자가 급여일 이후 실제 받은 돈을 확인해 verification을 생성한다.
+3. 시스템이 참고용 예상 금액 대비 `확인 필요 상태`와 근거를 계산한다.
+4. 사용자는 근거 항목, 포함 기록, 수정 기록 개수, 다음 액션 가능 여부를 확인하고, 필요 시 회사와 1차 확인으로 이어간다.
 
 ### 주요 규칙
 - Wage 조회는 `month`와 `workplaceId`를 함께 받아야 한다.
@@ -327,8 +327,9 @@
 - `CHECKED_IN` 상태 기록은 집계에서 제외하고 pending count로만 관리한다.
 - 연장은 일별 `480분` 초과분, 야간은 `22:00~06:00` 겹침 분으로 계산한다.
 - 휴일 가산은 P0 범위에서 제외한다.
-- 차액 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 추정은 `50,000원 또는 3%`를 사용한다.
-- 결과는 `최종 판정`이 아니라 `이상 징후 + 근거`다.
+- 확인 필요 상태 기본 임계값은 `30,000원 또는 2%`, 공제 미반영 추정은 `50,000원 또는 3%`를 사용한다.
+- 결과는 `최종 판정`이 아니라 `확인 필요 상태 + 근거`다.
+- 고용주는 연결된 경우에만, 근로자 확인 이후 설명/정정이 필요한 단계에서 보조 참여자로 등장한다.
 
 ### API 매핑
 - `GET /api/wage/monthly-summary?month=YYYY-MM&workplaceId={id}`
@@ -339,11 +340,12 @@
 ### v0 가정
 - 월간 집계 결과는 조회 시 계산하고 별도 snapshot 저장은 하지 않는다.
 - 휴일/법정 예외/더 정교한 근로 규칙은 후속 범위로 남긴다.
-- payslip parsing 없이 사용자가 실제 입금액을 직접 입력한다.
+- payslip parsing 없이 사용자가 실제 받은 돈을 직접 확인해 입력한다.
 
 ### 열린 질문
 - 자정 경계 근무를 Wage 계산 근거에 어떻게 표시할지 여부
 - 수정 기록을 verification 상세에서 개수 중심으로 볼지, 개별 근거 목록으로 더 강조할지 여부
+- 연결된 회사가 있을 때 `확인 요청` 상태를 Wage 상세 응답에 어디까지 포함할지 여부
 
 ## 6. Documents
 
@@ -368,7 +370,7 @@
 - P1용 고급 템플릿 확장
 
 ### 핵심 흐름
-1. 사용자가 Wage verification, Claim, Remittance 문맥에서 문서 생성을 요청한다.
+1. 사용자가 Wage 확인 결과(verification), Claim, Remittance 문맥에서 문서 생성을 요청한다.
 2. 시스템은 비동기 요청으로 접수하고 `requestId`, `status`, `pollUrl`을 반환한다.
 3. 생성된 문서는 Documents 목록에서 다시 조회할 수 있다.
 4. 상세 화면에서 요약과 관련 링크를 보고, 별도 다운로드 URL을 발급받는다.
@@ -418,7 +420,7 @@
 
 ### 핵심 흐름
 1. 사용자가 locale 기준 신고/상담 route를 조회한다.
-2. 사용자가 wage verification과 선택적 claim kit를 기반으로 preparation을 생성한다.
+2. 사용자가 Wage 확인 결과와 선택적 claim kit를 기반으로 preparation을 생성한다.
 3. 시스템은 summary text, checklist, suggested routes, related documents를 반환한다.
 4. 사용자는 복사, 공유, 바로가기 같은 반자동 지원만 사용하고 직접 제출한다.
 
@@ -427,7 +429,7 @@
 - route 안내는 locale에 따라 달라질 수 있다.
 - claim kit 없이도 preparation을 만들 수 있다.
 - `Idempotency-Key`는 v0에서 권장 수준으로 둔다.
-- Documents와 Claim은 verification 결과를 재사용한다.
+- Documents와 Claim은 Wage 확인 결과(verification)를 재사용한다.
 
 ### API 매핑
 - `GET /api/claim/routes?locale=ko-KR`
