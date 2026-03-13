@@ -16,6 +16,10 @@ public enum ErrorCode {
     INVALID_HOURLY_WAGE(HttpStatus.BAD_REQUEST, "normalizedHourlyWage must be greater than 0"),
     INVALID_PAYDAY(HttpStatus.BAD_REQUEST, "paydayDay must be between 1 and 31"),
     AS_OF_REQUIRED(HttpStatus.BAD_REQUEST, "asOf is required"),
+    MODIFICATION_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "reasonCode is required"),
+    INVALID_MISSING_RECORD_TIME(HttpStatus.BAD_REQUEST, "missing record times must be in chronological order"),
+    INVALID_MODIFICATION_TIME(HttpStatus.BAD_REQUEST, "modification times must be in chronological order"),
+    UNSUPPORTED_FILE_TYPE(HttpStatus.BAD_REQUEST, "Unsupported file type"),
 
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication is required"),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Token is invalid or expired"),
@@ -24,8 +28,17 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "WorkProof not found"),
     WORKPROOF_EDIT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Only reflected WorkProof can be edited"),
+    WORKPLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "Workplace not found"),
+    ACTIVE_CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "Active contract not found"),
+    ACTIVE_WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "Active workproof not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
+    ACTIVE_CONTRACT_REQUIRED(HttpStatus.CONFLICT, "Active contract is required"),
+    ACTIVE_CONTRACT_EXISTS(HttpStatus.CONFLICT, "Active contract already exists"),
+    ACTIVE_WORKPROOF_EXISTS(HttpStatus.CONFLICT, "Active workproof already exists"),
+    WORK_DATE_ALREADY_EXISTS(HttpStatus.CONFLICT, "A workproof already exists for the work date"),
+    CHECK_OUT_BEFORE_CHECK_IN(HttpStatus.CONFLICT, "checkOut device time must be after the active checkIn time"),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
 
