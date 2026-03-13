@@ -1,3 +1,78 @@
+def runLogged(String scriptText) {
+    sh """#!/bin/bash
+set -euo pipefail
+{
+${scriptText}
+} 2>&1 | tee -a "${env.WORKSPACE}/${env.LOG_FILE}"
+"""
+}
+
+def sendMMNotify(boolean success, Map info) {
+    try {
+        def action = info.action ?: "Build"
+        def emoji = success ? ":white_check_mark:" : ":x:"
+        def statusMsg = success ? "성공" : "실패"
+        def color = success ? "#36a64f" : "#dc3545"
+
+        def mainText = "### ${emoji} DonDone ${action} ${statusMsg}\n"
+        def links = []
+        if (info.mention) links << "${info.mention}"
+        if (info.buildUrl) links << "[빌드 결과 확인](${info.buildUrl})"
+        mainText += links.join(" | ")
+
+        def fields = []
+
+        if (info.branch) {
+            fields << [short: false, title: "Branch", value: "`${info.branch}`"]
+        }
+
+        if (info.commit) {
+            fields << [short: false, title: "Commit", value: info.commit]
+        }
+
+        def buildValue = "`${env.BUILD_NUMBER}`"
+        if (info.duration) buildValue += " · ${info.duration}"
+        fields << [short: !success, title: "Build", value: buildValue]
+
+        if (!success && info.failedStage) {
+            fields << [short: true, title: "Failed Stage", value: "`${info.failedStage}`"]
+        }
+
+        def attachments = []
+        attachments << [
+            color : color,
+            fields: fields
+        ]
+
+        if (!success && info.details) {
+            attachments << [
+                color: color,
+                text : "**Error Log:**\n```text\n${info.details}\n```"
+            ]
+        }
+
+        def payload = [
+            username   : "Jenkins",
+            icon_emoji : emoji,
+            text       : mainText,
+            attachments: attachments
+        ]
+
+        writeFile file: 'payload.json', text: groovy.json.JsonOutput.toJson(payload)
+
+        withCredentials([string(credentialsId: 'mattermost-webhook', variable: 'MM_WEBHOOK')]) {
+            sh '''#!/bin/bash
+set +x
+curl -sS -H 'Content-Type: application/json' \
+  --data-binary @payload.json \
+  "$MM_WEBHOOK" || true
+'''
+        }
+    } catch (err) {
+        echo "Mattermost notify failed: ${err}"
+    }
+}
+
 pipeline {
     agent any
 
@@ -11,31 +86,54 @@ pipeline {
         DEPLOY_DIR = '/srv/dondone/app'
         TARGET_BRANCH = 'develop'
         HEALTHCHECK_URL = 'https://dondone.duckdns.org/health'
+        LOG_FILE = 'jenkins-console.log'
     }
 
     stages {
+        stage('Init') {
+            steps {
+                script {
+                    env.FAILED_STAGE = 'Init'
+                    env.COMMIT_MSG = ''
+                }
+                writeFile file: env.LOG_FILE, text: ''
+            }
+        }
+
         stage('Checkout') {
             steps {
+                script {
+                    env.FAILED_STAGE = 'Checkout'
+                }
                 checkout scm
+                script {
+                    env.COMMIT_MSG = sh(script: "git log -1 --pretty=%s", returnStdout: true).trim()
+                }
             }
         }
 
         stage('Backend Test') {
             steps {
+                script {
+                    env.FAILED_STAGE = 'Backend Test'
+                }
                 dir('apps/dondone-backend') {
-                    sh '''
+                    runLogged('''
                         sed -i 's/\r$//' ./gradlew
                         chmod +x ./gradlew
                         ./gradlew test --console=plain --no-daemon
-                    '''
+                    ''')
                 }
             }
         }
 
         stage('Sync Server Repo') {
             steps {
+                script {
+                    env.FAILED_STAGE = 'Sync Server Repo'
+                }
                 withCredentials([usernamePassword(credentialsId: 'gitlab-credentials', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                    sh '''
+                    runLogged('''
                         git config --global --get-all safe.directory | grep -Fx "$DEPLOY_DIR" || git config --global --add safe.directory "$DEPLOY_DIR"
 
                         cat > /tmp/git-askpass.sh <<'EOF'
@@ -55,33 +153,42 @@ EOF
                         git fetch origin
                         git checkout "$TARGET_BRANCH"
                         git pull origin "$TARGET_BRANCH"
-                    '''
+                    ''')
                 }
             }
         }
 
         stage('Compose Validate') {
             steps {
-                sh '''
+                script {
+                    env.FAILED_STAGE = 'Compose Validate'
+                }
+                runLogged('''
                     cd "$DEPLOY_DIR"
                     docker compose config > /dev/null
-                '''
+                ''')
             }
         }
 
         stage('Deploy') {
             steps {
-                sh '''
+                script {
+                    env.FAILED_STAGE = 'Deploy'
+                }
+                runLogged('''
                     cd "$DEPLOY_DIR"
                     docker compose build api-server
                     docker compose up -d postgres redis api-server nginx
-                '''
+                ''')
             }
         }
 
         stage('Health Check') {
             steps {
-                sh '''
+                script {
+                    env.FAILED_STAGE = 'Health Check'
+                }
+                runLogged('''
                     for i in $(seq 1 12); do
                         if curl -fsS --max-time 5 "$HEALTHCHECK_URL"; then
                             echo "Health check passed"
@@ -92,16 +199,56 @@ EOF
                     done
                     echo "Health check failed after 60s"
                     exit 1
-                '''
+                ''')
             }
         }
     }
 
     post {
         success {
+            script {
+                def rawBranch = env.GIT_BRANCH ?: env.TARGET_BRANCH ?: "unknown"
+                def branch = rawBranch.replaceFirst(/^origin\//, "")
+                def duration = currentBuild.durationString.replace(' and counting', '')
+                sendMMNotify(true, [
+                    mention : "@here",
+                    branch  : branch,
+                    commit  : env.COMMIT_MSG ?: "",
+                    duration: duration,
+                    action  : "Deploy",
+                    buildUrl: env.BUILD_URL
+                ])
+            }
             echo 'Deploy succeeded'
         }
+
         failure {
+            script {
+                def rawBranch = env.GIT_BRANCH ?: env.TARGET_BRANCH ?: "unknown"
+                def branch = rawBranch.replaceFirst(/^origin\//, "")
+                def duration = currentBuild.durationString.replace(' and counting', '')
+
+                def details = ''
+                try {
+                    details = readFile(file: env.LOG_FILE).trim()
+                    if (details.length() > 4000) {
+                        details = details.substring(details.length() - 4000)
+                    }
+                } catch (err) {
+                    details = "Error log collection failed: ${err}"
+                }
+
+                sendMMNotify(false, [
+                    mention    : "@here",
+                    branch     : branch,
+                    commit     : env.COMMIT_MSG ?: "",
+                    duration   : duration,
+                    action     : "Deploy",
+                    failedStage: env.FAILED_STAGE ?: "unknown",
+                    details    : details,
+                    buildUrl   : env.BUILD_URL
+                ])
+            }
             echo 'Deploy failed'
         }
     }
