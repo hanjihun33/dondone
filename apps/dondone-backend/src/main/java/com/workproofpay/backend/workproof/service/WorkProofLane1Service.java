@@ -35,11 +35,12 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 
+/**
+ * WorkProof lane 1의 근무지, 활성 계약, 출퇴근 기록 흐름을 하나의 use-case 단위로 묶는다.
+ * Wage/Advance가 재사용할 upstream 입력을 먼저 안정화하는 역할을 맡는다.
+ */
 @Service
 @RequiredArgsConstructor
-/**
- * WorkProof lane 1의 근무지, 활성 계약, 출퇴근 기록 흐름을 묶는 애플리케이션 서비스다.
- */
 public class WorkProofLane1Service {
 
     private static final int DEFAULT_DAILY_WORK_MINUTES = 480;
@@ -53,6 +54,9 @@ public class WorkProofLane1Service {
     private final WorkProofLane1DraftValidator draftValidator;
     private final WorkProofMetricsCalculator workProofMetricsCalculator;
 
+    /**
+     * 사용자가 이후 출퇴근/월간 집계를 매달 수 있는 근무지 기준축을 생성한다.
+     */
     @Transactional
     public WorkplaceResponse createWorkplace(Long userId, CreateWorkplaceRequest request) {
         Workplace saved = workplaceRepository.save(Workplace.create(
@@ -66,6 +70,9 @@ public class WorkProofLane1Service {
         return toWorkplaceResponse(saved, false);
     }
 
+    /**
+     * 근무지 목록과 각 근무지의 활성 계약 존재 여부를 함께 돌려준다.
+     */
     @Transactional(readOnly = true)
     public WorkplaceListResponse getWorkplaces(Long userId) {
         List<WorkplaceResponse> workplaces = workplaceRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
@@ -77,6 +84,9 @@ public class WorkProofLane1Service {
         return new WorkplaceListResponse(workplaces);
     }
 
+    /**
+     * lane 1에서는 근무지마다 활성 계약을 하나만 유지하도록 막고 계약 기준 급여 단위를 고정한다.
+     */
     @Transactional
     public CurrentContractResponse createContract(Long userId, CreateContractRequest request) {
         draftValidator.validateCreateContract(request);
@@ -98,12 +108,18 @@ public class WorkProofLane1Service {
         return toCurrentContractResponse(saved);
     }
 
+    /**
+     * 출퇴근 기록 생성 전에 현재 유효한 계약을 읽어갈 수 있게 활성 계약을 조회한다.
+     */
     @Transactional(readOnly = true)
     public CurrentContractResponse getCurrentContract(Long userId, Long workplaceId) {
         getOwnedWorkplace(userId, workplaceId);
         return toCurrentContractResponse(getActiveContract(userId, workplaceId, ErrorCode.ACTIVE_CONTRACT_NOT_FOUND));
     }
 
+    /**
+     * 활성 계약이 있는 근무지에서만 출근을 열고, 동시에 하나의 열린 기록만 존재하게 강제한다.
+     */
     @Transactional
     public WorkProofRecordResponse checkIn(Long userId, CheckInWorkProofRequest request) {
         Workplace workplace = getOwnedWorkplace(userId, request.workplaceId());
@@ -131,6 +147,9 @@ public class WorkProofLane1Service {
         return toRecordResponse(saved);
     }
 
+    /**
+     * 현재 열려 있는 출근 기록 하나를 닫아 check-in/check-out 한 쌍을 완성한다.
+     */
     @Transactional
     public WorkProofRecordResponse checkOut(Long userId, CheckOutWorkProofRequest request) {
         WorkProof active = workProofRepository.findFirstByUserIdAndClockOutAtIsNullOrderByCreatedAtDesc(userId)
@@ -147,6 +166,9 @@ public class WorkProofLane1Service {
         return toRecordResponse(active);
     }
 
+    /**
+     * 월/근무지 기준 목록 조회는 이후 Wage 월간 계산이 재사용할 기록 집합을 그대로 보여주는 용도다.
+     */
     @Transactional(readOnly = true)
     public WorkProofRecordListResponse getRecords(Long userId, String month, Long workplaceId) {
         YearMonth targetMonth = parseYearMonth(month);
@@ -166,6 +188,9 @@ public class WorkProofLane1Service {
         return new WorkProofRecordListResponse(targetMonth.toString(), workplaceId, records);
     }
 
+    /**
+     * 상세 조회는 workplace/contract snapshot과 evidence capture를 같이 내려 후속 증빙 흐름의 기준으로 쓴다.
+     */
     @Transactional(readOnly = true)
     public WorkProofRecordResponse getRecord(Long userId, Long recordId) {
         WorkProof workProof = workProofRepository.findByIdAndUserId(recordId, userId)
@@ -173,6 +198,9 @@ public class WorkProofLane1Service {
         return toRecordResponse(workProof);
     }
 
+    /**
+     * lane 1 월간 요약은 reflected 기준 집계를 먼저 고정해 Wage가 읽을 최소 월간 입력을 만든다.
+     */
     @Transactional(readOnly = true)
     public WorkProofMonthlySummaryContractResponse getMonthlySummary(Long userId, String month, Long workplaceId) {
         YearMonth targetMonth = parseYearMonth(month);
@@ -185,6 +213,7 @@ public class WorkProofLane1Service {
                 targetMonth.atEndOfMonth()
         );
 
+        // v1 요약은 reflected record만 급여 계산 입력으로 간주하고, recorded/reflected 차이는 integrity에 남긴다.
         List<WorkProof> reflected = records.stream().filter(WorkProof::isReflected).toList();
         int recordedWorkDays = (int) records.stream().map(WorkProof::getWorkDate).distinct().count();
         int reflectedWorkDays = (int) reflected.stream().map(WorkProof::getWorkDate).distinct().count();
@@ -220,6 +249,7 @@ public class WorkProofLane1Service {
         );
     }
 
+    // 연장근무는 일 단위 총 근무시간에서 lane 1 기본 소정근로시간(480분)을 초과한 분만 합산한다.
     private long calculateOvertimeMinutes(List<WorkProof> reflected) {
         return reflected.stream()
                 .collect(java.util.stream.Collectors.groupingBy(WorkProof::getWorkDate, java.util.stream.Collectors.summingLong(WorkProof::workedMinutes)))
@@ -229,6 +259,7 @@ public class WorkProofLane1Service {
                 .sum();
     }
 
+    // 야간근무 분은 기존 metrics calculator 결과를 재사용해 월간 응답 shape로만 모아준다.
     private long calculateNightMinutes(List<WorkProof> reflected) {
         return reflected.stream().mapToLong(record -> {
             Long nightMinutes = workProofMetricsCalculator.toResponse(record).nightMinutes();
@@ -273,6 +304,7 @@ public class WorkProofLane1Service {
         return request.monthlyWorkMinutes() != null ? request.monthlyWorkMinutes() : DEFAULT_MONTHLY_WORK_MINUTES;
     }
 
+    // DAILY/MONTHLY 계약도 Wage에서 같은 기준으로 비교할 수 있게 시간당 단가로 정규화한다.
     private BigDecimal calculateNormalizedHourlyWage(CreateContractRequest request) {
         return switch (request.payUnit()) {
             case HOURLY -> request.basePayAmount();
