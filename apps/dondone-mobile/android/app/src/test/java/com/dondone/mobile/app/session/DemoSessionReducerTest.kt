@@ -2,6 +2,7 @@ package com.dondone.mobile.app.session
 
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.domain.model.TodayWork
+import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 import org.junit.Assert.assertEquals
@@ -69,6 +70,46 @@ class DemoSessionReducerTest {
 
         assertEquals("R-002", nextState.remittance.selectedRecipientId)
         assertEquals(TransferFlowStep.AMOUNT, nextState.remittance.flowStep)
+    }
+
+    @Test
+    fun `openTransferFlow starts at recipient step`() {
+        val baseState = DemoSeedFactory.create().copy(
+            remittance = DemoSeedFactory.create().remittance.copy(
+                flowStep = TransferFlowStep.ACCOUNT,
+                destinationMode = TransferDestinationMode.WALLET,
+                status = TransferStatus.CONFIRMED,
+                stepReturnTarget = TransferFlowStep.AMOUNT
+            )
+        )
+
+        val nextState = DemoSessionReducer.openTransferFlow(baseState)
+
+        assertEquals(TransferFlowStep.RECIPIENT, nextState.remittance.flowStep)
+        assertEquals(TransferDestinationMode.ACCOUNT, nextState.remittance.destinationMode)
+        assertEquals(TransferStatus.IDLE, nextState.remittance.status)
+        assertNull(nextState.remittance.stepReturnTarget)
+    }
+
+    @Test
+    fun `selectTransferDestinationMode updates remittance mode`() {
+        val baseState = DemoSeedFactory.create()
+
+        val nextState = DemoSessionReducer.selectTransferDestinationMode(
+            state = baseState,
+            mode = TransferDestinationMode.WALLET
+        )
+
+        assertEquals(TransferDestinationMode.WALLET, nextState.remittance.destinationMode)
+    }
+
+    @Test
+    fun `updateRecipientDisplayName stores trimmed override`() {
+        val baseState = DemoSeedFactory.create()
+
+        val nextState = DemoSessionReducer.updateRecipientDisplayName(baseState, "  차지훈  ")
+
+        assertEquals("차지훈", nextState.remittance.recipientDisplayNameOverride)
     }
 
     @Test

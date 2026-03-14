@@ -28,12 +28,12 @@ fun resolveScreenChrome(
                 Route.WAGE -> ""
                 Route.TRANSFER -> {
                     if (transferStatus == TransferStatus.SUBMITTED || transferStatus == TransferStatus.CONFIRMED) {
-                        "송금 상태"
+                        ""
                     } else {
                         when (transferStep) {
                             TransferFlowStep.ACCOUNT -> "계좌 선택"
-                            TransferFlowStep.RECIPIENT -> "받는 사람 선택"
-                            TransferFlowStep.AMOUNT -> "금액 입력"
+                            TransferFlowStep.RECIPIENT -> ""
+                            TransferFlowStep.AMOUNT -> ""
                         }
                     }
                 }

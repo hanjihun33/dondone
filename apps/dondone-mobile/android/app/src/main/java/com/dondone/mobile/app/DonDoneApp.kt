@@ -15,11 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
@@ -61,7 +62,6 @@ private val ChromeTextMuted = Color(0xFF8B95A1)
 private val ChromeAccent = Color(0xFF6D68F5)
 private val ChromeAccentSoft = Color(0xFFF2F3FF)
 private val ChromeBorder = Color(0xFFE8EBF0)
-private val ChromeBackSurface = Color(0xFFF7F8FA)
 
 @Composable
 fun DonDoneApp(
@@ -266,22 +266,15 @@ private fun ChildTopBar(
 private fun BackButton(
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(16.dp)
-
-    Box(
+    Icon(
+        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+        contentDescription = "뒤로",
         modifier = Modifier
-            .clip(shape)
-            .background(ChromeBackSurface)
-            .border(1.dp, ChromeBorder, shape)
+            .size(32.dp)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "뒤로",
-            tint = ChromeTextMuted
-        )
-    }
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        tint = ChromeTextMuted
+    )
 }
 
 @Composable
@@ -398,7 +391,8 @@ private fun TransferFlowStep.previousStep(
         TransferFlowStep.AMOUNT -> TransferFlowStep.RECIPIENT
         TransferFlowStep.RECIPIENT -> when (target) {
             TransferFlowStep.AMOUNT -> TransferFlowStep.AMOUNT
-            else -> TransferFlowStep.ACCOUNT
+            TransferFlowStep.ACCOUNT -> TransferFlowStep.ACCOUNT
+            else -> null
         }
         TransferFlowStep.ACCOUNT -> when (target) {
             TransferFlowStep.RECIPIENT -> TransferFlowStep.RECIPIENT

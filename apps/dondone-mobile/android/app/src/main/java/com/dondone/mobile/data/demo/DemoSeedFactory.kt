@@ -9,6 +9,7 @@ import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.RemittanceData
 import com.dondone.mobile.domain.model.TodayWork
 import com.dondone.mobile.domain.model.TransferFlowStep
+import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.VaultData
 import com.dondone.mobile.domain.model.WageData
@@ -66,6 +67,7 @@ object DemoSeedFactory {
                 txHash = "0x9f2e3d8b1c0a4e7f6d5c4b3a20e1f0d9c8b7a6f5e4d3c2b1a0",
                 status = TransferStatus.IDLE,
                 flowStep = TransferFlowStep.RECIPIENT,
+                destinationMode = TransferDestinationMode.ACCOUNT,
                 stepReturnTarget = null
             ),
             advance = AdvanceData(

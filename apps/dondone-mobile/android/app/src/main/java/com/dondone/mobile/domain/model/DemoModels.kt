@@ -72,15 +72,21 @@ enum class TransferFlowStep {
     ACCOUNT, RECIPIENT, AMOUNT
 }
 
+enum class TransferDestinationMode {
+    ACCOUNT, WALLET
+}
+
 data class RemittanceData(
     val accounts: List<Account>,
     val selectedAccountId: String,
     val recipients: List<Recipient>,
     val selectedRecipientId: String,
+    val recipientDisplayNameOverride: String? = null,
     val draftAmountUsd: Int,
     val txHash: String,
     val status: TransferStatus,
     val flowStep: TransferFlowStep,
+    val destinationMode: TransferDestinationMode = TransferDestinationMode.ACCOUNT,
     val stepReturnTarget: TransferFlowStep? = null
 ) {
     fun selectedAccountOrNull(): Account? = accounts.firstOrNull { it.id == selectedAccountId } ?: accounts.firstOrNull()
@@ -90,6 +96,8 @@ data class RemittanceData(
     fun selectedRecipientOrNull(): Recipient? = recipients.firstOrNull { it.id == selectedRecipientId } ?: recipients.firstOrNull()
 
     fun selectedRecipient(): Recipient = requireNotNull(selectedRecipientOrNull()) { "No recipient available" }
+
+    fun displayedRecipientName(): String = recipientDisplayNameOverride?.takeIf { it.isNotBlank() } ?: selectedRecipient().name
 
     fun setSelectedAccountBalance(balance: Int): RemittanceData {
         return copy(
