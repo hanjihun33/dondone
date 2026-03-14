@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,21 +19,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -63,7 +62,6 @@ import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
-import com.dondone.mobile.core.designsystem.SectionPanel
 import com.dondone.mobile.core.designsystem.StatusBadge
 
 private data class MenuServiceAction(
@@ -73,18 +71,17 @@ private data class MenuServiceAction(
 )
 
 private data class MenuDocumentColors(
-    val cardBackground: Color,
-    val cardBorder: Color,
     val iconBackground: Color,
     val iconColor: Color
 )
+
+private val MenuCanvas = Color.White
+private val MenuDivider = Color(0xFFE8EBF0)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MenuScreen(
     uiModel: MenuUiModel,
-    onShiftAsOf: (Int) -> Unit,
-    onResetSeed: () -> Unit,
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit
 ) {
@@ -107,31 +104,24 @@ fun MenuScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MenuCanvas)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        MenuServicesCard(actions = serviceActions)
-
-        Text(
-            text = "문서",
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        uiModel.documents.forEach { document ->
-            MenuDocumentCard(
-                document = document,
-                onOpenDetail = {
-                    if (document.accent == MenuDocumentAccent.Claim && document.statusTone != BadgeTone.Success) {
-                        showClaimSheet = true
-                    } else {
-                        selectedDocumentId = document.id
-                    }
+        MenuServicesSection(actions = serviceActions)
+        MenuSectionDivider()
+        MenuDocumentsSection(
+            documents = uiModel.documents,
+            onOpenDetail = { document ->
+                if (document.accent == MenuDocumentAccent.Claim && document.statusTone != BadgeTone.Success) {
+                    showClaimSheet = true
+                } else {
+                    selectedDocumentId = document.id
                 }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
+            }
+        )
+        Spacer(modifier = Modifier.height(24.dp))
     }
 
     if (showClaimSheet) {
@@ -166,11 +156,8 @@ fun MenuScreen(
             containerColor = DawnSurface
         ) {
             MenuSettingsSheet(
-                currentDateText = uiModel.currentDateText,
                 selectedLanguage = selectedLanguage,
                 onSelectLanguage = { selectedLanguage = it },
-                onShiftAsOf = onShiftAsOf,
-                onResetSeed = onResetSeed,
                 onDismiss = { showSettingsSheet = false }
             )
         }
@@ -194,92 +181,32 @@ fun MenuScreen(
 }
 
 @Composable
-private fun MenuServicesCard(
+private fun MenuServicesSection(
     actions: List<MenuServiceAction>
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = DawnSurface),
-        border = BorderStroke(1.dp, DawnBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(text = "서비스", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "급여 점검, 신고 준비, 계좌 관리를 여기에서 이어서 확인할 수 있어요.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DawnTextSubtle
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(DawnSecondary)
-                        .padding(14.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = null,
-                        tint = DawnPrimary
-                    )
-                }
-            }
+    MenuSectionSurface {
+        MenuSectionHeader(title = "서비스")
 
-            actions.chunked(2).forEach { rowActions ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    rowActions.forEach { action ->
-                        MenuGridActionButton(
-                            modifier = Modifier.weight(1f),
-                            label = action.label,
-                            icon = action.icon,
-                            onClick = action.onClick
-                        )
-                    }
-                    if (rowActions.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
+        actions.forEachIndexed { index, action ->
+            MenuServiceActionRow(
+                action = action,
+                showDivider = index != actions.lastIndex
+            )
         }
     }
 }
 
 @Composable
-private fun MenuGridActionButton(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun MenuServiceActionRow(
+    action: MenuServiceAction,
+    showDivider: Boolean
 ) {
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        color = DawnSurface,
-        border = BorderStroke(1.dp, DawnBorder)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 13.dp),
+                .clickable(onClick = action.onClick)
+                .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -291,47 +218,70 @@ private fun MenuGridActionButton(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = action.icon,
                     contentDescription = null,
                     tint = DawnPrimary
                 )
             }
             Text(
-                text = label,
+                text = action.label,
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = DawnTextSubtle,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        if (showDivider) {
+            HorizontalDivider(color = MenuDivider)
+        }
+    }
+}
+
+@Composable
+private fun MenuDocumentsSection(
+    documents: List<MenuDocumentUiModel>,
+    onOpenDetail: (MenuDocumentUiModel) -> Unit
+) {
+    MenuSectionSurface {
+        MenuSectionHeader(title = "문서")
+
+        documents.forEachIndexed { index, document ->
+            MenuDocumentRow(
+                document = document,
+                onOpenDetail = { onOpenDetail(document) },
+                showDivider = index != documents.lastIndex
             )
         }
     }
 }
 
 @Composable
-private fun MenuDocumentCard(
+private fun MenuDocumentRow(
     document: MenuDocumentUiModel,
-    onOpenDetail: () -> Unit
+    onOpenDetail: () -> Unit,
+    showDivider: Boolean
 ) {
     val colors = menuDocumentColors(document.accent)
-    val isReady = document.statusTone == BadgeTone.Success
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = colors.cardBackground,
-        border = BorderStroke(1.dp, colors.cardBorder)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .clickable(onClick = onOpenDetail)
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top
         ) {
             MenuDocumentAccentBox(document.accent, colors)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -344,7 +294,8 @@ private fun MenuDocumentCard(
                     ) {
                         Text(
                             text = document.title,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = DawnText
                         )
                         Text(
                             text = document.updatedAtText,
@@ -358,28 +309,25 @@ private fun MenuDocumentCard(
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    MenuDocumentActionButton(
-                        text = "공유",
-                        icon = Icons.Default.Share,
-                        onClick = onOpenDetail,
-                        enabled = isReady,
-                        primary = false,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MenuDocumentActionButton(
-                        text = "다운로드",
-                        icon = Icons.Default.Download,
-                        onClick = onOpenDetail,
-                        enabled = isReady,
-                        primary = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                Text(
+                    text = document.summaryText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DawnTextSubtle,
+                    maxLines = 1
+                )
             }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = DawnTextSubtle,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(16.dp)
+            )
+        }
+        if (showDivider) {
+            HorizontalDivider(color = MenuDivider)
         }
     }
 }
@@ -449,8 +397,8 @@ private fun MenuDocumentAccentBox(
 
     Box(
         modifier = Modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .size(38.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(colors.iconBackground),
         contentAlignment = Alignment.Center
     ) {
@@ -462,23 +410,105 @@ private fun MenuDocumentAccentBox(
     }
 }
 
+@Composable
+private fun MenuSectionSurface(
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        content = content
+    )
+}
+
+@Composable
+private fun MenuSectionHeader(
+    title: String
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleLarge,
+        color = DawnText
+    )
+}
+
+@Composable
+private fun MenuSectionDivider() {
+    Spacer(modifier = Modifier.height(14.dp))
+    HorizontalDivider(color = MenuDivider)
+    Spacer(modifier = Modifier.height(14.dp))
+}
+
+@Composable
+private fun MenuSheetHeader(
+    title: String,
+    subtitle: String? = null,
+    onDismiss: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = DawnText
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnTextSubtle
+                )
+            }
+        }
+        Text(
+            text = "닫기",
+            modifier = Modifier.clickable(onClick = onDismiss),
+            style = MaterialTheme.typography.labelLarge,
+            color = DawnTextSubtle
+        )
+    }
+}
+
+@Composable
+private fun MenuSheetSection(
+    title: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        title?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodyLarge,
+                color = DawnText
+            )
+        }
+        content()
+    }
+}
+
 private fun menuDocumentColors(accent: MenuDocumentAccent): MenuDocumentColors {
     return when (accent) {
         MenuDocumentAccent.Proof -> MenuDocumentColors(
-            cardBackground = DawnSurface,
-            cardBorder = DawnBorder,
             iconBackground = DawnSecondary,
             iconColor = DawnPrimaryDeep
         )
         MenuDocumentAccent.Claim -> MenuDocumentColors(
-            cardBackground = DawnSurface,
-            cardBorder = DawnBorder,
             iconBackground = Color(0xFFF1F5F9),
             iconColor = Color(0xFF475569)
         )
         MenuDocumentAccent.Receipt -> MenuDocumentColors(
-            cardBackground = DawnSurface,
-            cardBorder = DawnBorder,
             iconBackground = Color(0xFFE8F2FF),
             iconColor = DawnPrimaryDeep
         )
@@ -495,27 +525,16 @@ private fun MenuDocumentSheet(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = "DOCUMENT",
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnPrimary
-            )
-            Text(
-                text = document.title,
-                style = MaterialTheme.typography.titleLarge
-            )
-            Text(
-                text = document.summaryText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-        }
+        MenuSheetHeader(
+            title = document.title,
+            subtitle = document.summaryText,
+            onDismiss = onDismiss
+        )
 
-        SectionPanel {
+        MenuSheetSection {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -540,21 +559,11 @@ private fun MenuDocumentSheet(
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            SecondaryActionButton(
-                text = "닫기",
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f)
-            )
-            PrimaryActionButton(
-                text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
-                onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        PrimaryActionButton(
+            text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
+            onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -578,31 +587,17 @@ private fun MenuClaimSheet(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = "INSTANT CLAIM v0",
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnPrimary
-            )
-            Text(text = "신고 준비", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "mockup 기준 신고 준비 오버레이를 Android 바텀시트로 옮긴 데모 흐름입니다.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-        }
+        MenuSheetHeader(
+            title = "신고 준비",
+            subtitle = "필요한 문서와 접수 경로를 한 화면에서 정리해 둘 수 있어요.",
+            onDismiss = onDismiss
+        )
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            color = Color(0xFFF8FAFC),
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-        ) {
+        MenuSheetSection {
             Column(
-                modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
@@ -642,13 +637,12 @@ private fun MenuClaimSheet(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        MenuSheetSection(title = "파일") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "파일", style = MaterialTheme.typography.bodyLarge)
                 Text(
                     text = "문서로 이동",
                     modifier = Modifier.clickable {
@@ -666,8 +660,6 @@ private fun MenuClaimSheet(
                     accentBackground = DawnSecondary,
                     accentColor = DawnPrimaryDeep,
                     accentIcon = Icons.Default.Description,
-                    actionLabel = if (document.statusTone == BadgeTone.Success) "열기" else "준비",
-                    onAction = onOpenProofDocument,
                     onShare = onOpenProofDocument,
                     onOpen = onOpenProofDocument
                 )
@@ -680,16 +672,13 @@ private fun MenuClaimSheet(
                     accentBackground = Color(0xFFF1F5F9),
                     accentColor = Color(0xFF475569),
                     accentIcon = Icons.Default.Warning,
-                    actionLabel = if (document.statusTone == BadgeTone.Success) "열기" else "준비",
-                    onAction = onOpenClaimDocument,
                     onShare = onOpenClaimDocument,
                     onOpen = onOpenClaimDocument
                 )
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(text = "접수 경로 안내", style = MaterialTheme.typography.bodyLarge)
+        MenuSheetSection(title = "접수 경로 안내") {
             MenuClaimPathCard(
                 title = "온라인",
                 description = "온라인 접수 전에는 필요한 항목과 제출 순서를 먼저 확인해 두는 편이 안전해요.",
@@ -713,8 +702,7 @@ private fun MenuClaimSheet(
             )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(text = "체크리스트", style = MaterialTheme.typography.bodyLarge)
+        MenuSheetSection(title = "체크리스트") {
             MenuChecklistRow(text = "Proof Pack 준비")
             MenuChecklistRow(text = "근거 자료 묶음 준비")
             MenuChecklistRow(text = "접수 경로 확인(온라인/전화/방문)", isInfo = true)
@@ -742,11 +730,6 @@ private fun MenuClaimSheet(
             color = DawnTextSubtle
         )
 
-        SecondaryActionButton(
-            text = "닫기",
-            onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
@@ -758,21 +741,14 @@ private fun MenuClaimFileCard(
     accentBackground: Color,
     accentColor: Color,
     accentIcon: ImageVector,
-    actionLabel: String,
-    onAction: () -> Unit,
     onShare: () -> Unit,
     onOpen: () -> Unit
 ) {
     val enabled = badgeTone == BadgeTone.Success
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = Color(0xFFF8FAFC),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
@@ -803,7 +779,6 @@ private fun MenuClaimFileCard(
                         StatusBadge(text = badgeText, tone = badgeTone)
                     }
                 }
-                SecondaryActionButton(text = actionLabel, onClick = onAction)
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -819,7 +794,7 @@ private fun MenuClaimFileCard(
                 )
                 MenuDocumentActionButton(
                     text = "열기",
-                    icon = Icons.AutoMirrored.Filled.ArrowForward,
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     onClick = onOpen,
                     enabled = enabled,
                     primary = true,
@@ -827,6 +802,7 @@ private fun MenuClaimFileCard(
                 )
             }
         }
+        HorizontalDivider(color = MenuDivider)
     }
 }
 
@@ -838,16 +814,11 @@ private fun MenuClaimPathCard(
     accentBackground: Color,
     accentColor: Color
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = Color(0xFFF8FAFC),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -875,109 +846,55 @@ private fun MenuClaimPathCard(
                     color = DawnTextSubtle
                 )
             }
-            SecondaryActionButton(text = "바로가기", onClick = {})
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = DawnTextSubtle,
+                modifier = Modifier.size(18.dp)
+            )
         }
+        HorizontalDivider(color = MenuDivider)
     }
 }
 
 @Composable
 private fun MenuSettingsSheet(
-    currentDateText: String,
     selectedLanguage: String,
     onSelectLanguage: (String) -> Unit,
-    onShiftAsOf: (Int) -> Unit,
-    onResetSeed: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = "SETTINGS",
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnPrimary
-            )
-            Text(text = "설정", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "데모 기준일과 언어를 빠르게 바꾸고 현재 세션 상태를 다시 불러올 수 있어요.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-        }
+        MenuSheetHeader(
+            title = "설정",
+            onDismiss = onDismiss
+        )
 
-        SectionPanel {
-            Text(text = "언어", style = MaterialTheme.typography.bodyLarge)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+        MenuSheetSection(title = "언어") {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 MenuLanguageChip(
                     label = "한국어",
                     code = "ko",
                     selected = selectedLanguage == "ko",
-                    onClick = { onSelectLanguage("ko") }
+                    onClick = { onSelectLanguage("ko") },
+                    showDivider = true
                 )
                 MenuLanguageChip(
                     label = "English",
                     code = "en",
                     selected = selectedLanguage == "en",
-                    onClick = { onSelectLanguage("en") }
+                    onClick = { onSelectLanguage("en") },
+                    showDivider = false
                 )
             }
         }
-
-        SectionPanel {
-            Text(text = "기준일 이동", style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = currentDateText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                SecondaryActionButton(
-                    text = "-1일",
-                    onClick = { onShiftAsOf(-1) },
-                    modifier = Modifier.weight(1f)
-                )
-                SecondaryActionButton(
-                    text = "+1일",
-                    onClick = { onShiftAsOf(1) },
-                    modifier = Modifier.weight(1f)
-                )
-                SecondaryActionButton(
-                    text = "+7일",
-                    onClick = { onShiftAsOf(7) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        SectionPanel {
-            Text(text = "데모 상태", style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = "샘플 데이터를 처음 상태로 다시 불러옵니다.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-            SecondaryActionButton(
-                text = "데모 초기화",
-                onClick = onResetSeed,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        SecondaryActionButton(
-            text = "닫기",
-            onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
@@ -987,35 +904,22 @@ private fun MenuChecklistRow(
     isInfo: Boolean = false
 ) {
     val tint = if (isInfo) DawnPrimaryDeep else DawnSuccess
-    val background = if (isInfo) DawnSecondary else Color(0xFFEFFAF3)
     val icon = if (isInfo) Icons.Default.Info else Icons.Default.CheckCircle
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFF8FAFC),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(background),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = tint
-                )
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(18.dp)
+            )
             Text(
                 text = text,
                 modifier = Modifier.weight(1f),
@@ -1023,6 +927,7 @@ private fun MenuChecklistRow(
                 color = DawnText
             )
         }
+        HorizontalDivider(color = MenuDivider)
     }
 }
 
@@ -1052,29 +957,43 @@ private fun MenuLanguageChip(
     label: String,
     code: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    showDivider: Boolean
 ) {
-    Surface(
-        modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        color = if (selected) DawnSecondary else DawnSurfaceAlt,
-        border = BorderStroke(1.dp, if (selected) DawnPrimary else DawnBorder)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = code.uppercase(),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) DawnPrimaryDeep else DawnTextSubtle
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnText
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnText
+                )
+                Text(
+                    text = code.uppercase(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = DawnTextSubtle
+                )
+            }
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = DawnPrimary
+                )
+            }
+        }
+        if (showDivider) {
+            HorizontalDivider(color = MenuDivider)
         }
     }
 }
