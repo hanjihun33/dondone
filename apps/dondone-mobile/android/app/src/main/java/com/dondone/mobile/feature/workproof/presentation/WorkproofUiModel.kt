@@ -23,8 +23,7 @@ data class WorkproofSummaryUiModel(
     val auditCountText: String,
     val todayMetaText: String,
     val todayInText: String,
-    val todayOutText: String,
-    val todayImpactText: String
+    val todayOutText: String
 )
 
 data class WorkproofCalendarCellUiModel(
@@ -44,9 +43,10 @@ data class WorkproofRecordUiModel(
 )
 
 data class WorkproofAuditUiModel(
+    val dateText: String,
     val changeText: String,
-    val reasonText: String,
-    val metaText: String
+    val attachmentText: String,
+    val reasonText: String
 )
 
 data class WorkproofUiModel(
@@ -103,9 +103,10 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
 
     val auditItems = workproof.audit.map { audit ->
         WorkproofAuditUiModel(
+            dateText = audit.at,
             changeText = "${audit.before} -> ${audit.after}",
-            reasonText = audit.reason,
-            metaText = "${audit.at} / \uCCA8\uBD80 ${audit.attachments}\uAC1C"
+            attachmentText = "\uCCA8\uBD80 ${audit.attachments}\uAC1C",
+            reasonText = audit.reason
         )
     }
 
@@ -121,12 +122,7 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
             auditCountText = "${workproof.audit.size}\uAC74",
             todayMetaText = "${demo.year}.${formatTwoDigits(demo.month)}.${formatTwoDigits(demo.asOfDay)} / ${workproof.workplaceName}",
             todayInText = workproof.today.clockIn ?: "-",
-            todayOutText = workproof.today.clockOut ?: "-",
-            todayImpactText = when {
-                workproof.today.clockOut != null -> "\uC624\uB298 \uAE30\uB85D\uC774 \uC800\uC7A5\uB410\uACE0 \uAE09\uC5EC \uACC4\uC0B0\uACFC \uC99D\uBE59 \uBB36\uC74C\uC5D0 \uD568\uAED8 \uBC18\uC601\uB3FC\uC694."
-                workproof.today.clockIn != null -> "\uCD9C\uADFC\uB9CC \uAE30\uB85D\uB41C \uC0C1\uD0DC\uC608\uC694. \uD1F4\uADFC\uAE4C\uC9C0 \uB0A8\uAE30\uBA74 \uD558\uB8E8 \uADFC\uBB34\uAC00 \uC644\uB8CC\uB3FC\uC694."
-                else -> "\uAE30\uB85D \uC2DC\uAC04\uACFC \uC704\uCE58 \uC2A4\uB0C5\uC0F7\uC744 \uD55C \uBC88\uC5D0 \uC800\uC7A5\uD574 \uB458 \uC218 \uC788\uC5B4\uC694."
-            }
+            todayOutText = workproof.today.clockOut ?: "-"
         ),
         recentRecords = recentRecords,
         auditPreview = auditItems.firstOrNull(),

@@ -28,7 +28,8 @@ import com.dondone.mobile.feature.workproof.presentation.toWorkproofUiModel
 fun DonDoneNavGraph(
     modifier: Modifier = Modifier,
     navController: NavHostController,
-    viewModel: DemoSessionViewModel
+    viewModel: DemoSessionViewModel,
+    onWorkproofDetailVisibilityChange: (Boolean) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -58,7 +59,8 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toWorkproofUiModel(),
                 onClockIn = viewModel::clockIn,
                 onClockOut = viewModel::clockOut,
-                onSaveEdit = viewModel::saveWorkproofEdit
+                onSaveEdit = viewModel::saveWorkproofEdit,
+                onDetailVisibilityChange = onWorkproofDetailVisibilityChange
             )
         }
         composable(Route.FINANCE_HOME) {

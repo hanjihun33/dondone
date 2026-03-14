@@ -34,6 +34,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,11 +75,13 @@ fun DonDoneApp(
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
     val currentRoute = currentDestination?.route.orEmpty()
     val remittance = uiState.remittance
+    var isWorkproofDetailVisible by rememberSaveable { mutableStateOf(false) }
 
     val chrome = resolveScreenChrome(
         route = currentRoute,
         transferStep = remittance.flowStep,
-        transferStatus = remittance.status
+        transferStatus = remittance.status,
+        isWorkproofDetailVisible = isWorkproofDetailVisible
     )
 
     val headerTitle = chrome.title.takeIf(String::isNotBlank)
@@ -156,7 +161,10 @@ fun DonDoneApp(
                 bottom = innerPadding.calculateBottomPadding()
             ),
             navController = navController,
-            viewModel = viewModel
+            viewModel = viewModel,
+            onWorkproofDetailVisibilityChange = { visible ->
+                isWorkproofDetailVisible = visible
+            }
         )
     }
 }
@@ -176,10 +184,19 @@ private fun AppTopBar(
             .fillMaxWidth()
             .background(Color.White)
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(
+                horizontal = 16.dp,
+                vertical = if (showRootTabs && headerTitle == null && headerDateText == null && !showSettingsAction) {
+                    0.dp
+                } else {
+                    10.dp
+                }
+            ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (showRootTabs) {
+        if (showRootTabs && headerTitle == null && headerDateText == null && !showSettingsAction) {
+            Box(modifier = Modifier.heightIn(min = 4.dp))
+        } else if (showRootTabs) {
             RootTopBar(
                 currentRoute = currentRoute,
                 headerTitle = headerTitle,
