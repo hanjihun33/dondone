@@ -2,6 +2,7 @@ package com.dondone.mobile.app.session
 
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TodayWork
+import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.WorkAudit
@@ -42,9 +43,25 @@ object DemoSessionReducer {
     fun openTransferFlow(state: DemoState): DemoState {
         return state.copy(
             remittance = state.remittance.copy(
-                flowStep = TransferFlowStep.ACCOUNT,
+                flowStep = TransferFlowStep.RECIPIENT,
+                destinationMode = TransferDestinationMode.ACCOUNT,
+                recipientDisplayNameOverride = null,
                 status = TransferStatus.IDLE,
                 stepReturnTarget = null
+            )
+        )
+    }
+
+    fun selectTransferDestinationMode(state: DemoState, mode: TransferDestinationMode): DemoState {
+        return state.copy(
+            remittance = state.remittance.copy(destinationMode = mode)
+        )
+    }
+
+    fun updateRecipientDisplayName(state: DemoState, displayName: String): DemoState {
+        return state.copy(
+            remittance = state.remittance.copy(
+                recipientDisplayNameOverride = displayName.trim().ifBlank { null }
             )
         )
     }
@@ -103,6 +120,7 @@ object DemoSessionReducer {
         return state.copy(
             remittance = state.remittance.copy(
                 selectedRecipientId = recipientId,
+                recipientDisplayNameOverride = null,
                 flowStep = nextStep,
                 stepReturnTarget = null
             )
@@ -238,7 +256,9 @@ object DemoSessionReducer {
         return state.copy(
             remittance = state.remittance.copy(
                 status = TransferStatus.IDLE,
-                flowStep = TransferFlowStep.ACCOUNT,
+                flowStep = TransferFlowStep.RECIPIENT,
+                destinationMode = TransferDestinationMode.ACCOUNT,
+                recipientDisplayNameOverride = null,
                 stepReturnTarget = null
             )
         )

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.domain.model.DemoState
+import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 import kotlinx.coroutines.Job
@@ -51,6 +52,10 @@ class DemoSessionViewModel : ViewModel() {
         _uiState.update { state -> DemoSessionReducer.showAmountStep(state) }
     }
 
+    fun selectTransferDestinationMode(mode: TransferDestinationMode) {
+        _uiState.update { state -> DemoSessionReducer.selectTransferDestinationMode(state, mode) }
+    }
+
     fun showAccountStepFromRecipient() {
         _uiState.update { state ->
             DemoSessionReducer.showAccountStepForReturn(state, TransferFlowStep.RECIPIENT)
@@ -71,6 +76,10 @@ class DemoSessionViewModel : ViewModel() {
 
     fun selectRecipient(recipientId: String) {
         _uiState.update { state -> DemoSessionReducer.selectRecipient(state, recipientId) }
+    }
+
+    fun updateRecipientDisplayName(displayName: String) {
+        _uiState.update { state -> DemoSessionReducer.updateRecipientDisplayName(state, displayName) }
     }
 
     fun updateTransferAmount(nextAmount: Int) {

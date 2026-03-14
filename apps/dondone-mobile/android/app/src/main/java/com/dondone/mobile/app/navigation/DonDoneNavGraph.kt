@@ -63,13 +63,7 @@ fun DonDoneNavGraph(
         }
         composable(Route.FINANCE_HOME) {
             FinanceHomeScreen(
-                uiModel = uiState.toFinanceHomeUiModel(),
-                onOpenWage = { navController.navigate(Route.WAGE) },
-                onOpenTransfer = {
-                    viewModel.openTransferFlow()
-                    navController.navigate(Route.TRANSFER)
-                },
-                onOpenAccount = { navController.navigate(Route.ACCOUNT) }
+                uiModel = uiState.toFinanceHomeUiModel()
             )
         }
         composable(Route.WAGE) {
@@ -88,7 +82,9 @@ fun DonDoneNavGraph(
             TransferScreen(
                 uiModel = uiState.toTransferUiModel(),
                 onSelectAccount = viewModel::selectAccount,
+                onSelectDestinationMode = viewModel::selectTransferDestinationMode,
                 onSelectRecipient = viewModel::selectRecipient,
+                onUpdateRecipientDisplayName = viewModel::updateRecipientDisplayName,
                 onUpdateAmount = viewModel::updateTransferAmount,
                 onChangeRecipient = viewModel::showRecipientStepFromAmount,
                 onChangeAccountFromRecipient = viewModel::showAccountStepFromRecipient,
