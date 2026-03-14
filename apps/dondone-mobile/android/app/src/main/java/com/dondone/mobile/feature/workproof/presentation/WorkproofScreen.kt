@@ -148,8 +148,15 @@ fun WorkproofScreen(
     val editingRecord = remember(displayedRecentRecords, editingRecordId) {
         displayedRecentRecords.firstOrNull { it.id == editingRecordId }
     }
-    val clearEditSheet = {
+    val resetEditDraft = {
         editingRecordId = null
+        editReasonKey = ""
+        editMemo = ""
+        selectedAttachmentName = null
+        reasonMenuExpanded = false
+    }
+    val openEditSheet: (WorkproofRecordUiModel) -> Unit = { record ->
+        editingRecordId = record.id
         editReasonKey = ""
         editMemo = ""
         selectedAttachmentName = null
@@ -162,7 +169,7 @@ fun WorkproofScreen(
 
     if (editingRecord != null) {
         ModalBottomSheet(
-            onDismissRequest = clearEditSheet,
+            onDismissRequest = resetEditDraft,
             sheetState = editSheetState,
             containerColor = DawnSurface
         ) {
@@ -189,9 +196,9 @@ fun WorkproofScreen(
                         editMemo.trim(),
                         selectedAttachmentName != null
                     )
-                    clearEditSheet()
+                    resetEditDraft()
                 },
-                onClose = clearEditSheet
+                onClose = resetEditDraft
             )
         }
     }
@@ -236,13 +243,7 @@ fun WorkproofScreen(
                     onPreviousMonth = { monthOffset -= 1 },
                     onNextMonth = { monthOffset += 1 },
                     onBack = { showDetails = false },
-                    onEditRecord = { record ->
-                        editingRecordId = record.id
-                        editReasonKey = ""
-                        editMemo = ""
-                        selectedAttachmentName = null
-                        reasonMenuExpanded = false
-                    }
+                    onEditRecord = openEditSheet
                 )
             } else {
                 Column(
