@@ -13,11 +13,16 @@ data class ScreenChrome(
 fun resolveScreenChrome(
     route: String,
     transferStep: TransferFlowStep,
-    transferStatus: TransferStatus
+    transferStatus: TransferStatus,
+    isWorkproofDetailVisible: Boolean
 ): ScreenChrome {
     return if (isRootRoute(route)) {
         ScreenChrome(
-            title = if (route == Route.HOME) "DonDone" else routeTitle(route),
+            title = when {
+                route == Route.HOME -> "DonDone"
+                route == Route.WORKPROOF && isWorkproofDetailVisible -> ""
+                else -> routeTitle(route)
+            },
             showRootTabs = true,
             showSettingsAction = route == Route.HOME,
             showDate = route != Route.HOME && route != Route.FINANCE_HOME && route != Route.WORKPROOF && route != Route.MENU

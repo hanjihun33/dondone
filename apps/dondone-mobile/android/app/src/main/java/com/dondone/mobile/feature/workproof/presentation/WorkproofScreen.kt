@@ -5,7 +5,11 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,20 +26,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.WorkHistory
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -43,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,7 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -66,9 +70,12 @@ import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
-import com.dondone.mobile.core.designsystem.SectionPanel
 import java.time.YearMonth
 
+private val WorkproofCanvas = Color.White
+private val WorkproofDivider = Color(0xFFE8EBF0)
+private val WorkproofRowAccentBackground = Color(0xFFF2F3FF)
+private val WorkproofRowAccentTint = Color(0xFF6D68F5)
 private val WorkproofMissingBackground = Color(0xFFF1F5F9)
 private val WorkproofMissingBorder = Color(0xFFDBE3EE)
 private val WorkproofMissingText = Color(0xFF64748B)
@@ -81,6 +88,7 @@ private val WorkproofCompleteText = Color(0xFF166534)
 private val WorkproofModifiedBackground = Color(0xFFFECACA)
 private val WorkproofModifiedBorder = Color(0xFFF59EA9)
 private val WorkproofModifiedText = Color(0xFF9F1239)
+private val WorkproofWeekdays = listOf("일", "월", "화", "수", "목", "금", "토")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,18 +96,10 @@ fun WorkproofScreen(
     uiModel: WorkproofUiModel,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
-    onSaveEdit: (String, String, String, Boolean) -> Unit
+    onSaveEdit: (String, String, String, Boolean) -> Unit,
+    onDetailVisibilityChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
-    val weekdays = listOf(
-        "\uC77C",
-        "\uC6D4",
-        "\uD654",
-        "\uC218",
-        "\uBAA9",
-        "\uAE08",
-        "\uD1A0"
-    )
     val baseMonth = remember(uiModel.calendarBaseYear, uiModel.calendarBaseMonth) {
         YearMonth.of(uiModel.calendarBaseYear, uiModel.calendarBaseMonth)
     }
@@ -109,6 +109,7 @@ fun WorkproofScreen(
     var editReasonKey by rememberSaveable { mutableStateOf("") }
     var editMemo by rememberSaveable { mutableStateOf("") }
     var selectedAttachmentName by rememberSaveable { mutableStateOf<String?>(null) }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
     var reasonMenuExpanded by remember { mutableStateOf(false) }
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -118,8 +119,8 @@ fun WorkproofScreen(
     val displayedMonth = remember(baseMonth, monthOffset) {
         baseMonth.plusMonths(monthOffset.toLong())
     }
-    val editingRecord = remember(uiModel.recentRecords, editingRecordId) {
-        uiModel.recentRecords.firstOrNull { it.id == editingRecordId }
+    val isBaseMonth = remember(baseMonth, displayedMonth) {
+        displayedMonth == baseMonth
     }
     val selectedReason = remember(editReasonKey) {
         WorkproofEditReasons.firstOrNull { it.key == editReasonKey }
@@ -135,17 +136,40 @@ fun WorkproofScreen(
     val recordedDayCount = calendarCells.count {
         it.tone != null && it.tone != WorkproofCalendarTone.MISSING
     }
-    val clearEditSheet = {
+    val displayedRecentRecords = remember(isBaseMonth, uiModel.recentRecords) {
+        if (isBaseMonth) uiModel.recentRecords else emptyList()
+    }
+    val displayedAuditPreview = remember(isBaseMonth, uiModel.auditPreview) {
+        if (isBaseMonth) uiModel.auditPreview else null
+    }
+    val displayedAudits = remember(isBaseMonth, uiModel.audits) {
+        if (isBaseMonth) uiModel.audits else emptyList()
+    }
+    val editingRecord = remember(displayedRecentRecords, editingRecordId) {
+        displayedRecentRecords.firstOrNull { it.id == editingRecordId }
+    }
+    val resetEditDraft = {
         editingRecordId = null
         editReasonKey = ""
         editMemo = ""
         selectedAttachmentName = null
         reasonMenuExpanded = false
     }
+    val openEditSheet: (WorkproofRecordUiModel) -> Unit = { record ->
+        editingRecordId = record.id
+        editReasonKey = ""
+        editMemo = ""
+        selectedAttachmentName = null
+        reasonMenuExpanded = false
+    }
+
+    LaunchedEffect(showDetails) {
+        onDetailVisibilityChange(showDetails)
+    }
 
     if (editingRecord != null) {
         ModalBottomSheet(
-            onDismissRequest = clearEditSheet,
+            onDismissRequest = resetEditDraft,
             sheetState = editSheetState,
             containerColor = DawnSurface
         ) {
@@ -172,51 +196,73 @@ fun WorkproofScreen(
                         editMemo.trim(),
                         selectedAttachmentName != null
                     )
-                    clearEditSheet()
+                    resetEditDraft()
                 },
-                onClose = clearEditSheet
+                onClose = resetEditDraft
             )
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(WorkproofCanvas)
     ) {
-        WorkproofPunchCard(
-            uiModel = uiModel.summary,
-            onClockIn = onClockIn,
-            onClockOut = onClockOut
-        )
-
-        WorkproofCalendarCard(
-            displayedMonthText = formatMonthText(displayedMonth),
-            calendarCountText = "\uAE30\uB85D ${recordedDayCount}\uC77C",
-            calendarCells = calendarCells,
-            weekdays = weekdays,
-            onPreviousMonth = { monthOffset -= 1 },
-            onNextMonth = { monthOffset += 1 }
-        )
-
-        WorkproofRecentLogsCard(
-            records = uiModel.recentRecords,
-            onEditRecord = { record ->
-                editingRecordId = record.id
-                editReasonKey = ""
-                editMemo = ""
-                selectedAttachmentName = null
-                reasonMenuExpanded = false
+        AnimatedContent(
+            targetState = showDetails,
+            transitionSpec = {
+                if (targetState) {
+                    slideInHorizontally(
+                        animationSpec = tween(260),
+                        initialOffsetX = { it / 3 }
+                    ) togetherWith slideOutHorizontally(
+                        animationSpec = tween(220),
+                        targetOffsetX = { -it / 6 }
+                    )
+                } else {
+                    slideInHorizontally(
+                        animationSpec = tween(260),
+                        initialOffsetX = { -it / 6 }
+                    ) togetherWith slideOutHorizontally(
+                        animationSpec = tween(220),
+                        targetOffsetX = { it / 3 }
+                    )
+                }
+            },
+            label = "workproofContentSwitch"
+        ) { detailVisible ->
+            if (detailVisible) {
+                WorkproofDetailPage(
+                    displayedMonthText = formatMonthText(displayedMonth),
+                    calendarCountText = "기록 ${recordedDayCount}일",
+                    calendarCells = calendarCells,
+                    weekdays = WorkproofWeekdays,
+                    records = displayedRecentRecords,
+                    preview = displayedAuditPreview,
+                    audits = displayedAudits.drop(1),
+                    onPreviousMonth = { monthOffset -= 1 },
+                    onNextMonth = { monthOffset += 1 },
+                    onBack = { showDetails = false },
+                    onEditRecord = openEditSheet
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    WorkproofPunchCard(
+                        uiModel = uiModel.summary,
+                        onClockIn = onClockIn,
+                        onClockOut = onClockOut,
+                        onToggleDetails = { showDetails = true }
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
-        )
-        WorkproofAuditCard(
-            preview = uiModel.auditPreview,
-            audits = uiModel.audits.drop(1)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
+        }
     }
 }
 
@@ -224,111 +270,118 @@ fun WorkproofScreen(
 private fun WorkproofPunchCard(
     uiModel: WorkproofSummaryUiModel,
     onClockIn: () -> Unit,
-    onClockOut: () -> Unit
+    onClockOut: () -> Unit,
+    onToggleDetails: () -> Unit
 ) {
     WorkproofSurfaceCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "ONE TAP",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = DawnPrimaryDeep
-                )
-                Text(
-                    text = "\uCD9C\uD1F4\uADFC \uC6D0\uD0ED \uAE30\uB85D",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = DawnText
-                )
-                Text(
-                    text = "\uAE30\uB85D \uC2DC\uAC04\uACFC \uC704\uCE58 \uC2A4\uB0C5\uC0F7\uC744 \uD55C \uBC88\uC5D0 \uC800\uC7A5\uD574\uC694.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DawnTextSubtle
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(DawnSurfaceAlt),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.WorkHistory,
-                    contentDescription = null,
-                    tint = DawnPrimary,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-        }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            WorkproofSectionHeader(
+                title = "오늘 근무",
+                trailing = {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable(onClick = onToggleDetails),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "상세 기록 보기",
+                            tint = DawnTextSubtle,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            PrimaryActionButton(
-                text = "\uCD9C\uADFC",
-                onClick = onClockIn,
-                enabled = uiModel.canClockIn,
-                modifier = Modifier.weight(1f)
-            )
-            SecondaryActionButton(
-                text = "\uD1F4\uADFC",
-                onClick = onClockOut,
-                enabled = uiModel.canClockOut,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            WorkproofMiniStat(
-                label = "\uADFC\uBB34\uC77C",
-                value = uiModel.verifiedDaysText,
-                modifier = Modifier.weight(1f)
-            )
-            WorkproofMiniStat(
-                label = "\uC218\uC815",
-                value = uiModel.auditCountText,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        SectionPanel {
             Text(
                 text = uiModel.todayMetaText,
-                style = MaterialTheme.typography.labelLarge,
-                color = DawnPrimaryDeep
+                style = MaterialTheme.typography.bodyMedium,
+                color = DawnTextSubtle
             )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                WorkproofTimePill(
-                    label = "\uCD9C\uADFC",
-                    value = uiModel.todayInText,
+                PrimaryActionButton(
+                    text = "출근",
+                    onClick = onClockIn,
+                    enabled = uiModel.canClockIn,
                     modifier = Modifier.weight(1f)
                 )
-                WorkproofTimePill(
-                    label = "\uD1F4\uADFC",
-                    value = uiModel.todayOutText,
+                SecondaryActionButton(
+                    text = "퇴근",
+                    onClick = onClockOut,
+                    enabled = uiModel.canClockOut,
                     modifier = Modifier.weight(1f)
                 )
             }
-            Text(
-                text = uiModel.todayImpactText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnText
+
+            WorkproofKeyValueRow(label = "출근", value = uiModel.todayInText)
+            WorkproofKeyValueRow(label = "퇴근", value = uiModel.todayOutText)
+            WorkproofKeyValueRow(label = "근무일", value = uiModel.verifiedDaysText)
+            WorkproofKeyValueRow(label = "수정", value = uiModel.auditCountText)
+        }
+    }
+}
+
+@Composable
+private fun WorkproofDetailPage(
+    displayedMonthText: String,
+    calendarCountText: String,
+    calendarCells: List<WorkproofCalendarCellUiModel>,
+    weekdays: List<String>,
+    records: List<WorkproofRecordUiModel>,
+    preview: WorkproofAuditUiModel?,
+    audits: List<WorkproofAuditUiModel>,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onBack: () -> Unit,
+    onEditRecord: (WorkproofRecordUiModel) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 6.dp, vertical = 14.dp)
+                .size(28.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                contentDescription = "뒤로",
+                tint = DawnTextSubtle,
+                modifier = Modifier.size(20.dp)
             )
         }
+        WorkproofCalendarCard(
+            displayedMonthText = displayedMonthText,
+            calendarCountText = calendarCountText,
+            calendarCells = calendarCells,
+            weekdays = weekdays,
+            onPreviousMonth = onPreviousMonth,
+            onNextMonth = onNextMonth
+        )
+        WorkproofSectionDivider()
+        WorkproofRecentLogsCard(
+            records = records,
+            onEditRecord = onEditRecord
+        )
+        WorkproofSectionDivider()
+        WorkproofAuditCard(
+            preview = preview,
+            audits = audits
+        )
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
@@ -342,32 +395,16 @@ private fun WorkproofCalendarCard(
     onNextMonth: () -> Unit
 ) {
     WorkproofSurfaceCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+        WorkproofSectionHeader(
+            title = "근무 달력",
+            trailing = {
                 Text(
-                    text = "\uADFC\uBB34 \uCE98\uB9B0\uB354",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = DawnText
-                )
-                Text(
-                    text = "\uAE30\uB85D \uC0C1\uD0DC\uB97C \uD55C \uB2EC \uB2E8\uC704\uB85C \uD655\uC778\uD560 \uC218 \uC788\uC5B4\uC694.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = calendarCountText,
+                    style = MaterialTheme.typography.labelLarge,
                     color = DawnTextSubtle
                 )
             }
-            Text(
-                text = calendarCountText,
-                style = MaterialTheme.typography.labelLarge,
-                color = DawnTextSubtle
-            )
-        }
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -377,9 +414,10 @@ private fun WorkproofCalendarCard(
             WorkproofMonthButton(
                 icon = {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "\uC774\uC804 \uB2EC",
-                        tint = DawnTextSubtle
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "이전 달",
+                        tint = DawnTextSubtle,
+                        modifier = Modifier.size(28.dp)
                     )
                 },
                 onClick = onPreviousMonth
@@ -392,9 +430,10 @@ private fun WorkproofCalendarCard(
             WorkproofMonthButton(
                 icon = {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "\uB2E4\uC74C \uB2EC",
-                        tint = DawnTextSubtle
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "다음 달",
+                        tint = DawnTextSubtle,
+                        modifier = Modifier.size(28.dp)
                     )
                 },
                 onClick = onNextMonth
@@ -439,10 +478,10 @@ private fun WorkproofCalendarCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            WorkproofLegendItem(label = "\uBBF8\uAE30\uB85D", tone = WorkproofCalendarTone.MISSING)
-            WorkproofLegendItem(label = "\uCD9C\uADFC\uB9CC", tone = WorkproofCalendarTone.PARTIAL)
-            WorkproofLegendItem(label = "\uC644\uB8CC", tone = WorkproofCalendarTone.COMPLETE)
-            WorkproofLegendItem(label = "\uC218\uC815", tone = WorkproofCalendarTone.MODIFIED)
+            WorkproofLegendItem(label = "미기록", tone = WorkproofCalendarTone.MISSING)
+            WorkproofLegendItem(label = "출근만", tone = WorkproofCalendarTone.PARTIAL)
+            WorkproofLegendItem(label = "완료", tone = WorkproofCalendarTone.COMPLETE)
+            WorkproofLegendItem(label = "수정", tone = WorkproofCalendarTone.MODIFIED)
         }
     }
 }
@@ -453,75 +492,15 @@ private fun WorkproofRecentLogsCard(
     onEditRecord: (WorkproofRecordUiModel) -> Unit
 ) {
     WorkproofSurfaceCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "\uCD5C\uADFC \uAE30\uB85D",
-                style = MaterialTheme.typography.titleLarge,
-                color = DawnText
-            )
-            Text(
-                text = "\uC218\uC815 \uC0AC\uC720\uB97C \uB0A8\uACA8\uC8FC\uC138\uC694",
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnTextSubtle
-            )
-        }
+        WorkproofSectionHeader(title = "최근 기록")
 
-        records.forEach { record ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xFFF8FAFC))
-                    .border(1.dp, DawnBorder, RoundedCornerShape(22.dp))
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = record.dateText,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-                                color = DawnText
-                            )
-                            WorkproofStatusPill(
-                                text = record.statusText,
-                                tone = record.tone
-                            )
-                        }
-                        Text(
-                            text = formatRecordTimeLine(record.timeText),
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                            color = DawnText
-                        )
-                    }
-                    WorkproofInlineActionButton(
-                        text = "\uC218\uC815",
-                        onClick = { onEditRecord(record) }
-                    )
-                }
-
-                record.modifiedHintText?.let { hint ->
-                    Text(
-                        text = hint,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DawnTextSubtle
-                    )
-                }
+        records.forEachIndexed { index, record ->
+            WorkproofRecentRecordRow(
+                record = record,
+                onEditRecord = onEditRecord
+            )
+            if (index != records.lastIndex) {
+                HorizontalDivider(color = WorkproofDivider)
             }
         }
     }
@@ -533,50 +512,150 @@ private fun WorkproofAuditCard(
     audits: List<WorkproofAuditUiModel>
 ) {
     WorkproofSurfaceCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "\uBCC0\uACBD \uAE30\uB85D",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                    color = DawnText
-                )
-                Text(
-                    text = "\uBCC0\uACBD \uC774\uB825\uC740 \uBCF4\uAD00\uB418\uBA70 Proof Pack\uACFC \uADFC\uAC70 \uC790\uB8CC \uBB36\uC74C\uC5D0 \uD568\uAED8 \uD3EC\uD568\uB3FC\uC694.",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
-                    color = DawnTextSubtle
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.Description,
-                contentDescription = null,
-                tint = DawnPrimaryDeep,
-                modifier = Modifier.size(22.dp)
-            )
-        }
+        WorkproofSectionHeader(title = "변경 기록")
 
         if (preview != null) {
-            WorkproofAuditPreviewBox(uiModel = preview)
+            WorkproofAuditPreviewRow(uiModel = preview)
         } else {
-            WorkproofAuditPreviewBox(
+            WorkproofAuditPreviewRow(
                 uiModel = WorkproofAuditUiModel(
-                    changeText = "\uC544\uC9C1 \uC313\uC778 \uBCC0\uACBD \uAE30\uB85D\uC774 \uC5C6\uC5B4\uC694.",
-                    reasonText = "\uC218\uC815\uC774 \uC0DD\uAE30\uBA74 \uC0AC\uC720\uC640 \uCCA8\uBD80 \uC5EC\uBD80\uAC00 \uC5EC\uAE30\uC5D0 \uBA3C\uC800 \uD45C\uC2DC\uB3FC\uC694.",
-                    metaText = "\uD604\uC7AC \uBBF8\uB9AC\uBCF4\uAE30 \uD56D\uBAA9 \uC5C6\uC74C"
+                    dateText = "",
+                    changeText = "아직 쌓인 변경 기록이 없어요.",
+                    attachmentText = "",
+                    reasonText = "수정이 생기면 사유와 첨부 여부가 여기에 먼저 표시돼요."
                 )
             )
         }
 
         if (audits.isNotEmpty()) {
+            audits.forEachIndexed { index, audit ->
+                HorizontalDivider(color = WorkproofDivider)
+                WorkproofAuditPreviewRow(uiModel = audit)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkproofRecentRecordRow(
+    record: WorkproofRecordUiModel,
+    onEditRecord: (WorkproofRecordUiModel) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(WorkproofRowAccentBackground),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Schedule,
+                contentDescription = null,
+                tint = WorkproofRowAccentTint,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = record.dateText,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                    color = DawnText
+                )
+                WorkproofStatusPill(
+                    text = record.statusText,
+                    tone = record.tone
+                )
+            }
             Text(
-                text = "\uCD5C\uADFC \uBCC0\uACBD ${audits.size + if (preview != null) 1 else 0}\uAC74",
-                style = MaterialTheme.typography.labelMedium,
+                text = formatRecordTimeLine(record.timeText),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = DawnText
+            )
+            Text(
+                text = record.attachmentText,
+                style = MaterialTheme.typography.bodySmall,
+                color = DawnTextSubtle
+            )
+            record.modifiedHintText?.let { hint ->
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DawnTextSubtle
+                )
+            }
+        }
+        WorkproofInlineActionButton(
+            text = "수정",
+            onClick = { onEditRecord(record) }
+        )
+    }
+}
+
+@Composable
+private fun WorkproofAuditPreviewRow(
+    uiModel: WorkproofAuditUiModel
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(WorkproofRowAccentBackground),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.SyncAlt,
+                contentDescription = null,
+                tint = WorkproofRowAccentTint,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            if (uiModel.dateText.isNotBlank()) {
+                Text(
+                    text = uiModel.dateText,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                    color = DawnText
+                )
+            }
+            Text(
+                text = uiModel.changeText,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = DawnText
+            )
+            if (uiModel.attachmentText.isNotBlank()) {
+                Text(
+                    text = uiModel.attachmentText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DawnTextSubtle
+                )
+            }
+            Text(
+                text = uiModel.reasonText,
+                style = MaterialTheme.typography.bodySmall,
                 color = DawnTextSubtle
             )
         }
@@ -584,61 +663,63 @@ private fun WorkproofAuditCard(
 }
 
 @Composable
-private fun WorkproofAuditPreviewBox(
-    uiModel: WorkproofAuditUiModel
+private fun WorkproofSurfaceCard(
+    content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFF8FAFC))
-            .border(1.dp, Color(0xFFE7EDF5), RoundedCornerShape(16.dp))
-            .padding(horizontal = 13.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(horizontal = 6.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        content = content
+    )
+}
+
+@Composable
+private fun WorkproofSectionDivider() {
+    Spacer(modifier = Modifier.height(14.dp))
+    HorizontalDivider(color = WorkproofDivider)
+    Spacer(modifier = Modifier.height(14.dp))
+}
+
+@Composable
+private fun WorkproofSectionHeader(
+    title: String,
+    trailing: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = uiModel.changeText,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = Color(0xFF334155)
+            text = title,
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+            color = DawnText
         )
-        Text(
-            text = uiModel.reasonText,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF64748B)
-        )
-        Text(
-            text = uiModel.metaText,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF64748B)
-        )
+        trailing?.invoke()
     }
 }
 
 @Composable
-private fun WorkproofSurfaceCard(
-    content: @Composable ColumnScope.() -> Unit
+private fun WorkproofKeyValueRow(
+    label: String,
+    value: String
 ) {
-    Card(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = DawnSurface),
-        border = BorderStroke(1.dp, DawnBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White,
-                            Color(0xFFFCFAFF)
-                        )
-                    )
-                )
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            content = content
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DawnTextSubtle
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+            color = DawnText
         )
     }
 }
@@ -650,41 +731,11 @@ private fun WorkproofMonthButton(
 ) {
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(DawnSurfaceAlt)
-            .border(1.dp, DawnBorder, RoundedCornerShape(12.dp))
+            .size(32.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         icon()
-    }
-}
-
-@Composable
-private fun WorkproofMiniStat(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFF8FAFC))
-            .border(1.dp, DawnBorder, RoundedCornerShape(18.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = DawnTextSubtle
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            color = DawnText
-        )
     }
 }
 
@@ -733,7 +784,7 @@ private fun WorkproofSelectionField(
             color = if (isPlaceholder) DawnTextSubtle else DawnText
         )
         Text(
-            text = "\u25BE",
+            text = "▾",
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
             color = DawnTextSubtle
         )
@@ -756,40 +807,55 @@ private fun WorkproofEditSheet(
     onSave: () -> Unit,
     onClose: () -> Unit
 ) {
+    val timeParts = remember(record.timeText) {
+        record.timeText.split(" - ").let { parts ->
+            (parts.getOrNull(0) ?: "-") to (parts.getOrNull(1) ?: "-")
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "근무 시간 수정",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = DawnText
+                )
+                Text(
+                    text = record.dateText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DawnTextSubtle
+                )
+            }
             Text(
-                text = "WORKPROOF EDIT",
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnPrimaryDeep
-            )
-            Text(
-                text = "\uADFC\uBB34 \uC2DC\uAC04 \uC218\uC815",
-                style = MaterialTheme.typography.titleLarge,
-                color = DawnText
-            )
-            Text(
-                text = "${record.dateText} / ${formatRecordTimeLine(record.timeText)}",
-                style = MaterialTheme.typography.bodySmall,
+                text = "닫기",
+                modifier = Modifier.clickable(onClick = onClose),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                 color = DawnTextSubtle
             )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = "\uC218\uC815 \uC0AC\uC720",
-                style = MaterialTheme.typography.labelLarge,
-                color = DawnText
-            )
+        WorkproofKeyValueRow(label = "출근", value = timeParts.first)
+        WorkproofKeyValueRow(label = "퇴근", value = timeParts.second)
+        HorizontalDivider(color = WorkproofDivider)
+
+        WorkproofEditSheetSection(title = "수정 사유") {
             Box(modifier = Modifier.fillMaxWidth()) {
                 WorkproofSelectionField(
                     value = if (selectedReasonLabel.isBlank()) {
-                        "\uC120\uD0DD\uD558\uC138\uC694"
+                        "선택하세요"
                     } else {
                         selectedReasonLabel
                     },
@@ -811,32 +877,28 @@ private fun WorkproofEditSheet(
             }
         }
 
-        OutlinedTextField(
-            value = memo,
-            onValueChange = onMemoChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp),
-            textStyle = MaterialTheme.typography.bodyMedium,
-            placeholder = {
-                Text(
-                    text = "\uCD94\uAC00 \uBA54\uBAA8(\uC120\uD0DD)",
-                    color = DawnTextSubtle
-                )
-            }
-        )
+        HorizontalDivider(color = WorkproofDivider)
 
-        SectionPanel {
-            Text(
-                text = "\uCD94\uAC00 \uC99D\uAC70(\uC120\uD0DD)",
-                style = MaterialTheme.typography.labelLarge,
-                color = DawnText
+        WorkproofEditSheetSection(title = "메모") {
+            OutlinedTextField(
+                value = memo,
+                onValueChange = onMemoChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                placeholder = {
+                    Text(
+                        text = "추가 메모(선택)",
+                        color = DawnTextSubtle
+                    )
+                }
             )
-            Text(
-                text = "\uC0AC\uC9C4/\uBA54\uBAA8 \uCCA8\uBD80 \uAC00\uB2A5 / \uCCA8\uBD80 \uC5C6\uC74C\uB3C4 \uAE30\uB85D\uB429\uB2C8\uB2E4.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
+        }
+
+        HorizontalDivider(color = WorkproofDivider)
+
+        WorkproofEditSheetSection(title = "첨부") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -844,74 +906,56 @@ private fun WorkproofEditSheet(
             ) {
                 SecondaryActionButton(
                     text = if (selectedAttachmentName == null) {
-                        "\uD30C\uC77C \uC120\uD0DD"
+                        "파일 선택"
                     } else {
-                        "\uB2E4\uC2DC \uC120\uD0DD"
+                        "다시 선택"
                     },
                     onClick = onPickAttachment,
                     modifier = Modifier.weight(1f)
                 )
                 if (selectedAttachmentName != null) {
                     SecondaryActionButton(
-                        text = "\uC81C\uAC70",
+                        text = "제거",
                         onClick = onClearAttachment,
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
             Text(
-                text = selectedAttachmentName ?: "\uC120\uD0DD\uB41C \uD30C\uC77C \uC5C6\uC74C",
+                text = selectedAttachmentName ?: "선택된 파일 없음",
                 style = MaterialTheme.typography.bodyMedium,
-                color = DawnText
+                color = if (selectedAttachmentName == null) DawnTextSubtle else DawnText
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            PrimaryActionButton(
-                text = "\uC800\uC7A5",
-                onClick = onSave,
-                enabled = selectedReasonLabel.isNotBlank(),
-                modifier = Modifier.weight(1f)
-            )
-            SecondaryActionButton(
-                text = "\uB2EB\uAE30",
-                onClick = onClose,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        Spacer(modifier = Modifier.height(4.dp))
+
+        PrimaryActionButton(
+            text = "저장",
+            onClick = onSave,
+            enabled = selectedReasonLabel.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
 @Composable
-private fun WorkproofTimePill(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
+private fun WorkproofEditSheetSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
-            .border(1.dp, DawnBorder, RoundedCornerShape(16.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = label,
+            text = title,
             style = MaterialTheme.typography.labelLarge,
-            color = DawnTextSubtle
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge,
             color = DawnText
         )
+        content()
     }
 }
 
@@ -1087,7 +1131,7 @@ private fun formatMonthText(month: YearMonth): String {
 private fun formatRecordTimeLine(timeText: String): String {
     val parts = timeText.split(" - ")
     if (parts.size != 2) return timeText
-    return "\uCD9C\uADFC ${parts[0]} / \uD1F4\uADFC ${parts[1]}"
+    return "출근 ${parts[0]} / 퇴근 ${parts[1]}"
 }
 
 private fun resolveAttachmentName(context: Context, uri: Uri): String {
@@ -1104,7 +1148,7 @@ private fun resolveAttachmentName(context: Context, uri: Uri): String {
             return it.getString(nameIndex)
         }
     }
-    return uri.lastPathSegment ?: "\uC120\uD0DD\uD55C \uCCA8\uBD80"
+    return uri.lastPathSegment ?: "선택한 첨부"
 }
 
 private data class WorkproofEditReasonOption(
@@ -1115,22 +1159,22 @@ private data class WorkproofEditReasonOption(
 private val WorkproofEditReasons = listOf(
     WorkproofEditReasonOption(
         key = "late_tap",
-        label = "\uCD9C\uADFC/\uD1F4\uADFC \uD0ED\uC744 \uB2A6\uAC8C \uB20C\uB800\uC5B4\uC694"
+        label = "출근/퇴근 탭을 늦게 눌렀어요"
     ),
     WorkproofEditReasonOption(
         key = "overtime",
-        label = "\uC5F0\uC7A5\uADFC\uBB34\uAC00 \uC788\uC5C8\uC5B4\uC694"
+        label = "연장근무가 있었어요"
     ),
     WorkproofEditReasonOption(
         key = "break",
-        label = "\uD734\uAC8C\uC2DC\uAC04\uC774 \uB2EC\uB790\uC5B4\uC694"
+        label = "휴게시간이 달랐어요"
     ),
     WorkproofEditReasonOption(
         key = "missing",
-        label = "\uAE30\uB85D\uC774 \uB204\uB77D\uB410\uC5B4\uC694"
+        label = "기록이 누락됐어요"
     ),
     WorkproofEditReasonOption(
         key = "other",
-        label = "\uAE30\uD0C0(\uC9C1\uC811 \uC785\uB825)"
+        label = "기타(직접 입력)"
     )
 )
