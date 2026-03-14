@@ -117,8 +117,6 @@ fun DonDoneNavGraph(
         composable(Route.MENU) {
             MenuScreen(
                 uiModel = uiState.toMenuUiModel(),
-                onShiftAsOf = viewModel::shiftAsOfDay,
-                onResetSeed = viewModel::resetSeed,
                 onOpenWage = { navController.navigate(Route.WAGE) },
                 onOpenAccount = { navController.navigate(Route.ACCOUNT) }
             )

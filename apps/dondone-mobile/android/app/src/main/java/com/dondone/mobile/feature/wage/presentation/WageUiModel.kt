@@ -81,10 +81,7 @@ data class WageCopilotChipUiModel(
 
 data class WageUiModel(
     val chips: List<WageCopilotChipUiModel>,
-    val heroTitleText: String,
-    val heroDescriptionText: String,
     val disclaimerLines: List<String>,
-    val monthText: String,
     val titleText: String,
     val descriptionText: String,
     val modifiedCountText: String,
@@ -97,9 +94,10 @@ data class WageUiModel(
 
 fun DemoState.toWageUiModel(): WageUiModel {
     val estimate = WageEstimator.calculate(this)
-    val monthText = "${demo.year}-${demo.month.toString().padStart(2, '0')}"
     val recordedDayText = wage.actualDepositRecordedDay?.toString()?.padStart(2, '0')
-    val recordedDateText = recordedDayText?.let { "$monthText-$it" }
+    val recordedDateText = recordedDayText?.let {
+        "${demo.year}-${demo.month.toString().padStart(2, '0')}-$it"
+    }
     val isRecorded = wage.actualDepositRecordedDay != null
     val hasDifference = estimate.difference != 0
     val differenceAmountText = formatKrw(abs(estimate.difference))
@@ -163,13 +161,10 @@ fun DemoState.toWageUiModel(): WageUiModel {
                 )
             )
         ),
-        heroTitleText = "급여 점검",
-        heroDescriptionText = "실입금 입력부터 근거 확인, 다음 행동까지 한 화면에서 이어집니다.",
         disclaimerLines = listOf(
             "이 급여 계산은 참고용 추정입니다. 실제 지급과 공제는 근로계약, 급여명세서, 회사 규정에 따라 달라질 수 있습니다.",
             "공제 항목이 일부 입력되지 않았다면 현재는 보수적인 기준으로 계산됩니다."
         ),
-        monthText = monthText,
         titleText = "이번 달 급여 확인",
         descriptionText = "먼저 실입금을 입력하고 추정 급여와 바로 비교해 보세요.",
         modifiedCountText = "수정 ${workproof.audit.size}",

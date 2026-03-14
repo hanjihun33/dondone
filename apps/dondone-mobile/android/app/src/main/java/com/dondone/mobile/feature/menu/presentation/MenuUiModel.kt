@@ -16,18 +16,15 @@ data class MenuDocumentUiModel(
     val updatedAtText: String,
     val statusText: String,
     val statusTone: BadgeTone,
-    val actionLabel: String,
     val accent: MenuDocumentAccent
 )
 
 data class MenuUiModel(
-    val currentDateText: String,
     val documents: List<MenuDocumentUiModel>
 )
 
 fun DemoState.toMenuUiModel(): MenuUiModel {
     return MenuUiModel(
-        currentDateText = "${demo.year}.${demo.month.toString().padStart(2, '0')}.${demo.asOfDay.toString().padStart(2, '0')}",
         documents = documents.map { document ->
             val accent = when {
                 document.id.contains("PROOF") -> MenuDocumentAccent.Proof
@@ -50,7 +47,6 @@ fun DemoState.toMenuUiModel(): MenuUiModel {
                     else -> "검토 필요"
                 },
                 statusTone = if (isReady) BadgeTone.Success else BadgeTone.Warning,
-                actionLabel = if (isReady) "열기" else "준비",
                 accent = accent
             )
         }

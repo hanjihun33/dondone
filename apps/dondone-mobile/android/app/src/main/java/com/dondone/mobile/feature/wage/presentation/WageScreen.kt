@@ -24,8 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -55,7 +52,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -67,12 +63,14 @@ import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnPrimaryDeep
 import com.dondone.mobile.core.designsystem.DawnSecondary
 import com.dondone.mobile.core.designsystem.DawnSuccess
-import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DawnWarning
 import com.dondone.mobile.core.designsystem.StatusBadge
+
+private val WageCanvas = Color.White
+private val WageDivider = Color(0xFFE8EBF0)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,21 +89,20 @@ fun WageScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(WageCanvas)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        WageHeader(
-            uiModel = uiModel,
-            onOpenCopilot = { chip -> selectedCopilotChipLabel = chip.label }
-        )
+        WageHeader(uiModel = uiModel, onOpenCopilot = { chip -> selectedCopilotChipLabel = chip.label })
+        WageSectionDivider()
         WageNoticeCard(uiModel = uiModel)
-
+        WageSectionDivider()
         WageCheckCard(
             uiModel = uiModel,
             onApplyActualDeposit = onApplyActualDeposit
         )
-
+        WageSectionDivider()
         WageDifferenceCard(
             difference = uiModel.difference,
             showSecondaryActions = showSecondaryActions,
@@ -126,7 +123,7 @@ fun WageScreen(
             }
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(24.dp))
     }
 
     if (selectedCopilotChip != null) {
@@ -150,19 +147,8 @@ private fun WageHeader(
     uiModel: WageUiModel,
     onOpenCopilot: (WageCopilotChipUiModel) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "급여 점검",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                color = DawnText
-            )
-        }
+    WageSectionSurface {
+        WageSectionHeader(title = "급여 점검")
 
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -181,30 +167,14 @@ private fun WageHeader(
 
 @Composable
 private fun WageNoticeCard(uiModel: WageUiModel) {
-    WageInfoPanel {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = null,
-                tint = DawnTextSubtle,
-                modifier = Modifier.padding(top = 2.dp)
+    WageSectionSurface {
+        WageSectionHeader(title = "안내")
+        uiModel.disclaimerLines.forEach { line ->
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodyMedium,
+                color = DawnTextSubtle
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                uiModel.disclaimerLines.forEach { line ->
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DawnText
-                    )
-                }
-            }
         }
     }
 }
@@ -222,37 +192,23 @@ private fun WageCheckCard(
     val canApplyDeposit = actualDepositValue != null && actualDepositValue > 0
 
     WageSurfaceCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top
+        WageSectionHeader(title = uiModel.titleText)
+        Text(
+            text = uiModel.descriptionText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DawnTextSubtle
+        )
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = uiModel.titleText,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = DawnText
-                )
-                Text(
-                    text = uiModel.descriptionText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DawnTextSubtle
-                )
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                WageMiniBadge(text = uiModel.modifiedCountText)
-                WageMiniBadge(
-                    text = uiModel.evidenceBadgeText,
-                    accent = DawnSuccess,
-                    background = Color(0xFFEFFAF4)
-                )
-            }
+            WageMiniBadge(text = uiModel.modifiedCountText)
+            WageMiniBadge(
+                text = uiModel.evidenceBadgeText,
+                accent = DawnSuccess,
+                background = Color(0xFFEFFAF4)
+            )
         }
 
         WageInfoPanel {
@@ -265,11 +221,6 @@ private fun WageCheckCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "급여일 체크",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = DawnPrimaryDeep
-                    )
                     Text(
                         text = uiModel.deposit.headerText,
                         style = MaterialTheme.typography.titleMedium,
@@ -470,21 +421,8 @@ private fun WageDifferenceCard(
         BadgeTone.Success -> DawnSuccess
         BadgeTone.Info -> DawnPrimaryDeep
     }
-    val soft = when (difference.statusTone) {
-        BadgeTone.Warning -> Color(0xFFFFF6ED)
-        BadgeTone.Success -> Color(0xFFEFFAF4)
-        BadgeTone.Info -> DawnSurfaceAlt
-    }
 
-    WageSurfaceCard(
-        backgroundBrush = Brush.verticalGradient(
-            colors = listOf(
-                Color.White,
-                soft.copy(alpha = 0.45f)
-            )
-        ),
-        borderColor = soft
-    ) {
+    WageSurfaceCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -494,11 +432,6 @@ private fun WageDifferenceCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = "REVIEW DIFF",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = accent
-                )
                 Text(
                     text = difference.title,
                     style = MaterialTheme.typography.titleLarge,
@@ -512,14 +445,14 @@ private fun WageDifferenceCard(
             }
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(soft),
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(accent.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (difference.statusTone == BadgeTone.Warning) "!" else "✓",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                     color = accent
                 )
             }
@@ -571,9 +504,9 @@ private fun WageDifferenceCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.White.copy(alpha = 0.94f))
-                    .border(BorderStroke(1.dp, DawnBorder), RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFFF8FAFC))
+                    .border(BorderStroke(1.dp, DawnBorder), RoundedCornerShape(18.dp))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -586,11 +519,6 @@ private fun WageDifferenceCard(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "다음 추천 행동",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = DawnPrimaryDeep
-                        )
                         Text(
                             text = difference.primaryActionDescription,
                             style = MaterialTheme.typography.bodyMedium,
@@ -644,46 +572,46 @@ private fun WageDifferenceCard(
 
 @Composable
 private fun WageSurfaceCard(
-    hero: Boolean = false,
-    backgroundBrush: Brush? = null,
-    borderColor: Color = DawnBorder,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val brush = backgroundBrush ?: if (hero) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.White,
-                Color(0xFFF8F4FF)
-            )
-        )
-    } else {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.White,
-                Color(0xFFFCFAFF)
-            )
-        )
-    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        content = content
+    )
+}
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = DawnSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        border = BorderStroke(1.dp, borderColor)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(brush)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                content = content
-            )
-        }
-    }
+@Composable
+private fun WageSectionHeader(
+    title: String
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleLarge,
+        color = DawnText
+    )
+}
+
+@Composable
+private fun WageSectionSurface(
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        content = content
+    )
+}
+
+@Composable
+private fun WageSectionDivider() {
+    Spacer(modifier = Modifier.height(14.dp))
+    HorizontalDivider(color = WageDivider)
+    Spacer(modifier = Modifier.height(14.dp))
 }
 
 @Composable
