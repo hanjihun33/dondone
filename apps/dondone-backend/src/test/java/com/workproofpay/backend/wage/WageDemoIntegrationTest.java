@@ -7,8 +7,15 @@ import com.workproofpay.backend.shared.security.JwtTokenProvider;
 import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
 import com.workproofpay.backend.wage.api.dto.request.CreateWageDepositRequest;
 import com.workproofpay.backend.wage.repo.WageDepositRepository;
+import com.workproofpay.backend.workproof.api.dto.request.CheckInWorkProofRequest;
+import com.workproofpay.backend.workproof.api.dto.request.CheckOutWorkProofRequest;
+import com.workproofpay.backend.workproof.api.dto.request.CreateContractRequest;
+import com.workproofpay.backend.workproof.api.dto.request.CreateWorkplaceRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CreateWorkProofRequest;
+import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
+import com.workproofpay.backend.workproof.repo.WorkContractRepository;
 import com.workproofpay.backend.workproof.repo.WorkProofRepository;
+import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -43,6 +51,12 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
     private WorkProofRepository workProofRepository;
 
     @Autowired
+    private WorkContractRepository workContractRepository;
+
+    @Autowired
+    private WorkplaceRepository workplaceRepository;
+
+    @Autowired
     private WageDepositRepository wageDepositRepository;
 
     @Autowired
@@ -52,7 +66,64 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
     void setUp() {
         wageDepositRepository.deleteAll();
         workProofRepository.deleteAll();
+        workContractRepository.deleteAll();
+        workplaceRepository.deleteAll();
         userRepository.deleteAll();
+    }
+
+    @Test
+    void returnsLane1MonthlySummaryAndEstimateFromWorkProofInputs() throws Exception {
+        User user = userRepository.save(User.register("lane1-wage@test.com", "hashed", "Tester"));
+        String token = tokenFor(user);
+        Lane1Fixture fixture = createLane1WorkplaceAndContract(token);
+
+        Long firstRecordId = checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 10, 18, 0));
+        Long secondRecordId = checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 12, 21, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 12, 23, 0));
+
+        mockMvc.perform(get("/api/wage/monthly-summary")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-03")
+                        .param("workplaceId", fixture.workplaceId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.month").value("2026-03"))
+                .andExpect(jsonPath("$.data.workplaceId").value(fixture.workplaceId()))
+                .andExpect(jsonPath("$.data.contractId").value(fixture.contractId()))
+                .andExpect(jsonPath("$.data.payUnit").value("HOURLY"))
+                .andExpect(jsonPath("$.data.normalizedHourlyWage").value(12000))
+                .andExpect(jsonPath("$.data.workDayCount").value(2))
+                .andExpect(jsonPath("$.data.verifiedWorkMinutes").value(660))
+                .andExpect(jsonPath("$.data.overtimeMinutes").value(60))
+                .andExpect(jsonPath("$.data.nightMinutes").value(60))
+                .andExpect(jsonPath("$.data.modifiedRecordCount").value(0))
+                .andExpect(jsonPath("$.data.excludedPendingRecordCount").value(0))
+                .andExpect(jsonPath("$.data.includedRecordIds[*]").value(hasItems(
+                        firstRecordId.intValue(),
+                        secondRecordId.intValue()
+                )));
+
+        mockMvc.perform(get("/api/wage/estimate")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-03")
+                        .param("workplaceId", fixture.workplaceId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.month").value("2026-03"))
+                .andExpect(jsonPath("$.data.workplaceId").value(fixture.workplaceId()))
+                .andExpect(jsonPath("$.data.contract.contractId").value(fixture.contractId()))
+                .andExpect(jsonPath("$.data.contract.payUnit").value("HOURLY"))
+                .andExpect(jsonPath("$.data.contract.normalizedHourlyWage").value(12000))
+                .andExpect(jsonPath("$.data.summary.workDayCount").value(2))
+                .andExpect(jsonPath("$.data.summary.verifiedWorkMinutes").value(660))
+                .andExpect(jsonPath("$.data.summary.overtimeMinutes").value(60))
+                .andExpect(jsonPath("$.data.summary.nightMinutes").value(60))
+                .andExpect(jsonPath("$.data.summary.modifiedRecordCount").value(0))
+                .andExpect(jsonPath("$.data.estimate.baseEstimate").value(132000))
+                .andExpect(jsonPath("$.data.estimate.overtimePremium").value(6000))
+                .andExpect(jsonPath("$.data.estimate.nightPremium").value(6000))
+                .andExpect(jsonPath("$.data.estimate.estimatedTotal").value(144000))
+                .andExpect(jsonPath("$.data.ruleVersion").value("WAGE_LANE1_V0"))
+                .andExpect(jsonPath("$.data.disclaimer").exists());
     }
 
     @Test
@@ -167,6 +238,20 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
                 .andExpect(jsonPath("$.details[0].message").value("paydayDay must be between 1 and 31"));
+
+        mockMvc.perform(get("/api/wage/monthly-summary")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026/03")
+                        .param("workplaceId", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
+
+        mockMvc.perform(get("/api/wage/estimate")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-03")
+                        .param("workplaceId", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
     }
 
     @Test
@@ -263,7 +348,84 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
         return jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.getRole().name());
     }
 
+    private Lane1Fixture createLane1WorkplaceAndContract(String token) throws Exception {
+        String workplaceBody = mockMvc.perform(post("/api/workproof/workplaces")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkplaceRequest(
+                                "DonDone Wage Cafe",
+                                "Seoul Somewhere 1",
+                                "Front door",
+                                37.5,
+                                127.0
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long workplaceId = readId(workplaceBody, "workplaceId");
+
+        String contractBody = mockMvc.perform(post("/api/workproof/contracts")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateContractRequest(
+                                workplaceId,
+                                WorkProofPayUnit.HOURLY,
+                                BigDecimal.valueOf(12_000),
+                                null,
+                                null,
+                                LocalDate.of(2026, 3, 1)
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long contractId = readId(contractBody, "contractId");
+        return new Lane1Fixture(workplaceId, contractId);
+    }
+
+    private Long checkIn(String token, Long workplaceId, LocalDateTime deviceAt) throws Exception {
+        String body = mockMvc.perform(post("/api/workproof/records/check-in")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckInWorkProofRequest(
+                                workplaceId,
+                                deviceAt,
+                                37.5,
+                                127.0,
+                                "Front door"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return readId(body, "recordId");
+    }
+
+    private void checkOut(String token, LocalDateTime deviceAt) throws Exception {
+        mockMvc.perform(post("/api/workproof/records/check-out")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckOutWorkProofRequest(
+                                deviceAt,
+                                37.5,
+                                127.0,
+                                "Front door"
+                        ))))
+                .andExpect(status().isOk());
+    }
+
+    private Long readId(String json, String fieldName) throws Exception {
+        return objectMapper.readTree(json).path("data").path(fieldName).asLong();
+    }
+
     private String bearer(String token) {
         return "Bearer " + token;
+    }
+
+    private record Lane1Fixture(Long workplaceId, Long contractId) {
     }
 }
