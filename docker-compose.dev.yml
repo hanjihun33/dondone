@@ -18,7 +18,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7.2
+    image: redis:7.4.8
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
