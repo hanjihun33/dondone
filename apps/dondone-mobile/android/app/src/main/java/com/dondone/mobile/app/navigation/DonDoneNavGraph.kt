@@ -1,5 +1,7 @@
 package com.dondone.mobile.app.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -37,7 +39,14 @@ fun DonDoneNavGraph(
     NavHost(
         modifier = modifier,
         navController = navController,
-        startDestination = Route.HOME
+        startDestination = Route.HOME,
+        // Navigation Compose applies a default crossfade/size transform. Disable it so
+        // route changes render as immediate swaps instead of overlapping old/new screens.
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
+        sizeTransform = { null }
     ) {
         composable(Route.HOME) {
             HomeScreen(

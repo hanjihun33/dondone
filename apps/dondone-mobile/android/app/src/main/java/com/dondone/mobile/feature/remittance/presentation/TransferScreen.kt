@@ -42,10 +42,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +49,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -335,27 +330,15 @@ private fun TransferRecipientSegmentedTabs(
         val segmentWidth = remember(maxWidth, tabs.size) {
             (maxWidth - itemSpacing * (tabs.size - 1)) / tabs.size
         }
-        val animatedOffset by animateDpAsState(
-            targetValue = (segmentWidth + itemSpacing) * selectedIndex,
-            animationSpec = spring(
-                dampingRatio = 0.78f,
-                stiffness = 540f
-            ),
-            label = "recipientSegmentOffset"
-        )
-        val animatedShadow by animateDpAsState(
-            targetValue = 2.dp,
-            animationSpec = tween(durationMillis = 180),
-            label = "recipientSegmentShadow"
-        )
+        val selectedOffset = (segmentWidth + itemSpacing) * selectedIndex
 
         Box(
             modifier = Modifier
-                .offset(x = animatedOffset)
+                .offset(x = selectedOffset)
                 .width(segmentWidth)
                 .fillMaxHeight()
                 .shadow(
-                    elevation = animatedShadow,
+                    elevation = 2.dp,
                     shape = RoundedCornerShape(12.dp),
                     ambientColor = Color(0x12000000),
                     spotColor = Color(0x12000000)
@@ -377,11 +360,7 @@ private fun TransferRecipientSegmentedTabs(
         ) {
             tabs.forEach { tab ->
                 val selected = tab == selectedTab
-                val textAlpha by animateFloatAsState(
-                    targetValue = if (selected) 1f else 0.56f,
-                    animationSpec = tween(durationMillis = 150),
-                    label = "recipientTabAlpha"
-                )
+                val textAlpha = if (selected) 1f else 0.56f
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -561,16 +540,7 @@ private fun AmountStepCard(
     val actionBarReservedHeight = 62.dp
     val numberPadHeight = 358.dp
     val bottomContentReservedHeight = actionBarReservedHeight + numberPadHeight
-    val actionBarOffset by animateDpAsState(
-        targetValue = if (hasAmountInput) 0.dp else 20.dp,
-        animationSpec = tween(durationMillis = 180),
-        label = "amountActionBarOffset"
-    )
-    val actionBarAlpha by animateFloatAsState(
-        targetValue = if (hasAmountInput) 1f else 0f,
-        animationSpec = tween(durationMillis = 160),
-        label = "amountActionBarAlpha"
-    )
+    val actionBarVisible = hasAmountInput
 
     fun syncAmount(nextInput: String) {
         amountInput = nextInput
@@ -653,27 +623,25 @@ private fun AmountStepCard(
                     syncAmount(removeLastTransferAmountDigit(amountInput))
                 }
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .offset(y = actionBarOffset)
-                    .alpha(actionBarAlpha)
-                    .background(TransferAmountActionBackground)
-                    .clickable(
-                        enabled = hasAmountInput && uiModel.canSubmit,
-                        onClick = onPrimaryAction
+            if (actionBarVisible) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .background(TransferAmountActionBackground)
+                        .clickable(
+                            enabled = uiModel.canSubmit,
+                            onClick = onPrimaryAction
+                        )
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "다음",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                        color = Color.White.copy(alpha = if (uiModel.canSubmit) 1f else 0.52f)
                     )
-                    .padding(vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "다음",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                    color = Color.White.copy(
-                        alpha = if (hasAmountInput && uiModel.canSubmit) actionBarAlpha else 0.52f * actionBarAlpha
-                    )
-                )
+                }
             }
         }
     }

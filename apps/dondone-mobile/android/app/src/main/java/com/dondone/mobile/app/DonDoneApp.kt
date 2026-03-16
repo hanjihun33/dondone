@@ -61,7 +61,6 @@ import com.dondone.mobile.app.navigation.resolveScreenChrome
 import com.dondone.mobile.app.navigation.shouldResetWorkproofUiState
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.DonDoneWordmark
-import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
@@ -298,10 +297,6 @@ private fun BackButton(
         contentDescription = "뒤로",
         modifier = Modifier
             .size(32.dp)
-            .pressableScale(
-                interactionSource = interactionSource,
-                pressedScale = 0.94f
-            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = rememberDonDoneGrayRipple(bounded = false),
@@ -376,10 +371,6 @@ private fun RowScope.RootTabItem(
         modifier = Modifier
             .weight(1f)
             .clip(RoundedCornerShape(20.dp))
-            .pressableScale(
-                interactionSource = interactionSource,
-                pressedScale = 0.96f
-            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = rememberDonDoneGrayRipple(),

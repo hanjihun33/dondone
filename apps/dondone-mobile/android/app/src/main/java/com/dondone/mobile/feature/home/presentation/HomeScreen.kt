@@ -1,18 +1,12 @@
 package com.dondone.mobile.feature.home.presentation
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,10 +16,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Button
@@ -100,17 +94,20 @@ fun HomeScreen(
                 onClockOut = onClockOut
             )
             if (uiModel.money.showWorkActionCard) {
-                HomeSectionDivider()
-                HomeActionCallout(
-                    message = uiModel.money.nextAction.message,
-                    buttonText = uiModel.money.nextAction.buttonText,
-                    onClick = resolveAction(
-                        target = uiModel.money.nextAction.actionTarget,
+                Column {
+                    HomeSectionDivider()
+                    HomeActionCallout(
+                        message = uiModel.money.nextAction.message,
+                        buttonText = uiModel.money.nextAction.buttonText,
                         onOpenWage = onOpenWage,
-                        onOpenFinance = onOpenFinance,
-                        onOpenMenu = onOpenMenu
+                        onActionClick = resolveAction(
+                            target = uiModel.money.nextAction.actionTarget,
+                            onOpenWage = onOpenWage,
+                            onOpenFinance = onOpenFinance,
+                            onOpenMenu = onOpenMenu
+                        )
                     )
-                )
+                }
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -124,26 +121,35 @@ private fun HomeAccountHero(
     onOpenTransfer: () -> Unit
 ) {
     HomeSectionSurface {
-        HomeSectionHeader(
-            title = "지금 쓸 수 있는 돈",
-            trailing = {
-                HomeLinkText(
-                    text = "계좌 관리",
-                    onClick = onOpenAccount
-                )
-            }
-        )
+        HomeSectionHeader(title = "지금 쓸 수 있는 돈")
 
-        Row(
+        HomePressableCard(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            onClick = onOpenAccount,
+            containerColor = HomeSurface
         ) {
             Text(
-                text = uiModel.account.balanceText,
-                style = MaterialTheme.typography.displaySmall,
-                color = HomeTextPrimary
+                text = "대표 계좌",
+                style = MaterialTheme.typography.labelLarge,
+                color = HomeTextMuted
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = uiModel.account.balanceText,
+                    style = MaterialTheme.typography.displaySmall,
+                    color = HomeTextPrimary
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = HomeTextMuted
+                )
+            }
         }
 
         HomePrimaryButton(
@@ -157,15 +163,75 @@ private fun HomeAccountHero(
 @Composable
 private fun HomeActionCallout(
     message: String,
+    onOpenWage: () -> Unit,
     buttonText: String,
-    onClick: () -> Unit
+    onActionClick: () -> Unit
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val stackedLayout = maxWidth < 360.dp
+        val interactionSource = remember { MutableInteractionSource() }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(HomeSurfaceMuted)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (stackedLayout) {
+                HomeActionCalloutBody(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = rememberDonDoneGrayRipple(),
+                            onClick = onOpenWage
+                        )
+                        .padding(vertical = 2.dp),
+                    message = message
+                )
+                HomeMiniAccentButton(
+                    text = buttonText,
+                    onClick = onActionClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HomeActionCalloutBody(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = rememberDonDoneGrayRipple(),
+                                onClick = onOpenWage
+                            )
+                            .padding(vertical = 2.dp),
+                        message = message
+                    )
+                    HomeMiniAccentButton(
+                        text = buttonText,
+                        onClick = onActionClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeActionCalloutBody(
+    modifier: Modifier = Modifier,
+    message: String
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(HomeSurfaceMuted)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -199,10 +265,6 @@ private fun HomeActionCallout(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        HomeMiniAccentButton(
-            text = buttonText,
-            onClick = onClick
-        )
     }
 }
 
@@ -214,15 +276,39 @@ private fun HomeWorkSection(
     onClockOut: () -> Unit
 ) {
     HomeSectionSurface {
-        HomeSectionHeader(
-            title = "오늘 근무",
-            trailing = {
-                HomeLinkText(
-                    text = "기록 보기",
-                    onClick = onOpenWorkproof
+        HomeSectionHeader(title = "오늘 근무")
+
+        HomePressableCard(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onOpenWorkproof,
+            containerColor = HomeSurface
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = uiModel.work.dateText,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = HomeTextMuted
+                    )
+                    Text(
+                        text = "근무 기록 보기",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                        color = HomeTextPrimary
+                    )
+                }
+                HomeStatusPill(
+                    text = uiModel.work.statusText,
+                    tone = uiModel.work.statusTone
                 )
             }
-        )
+
+            HomeKeyValueRow(label = "출근", value = uiModel.work.clockInText)
+            HomeKeyValueRow(label = "퇴근", value = uiModel.work.clockOutText)
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -242,9 +328,32 @@ private fun HomeWorkSection(
             )
         }
 
-        HomeKeyValueRow(label = "출근", value = uiModel.work.clockInText)
-        HomeKeyValueRow(label = "퇴근", value = uiModel.work.clockOutText)
     }
+}
+
+@Composable
+private fun HomePressableCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = HomeSurfaceMuted,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(20.dp)
+
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(containerColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content
+    )
 }
 
 @Composable
@@ -271,7 +380,7 @@ private fun HomeSectionDivider() {
 @Composable
 private fun HomeSectionHeader(
     title: String,
-    trailing: @Composable () -> Unit
+    trailing: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -283,7 +392,7 @@ private fun HomeSectionHeader(
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
             color = HomeTextPrimary
         )
-        trailing()
+        trailing?.invoke()
     }
 }
 
@@ -335,22 +444,13 @@ private fun HomeKeyValueRow(
             style = MaterialTheme.typography.labelLarge,
             color = HomeTextMuted
         )
-        AnimatedContent(
-            targetState = value,
-            transitionSpec = {
-                (fadeIn() + slideInHorizontally(initialOffsetX = { it / 6 })) togetherWith
-                    (fadeOut() + slideOutHorizontally(targetOffsetX = { -it / 8 }))
-            },
-            label = "homeKeyValueValue"
-        ) { animatedValue ->
-            Text(
-                text = animatedValue,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
-                color = valueColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -463,7 +563,8 @@ private fun HomeSoftButton(
 @Composable
 private fun HomeMiniAccentButton(
     text: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -472,7 +573,7 @@ private fun HomeMiniAccentButton(
     ) {
         Button(
             onClick = onClick,
-            modifier = Modifier.pressableScale(interactionSource = interactionSource),
+            modifier = modifier,
             interactionSource = interactionSource,
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
@@ -487,32 +588,6 @@ private fun HomeMiniAccentButton(
             )
         }
     }
-}
-
-@Composable
-private fun HomeLinkText(
-    text: String,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-
-    Text(
-        text = text,
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .pressableScale(
-                interactionSource = interactionSource,
-                pressedScale = 0.98f
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = rememberDonDoneGrayRipple(),
-                onClick = onClick
-            )
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-        color = HomeAccent
-    )
 }
 
 private fun resolveAction(
