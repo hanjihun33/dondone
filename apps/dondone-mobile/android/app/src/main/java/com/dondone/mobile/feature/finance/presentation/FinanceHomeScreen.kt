@@ -48,6 +48,7 @@ import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DonDoneProgressBar
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.domain.advance.AdvanceSurfaceState
 
 private val FinanceCanvas = Color.White
 private val FinanceSurfaceMuted = Color(0xFFF5F6FA)
@@ -66,10 +67,17 @@ private val FinanceAdvanceSheetDefaultText = Color(0xFF94A3B8)
 @Composable
 fun FinanceHomeScreen(
     uiModel: FinanceHomeUiModel,
+    onSelectAdvanceAmount: (Int) -> Unit,
+    onRequestAdvance: () -> Unit,
+    onClearAdvanceMessage: () -> Unit,
+    onOpenAdvanceRequestDetail: (Long) -> Unit,
+    onCloseAdvanceRequestDetail: () -> Unit
 ) {
     val advanceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val advanceRequestDetailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val vaultSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showAdvanceSheet by remember { mutableStateOf(false) }
+    var showAdvanceRequestDetailSheet by remember { mutableStateOf(false) }
     var showVaultSheet by remember { mutableStateOf(false) }
 
     Box(
@@ -99,7 +107,10 @@ fun FinanceHomeScreen(
 
     if (showAdvanceSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showAdvanceSheet = false },
+            onDismissRequest = {
+                onClearAdvanceMessage()
+                showAdvanceSheet = false
+            },
             sheetState = advanceSheetState,
             containerColor = Color.White,
             shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
@@ -107,8 +118,38 @@ fun FinanceHomeScreen(
         ) {
             FinanceAdvanceBottomSheet(
                 uiModel = uiModel.advance.detail,
-                onDismiss = { showAdvanceSheet = false },
-                onRequestAdvance = { showAdvanceSheet = false }
+                onDismiss = {
+                    onClearAdvanceMessage()
+                    showAdvanceSheet = false
+                },
+                onSelectAmount = onSelectAdvanceAmount,
+                onRequestAdvance = onRequestAdvance,
+                onClearRequestMessage = onClearAdvanceMessage,
+                onOpenHistoryDetail = { requestId ->
+                    onOpenAdvanceRequestDetail(requestId)
+                    showAdvanceRequestDetailSheet = true
+                }
+            )
+        }
+    }
+
+    if (showAdvanceRequestDetailSheet && uiModel.advance.requestDetail.isVisible) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                onCloseAdvanceRequestDetail()
+                showAdvanceRequestDetailSheet = false
+            },
+            sheetState = advanceRequestDetailSheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+            dragHandle = null
+        ) {
+            FinanceAdvanceRequestDetailBottomSheet(
+                uiModel = uiModel.advance.requestDetail,
+                onDismiss = {
+                    onCloseAdvanceRequestDetail()
+                    showAdvanceRequestDetailSheet = false
+                }
             )
         }
     }
@@ -140,6 +181,11 @@ private fun FinanceAdvanceSection(
         description = "",
         trailing = { FinanceCapsule(text = uiModel.statusText) }
     ) {
+        Text(
+            text = uiModel.sourceLabelText,
+            style = MaterialTheme.typography.labelSmall,
+            color = FinanceTextMuted
+        )
         FinanceInnerPanel {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -163,10 +209,15 @@ private fun FinanceAdvanceSection(
                 color = FinanceTextMuted
             )
         }
+        FinanceAdvanceStatePanel(
+            surfaceState = uiModel.surfaceState,
+            title = uiModel.statusText,
+            body = uiModel.stateBodyText
+        )
         FinanceKeyValueRow(label = "지금 가능 금액", value = uiModel.availableText)
         FinanceKeyValueRow(label = "상환 예정일", value = uiModel.repaymentDueText)
         FinancePrimaryButton(
-            text = "미리받기 신청",
+            text = uiModel.actionText,
             modifier = Modifier.fillMaxWidth(),
             onClick = onOpenSheet
         )
@@ -331,7 +382,10 @@ private fun FinanceKeyValueRow(
 private fun FinanceAdvanceBottomSheet(
     uiModel: FinanceAdvanceDetailUiModel,
     onDismiss: () -> Unit,
-    onRequestAdvance: () -> Unit
+    onSelectAmount: (Int) -> Unit,
+    onRequestAdvance: () -> Unit,
+    onClearRequestMessage: () -> Unit,
+    onOpenHistoryDetail: (Long) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -366,6 +420,11 @@ private fun FinanceAdvanceBottomSheet(
             FinanceKeyValueRow(label = "지금 신청 가능", value = uiModel.availableText)
             FinanceKeyValueRow(label = "이번 달 사용", value = uiModel.usedText)
             FinanceKeyValueRow(label = "정산 예정일", value = uiModel.repaymentDueText)
+            FinanceAdvanceStatePanel(
+                surfaceState = uiModel.surfaceState,
+                title = uiModel.stateTitleText,
+                body = uiModel.stateBodyText
+            )
         }
 
         FinanceBottomSheetDivider()
@@ -421,7 +480,13 @@ private fun FinanceAdvanceBottomSheet(
         if (uiModel.amountOptions.isNotEmpty()) {
             FinanceBottomSheetSection {
                 FinanceBottomSheetHeader(title = "받을 금액")
-                FinanceAmountOptionGrid(options = uiModel.amountOptions)
+                FinanceAmountOptionGrid(
+                    options = uiModel.amountOptions,
+                    onSelect = {
+                        onClearRequestMessage()
+                        onSelectAmount(it)
+                    }
+                )
                 Text(
                     text = uiModel.progressHintText,
                     style = MaterialTheme.typography.bodyMedium,
@@ -430,6 +495,20 @@ private fun FinanceAdvanceBottomSheet(
                 FinanceKeyValueRow(label = "이번 수령 예정", value = uiModel.receiveAmountText)
                 FinanceKeyValueRow(label = "수수료", value = uiModel.feeText)
                 FinanceKeyValueRow(label = "선택 금액", value = uiModel.requestAmountText)
+            }
+        }
+
+        if (uiModel.blockReasonTexts.isNotEmpty()) {
+            FinanceBottomSheetDivider()
+            FinanceBottomSheetSection {
+                FinanceBottomSheetHeader(title = "지금 막힌 이유")
+                uiModel.blockReasonTexts.forEach { reason ->
+                    Text(
+                        text = "- $reason",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTextPrimary
+                    )
+                }
             }
         }
 
@@ -446,7 +525,17 @@ private fun FinanceAdvanceBottomSheet(
                 }
                 uiModel.historyItems.forEach { item ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(
+                                enabled = item.clickable && item.requestId != null,
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberDonDoneGrayRipple(bounded = true)
+                            ) {
+                                item.requestId?.let(onOpenHistoryDetail)
+                            }
+                            .padding(vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -477,13 +566,142 @@ private fun FinanceAdvanceBottomSheet(
 
         FinanceBottomSheetDivider()
         FinanceBottomSheetSection {
+            Text(
+                text = uiModel.disclaimerText,
+                style = MaterialTheme.typography.bodySmall,
+                color = FinanceTextMuted
+            )
+            if (uiModel.requestFeedbackText != null) {
+                FinanceSheetPanel(
+                    backgroundColor = if (uiModel.requestFeedbackIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
+                    borderColor = if (uiModel.requestFeedbackIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
+                ) {
+                    Text(
+                        text = uiModel.requestFeedbackText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = FinanceTextPrimary
+                    )
+                }
+            }
             FinancePrimaryButton(
-                text = "미리받기 신청",
+                text = uiModel.requestButtonText,
                 modifier = Modifier.fillMaxWidth(),
+                enabled = uiModel.canRequest,
                 onClick = onRequestAdvance
             )
         }
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun FinanceAdvanceRequestDetailBottomSheet(
+    uiModel: FinanceAdvanceRequestDetailUiModel,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        FinanceBottomSheetSection {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = uiModel.titleText,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                        color = FinanceTextPrimary
+                    )
+                    Text(
+                        text = uiModel.stateText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTextMuted
+                    )
+                }
+                FinanceLinkButton(text = "닫기", onClick = onDismiss)
+            }
+
+            if (uiModel.isLoading) {
+                Text(
+                    text = "신청 상세를 불러오는 중이에요.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FinanceTextMuted
+                )
+            } else if (uiModel.errorMessage != null) {
+                FinanceSheetPanel(
+                    backgroundColor = Color(0xFFFFF5F5),
+                    borderColor = Color(0xFFFECACA)
+                ) {
+                    Text(
+                        text = uiModel.errorMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTextPrimary
+                    )
+                }
+            } else {
+                FinanceKeyValueRow(label = "요청 금액", value = uiModel.requestedAmountText)
+                FinanceKeyValueRow(label = "승인 금액", value = uiModel.approvedAmountText)
+                FinanceKeyValueRow(label = "수수료", value = uiModel.feeAmountText)
+                FinanceKeyValueRow(label = "상환 예정일", value = uiModel.repaymentDueText)
+                FinanceKeyValueRow(label = "생성 시각", value = uiModel.createdAtText)
+            }
+        }
+
+        if (!uiModel.isLoading && uiModel.errorMessage == null) {
+            FinanceBottomSheetDivider()
+            FinanceBottomSheetSection {
+                FinanceBottomSheetHeader(title = "신청 당시 기준")
+                FinanceKeyValueRow(label = "당시 가능 금액", value = uiModel.snapshotAvailableText)
+                FinanceKeyValueRow(label = "당시 최대 한도", value = uiModel.snapshotCapText)
+                FinanceKeyValueRow(label = "반영 근무", value = uiModel.snapshotReflectedText)
+                FinanceKeyValueRow(label = "확인 필요 기록", value = uiModel.snapshotReviewText)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun FinanceAdvanceStatePanel(
+    surfaceState: AdvanceSurfaceState,
+    title: String,
+    body: String
+) {
+    val borderColor = when (surfaceState) {
+        AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHeroBorder
+        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetWarningBorder
+        else -> FinanceDivider
+    }
+    val backgroundColor = when (surfaceState) {
+        AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHero
+        AdvanceSurfaceState.BLOCKED -> Color(0xFFFFFBEB)
+        else -> FinanceSurfaceMuted
+    }
+
+    FinanceSheetPanel(
+        backgroundColor = backgroundColor,
+        borderColor = borderColor
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary
+        )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodySmall,
+            color = FinanceTextMuted
+        )
     }
 }
 
@@ -705,7 +923,10 @@ private fun FinanceVaultActiveSection(uiModel: FinanceVaultDetailUiModel) {
 }
 
 @Composable
-private fun FinanceAmountOptionGrid(options: List<FinanceAmountOptionUiModel>) {
+private fun FinanceAmountOptionGrid(
+    options: List<FinanceAmountOptionUiModel>,
+    onSelect: ((Int) -> Unit)? = null
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.chunked(4).forEach { optionRow ->
             Row(
@@ -720,6 +941,14 @@ private fun FinanceAmountOptionGrid(options: List<FinanceAmountOptionUiModel>) {
                             .weight(1f)
                             .background(backgroundColor, RoundedCornerShape(18.dp))
                             .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable(
+                                enabled = onSelect != null,
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberDonDoneGrayRipple(bounded = true)
+                            ) {
+                                onSelect?.invoke(option.amount)
+                            }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -991,6 +1220,7 @@ private fun FinanceLinkText(
 private fun FinancePrimaryButton(
     text: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -1001,11 +1231,14 @@ private fun FinancePrimaryButton(
         Button(
             modifier = modifier.pressableScale(interactionSource = interactionSource),
             onClick = onClick,
+            enabled = enabled,
             interactionSource = interactionSource,
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = FinanceAccent,
-                contentColor = Color.White
+                contentColor = Color.White,
+                disabledContainerColor = FinanceDivider,
+                disabledContentColor = FinanceTextMuted
             ),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
         ) {

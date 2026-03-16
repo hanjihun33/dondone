@@ -215,12 +215,18 @@ public class WorkProofLane1Service {
 
         // v1 요약은 reflected record만 급여 계산 입력으로 간주하고, recorded/reflected 차이는 integrity에 남긴다.
         List<WorkProof> reflected = records.stream().filter(WorkProof::isReflected).toList();
+        List<WorkProof> needsReview = records.stream().filter(record -> !record.isReflected() || record.isEdited()).toList();
         int recordedWorkDays = (int) records.stream().map(WorkProof::getWorkDate).distinct().count();
         int reflectedWorkDays = (int) reflected.stream().map(WorkProof::getWorkDate).distinct().count();
         long totalWorkMinutes = reflected.stream().mapToLong(WorkProof::workedMinutes).sum();
         long overtimeMinutes = calculateOvertimeMinutes(reflected);
         long nightMinutes = calculateNightMinutes(reflected);
         int modifiedRecordCount = (int) records.stream().filter(WorkProof::isEdited).count();
+        long pendingMinutes = needsReview.stream()
+                .filter(record -> !record.isReflected())
+                .mapToLong(WorkProof::workedMinutes)
+                .sum();
+        List<String> riskFlags = buildRiskFlags(records);
 
         return new WorkProofMonthlySummaryContractResponse(
                 targetMonth.toString(),
@@ -232,15 +238,15 @@ public class WorkProofLane1Service {
                 modifiedRecordCount,
                 new WorkProofMonthlySummaryContractResponse.ReflectionSummary(
                         reflected.size(),
-                        0,
+                        needsReview.size(),
                         0
                 ),
                 new WorkProofMonthlySummaryContractResponse.IntegritySummary(
                         recordedWorkDays,
                         reflectedWorkDays,
                         totalWorkMinutes,
-                        0,
-                        List.of()
+                        pendingMinutes,
+                        riskFlags
                 ),
                 new WorkProofMonthlySummaryContractResponse.FinanceReadinessSummary(
                         reflectedWorkDays,
@@ -265,6 +271,17 @@ public class WorkProofLane1Service {
             Long nightMinutes = workProofMetricsCalculator.toResponse(record).nightMinutes();
             return nightMinutes == null ? 0L : nightMinutes;
         }).sum();
+    }
+
+    private List<String> buildRiskFlags(List<WorkProof> records) {
+        java.util.ArrayList<String> flags = new java.util.ArrayList<>();
+        if (records.stream().anyMatch(WorkProof::isEdited)) {
+            flags.add("MODIFIED_RECORD_PRESENT");
+        }
+        if (records.stream().anyMatch(record -> !record.isReflected())) {
+            flags.add("PENDING_WORKPROOF_PRESENT");
+        }
+        return List.copyOf(flags);
     }
 
     private Workplace getOwnedWorkplace(Long userId, Long workplaceId) {

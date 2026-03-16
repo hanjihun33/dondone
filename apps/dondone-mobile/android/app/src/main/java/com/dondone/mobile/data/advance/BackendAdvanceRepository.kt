@@ -1,0 +1,266 @@
+package com.dondone.mobile.data.advance
+
+import com.dondone.mobile.data.remote.BackendApiException
+import com.dondone.mobile.data.remote.BackendApiSupport
+import com.dondone.mobile.data.remote.parseBackendErrorMessage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.time.LocalDateTime
+import java.time.YearMonth
+import java.util.UUID
+
+private const val SESSION_EXPIRED_MESSAGE = "세션이 만료되어 다시 로그인해 주세요."
+private val JSON_MEDIA_TYPE = "application/json".toMediaType()
+
+class BackendAdvanceRepository(
+    private val client: OkHttpClient = OkHttpClient()
+) : AdvanceRepository {
+
+    override suspend fun load(accessToken: String): AdvanceRemoteState = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) {
+            return@withContext AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+        }
+        runCatching {
+            val workplace = fetchPrimaryWorkplace(accessToken) ?: return@withContext AdvanceRemoteState.empty(
+                "연결된 근무지가 없어 미리받기 실연동을 표시할 수 없어요."
+            )
+            val eligibility = fetchEligibility(accessToken, workplace.id)
+            val requests = fetchRequests(accessToken)
+            AdvanceRemoteState.content(workplace.name, eligibility, requests)
+        }.getOrElse { error ->
+            when (error) {
+                is AdvanceUnauthorizedException -> AdvanceRemoteState.unauthenticated(
+                    error.message ?: SESSION_EXPIRED_MESSAGE
+                )
+
+                else -> AdvanceRemoteState.error(
+                    error.message ?: "백엔드 연결에 실패해 데모 상태로 표시합니다."
+                )
+            }
+        }
+    }
+
+    override suspend fun createRequest(
+        accessToken: String,
+        workplaceId: Long,
+        requestedAmount: Long
+    ): AdvanceCreateResult = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) {
+            throw AdvanceUnauthorizedException()
+        }
+
+        val body = JSONObject()
+            .put("workplaceId", workplaceId)
+            .put("requestedAmount", requestedAmount)
+            .put("requestedAt", LocalDateTime.now().withNano(0).toString())
+            .toString()
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/advance/requests")
+            .header("Authorization", "Bearer $accessToken")
+            .header("Idempotency-Key", "android-${UUID.randomUUID()}")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            val json = JSONObject(responseBody.ifBlank { "{}" })
+            if (!response.isSuccessful) {
+                if (response.code == 401 || response.code == 403) {
+                    throw AdvanceUnauthorizedException()
+                }
+                throw BackendApiException(
+                    parseBackendErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "미리받기 신청에 실패했어요. 잠시 후 다시 시도해 주세요."
+                    )
+                )
+            }
+
+            val data = json.getJSONObject("data")
+            return@withContext AdvanceCreateResult(
+                requestId = data.getLong("requestId"),
+                status = data.getString("status"),
+                approvedAmount = data.getLong("approvedAmount"),
+                feeAmount = data.getLong("feeAmount"),
+                repaymentDueDate = data.getString("repaymentDueDate")
+            )
+        }
+    }
+
+    override suspend fun getRequestDetail(
+        accessToken: String,
+        requestId: Long
+    ): AdvanceRequestDetailPayload = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) {
+            throw AdvanceUnauthorizedException()
+        }
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/advance/requests/$requestId")
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            val json = JSONObject(responseBody.ifBlank { "{}" })
+            if (!response.isSuccessful) {
+                if (response.code == 401 || response.code == 403) {
+                    throw AdvanceUnauthorizedException()
+                }
+                throw BackendApiException(
+                    parseBackendErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "미리받기 상세를 불러오지 못했어요."
+                    )
+                )
+            }
+            return@withContext toDetailPayload(json.getJSONObject("data"))
+        }
+    }
+
+    private fun fetchPrimaryWorkplace(token: String): WorkplacePayload? {
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/workproof/workplaces")
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                if (response.code == 401 || response.code == 403) {
+                    throw AdvanceUnauthorizedException()
+                }
+                throw BackendApiException("근무지 조회 실패: ${response.code}")
+            }
+            val workplaces = JSONObject(response.body?.string().orEmpty())
+                .getJSONObject("data")
+                .getJSONArray("workplaces")
+            if (workplaces.length() == 0) return null
+
+            var selected: JSONObject? = null
+            for (index in 0 until workplaces.length()) {
+                val item = workplaces.getJSONObject(index)
+                if (item.optBoolean("hasActiveContract")) {
+                    selected = item
+                    break
+                }
+                if (selected == null) {
+                    selected = item
+                }
+            }
+            selected ?: return null
+            return WorkplacePayload(
+                id = selected.getLong("workplaceId"),
+                name = selected.getString("name")
+            )
+        }
+    }
+
+    private fun fetchEligibility(token: String, workplaceId: Long): AdvanceEligibilityPayload {
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/advance/eligibility?workplaceId=$workplaceId")
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                if (response.code == 401 || response.code == 403) {
+                    throw AdvanceUnauthorizedException()
+                }
+                throw BackendApiException("미리받기 적격성 조회 실패: ${response.code}")
+            }
+            val data = JSONObject(response.body?.string().orEmpty()).getJSONObject("data")
+            val blockReasonsJson = data.getJSONArray("blockReasonCodes")
+            val blockReasons = buildList {
+                for (index in 0 until blockReasonsJson.length()) {
+                    add(blockReasonsJson.getString(index))
+                }
+            }
+            return AdvanceEligibilityPayload(
+                workplaceId = data.getLong("workplaceId"),
+                availableAmount = data.getLong("availableAmount"),
+                repaymentTier = data.getString("repaymentTier"),
+                blockReasonCodes = blockReasons,
+                estimatedRepaymentDate = data.getString("estimatedRepaymentDate"),
+                disclaimer = data.getString("disclaimer"),
+                needsReviewRecordCount = data.getInt("needsReviewRecordCount")
+            )
+        }
+    }
+
+    private fun fetchRequests(token: String): List<AdvanceRequestItemPayload> {
+        val months = listOf(
+            YearMonth.now().minusMonths(1),
+            YearMonth.now(),
+            YearMonth.now().plusMonths(1)
+        ).distinct()
+        val collected = linkedMapOf<Long, AdvanceRequestItemPayload>()
+
+        months.forEach { month ->
+            val request = Request.Builder()
+                .url("${BackendApiSupport.baseUrl}/api/advance/requests?month=$month")
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    if (response.code == 401 || response.code == 403) {
+                        throw AdvanceUnauthorizedException()
+                    }
+                    throw BackendApiException("미리받기 이력 조회 실패: ${response.code}")
+                }
+                val requests = JSONObject(response.body?.string().orEmpty())
+                    .getJSONObject("data")
+                    .getJSONArray("requests")
+
+                for (index in 0 until requests.length()) {
+                    val item = requests.getJSONObject(index)
+                    val payload = AdvanceRequestItemPayload(
+                        requestId = item.getLong("requestId"),
+                        requestedAmount = item.getLong("requestedAmount"),
+                        approvedAmount = item.getLong("approvedAmount"),
+                        status = item.getString("status"),
+                        repaymentDueDate = item.getString("repaymentDueDate")
+                    )
+                    collected[payload.requestId] = payload
+                }
+            }
+        }
+
+        return collected.values.sortedByDescending { it.requestId }
+    }
+
+    private fun toDetailPayload(data: JSONObject): AdvanceRequestDetailPayload {
+        val snapshot = data.getJSONObject("eligibilitySnapshot")
+        return AdvanceRequestDetailPayload(
+            requestId = data.getLong("requestId"),
+            workplaceId = data.getLong("workplaceId"),
+            requestedAmount = data.getLong("requestedAmount"),
+            approvedAmount = data.getLong("approvedAmount"),
+            feeAmount = data.getLong("feeAmount"),
+            status = data.getString("status"),
+            repaymentDueDate = data.getString("repaymentDueDate"),
+            eligibilitySnapshot = AdvanceEligibilitySnapshotPayload(
+                availableAmount = snapshot.getLong("availableAmount"),
+                maxCap = snapshot.getLong("maxCap"),
+                policyRate = snapshot.get("policyRate").toString(),
+                reflectedWorkDays = snapshot.getInt("reflectedWorkDays"),
+                reflectedWorkMinutes = snapshot.getLong("reflectedWorkMinutes"),
+                needsReviewRecordCount = snapshot.getInt("needsReviewRecordCount")
+            ),
+            createdAt = data.getString("createdAt")
+        )
+    }
+
+    private data class WorkplacePayload(
+        val id: Long,
+        val name: String
+    )
+}

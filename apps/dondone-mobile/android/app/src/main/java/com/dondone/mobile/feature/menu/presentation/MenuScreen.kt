@@ -86,7 +86,8 @@ private val MenuDivider = Color(0xFFE8EBF0)
 fun MenuScreen(
     uiModel: MenuUiModel,
     onOpenWage: () -> Unit,
-    onOpenAccount: () -> Unit
+    onOpenAccount: () -> Unit,
+    onLogout: () -> Unit
 ) {
     var showClaimSheet by rememberSaveable { mutableStateOf(false) }
     var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
@@ -112,6 +113,13 @@ fun MenuScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
+        if (uiModel.session != null) {
+            MenuSessionSection(
+                session = uiModel.session,
+                onLogout = onLogout
+            )
+            MenuSectionDivider()
+        }
         MenuServicesSection(actions = serviceActions)
         MenuSectionDivider()
         MenuDocumentsSection(
@@ -180,6 +188,33 @@ fun MenuScreen(
                 onDismiss = { selectedDocumentId = null }
             )
         }
+    }
+}
+
+@Composable
+private fun MenuSessionSection(
+    session: MenuSessionUiModel,
+    onLogout: () -> Unit
+) {
+    MenuSectionSurface {
+        MenuSectionHeader(title = "계정")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = session.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = DawnText
+            )
+            Text(
+                text = session.email,
+                style = MaterialTheme.typography.bodyMedium,
+                color = DawnTextSubtle
+            )
+        }
+        SecondaryActionButton(
+            text = "로그아웃",
+            onClick = onLogout,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
