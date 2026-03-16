@@ -6,6 +6,7 @@ import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
 import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
 import com.workproofpay.backend.wage.api.dto.request.CreateWageDepositRequest;
+import com.workproofpay.backend.wage.api.dto.request.CreateWageVerificationRequest;
 import com.workproofpay.backend.wage.repo.WageDepositRepository;
 import com.workproofpay.backend.workproof.api.dto.request.CheckInWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CheckOutWorkProofRequest;
@@ -128,6 +129,99 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.estimate.estimatedTotal").value(144000))
                 .andExpect(jsonPath("$.data.ruleVersion").value("WAGE_LANE1_V0"))
                 .andExpect(jsonPath("$.data.disclaimer").exists());
+    }
+
+    @Test
+    void createsVerificationAndReturnsDetailSnapshotFromLane1Inputs() throws Exception {
+        // reflected 근무를 기준으로 verification 생성 -> 상세 조회까지 이어지는 worker self-check 흐름을 검증한다.
+        User user = userRepository.save(User.register("verification@test.com", "hashed", "Verifier"));
+        String token = tokenFor(user);
+        Lane1Fixture fixture = createLane1WorkplaceAndContract(token);
+
+        Long firstRecordId = checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 10, 18, 0));
+        Long secondRecordId = checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 12, 21, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 12, 23, 0));
+
+        CreateWageVerificationRequest request = new CreateWageVerificationRequest(
+                "2026-03",
+                fixture.workplaceId(),
+                130_000L,
+                false,
+                "Please check overtime."
+        );
+
+        String verificationBody = mockMvc.perform(post("/api/wage/verifications")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("CHECK_REQUIRED"))
+                .andExpect(jsonPath("$.data.resolutionStage").value("EMPLOYER_CONFIRMATION_RECOMMENDED"))
+                .andExpect(jsonPath("$.data.estimatedTotal").value(144000))
+                .andExpect(jsonPath("$.data.actualDepositAmount").value(130000))
+                .andExpect(jsonPath("$.data.differenceAmount").value(14000))
+                .andExpect(jsonPath("$.data.differenceRate").value(0.0972))
+                .andExpect(jsonPath("$.data.threshold.absoluteWon").value(4320))
+                .andExpect(jsonPath("$.data.threshold.relativePercent").value(0.03))
+                .andExpect(jsonPath("$.data.threshold.deductionRelaxed").value(true))
+                .andExpect(jsonPath("$.data.possibleCauses[*].code", hasItems(
+                        "OVERTIME_INCLUDED",
+                        "NIGHT_SHIFT_INCLUDED",
+                        "DIFFERENCE_OVER_THRESHOLD"
+                )))
+                .andExpect(jsonPath("$.data.evidence.overtimeMinutes").value(60))
+                .andExpect(jsonPath("$.data.evidence.nightMinutes").value(60))
+                .andExpect(jsonPath("$.data.evidence.modifiedRecordCount").value(0))
+                .andExpect(jsonPath("$.data.evidence.recordIds[*]").value(hasItems(
+                        firstRecordId.intValue(),
+                        secondRecordId.intValue()
+                )))
+                .andExpect(jsonPath("$.data.nextActions[*]", hasItems(
+                        "VIEW_EVIDENCE",
+                        "REQUEST_EMPLOYER_CONFIRMATION",
+                        "PREPARE_PROOF_PACK"
+                )))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long verificationId = readId(verificationBody, "verificationId");
+
+        mockMvc.perform(get("/api/wage/verifications/{verificationId}", verificationId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationId").value(verificationId))
+                .andExpect(jsonPath("$.data.month").value("2026-03"))
+                .andExpect(jsonPath("$.data.workplaceId").value(fixture.workplaceId()))
+                .andExpect(jsonPath("$.data.status").value("CHECK_REQUIRED"))
+                .andExpect(jsonPath("$.data.resolutionStage").value("EMPLOYER_CONFIRMATION_RECOMMENDED"))
+                .andExpect(jsonPath("$.data.estimated.baseEstimate").value(132000))
+                .andExpect(jsonPath("$.data.estimated.overtimePremium").value(6000))
+                .andExpect(jsonPath("$.data.estimated.nightPremium").value(6000))
+                .andExpect(jsonPath("$.data.estimated.estimatedTotal").value(144000))
+                .andExpect(jsonPath("$.data.actual.actualDepositAmount").value(130000))
+                .andExpect(jsonPath("$.data.actual.deductionsKnown").value(false))
+                .andExpect(jsonPath("$.data.actual.submittedBy").value("WORKER"))
+                .andExpect(jsonPath("$.data.difference.differenceAmount").value(14000))
+                .andExpect(jsonPath("$.data.difference.differenceRate").value(0.0972))
+                .andExpect(jsonPath("$.data.difference.thresholdApplied.absoluteWon").value(4320))
+                .andExpect(jsonPath("$.data.threshold.absoluteWon").value(4320))
+                .andExpect(jsonPath("$.data.possibleCauses[*].code", hasItems(
+                        "OVERTIME_INCLUDED",
+                        "NIGHT_SHIFT_INCLUDED",
+                        "DIFFERENCE_OVER_THRESHOLD"
+                )))
+                .andExpect(jsonPath("$.data.evidence.recordIds[*]").value(hasItems(
+                        firstRecordId.intValue(),
+                        secondRecordId.intValue()
+                )))
+                .andExpect(jsonPath("$.data.employerSupport.available").value(false))
+                .andExpect(jsonPath("$.data.employerSupport.recommended").value(true))
+                .andExpect(jsonPath("$.data.employerSupport.status").value("REQUEST_RECOMMENDED"))
+                .andExpect(jsonPath("$.data.relatedActions.proofPackReady").value(true))
+                .andExpect(jsonPath("$.data.relatedActions.claimKitReady").value(true))
+                .andExpect(jsonPath("$.data.relatedActions.instantClaimAvailable").value(true));
     }
 
     @Test
@@ -258,6 +352,55 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
+
+        mockMvc.perform(post("/api/wage/verifications")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "month": "2026/03",
+                                  "workplaceId": 0,
+                                  "deductionsKnown": false
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
+    }
+
+    @Test
+    void hidesVerificationOwnedByAnotherUser() throws Exception {
+        // verification도 기존 protected resource 규칙처럼 타인 조회 시 404 은닉을 유지한다.
+        User owner = userRepository.save(User.register("owner@test.com", "hashed", "Owner"));
+        String ownerToken = tokenFor(owner);
+        Lane1Fixture fixture = createLane1WorkplaceAndContract(ownerToken);
+
+        checkIn(ownerToken, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
+        checkOut(ownerToken, LocalDateTime.of(2026, 3, 10, 18, 0));
+
+        String verificationBody = mockMvc.perform(post("/api/wage/verifications")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWageVerificationRequest(
+                                "2026-03",
+                                fixture.workplaceId(),
+                                90_000L,
+                                true,
+                                null
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long verificationId = readId(verificationBody, "verificationId");
+
+        User otherUser = userRepository.save(User.register("other@test.com", "hashed", "Other"));
+        String otherToken = tokenFor(otherUser);
+
+        mockMvc.perform(get("/api/wage/verifications/{verificationId}", verificationId)
+                        .header("Authorization", bearer(otherToken)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WAGE_VERIFICATION_NOT_FOUND"));
     }
 
     @Test
