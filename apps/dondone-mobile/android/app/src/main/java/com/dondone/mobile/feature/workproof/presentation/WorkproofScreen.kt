@@ -381,6 +381,7 @@ private fun WorkproofPunchCard(
     }
 }
 
+@Composable
 private fun WorkproofActionButtonWithFeedback(
     enabled: Boolean,
     showDisabledFeedback: Boolean,
