@@ -31,6 +31,7 @@ public enum ErrorCode {
     WORKPLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "Workplace not found"),
     ACTIVE_CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "Active contract not found"),
     ACTIVE_WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "Active workproof not found"),
+    WAGE_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Wage verification not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     ACTIVE_CONTRACT_REQUIRED(HttpStatus.CONFLICT, "Active contract is required"),

@@ -4,10 +4,13 @@ import com.workproofpay.backend.shared.api.ApiResponse;
 import com.workproofpay.backend.shared.config.OpenApiConfig;
 import com.workproofpay.backend.shared.security.AuthenticatedUser;
 import com.workproofpay.backend.wage.api.dto.request.CreateWageDepositRequest;
+import com.workproofpay.backend.wage.api.dto.request.CreateWageVerificationRequest;
 import com.workproofpay.backend.wage.api.dto.response.WageDepositResponse;
 import com.workproofpay.backend.wage.api.dto.response.WageEstimateResponse;
 import com.workproofpay.backend.wage.api.dto.response.WageMonthlySummaryResponse;
 import com.workproofpay.backend.wage.api.dto.response.WageSummaryResponse;
+import com.workproofpay.backend.wage.api.dto.response.WageVerificationCreatedResponse;
+import com.workproofpay.backend.wage.api.dto.response.WageVerificationDetailResponse;
 import com.workproofpay.backend.wage.service.WageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -69,6 +72,62 @@ public class WageController {
             @Valid @RequestBody CreateWageDepositRequest request
     ) {
         return ApiResponse.created(wageService.createDeposit(user.userId(), request));
+    }
+
+    @PostMapping("/verifications")
+    @Operation(
+            summary = "실제 지급 결과 확인과 verification 생성",
+            description = """
+                    인증된 근로자가 실제 받은 돈을 확인해 Wage verification snapshot을 생성합니다.
+
+                    현재 범위:
+                    - worker self-check만 지원합니다.
+                    - employer confirmation과 documents/claim 연결은 후속 단계에서 확장합니다.
+                    - 응답은 최종 급여 확정이 아니라 확인 필요 상태와 근거 요약입니다.
+                    """,
+            security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "verification이 생성되었습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증에 실패했습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "소유한 근무지 또는 활성 계약을 찾을 수 없습니다.", content = @Content)
+    })
+    public ResponseEntity<ApiResponse<WageVerificationCreatedResponse>> createVerification(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "worker self-check verification request body",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = CreateWageVerificationRequest.class))
+            )
+            @Valid @RequestBody CreateWageVerificationRequest request
+    ) {
+        return ApiResponse.created(wageService.createVerification(user.userId(), request));
+    }
+
+    @GetMapping("/verifications/{verificationId}")
+    @Operation(
+            summary = "verification 상세 조회",
+            description = """
+                    인증된 근로자의 Wage verification snapshot 상세를 반환합니다.
+
+                    현재 범위:
+                    - Documents/Claim downstream이 재사용할 수 있는 상세 snapshot을 반환합니다.
+                    - employer support는 readiness 수준의 상태만 포함합니다.
+                    """,
+            security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "verification 상세를 반환했습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증에 실패했습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "verification을 찾을 수 없습니다.", content = @Content)
+    })
+    public ResponseEntity<ApiResponse<WageVerificationDetailResponse>> getVerification(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable @Min(value = 1, message = "verificationId must be greater than 0") long verificationId
+    ) {
+        return ApiResponse.success(wageService.getVerification(user.userId(), verificationId));
     }
 
     @GetMapping("/monthly-summary")
