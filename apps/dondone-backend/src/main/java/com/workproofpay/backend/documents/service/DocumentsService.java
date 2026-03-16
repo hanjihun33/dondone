@@ -10,6 +10,8 @@ import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.wage.model.WageVerification;
 import com.workproofpay.backend.wage.service.WageVerificationQueryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.NestedExceptionUtils;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class DocumentsService {
+
+    private static final String DUPLICATE_REQUEST_CONSTRAINT = "uk_document_generation_requests_user_type_key";
 
     private final DocumentGenerationRequestRepository documentGenerationRequestRepository;
     private final WageVerificationQueryService wageVerificationQueryService;
@@ -40,15 +44,29 @@ public class DocumentsService {
         }
 
         WageVerification verification = wageVerificationQueryService.getOwnedVerification(userId, request.wageVerificationId());
-        DocumentGenerationRequest saved = documentGenerationRequestRepository.save(
-                DocumentGenerationRequest.queueProofPack(
-                        verification.getUser(),
-                        verification.getId(),
-                        verification.getMonth(),
-                        verification.getWorkplaceId(),
-                        idempotencyKey
-                )
+        DocumentGenerationRequest requestToSave = DocumentGenerationRequest.queueProofPack(
+                verification.getUser(),
+                verification.getId(),
+                verification.getMonth(),
+                verification.getWorkplaceId(),
+                idempotencyKey
         );
-        return DocumentGenerationAcceptedResponse.from(saved);
+
+        try {
+            // The pre-check handles common retries; the flush closes the concurrent request race window.
+            DocumentGenerationRequest saved = documentGenerationRequestRepository.saveAndFlush(requestToSave);
+            return DocumentGenerationAcceptedResponse.from(saved);
+        } catch (DataIntegrityViolationException e) {
+            if (isDuplicateRequestViolation(e)) {
+                throw new ApiException(ErrorCode.DOCUMENT_DUPLICATE_REQUEST);
+            }
+            throw e;
+        }
+    }
+
+    private boolean isDuplicateRequestViolation(DataIntegrityViolationException e) {
+        Throwable rootCause = NestedExceptionUtils.getMostSpecificCause(e);
+        String message = rootCause == null ? e.getMessage() : rootCause.getMessage();
+        return message != null && message.contains(DUPLICATE_REQUEST_CONSTRAINT);
     }
 }
