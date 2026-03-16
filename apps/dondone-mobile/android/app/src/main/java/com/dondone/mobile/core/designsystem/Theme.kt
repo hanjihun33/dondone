@@ -1,9 +1,11 @@
 package com.dondone.mobile.core.designsystem
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -96,9 +98,13 @@ private val DonDoneTypography = Typography(
 fun DonDoneTheme(
     content: @Composable () -> Unit
 ) {
-    MaterialTheme(
-        colorScheme = LightColors,
-        typography = DonDoneTypography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalIndication provides rememberDonDoneGrayRipple()
+    ) {
+        MaterialTheme(
+            colorScheme = LightColors,
+            typography = DonDoneTypography,
+            content = content
+        )
+    }
 }

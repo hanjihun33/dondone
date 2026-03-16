@@ -22,6 +22,7 @@ import com.workproofpay.backend.workproof.service.WorkProofService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -91,7 +92,10 @@ public class WorkProofController {
     @GetMapping("/records")
     public ResponseEntity<ApiResponse<WorkProofRecordListResponse>> getRecords(
             @AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "month must follow YYYY-MM") String month,
+            @RequestParam
+            @Size(min = 7, max = 7, message = "month must be exactly 7 characters")
+            @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "month must follow YYYY-MM")
+            String month,
             @RequestParam @Positive(message = "workplaceId must be greater than 0") Long workplaceId
     ) {
         return ApiResponse.success(workProofLane1Service.getRecords(user.userId(), month, workplaceId));
@@ -116,7 +120,10 @@ public class WorkProofController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<WorkProofResponse>>> getWorkProofs(
             @AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam(required = false) @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "yearMonth must follow YYYY-MM") String yearMonth,
+            @RequestParam(required = false)
+            @Size(min = 7, max = 7, message = "yearMonth must be exactly 7 characters")
+            @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "yearMonth must follow YYYY-MM")
+            String yearMonth,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf
     ) {
         return ApiResponse.success(workProofService.getWorkProofs(user.userId(), yearMonth, asOf));
@@ -142,7 +149,10 @@ public class WorkProofController {
     @GetMapping(value = "/monthly-summary", params = "yearMonth")
     public ResponseEntity<ApiResponse<WorkProofMonthlySummaryResponse>> getMonthlySummary(
             @AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "yearMonth must follow YYYY-MM") String yearMonth,
+            @RequestParam
+            @Size(min = 7, max = 7, message = "yearMonth must be exactly 7 characters")
+            @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "yearMonth must follow YYYY-MM")
+            String yearMonth,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf
     ) {
         WorkProofMonthlyMetrics metrics = workProofService.getMonthlyMetrics(user.userId(), yearMonth, asOf);
@@ -152,7 +162,10 @@ public class WorkProofController {
     @GetMapping(value = "/monthly-summary", params = {"month", "workplaceId"})
     public ResponseEntity<ApiResponse<WorkProofMonthlySummaryContractResponse>> getLane1MonthlySummary(
             @AuthenticationPrincipal AuthenticatedUser user,
-            @RequestParam @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "month must follow YYYY-MM") String month,
+            @RequestParam
+            @Size(min = 7, max = 7, message = "month must be exactly 7 characters")
+            @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "month must follow YYYY-MM")
+            String month,
             @RequestParam @Positive(message = "workplaceId must be greater than 0") Long workplaceId
     ) {
         return ApiResponse.success(workProofLane1Service.getMonthlySummary(user.userId(), month, workplaceId));

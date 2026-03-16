@@ -1,6 +1,8 @@
 package com.workproofpay.backend.wage.service;
 
 import com.workproofpay.backend.wage.model.WageDeposit;
+import com.workproofpay.backend.workproof.api.dto.response.CurrentContractResponse;
+import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
 import com.workproofpay.backend.workproof.service.WorkProofMonthlyMetrics;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+/**
+ * Wage 계산 규칙을 한 곳에 모아 기존 summary 흐름과 lane 1 estimate 흐름이 같은 기준을 공유하게 한다.
+ */
 public class WageSummaryCalculator {
 
     private static final BigDecimal DEDUCTIONS_KNOWN_TRIGGER_RATIO = BigDecimal.valueOf(0.02);
@@ -19,6 +24,8 @@ public class WageSummaryCalculator {
     private static final long DEDUCTIONS_UNKNOWN_TRIGGER_CAP = 50_000L;
     private static final long MIN_TRIGGER_AMOUNT = 1L;
     private static final int MINUTES_PER_HOUR = 60;
+    // lane 1 estimate is still reference-only, so it currently uses a conservative round-down policy until payroll rules are fixed.
+    private static final RoundingMode LANE1_ESTIMATE_ROUNDING_MODE = RoundingMode.DOWN;
 
     public WageSummarySnapshot summarize(WorkProofMonthlyMetrics metrics,
                                          long normalizedHourlyWage,
@@ -60,6 +67,37 @@ public class WageSummaryCalculator {
         );
     }
 
+    // This is a temporary lane 1 assumption, not a finalized payroll policy.
+    public WageEstimateSnapshot estimate(CurrentContractResponse contract,
+                                         WorkProofMonthlySummaryContractResponse summary) {
+        // P0 규칙대로 기본급/연장/야간을 항목별로 따로 계산하고 floor 성격으로 내린다.
+        long baseEstimate = prorateAmount(
+                summary.integrity().verifiedMinutes(),
+                contract.normalizedHourlyWage(),
+                BigDecimal.ONE,
+                LANE1_ESTIMATE_ROUNDING_MODE
+        );
+        long overtimePremium = prorateAmount(
+                summary.overtimeMinutes(),
+                contract.normalizedHourlyWage(),
+                BigDecimal.valueOf(0.5),
+                LANE1_ESTIMATE_ROUNDING_MODE
+        );
+        long nightPremium = prorateAmount(
+                summary.nightMinutes(),
+                contract.normalizedHourlyWage(),
+                BigDecimal.valueOf(0.5),
+                LANE1_ESTIMATE_ROUNDING_MODE
+        );
+
+        return new WageEstimateSnapshot(
+                baseEstimate,
+                overtimePremium,
+                nightPremium,
+                baseEstimate + overtimePremium + nightPremium
+        );
+    }
+
     public BigDecimal minutesToHours(long minutes) {
         return BigDecimal.valueOf(minutes)
                 .divide(BigDecimal.valueOf(MINUTES_PER_HOUR), 1, RoundingMode.HALF_UP);
@@ -76,10 +114,17 @@ public class WageSummaryCalculator {
     }
 
     private long prorateAmount(long minutes, long hourlyWage, BigDecimal multiplier) {
+        return prorateAmount(minutes, BigDecimal.valueOf(hourlyWage), multiplier, RoundingMode.HALF_UP);
+    }
+
+    private long prorateAmount(long minutes,
+                               BigDecimal hourlyWage,
+                               BigDecimal multiplier,
+                               RoundingMode roundingMode) {
         return BigDecimal.valueOf(minutes)
-                .multiply(BigDecimal.valueOf(hourlyWage))
+                .multiply(hourlyWage)
                 .multiply(multiplier)
-                .divide(BigDecimal.valueOf(MINUTES_PER_HOUR), 0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(MINUTES_PER_HOUR), 0, roundingMode)
                 .longValue();
     }
 
@@ -154,6 +199,14 @@ public class WageSummaryCalculator {
             long anomalyTriggerAmount,
             boolean anomalyDetected,
             String status
+    ) {
+    }
+
+    public record WageEstimateSnapshot(
+            long baseEstimate,
+            long overtimePremium,
+            long nightPremium,
+            long estimatedTotal
     ) {
     }
 }

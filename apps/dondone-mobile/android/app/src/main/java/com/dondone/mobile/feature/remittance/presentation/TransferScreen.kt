@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -685,7 +686,9 @@ private fun TransferAmountSummaryBlock(
     onClick: () -> Unit
 ) {
     Column(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
@@ -1094,15 +1097,22 @@ private fun TransferRecipientDisplayNameEditor(
                 contentDescription = "닫기",
                 tint = DawnTextSubtle,
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(36.dp)
                     .clickable(onClick = onClose)
             )
-            Text(
-                text = "완료",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-                color = DawnTextSubtle,
-                modifier = Modifier.clickable(onClick = onDone)
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onDone)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "완료",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                    color = DawnTextSubtle
+                )
+            }
         }
 
         BasicTextField(

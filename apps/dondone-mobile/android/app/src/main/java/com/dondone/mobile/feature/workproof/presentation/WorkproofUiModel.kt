@@ -2,8 +2,12 @@ package com.dondone.mobile.feature.workproof.presentation
 
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import com.dondone.mobile.domain.model.DemoState
+import com.dondone.mobile.domain.model.WorkRecord
+
+private const val UnrecordedTime = "-"
 
 enum class WorkproofCalendarTone {
+    UNAVAILABLE,
     MISSING,
     PARTIAL,
     COMPLETE,
@@ -19,6 +23,10 @@ enum class WorkproofRecordTone {
 data class WorkproofSummaryUiModel(
     val canClockIn: Boolean,
     val canClockOut: Boolean,
+    val verifiedDays: Int,
+    val auditCount: Int,
+    val todayInTime: String?,
+    val todayOutTime: String?,
     val workplaceLatitude: Double,
     val workplaceLongitude: Double,
     val currentLatitude: Double,
@@ -27,12 +35,7 @@ data class WorkproofSummaryUiModel(
     val distanceToWorkplaceMeters: Int,
     val isWithinWorkplaceRadius: Boolean,
     val locationStatusText: String,
-    val locationStatusDetailText: String,
-    val verifiedDaysText: String,
-    val auditCountText: String,
-    val todayMetaText: String,
-    val todayInText: String,
-    val todayOutText: String
+    val locationStatusDetailText: String
 )
 
 data class WorkproofCalendarCellUiModel(
@@ -45,16 +48,15 @@ data class WorkproofRecordUiModel(
     val id: String,
     val dateText: String,
     val timeText: String,
-    val statusText: String,
     val tone: WorkproofRecordTone,
-    val attachmentText: String,
-    val modifiedHintText: String?
+    val attachmentCount: Int,
+    val modifiedReason: String?
 )
 
 data class WorkproofAuditUiModel(
     val dateText: String,
     val changeText: String,
-    val attachmentText: String,
+    val attachmentCount: Int,
     val reasonText: String
 )
 
@@ -71,6 +73,7 @@ data class WorkproofUiModel(
 
 fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
+    val verifiedSnapshot = WorkproofCalculator.verify(this)
     val workplaceRadiusMeters = 100
     val distanceToWorkplaceMeters = calculateDistanceMeters(
         startLatitude = workproof.currentLatitude,
@@ -80,41 +83,21 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
     )
     val isWithinWorkplaceRadius = distanceToWorkplaceMeters <= workplaceRadiusMeters
     val dayTones = (1..demo.monthLength).associateWith { day ->
-        val record = visibleRecords.firstOrNull { it.day == day }
         when {
-            record == null -> WorkproofCalendarTone.MISSING
-            record.modified -> WorkproofCalendarTone.MODIFIED
-            record.inTime != "-" && record.outTime != "-" -> WorkproofCalendarTone.COMPLETE
-            record.inTime != "-" || record.outTime != "-" -> WorkproofCalendarTone.PARTIAL
-            else -> WorkproofCalendarTone.MISSING
+            day > demo.asOfDay -> WorkproofCalendarTone.UNAVAILABLE
+            else -> visibleRecords.firstOrNull { it.day == day }?.toCalendarTone() ?: WorkproofCalendarTone.MISSING
         }
     }
 
     val recentRecords = visibleRecords.take(4).map { record ->
         val audit = workproof.audit.firstOrNull { it.id == record.id }
-        val tone = when {
-            record.modified -> WorkproofRecordTone.MODIFIED
-            record.inTime == "-" || record.outTime == "-" -> WorkproofRecordTone.ACTIVE
-            else -> WorkproofRecordTone.DEFAULT
-        }
-        val statusText = when {
-            record.modified -> "\uC218\uC815"
-            record.inTime == "-" || record.outTime == "-" -> "\uCD9C\uADFC\uB9CC"
-            else -> "\uAE30\uB85D"
-        }
-
         WorkproofRecordUiModel(
             id = record.id,
             dateText = formatDateText(demo.year, demo.month, record.day),
             timeText = "${record.inTime} - ${record.outTime}",
-            statusText = statusText,
-            tone = tone,
-            attachmentText = if (record.attachments > 0) {
-                "\uCCA8\uBD80 ${record.attachments}\uAC1C"
-            } else {
-                "\uCCA8\uBD80 \uC5C6\uC74C"
-            },
-            modifiedHintText = audit?.let { "\uC218\uC815 \uC0AC\uC720: ${it.reason}" }
+            tone = record.toRecordTone(),
+            attachmentCount = record.attachments,
+            modifiedReason = audit?.reason
         )
     }
 
@@ -122,10 +105,11 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
         WorkproofAuditUiModel(
             dateText = audit.at,
             changeText = "${audit.before} -> ${audit.after}",
-            attachmentText = "\uCCA8\uBD80 ${audit.attachments}\uAC1C",
+            attachmentCount = audit.attachments,
             reasonText = audit.reason
         )
     }
+    val todayDateText = formatDateText(demo.year, demo.month, demo.asOfDay)
 
     return WorkproofUiModel(
         calendarBaseYear = demo.year,
@@ -135,6 +119,10 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
         summary = WorkproofSummaryUiModel(
             canClockIn = workproof.today.clockIn == null,
             canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null,
+            verifiedDays = verifiedSnapshot.verifiedDays,
+            auditCount = workproof.audit.size,
+            todayInTime = workproof.today.clockIn?.let { "$todayDateText · $it" },
+            todayOutTime = workproof.today.clockOut?.let { "$todayDateText · $it" },
             workplaceLatitude = workproof.workplaceLatitude,
             workplaceLongitude = workproof.workplaceLongitude,
             currentLatitude = workproof.currentLatitude,
@@ -151,18 +139,32 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
                 "현재 위치가 근무지 기준 ${workplaceRadiusMeters}m 안에 있어 출퇴근 버튼을 사용할 수 있어요."
             } else {
                 "현재 위치가 근무지에서 ${distanceToWorkplaceMeters}m 떨어져 있어요. 반경 ${workplaceRadiusMeters}m 안에 들어오면 출퇴근 버튼이 활성화돼요."
-            },
-            verifiedDaysText = "${visibleRecords.count { it.inTime != "-" && it.outTime != "-" }}\uC77C",
-            auditCountText = "${workproof.audit.size}\uAC74",
-            todayMetaText = "${demo.year}.${formatTwoDigits(demo.month)}.${formatTwoDigits(demo.asOfDay)} / ${workproof.workplaceName}",
-            todayInText = workproof.today.clockIn ?: "-",
-            todayOutText = workproof.today.clockOut ?: "-"
+            }
         ),
         recentRecords = recentRecords,
         auditPreview = auditItems.firstOrNull(),
         audits = auditItems
     )
 }
+
+internal fun WorkRecord.toCalendarTone(): WorkproofCalendarTone {
+    return when {
+        modified -> WorkproofCalendarTone.MODIFIED
+        inTime.isRecordedTime() && outTime.isRecordedTime() -> WorkproofCalendarTone.COMPLETE
+        inTime.isRecordedTime() || outTime.isRecordedTime() -> WorkproofCalendarTone.PARTIAL
+        else -> WorkproofCalendarTone.MISSING
+    }
+}
+
+internal fun WorkRecord.toRecordTone(): WorkproofRecordTone {
+    return when {
+        modified -> WorkproofRecordTone.MODIFIED
+        !inTime.isRecordedTime() || !outTime.isRecordedTime() -> WorkproofRecordTone.ACTIVE
+        else -> WorkproofRecordTone.DEFAULT
+    }
+}
+
+private fun String.isRecordedTime(): Boolean = this != UnrecordedTime
 
 private fun formatDateText(
     year: Int,

@@ -5,6 +5,7 @@ import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.api.dto.request.CheckInWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CheckOutWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CreateContractRequest;
+import com.workproofpay.backend.workproof.api.dto.request.GetWorkProofMonthlySummaryQuery;
 import com.workproofpay.backend.workproof.api.dto.request.ListWorkProofRecordsQuery;
 import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
 import com.workproofpay.backend.workproof.service.WorkProofLane1DraftValidator;
@@ -55,6 +56,18 @@ class WorkProofLane1DraftValidatorTest {
         Set<ConstraintViolation<ListWorkProofRecordsQuery>> violations = validator.validate(query);
 
         assertTrue(violations.stream().anyMatch(violation -> violation.getMessage().equals("month must follow YYYY-MM")));
+    }
+
+    @Test
+    void rejectsTooLongMonthQueryWithBeanValidation() {
+        ListWorkProofRecordsQuery recordsQuery = new ListWorkProofRecordsQuery("2026-031", 2L);
+        GetWorkProofMonthlySummaryQuery summaryQuery = new GetWorkProofMonthlySummaryQuery("2026-031", 2L);
+
+        Set<ConstraintViolation<ListWorkProofRecordsQuery>> recordViolations = validator.validate(recordsQuery);
+        Set<ConstraintViolation<GetWorkProofMonthlySummaryQuery>> summaryViolations = validator.validate(summaryQuery);
+
+        assertTrue(recordViolations.stream().anyMatch(violation -> violation.getMessage().equals("month must be exactly 7 characters")));
+        assertTrue(summaryViolations.stream().anyMatch(violation -> violation.getMessage().equals("month must be exactly 7 characters")));
     }
 
     @Test

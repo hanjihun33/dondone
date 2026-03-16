@@ -94,7 +94,7 @@ fun DemoState.toTransferUiModel(): TransferUiModel {
         confirmationAmountText = if (remittance.destinationMode == TransferDestinationMode.ACCOUNT) {
             formatKrw(amountKrw)
         } else {
-            "$amountUsd USDC"
+            "${'$'}$amountUsd USDC"
         },
         accountStepHintText = "먼저 송금에 사용할 계좌를 선택해 주세요.",
         canSubmit = canSubmit,

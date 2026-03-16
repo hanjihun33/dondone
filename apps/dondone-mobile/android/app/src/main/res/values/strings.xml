@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DonDone</string>
+    <string name="workproof_value_day_count">%1$d일</string>
+    <string name="workproof_value_audit_count">%1$d건</string>
+    <string name="workproof_value_time_placeholder">-</string>
+    <string name="workproof_value_attachment_count">첨부 %1$d개</string>
+    <string name="workproof_value_attachment_none">첨부 없음</string>
+    <string name="workproof_value_modified_reason">수정 사유: %1$s</string>
+    <string name="workproof_status_default">기록</string>
+    <string name="workproof_status_active">출근만</string>
+    <string name="workproof_status_modified">수정</string>
+    <string name="workproof_record_time_line">출근 %1$s / 퇴근 %2$s</string>
+    <string name="workproof_calendar_recorded_count">기록 %1$d일</string>
+    <string name="workproof_label_clock_in">출근</string>
+    <string name="workproof_label_clock_out">퇴근</string>
+    <string name="workproof_label_work_days">근무일</string>
+    <string name="workproof_label_audits">수정</string>
+    <string name="workproof_action_edit">수정</string>
+    <string name="workproof_empty_audit_title">아직 쌓인 변경 기록이 없어요.</string>
+    <string name="workproof_empty_audit_description">수정이 생기면 사유와 첨부 여부가 여기에 먼저 표시돼요.</string>
 </resources>

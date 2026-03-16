@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -463,6 +464,13 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(otherToken)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("WORKPROOF_NOT_FOUND"));
+
+        mockMvc.perform(get("/api/workproof")
+                        .header("Authorization", bearer(ownerToken))
+                        .param("yearMonth", "2026-031"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.details[*].message").value(hasItem("yearMonth must be exactly 7 characters")));
 
         UpdateWorkProofRequest invalidUpdateRequest = new UpdateWorkProofRequest(
                 LocalDateTime.of(2026, 3, 7, 18, 0),
