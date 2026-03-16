@@ -1,5 +1,7 @@
 package com.dondone.mobile.app.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -37,7 +39,12 @@ fun DonDoneNavGraph(
     NavHost(
         modifier = modifier,
         navController = navController,
-        startDestination = Route.HOME
+        startDestination = Route.HOME,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
+        sizeTransform = { null }
     ) {
         composable(Route.HOME) {
             HomeScreen(
