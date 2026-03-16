@@ -4,21 +4,21 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-dondone}
-      POSTGRES_USER: ${POSTGRES_USER:-dondone}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dondone}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       TZ: Asia/Seoul
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dondone} -d ${POSTGRES_DB:-dondone}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required} -d ${POSTGRES_DB:-dondone}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.2
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
@@ -35,8 +35,8 @@ services:
     image: minio/minio:latest
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-dondone}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-dondone123!}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -52,9 +52,9 @@ services:
       - /bin/sh
       - -c
       - |
-        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-dondone} ${MINIO_ROOT_PASSWORD:-dondone123!}; do sleep 1; done
-        mc mb -p local/${MINIO_BUCKET:-dondone-private} || true
-        mc anonymous set none local/${MINIO_BUCKET:-dondone-private}
+        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required} ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}; do sleep 1; done
+        mc mb -p local/${MINIO_BUCKET:-dondone-local} || true
+        mc anonymous set none local/${MINIO_BUCKET:-dondone-local}
     restart: "no"
 
 volumes:
