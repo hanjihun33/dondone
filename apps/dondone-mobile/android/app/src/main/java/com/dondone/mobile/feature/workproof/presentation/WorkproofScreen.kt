@@ -13,6 +13,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -70,24 +72,28 @@ import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
+import com.dondone.mobile.core.designsystem.pressableScale
+import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 import java.time.YearMonth
 
 private val WorkproofCanvas = Color.White
 private val WorkproofDivider = Color(0xFFE8EBF0)
+private val WorkproofGhostBorder = Color(0xFFF4F6F8)
+private val WorkproofCurrentDayBorder = Color(0xFFDDE4FF)
 private val WorkproofRowAccentBackground = Color(0xFFF2F3FF)
 private val WorkproofRowAccentTint = Color(0xFF6D68F5)
-private val WorkproofMissingBackground = Color(0xFFF1F5F9)
-private val WorkproofMissingBorder = Color(0xFFDBE3EE)
+private val WorkproofMissingBackground = Color.White
+private val WorkproofMissingBorder = Color.Transparent
 private val WorkproofMissingText = Color(0xFF64748B)
-private val WorkproofPartialBackground = Color(0xFFFEF3C7)
-private val WorkproofPartialBorder = Color(0xFFF8D26D)
-private val WorkproofPartialText = Color(0xFF92400E)
-private val WorkproofCompleteBackground = Color(0xFFBBF7D0)
-private val WorkproofCompleteBorder = Color(0xFF74E4A2)
-private val WorkproofCompleteText = Color(0xFF166534)
-private val WorkproofModifiedBackground = Color(0xFFFECACA)
-private val WorkproofModifiedBorder = Color(0xFFF59EA9)
-private val WorkproofModifiedText = Color(0xFF9F1239)
+private val WorkproofPartialBackground = Color(0xFFEEE5FF)
+private val WorkproofPartialBorder = Color(0xFFC3A6FF)
+private val WorkproofPartialText = Color(0xFF6F42D9)
+private val WorkproofCompleteBackground = Color(0xFFE9DEFF)
+private val WorkproofCompleteBorder = Color(0xFFB89BFF)
+private val WorkproofCompleteText = Color(0xFF5E3CC5)
+private val WorkproofModifiedBackground = Color(0xFFF7E4F4)
+private val WorkproofModifiedBorder = Color(0xFFD98FD0)
+private val WorkproofModifiedText = Color(0xFFAA3E96)
 private val WorkproofWeekdays = listOf("일", "월", "화", "수", "목", "금", "토")
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -729,10 +735,20 @@ private fun WorkproofMonthButton(
     icon: @Composable () -> Unit,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = Modifier
             .size(32.dp)
-            .clickable(onClick = onClick),
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.94f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(bounded = false),
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         icon()
@@ -744,12 +760,22 @@ private fun WorkproofInlineActionButton(
     text: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
             .border(1.dp, DawnBorder, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.98f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
             .padding(horizontal = 12.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -767,13 +793,23 @@ private fun WorkproofSelectionField(
     isPlaceholder: Boolean,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(Color.White)
             .border(1.dp, DawnBorder, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.99f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -839,12 +875,19 @@ private fun WorkproofEditSheet(
                     color = DawnTextSubtle
                 )
             }
-            Text(
-                text = "닫기",
-                modifier = Modifier.clickable(onClick = onClose),
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                color = DawnTextSubtle
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onClose)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "닫기",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                    color = DawnTextSubtle
+                )
+            }
         }
 
         WorkproofKeyValueRow(label = "출근", value = timeParts.first)
@@ -988,23 +1031,37 @@ private fun WorkproofCalendarCell(
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedText
     }
 
+    val isRecordedDay = uiModel.tone != WorkproofCalendarTone.MISSING
+    val cellShape = if (isRecordedDay) CircleShape else RoundedCornerShape(999.dp)
+
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(10.dp))
-            .background(background)
-            .border(
-                width = if (uiModel.isCurrent) 2.dp else 1.dp,
-                color = if (uiModel.isCurrent) DawnPrimary else border,
-                shape = RoundedCornerShape(10.dp)
-            ),
+        modifier = modifier.aspectRatio(1f),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = uiModel.dayLabel,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-            color = textColor
-        )
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(cellShape)
+                .background(background)
+                .then(
+                    if (uiModel.isCurrent || isRecordedDay) {
+                        Modifier.border(
+                            width = if (uiModel.isCurrent) 2.dp else 1.dp,
+                            color = if (uiModel.isCurrent) WorkproofCurrentDayBorder else border,
+                            shape = cellShape
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = uiModel.dayLabel,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                color = textColor
+            )
+        }
     }
 }
 
@@ -1020,7 +1077,7 @@ private fun WorkproofLegendItem(
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBackground
     }
     val border = when (tone) {
-        WorkproofCalendarTone.MISSING -> WorkproofMissingBorder
+        WorkproofCalendarTone.MISSING -> WorkproofGhostBorder
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBorder
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBorder
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBorder
@@ -1033,9 +1090,13 @@ private fun WorkproofLegendItem(
         Box(
             modifier = Modifier
                 .size(10.dp)
-                .clip(RoundedCornerShape(3.dp))
+                .clip(if (tone == WorkproofCalendarTone.MISSING) RoundedCornerShape(999.dp) else CircleShape)
                 .background(color)
-                .border(1.dp, border, RoundedCornerShape(3.dp))
+                .border(
+                    width = if (tone == WorkproofCalendarTone.MISSING) 1.dp else 0.dp,
+                    color = border,
+                    shape = if (tone == WorkproofCalendarTone.MISSING) RoundedCornerShape(999.dp) else CircleShape
+                )
         )
         Text(
             text = label,
