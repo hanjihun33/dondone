@@ -33,10 +33,7 @@ data class WorkproofSummaryUiModel(
     val currentLatitude: Double,
     val currentLongitude: Double,
     val workplaceRadiusMeters: Int,
-    val distanceToWorkplaceMeters: Int,
-    val isWithinWorkplaceRadius: Boolean,
-    val locationStatusText: String,
-    val locationStatusDetailText: String
+    val isWithinWorkplaceRadius: Boolean
 )
 
 data class WorkproofCalendarCellUiModel(
@@ -76,13 +73,13 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val verifiedSnapshot = WorkproofCalculator.verify(this)
     val workplaceRadiusMeters = 100
-    val distanceToWorkplaceMeters = calculateDistanceMeters(
+    val isWithinWorkplaceRadius = isWithinWorkplaceRadius(
         startLatitude = workproof.currentLatitude,
         startLongitude = workproof.currentLongitude,
         endLatitude = workproof.workplaceLatitude,
-        endLongitude = workproof.workplaceLongitude
+        endLongitude = workproof.workplaceLongitude,
+        radiusMeters = workplaceRadiusMeters
     )
-    val isWithinWorkplaceRadius = distanceToWorkplaceMeters <= workplaceRadiusMeters
     val dayTones = (1..demo.monthLength).associateWith { day ->
         when {
             day > demo.asOfDay -> WorkproofCalendarTone.UNAVAILABLE
@@ -129,18 +126,7 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
             currentLatitude = workproof.currentLatitude,
             currentLongitude = workproof.currentLongitude,
             workplaceRadiusMeters = workplaceRadiusMeters,
-            distanceToWorkplaceMeters = distanceToWorkplaceMeters,
-            isWithinWorkplaceRadius = isWithinWorkplaceRadius,
-            locationStatusText = if (isWithinWorkplaceRadius) {
-                "근무지 반경 안에 있어요"
-            } else {
-                "근무지 반경 밖이에요"
-            },
-            locationStatusDetailText = if (isWithinWorkplaceRadius) {
-                "현재 위치가 근무지 기준 ${workplaceRadiusMeters}m 안에 있어 출퇴근 버튼을 사용할 수 있어요."
-            } else {
-                "현재 위치가 근무지에서 ${distanceToWorkplaceMeters}m 떨어져 있어요. 반경 ${workplaceRadiusMeters}m 안에 들어오면 출퇴근 버튼이 활성화돼요."
-            }
+            isWithinWorkplaceRadius = isWithinWorkplaceRadius
         ),
         recentRecords = recentRecords,
         auditPreview = auditItems.firstOrNull(),
@@ -175,12 +161,13 @@ private fun formatDateText(
 
 private fun formatTwoDigits(value: Int): String = value.toString().padStart(2, '0')
 
-private fun calculateDistanceMeters(
+private fun isWithinWorkplaceRadius(
     startLatitude: Double,
     startLongitude: Double,
     endLatitude: Double,
-    endLongitude: Double
-): Int {
+    endLongitude: Double,
+    radiusMeters: Int
+): Boolean {
     val result = FloatArray(1)
     Location.distanceBetween(
         startLatitude,
@@ -189,5 +176,5 @@ private fun calculateDistanceMeters(
         endLongitude,
         result
     )
-    return result.first().toInt()
+    return result.first() <= radiusMeters
 }
