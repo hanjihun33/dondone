@@ -1,6 +1,8 @@
 package com.workproofpay.backend.wage.service;
 
 import com.workproofpay.backend.wage.model.WageDeposit;
+import com.workproofpay.backend.workproof.api.dto.response.CurrentContractResponse;
+import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
 import com.workproofpay.backend.workproof.service.WorkProofMonthlyMetrics;
 import org.springframework.stereotype.Component;
 
@@ -60,6 +62,35 @@ public class WageSummaryCalculator {
         );
     }
 
+    public WageEstimateSnapshot estimate(CurrentContractResponse contract,
+                                         WorkProofMonthlySummaryContractResponse summary) {
+        long baseEstimate = prorateAmount(
+                summary.integrity().verifiedMinutes(),
+                contract.normalizedHourlyWage(),
+                BigDecimal.ONE,
+                RoundingMode.DOWN
+        );
+        long overtimePremium = prorateAmount(
+                summary.overtimeMinutes(),
+                contract.normalizedHourlyWage(),
+                BigDecimal.valueOf(0.5),
+                RoundingMode.DOWN
+        );
+        long nightPremium = prorateAmount(
+                summary.nightMinutes(),
+                contract.normalizedHourlyWage(),
+                BigDecimal.valueOf(0.5),
+                RoundingMode.DOWN
+        );
+
+        return new WageEstimateSnapshot(
+                baseEstimate,
+                overtimePremium,
+                nightPremium,
+                baseEstimate + overtimePremium + nightPremium
+        );
+    }
+
     public BigDecimal minutesToHours(long minutes) {
         return BigDecimal.valueOf(minutes)
                 .divide(BigDecimal.valueOf(MINUTES_PER_HOUR), 1, RoundingMode.HALF_UP);
@@ -76,10 +107,17 @@ public class WageSummaryCalculator {
     }
 
     private long prorateAmount(long minutes, long hourlyWage, BigDecimal multiplier) {
+        return prorateAmount(minutes, BigDecimal.valueOf(hourlyWage), multiplier, RoundingMode.HALF_UP);
+    }
+
+    private long prorateAmount(long minutes,
+                               BigDecimal hourlyWage,
+                               BigDecimal multiplier,
+                               RoundingMode roundingMode) {
         return BigDecimal.valueOf(minutes)
-                .multiply(BigDecimal.valueOf(hourlyWage))
+                .multiply(hourlyWage)
                 .multiply(multiplier)
-                .divide(BigDecimal.valueOf(MINUTES_PER_HOUR), 0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(MINUTES_PER_HOUR), 0, roundingMode)
                 .longValue();
     }
 
@@ -154,6 +192,14 @@ public class WageSummaryCalculator {
             long anomalyTriggerAmount,
             boolean anomalyDetected,
             String status
+    ) {
+    }
+
+    public record WageEstimateSnapshot(
+            long baseEstimate,
+            long overtimePremium,
+            long nightPremium,
+            long estimatedTotal
     ) {
     }
 }
