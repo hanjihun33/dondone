@@ -2,8 +2,8 @@ package com.dondone.mobile.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,8 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,7 +46,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
@@ -58,13 +59,16 @@ import com.dondone.mobile.app.navigation.mainTabs
 import com.dondone.mobile.app.navigation.resolveScreenChrome
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.DonDoneWordmark
+import com.dondone.mobile.core.designsystem.pressableScale
+import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 
-private val ChromeTextMuted = Color(0xFF8B95A1)
-private val ChromeAccent = Color(0xFF6D68F5)
-private val ChromeAccentSoft = Color(0xFFF2F3FF)
-private val ChromeBorder = Color(0xFFE8EBF0)
+private val ChromeTextStrong = Color(0xFF191F28)
+private val ChromeTextMuted = Color(0xFFB0B8C1)
+private val ChromeAccent = Color(0xFF9AA4B2)
+private val ChromeBorder = Color(0xFFF0F2F5)
+private val ChromeSurface = Color.White
 
 @Composable
 fun DonDoneApp(
@@ -134,7 +138,7 @@ fun DonDoneApp(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.White,
+        containerColor = ChromeSurface,
         topBar = {
             AppTopBar(
                 showRootTabs = chrome.showRootTabs,
@@ -182,7 +186,7 @@ private fun AppTopBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(ChromeSurface)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(
                 horizontal = 16.dp,
@@ -283,12 +287,22 @@ private fun ChildTopBar(
 private fun BackButton(
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
         contentDescription = "뒤로",
         modifier = Modifier
             .size(32.dp)
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.94f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(bounded = false),
+                onClick = onClick
+            )
             .padding(horizontal = 4.dp, vertical = 4.dp),
         tint = ChromeTextMuted
     )
@@ -305,28 +319,40 @@ private fun RootBottomBar(
 
     Surface(
         modifier = Modifier
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.White,
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        color = ChromeSurface,
         shadowElevation = 8.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .background(ChromeSurface)
         ) {
-            mainTabs.forEach { tab ->
-                RootTabItem(
-                    rootRoute = tab.rootRoute,
-                    label = tab.label,
-                    selected = currentDestination.isSelectedTab(
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(ChromeBorder)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                mainTabs.forEach { tab ->
+                    RootTabItem(
                         rootRoute = tab.rootRoute,
-                        currentRoute = currentRoute
-                    ),
-                    onClick = { onTabClick(tab.rootRoute) }
-                )
+                        label = tab.label,
+                        selected = currentDestination.isSelectedTab(
+                            rootRoute = tab.rootRoute,
+                            currentRoute = currentRoute
+                        ),
+                        onClick = { onTabClick(tab.rootRoute) }
+                    )
+                }
             }
         }
     }
@@ -340,32 +366,38 @@ private fun RowScope.RootTabItem(
     onClick: () -> Unit
 ) {
     val colors = selected.toTabColors()
-    val shape = RoundedCornerShape(20.dp)
+    val interactionSource = remember { MutableInteractionSource() }
 
     Column(
         modifier = Modifier
             .weight(1f)
-            .clip(shape)
-            .background(colors.background)
-            .border(
-                width = colors.borderWidth,
-                color = colors.borderColor,
-                shape = shape
+            .clip(RoundedCornerShape(20.dp))
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.96f
             )
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
             imageVector = tabIcon(rootRoute),
             contentDescription = label,
-            tint = colors.content
+            tint = colors.iconTint
         )
         Text(
             text = label,
-            color = colors.content,
-            style = MaterialTheme.typography.labelMedium
+            color = colors.labelTint,
+            style = if (selected) {
+                MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
+            } else {
+                MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
+            }
         )
     }
 }
@@ -435,23 +467,17 @@ private fun tabIcon(route: String): ImageVector = when (route) {
 private fun Boolean.toTabColors(): TabColors =
     if (this) {
         TabColors(
-            background = ChromeAccentSoft,
-            borderColor = ChromeBorder,
-            borderWidth = 1.dp,
-            content = ChromeAccent
+            iconTint = ChromeTextStrong,
+            labelTint = ChromeTextStrong
         )
     } else {
         TabColors(
-            background = Color.Transparent,
-            borderColor = Color.Transparent,
-            borderWidth = 0.dp,
-            content = ChromeTextMuted
+            iconTint = ChromeAccent,
+            labelTint = ChromeTextMuted
         )
     }
 
 private data class TabColors(
-    val background: Color,
-    val borderColor: Color,
-    val borderWidth: Dp,
-    val content: Color
+    val iconTint: Color,
+    val labelTint: Color
 )

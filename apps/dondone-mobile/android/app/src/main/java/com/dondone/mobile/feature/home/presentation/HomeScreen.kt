@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +36,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSecondary
+import com.dondone.mobile.core.designsystem.pressableScale
+import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 
 private val HomeCanvas = Color.White
 private val HomeSurface = Color.White
@@ -42,7 +47,7 @@ private val HomeSurfaceMuted = Color(0xFFF5F6FA)
 private val HomeDivider = Color(0xFFE8EBF0)
 private val HomeTextPrimary = Color(0xFF1F2430)
 private val HomeTextMuted = Color(0xFF8B95A1)
-private val HomeAccent = Color(0xFF6D68F5)
+private val HomeAccent = DawnPrimary
 private val HomeAccentSoft = DawnSecondary.copy(alpha = 0.62f)
 private val HomeSuccessMuted = Color(0xFFF3F5F8)
 private val HomeWarningMuted = Color(0xFFF9F4EC)
@@ -310,21 +315,31 @@ private fun HomePrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = HomeAccent,
-            contentColor = Color.White
-        )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-        )
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = HomeAccent,
+                contentColor = Color.White
+            )
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 
@@ -335,22 +350,32 @@ private fun HomeSecondaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, HomeDivider),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = HomeSurface,
-            contentColor = HomeAccent
-        )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-        )
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, HomeDivider),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = HomeSurface,
+                contentColor = HomeAccent
+            )
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 
@@ -361,21 +386,31 @@ private fun HomeSoftButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = HomeSurfaceMuted,
-            contentColor = HomeTextPrimary
-        )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-        )
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = HomeSurfaceMuted,
+                contentColor = HomeTextPrimary
+            )
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 
@@ -384,11 +419,21 @@ private fun HomeLinkText(
     text: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Text(
         text = text,
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.98f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
             .padding(horizontal = 4.dp, vertical = 2.dp),
         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
         color = HomeAccent

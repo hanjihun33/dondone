@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,13 +46,15 @@ import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DonDoneProgressBar
+import com.dondone.mobile.core.designsystem.pressableScale
+import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 
 private val FinanceCanvas = Color.White
 private val FinanceSurfaceMuted = Color(0xFFF5F6FA)
 private val FinanceDivider = Color(0xFFE8EBF0)
 private val FinanceTextPrimary = Color(0xFF1F2430)
 private val FinanceTextMuted = Color(0xFF8B95A1)
-private val FinanceAccent = Color(0xFF6D68F5)
+private val FinanceAccent = DawnPrimary
 private val FinanceAdvanceSheetHero = Color(0xFFF5F0FF)
 private val FinanceAdvanceSheetHeroBorder = Color(0xFFE9DFFF)
 private val FinanceAdvanceSheetMutedBackground = Color(0xFFF8FAFC)
@@ -963,11 +966,21 @@ private fun FinanceLinkText(
     text: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Text(
         text = text,
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.98f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
             .padding(horizontal = 4.dp, vertical = 2.dp),
         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
         color = FinanceAccent
@@ -980,20 +993,27 @@ private fun FinancePrimaryButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Button(
-        modifier = modifier,
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = FinanceAccent,
-            contentColor = Color.White
-        ),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-        )
+        Button(
+            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            onClick = onClick,
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = FinanceAccent,
+                contentColor = Color.White
+            ),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 
@@ -1003,21 +1023,28 @@ private fun FinanceSoftButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    OutlinedButton(
-        modifier = modifier,
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, FinanceDivider),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = FinanceSurfaceMuted,
-            contentColor = FinanceTextPrimary
-        ),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-        )
+        OutlinedButton(
+            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            onClick = onClick,
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, FinanceDivider),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = FinanceSurfaceMuted,
+                contentColor = FinanceTextPrimary
+            ),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 
