@@ -32,33 +32,37 @@ import java.time.LocalDate;
 @Validated
 @RestController
 @RequestMapping("/api/wage")
-@Tag(name = "Wage", description = "Worker wage confirmation endpoints based on reference-only estimate and self-reported actual deposit")
+@Tag(name = "Wage", description = "참고용 예상 급여와 근로자 실수령 입력을 기반으로 급여를 확인하는 API")
 @RequiredArgsConstructor
+/**
+ * Wage lane 1에서는 WorkProof monthly summary를 읽는 조회 endpoint를 먼저 열고,
+ * 기존 입금 기록/차액 요약 흐름은 호환성을 위해 유지한다.
+ */
 public class WageController {
 
     private final WageService wageService;
 
     @PostMapping("/deposits")
     @Operation(
-            summary = "Record actual deposit",
+            summary = "실수령 급여 등록",
             description = """
-                    Records the worker's self-reported actual received deposit for a month.
+                    근로자가 특정 월의 실제 입금 금액을 직접 기록합니다.
 
-                    Current scope:
-                    - worker self-report only
-                    - employer confirmation or dispute workflow is not part of this API contract yet
+                    현재 범위:
+                    - 근로자 본인 입력만 지원합니다.
+                    - 사업주 확인이나 분쟁 처리 흐름은 아직 이 API 계약에 포함되지 않습니다.
                     """,
             security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
     )
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Actual deposit recorded"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content)
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "실수령 급여가 등록되었습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증에 실패했습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content)
     })
     public ResponseEntity<ApiResponse<WageDepositResponse>> createDeposit(
             @AuthenticationPrincipal AuthenticatedUser user,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Worker self-reported actual deposit payload",
+                    description = "근로자가 직접 입력하는 실수령 급여 요청 본문",
                     required = true,
                     content = @Content(schema = @Schema(implementation = CreateWageDepositRequest.class))
             )
@@ -69,23 +73,26 @@ public class WageController {
 
     @GetMapping("/monthly-summary")
     @Operation(
-            summary = "Get wage monthly summary",
+            summary = "월간 급여 요약 조회",
             description = """
-                    Returns the WorkProof-based monthly wage summary for the authenticated worker.
+                    인증된 근로자의 WorkProof 기반 월간 급여 요약을 반환합니다.
 
-                    Current scope:
-                    - reads WorkProof lane 1 monthly summary as upstream input
-                    - uses workplace-scoped contract and reflected records only
-                    - keeps this response read-only until verification endpoints are added
+                    현재 범위:
+                    - WorkProof lane 1 월간 집계를 상위 입력으로 사용합니다.
+                    - 근무지 기준 활성 계약과 reflected 기록만 반영합니다.
+                    - verification API가 추가되기 전까지는 읽기 전용 응답으로 유지합니다.
                     """,
             security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
     )
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Wage monthly summary returned"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Owned workplace or active contract not found", content = @Content)
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "월간 급여 요약을 반환했습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증에 실패했습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "소유한 근무지 또는 활성 계약을 찾을 수 없습니다.", content = @Content)
     })
+    /**
+     * Wage 화면이 먼저 보여줄 월간 근무/계약 요약 read-model을 반환한다.
+     */
     public ResponseEntity<ApiResponse<WageMonthlySummaryResponse>> getMonthlySummary(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam
@@ -99,23 +106,26 @@ public class WageController {
 
     @GetMapping("/estimate")
     @Operation(
-            summary = "Get reference-only wage estimate",
+            summary = "참고용 예상 급여 조회",
             description = """
-                    Returns the reference-only wage estimate for the authenticated worker.
+                    인증된 근로자의 참고용 예상 급여를 반환합니다.
 
-                    Current scope:
-                    - uses WorkProof lane 1 monthly summary and active contract as inputs
-                    - excludes payslip parsing and verification workflow
-                    - keeps reference-only disclaimer in the response
+                    현재 범위:
+                    - WorkProof lane 1 월간 집계와 활성 계약을 입력으로 사용합니다.
+                    - 급여명세서 파싱과 verification 흐름은 포함하지 않습니다.
+                    - 응답에 참고용 안내 문구를 유지합니다.
                     """,
             security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
     )
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Wage estimate returned"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Owned workplace or active contract not found", content = @Content)
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "예상 급여를 반환했습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증에 실패했습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "소유한 근무지 또는 활성 계약을 찾을 수 없습니다.", content = @Content)
     })
+    /**
+     * verification 전 단계의 참고용 예상 급여를 같은 month/workplace 축으로 계산해 반환한다.
+     */
     public ResponseEntity<ApiResponse<WageEstimateResponse>> getEstimate(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam
@@ -129,21 +139,21 @@ public class WageController {
 
     @GetMapping("/summary")
     @Operation(
-            summary = "Get monthly wage confirmation summary",
+            summary = "월간 급여 확인 요약 조회",
             description = """
-                    Returns a monthly wage summary for the authenticated worker.
+                    인증된 근로자의 월간 급여 확인 요약을 반환합니다.
 
-                    The response combines:
-                    - WorkProof-based reference-only estimate
-                    - latest self-reported actual deposit
-                    - difference and anomaly preview for follow-up confirmation
+                    응답에는 아래 정보가 함께 포함됩니다.
+                    - WorkProof 기반 참고용 예상 급여
+                    - 가장 최근의 실수령 입력값
+                    - 후속 확인을 위한 차이와 이상 징후 미리보기
                     """,
             security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
     )
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Monthly wage summary returned"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content)
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "월간 급여 확인 요약을 반환했습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증에 실패했습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content)
     })
     public ResponseEntity<ApiResponse<WageSummaryResponse>> getSummary(
             @AuthenticationPrincipal AuthenticatedUser user,
