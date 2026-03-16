@@ -911,7 +911,7 @@ Response:
 ### 5.4 `POST /api/documents/proof-packs`
 
 배경: Wage 확인 결과를 설명하거나 회사/외부 기관과 공유할 때 바로 꺼낼 수 있는 증빙 리포트를 만든다.
-v0 메모: 월간 요약, WorkProof 상세표, 급여 추정 근거, 수정 이력표, 첨부 목록(있으면)을 기본 포함 대상으로 본다.
+v0 메모: 월간 요약, WorkProof 상세표, 급여 추정 근거, 수정 이력표, 첨부 목록(있으면)을 기본 포함 대상으로 본다. 입력 anchor는 `wageVerificationId` 하나로 고정하고, `month`와 `workplaceId`는 verification snapshot에서 파생한다. WorkProof 상세표가 필요하면 verification에 저장된 `recordIds`로 보조 조회한다.
 
 Headers:
 | 헤더 | 규칙 | 설명 |
@@ -921,8 +921,6 @@ Headers:
 Request:
 | 필드 | 설명 |
 | --- | --- |
-| `month` | - |
-| `workplaceId` | - |
 | `wageVerificationId` | - |
 
 Response `202 Accepted`:
@@ -939,10 +937,14 @@ Response `202 Accepted`:
 | `409` | `DOCUMENT_DUPLICATE_REQUEST` | - |
 | `404` | `WAGE_VERIFICATION_NOT_FOUND` | - |
 
+추가 메모:
+- Proof Pack은 legacy `POST /api/wage/deposits`, `GET /api/wage/summary`를 직접 입력으로 받지 않는다.
+- 급여 계산/차액/threshold 설명은 verification 생성 시점 snapshot을 재사용한다.
+
 ### 5.5 `POST /api/documents/claim-kits`
 
 배경: 신고/상담 준비에서 필요한 자료를 한 번에 공유하기 위한 묶음 생성 요청이다.
-v0 메모: Proof Pack + 제출용 요약 + 체크리스트를 기본으로 묶고, 첨부가 많으면 `ZIP`을 허용한다.
+v0 메모: Proof Pack + 제출용 요약 + 체크리스트를 기본으로 묶고, 첨부가 많으면 `ZIP`을 허용한다. 이 API도 follow-up 구현에서는 `wageVerificationId`를 anchor로 사용하고 나머지 월/근무지 문맥은 verification snapshot에서 파생하는 방향을 우선한다.
 
 Headers:
 | 헤더 | 규칙 | 설명 |
@@ -1014,7 +1016,7 @@ Response:
 ### 6.2 `POST /api/claim/preparations`
 
 배경: 제출 자체를 대신하지 않고, 사용자가 복사·공유·바로가기를 쉽게 하도록 준비 데이터를 만든다.
-v0 메모: `Idempotency-Key`는 현재 권장으로 두고, 구현 중 비용/캐시 전략을 보며 필수 전환 가능성을 연다.
+v0 메모: `Idempotency-Key`는 현재 권장으로 두고, 구현 중 비용/캐시 전략을 보며 필수 전환 가능성을 연다. summary/checklist/route 추천의 1차 facts는 `wageVerificationId`가 가리키는 verification snapshot에서 읽고, `claimKitDocumentId`는 선택적으로 연결 문서를 덧붙이는 용도다.
 
 Headers:
 | 헤더 | 규칙 | 설명 |
@@ -1044,6 +1046,11 @@ Response `201 Created`:
 | --- | --- | --- |
 | `404` | `WAGE_VERIFICATION_NOT_FOUND` | - |
 | `404` | `CLAIM_KIT_NOT_FOUND` | - |
+
+추가 메모:
+- `claimKitDocumentId`가 들어오면 같은 사용자 소유이면서 같은 verification 문맥에서 생성된 문서만 허용한다.
+- Claim preparation도 legacy `POST /api/wage/deposits`, `GET /api/wage/summary`를 직접 읽지 않는다.
+- 현재 `WageVerification` snapshot이면 P0 준비 문구/체크리스트를 시작하기에 충분하다고 보고, 별도 historical contract snapshot 전용 기능은 후속으로 둔다.
 
 ### 6.3 `GET /api/claim/preparations/{preparationId}`
 

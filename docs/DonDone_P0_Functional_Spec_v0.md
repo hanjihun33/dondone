@@ -378,7 +378,9 @@
 ### 주요 규칙
 - 문서 생성은 비동기 처리(`202 Accepted`)를 전제로 한다.
 - 문서 생성 계열 API는 `Idempotency-Key`를 필수로 둔다.
+- Proof Pack의 request anchor는 `wageVerificationId` 하나로 두고, `month`/`workplaceId`는 verification snapshot에서 파생한다.
 - Proof Pack은 월간 요약, WorkProof 상세표, 급여 추정 근거, 수정 이력, 첨부 목록을 기본 포함 대상으로 본다.
+- Proof Pack의 급여 설명은 verification snapshot을 재사용하고, WorkProof 상세 행은 verification에 저장된 `recordIds`로 보조 조회한다.
 - Claim Kit는 Proof Pack + 제출용 요약 + 체크리스트를 묶고, 첨부가 많으면 `ZIP`을 허용한다.
 - Transfer Receipt는 tx hash와 송금 상태 요약을 포함한다.
 - 실제 파일 접근은 만료 가능한 download URL로 분리한다.
@@ -395,6 +397,7 @@
 - 문서 타입은 `PROOF_PACK`, `CLAIM_KIT`, `TRANSFER_RECEIPT`를 우선 사용한다.
 - 문서 상태는 `QUEUED`, `RUNNING`, `READY`, `FAILED` 수준으로 관리한다.
 - 템플릿은 v1 수준의 초안으로 두고 시각 스타일 고도화는 후속 범위로 남긴다.
+- legacy `POST /api/wage/deposits`, `GET /api/wage/summary`는 기존 화면 호환용으로 남기되, Documents 입력으로 직접 재사용하지 않는다.
 
 ### 열린 질문
 - 제출용 문서 톤을 `공식 제출용`에 더 맞출지, `읽기 쉬운 설명형`에 더 맞출지 여부
@@ -430,6 +433,8 @@
 - claim kit 없이도 preparation을 만들 수 있다.
 - `Idempotency-Key`는 v0에서 권장 수준으로 둔다.
 - Documents와 Claim은 Wage 확인 결과(verification)를 재사용한다.
+- Claim preparation은 verification snapshot을 1차 facts source로 사용하고, 선택적 `claimKitDocumentId`는 연결 문서 보강 용도로만 사용한다.
+- 현재 `WageVerification`이 가진 contract/pay snapshot이면 P0 summary/checklist를 시작하기에 충분하다고 본다.
 
 ### API 매핑
 - `GET /api/claim/routes?locale=ko-KR`
@@ -440,6 +445,7 @@
 - 요약 문구는 facts 기반 템플릿/생성 결과로 다룬다.
 - 생성 직후 `READY` 상태를 반환하는 동기형 흐름을 우선 사용한다.
 - 비용/캐시 전략이 바뀌기 전까지는 idempotency를 권장으로 유지한다.
+- legacy wage deposit/summary와 verification은 공존하지만, Claim의 downstream 입력축은 `wageVerificationId`로 고정한다.
 
 ### 열린 질문
 - claim preparation 생성 비용과 캐시 전략이 정해지면 `Idempotency-Key`를 필수로 전환할지 여부
