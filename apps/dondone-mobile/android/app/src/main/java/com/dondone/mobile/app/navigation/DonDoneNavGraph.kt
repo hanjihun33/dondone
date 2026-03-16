@@ -35,6 +35,11 @@ fun DonDoneNavGraph(
     onWorkproofDetailVisibilityChange: (Boolean) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
+    val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
+    val selectedAdvanceAmount by viewModel.selectedAdvanceAmount.collectAsStateWithLifecycle()
+    val advanceRequestUiState by viewModel.advanceRequestUiState.collectAsStateWithLifecycle()
+    val advanceRequestDetailUiState by viewModel.advanceRequestDetailUiState.collectAsStateWithLifecycle()
 
     NavHost(
         modifier = modifier,
@@ -50,7 +55,7 @@ fun DonDoneNavGraph(
     ) {
         composable(Route.HOME) {
             HomeScreen(
-                uiModel = uiState.toHomeUiModel(),
+                uiModel = uiState.toHomeUiModel(advanceRemoteState),
                 onOpenTransfer = {
                     viewModel.openTransferFlow()
                     navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target -> navController.navigate(target) }
@@ -76,7 +81,17 @@ fun DonDoneNavGraph(
         }
         composable(Route.FINANCE_HOME) {
             FinanceHomeScreen(
-                uiModel = uiState.toFinanceHomeUiModel()
+                uiModel = uiState.toFinanceHomeUiModel(
+                    remoteState = advanceRemoteState,
+                    selectedAdvanceAmount = selectedAdvanceAmount,
+                    advanceRequestUiState = advanceRequestUiState,
+                    advanceRequestDetailUiState = advanceRequestDetailUiState
+                ),
+                onSelectAdvanceAmount = viewModel::selectAdvanceAmount,
+                onRequestAdvance = viewModel::requestAdvance,
+                onClearAdvanceMessage = viewModel::clearAdvanceRequestMessage,
+                onOpenAdvanceRequestDetail = viewModel::openAdvanceRequestDetail,
+                onCloseAdvanceRequestDetail = viewModel::closeAdvanceRequestDetail
             )
         }
         composable(Route.WAGE) {
@@ -100,7 +115,6 @@ fun DonDoneNavGraph(
                 onUpdateRecipientDisplayName = viewModel::updateRecipientDisplayName,
                 onUpdateAmount = viewModel::updateTransferAmount,
                 onChangeRecipient = viewModel::showRecipientStepFromAmount,
-                onChangeAccountFromRecipient = viewModel::showAccountStepFromRecipient,
                 onChangeAccountFromAmount = viewModel::showAccountStepFromAmount,
                 onSubmitTransfer = viewModel::submitTransfer,
                 onDismissTransferConfirmation = viewModel::dismissTransferConfirmation,
@@ -116,9 +130,10 @@ fun DonDoneNavGraph(
         }
         composable(Route.MENU) {
             MenuScreen(
-                uiModel = uiState.toMenuUiModel(),
+                uiModel = uiState.toMenuUiModel(authUiState.session),
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
-                onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } }
+                onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
+                onLogout = viewModel::logout
             )
         }
     }

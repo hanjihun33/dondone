@@ -29,6 +29,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"${kakaoNativeAppKey.replace("\"", "\\\"")}\"")
+        buildConfigField("String", "DONDONE_API_BASE_URL", "\"http://10.0.2.2:8080\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -52,8 +53,8 @@ android {
     }
 
     buildFeatures {
-        buildConfig = true
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -71,6 +72,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.navigation:navigation-compose:2.9.7")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -82,6 +85,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

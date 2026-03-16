@@ -2,6 +2,15 @@ package com.dondone.mobile.app.session
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dondone.mobile.data.advance.AdvanceRemoteMode
+import com.dondone.mobile.data.advance.AdvanceRequestDetailPayload
+import com.dondone.mobile.data.advance.AdvanceRequestItemPayload
+import com.dondone.mobile.data.advance.AdvanceRemoteState
+import com.dondone.mobile.data.advance.AdvanceRepository
+import com.dondone.mobile.data.advance.AdvanceUnauthorizedException
+import com.dondone.mobile.data.advance.BackendAdvanceRepository
+import com.dondone.mobile.data.auth.AuthRepository
+import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferDestinationMode
@@ -17,11 +26,29 @@ import kotlinx.coroutines.launch
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 
-class DemoSessionViewModel : ViewModel() {
+class DemoSessionViewModel(
+    private val authRepository: AuthRepository,
+    private val advanceRepository: AdvanceRepository = BackendAdvanceRepository()
+) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
     private val _uiState = MutableStateFlow(initialState)
     val uiState: StateFlow<DemoState> = _uiState.asStateFlow()
+    private val _authUiState = MutableStateFlow(AuthUiState.restoring())
+    val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
+    private val _advanceRemoteState =
+        MutableStateFlow(AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다."))
+    val advanceRemoteState: StateFlow<AdvanceRemoteState> = _advanceRemoteState.asStateFlow()
+    private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
+    val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
+    private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
+    val advanceRequestUiState: StateFlow<AdvanceRequestUiState> = _advanceRequestUiState.asStateFlow()
+    private val _advanceRequestDetailUiState = MutableStateFlow(AdvanceRequestDetailUiState())
+    val advanceRequestDetailUiState: StateFlow<AdvanceRequestDetailUiState> = _advanceRequestDetailUiState.asStateFlow()
+
+    init {
+        restoreAuthSession()
+    }
 
     fun shiftAsOfDay(delta: Int) {
         _uiState.update { state -> DemoSessionReducer.shiftAsOfDay(state, delta) }
@@ -139,6 +166,278 @@ class DemoSessionViewModel : ViewModel() {
     fun resetSeed() {
         cancelTransferCompletion()
         _uiState.value = initialState
+        _advanceRequestUiState.value = AdvanceRequestUiState()
+        _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
+        refreshAdvanceRemoteState()
+    }
+
+    fun login(email: String, password: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || password.isBlank()) {
+            _authUiState.value = AuthUiState.unauthenticated("이메일과 비밀번호를 입력해 주세요.")
+            return
+        }
+
+        viewModelScope.launch {
+            _authUiState.value = AuthUiState.submitting()
+            try {
+                val session = authRepository.login(trimmedEmail, password)
+                onAuthenticated(session)
+            } catch (error: Exception) {
+                _authUiState.value = AuthUiState.unauthenticated(
+                    error.message ?: "로그인에 실패했어요. 잠시 후 다시 시도해 주세요."
+                )
+                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+            }
+        }
+    }
+
+    fun signup(name: String, email: String, password: String) {
+        val trimmedName = name.trim()
+        val trimmedEmail = email.trim()
+        if (trimmedName.isBlank() || trimmedEmail.isBlank() || password.isBlank()) {
+            _authUiState.value = AuthUiState.unauthenticated("이름, 이메일, 비밀번호를 모두 입력해 주세요.")
+            return
+        }
+        if (password.length < 8) {
+            _authUiState.value = AuthUiState.unauthenticated("비밀번호는 8자 이상이어야 해요.")
+            return
+        }
+
+        viewModelScope.launch {
+            _authUiState.value = AuthUiState.submitting()
+            try {
+                val session = authRepository.signup(trimmedName, trimmedEmail, password)
+                onAuthenticated(session)
+            } catch (error: Exception) {
+                _authUiState.value = AuthUiState.unauthenticated(
+                    error.message ?: "회원가입에 실패했어요. 잠시 후 다시 시도해 주세요."
+                )
+                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+            }
+        }
+    }
+
+    fun clearAuthError() {
+        if (_authUiState.value.errorMessage != null && !_authUiState.value.isSubmitting) {
+            _authUiState.value = _authUiState.value.copy(errorMessage = null)
+        }
+    }
+
+    fun logout() {
+        cancelTransferCompletion()
+        viewModelScope.launch {
+            clearAuthenticatedState(AuthUiState.unauthenticated())
+        }
+    }
+
+    fun selectAdvanceAmount(amount: Int) {
+        _selectedAdvanceAmount.value = amount
+        if (_advanceRequestUiState.value.message != null) {
+            _advanceRequestUiState.value = AdvanceRequestUiState()
+        }
+    }
+
+    fun clearAdvanceRequestMessage() {
+        if (!_advanceRequestUiState.value.isSubmitting && _advanceRequestUiState.value.message != null) {
+            _advanceRequestUiState.value = AdvanceRequestUiState()
+        }
+    }
+
+    fun openAdvanceRequestDetail(requestId: Long) {
+        val cached = _advanceRemoteState.value.requestDetailsById[requestId]
+        if (cached != null) {
+            _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(detail = cached)
+            return
+        }
+
+        val session = _authUiState.value.session ?: run {
+            _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(
+                errorMessage = "로그인 후 다시 시도해 주세요."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(isLoading = true)
+            try {
+                val detail = advanceRepository.getRequestDetail(session.accessToken, requestId)
+                mergeAdvanceRequestDetail(detail)
+                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(detail = detail)
+            } catch (error: AdvanceUnauthorizedException) {
+                expireSession(error.message)
+                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(
+                    errorMessage = error.message ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            } catch (error: Exception) {
+                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(
+                    errorMessage = error.message ?: "미리받기 상세를 불러오지 못했어요."
+                )
+            }
+        }
+    }
+
+    fun closeAdvanceRequestDetail() {
+        _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
+    }
+
+    fun requestAdvance() {
+        val session = _authUiState.value.session ?: run {
+            _advanceRequestUiState.value = AdvanceRequestUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val eligibility = _advanceRemoteState.value.eligibility ?: run {
+            _advanceRequestUiState.value = AdvanceRequestUiState(
+                message = "실연동 한도를 다시 불러온 뒤 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val requestedAmount = (_selectedAdvanceAmount.value ?: eligibility.availableAmount.toInt())
+            .coerceAtMost(eligibility.availableAmount.toInt())
+        if (requestedAmount <= 0) {
+            _advanceRequestUiState.value = AdvanceRequestUiState(
+                message = "신청 가능한 금액이 없어요.",
+                isError = true
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _advanceRequestUiState.value = AdvanceRequestUiState(isSubmitting = true)
+            try {
+                val result = advanceRepository.createRequest(
+                    accessToken = session.accessToken,
+                    workplaceId = eligibility.workplaceId,
+                    requestedAmount = requestedAmount.toLong()
+                )
+                val detail = advanceRepository.getRequestDetail(session.accessToken, result.requestId)
+                loadAdvanceRemoteState(session)
+                mergeAdvanceRequestDetail(detail)
+                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(detail = detail)
+                _advanceRequestUiState.value = AdvanceRequestUiState(
+                    message = "미리받기 신청이 반영됐어요. ${result.status} · ${result.approvedAmount}원",
+                    isError = false
+                )
+            } catch (error: AdvanceUnauthorizedException) {
+                expireSession(error.message)
+                _advanceRequestUiState.value = AdvanceRequestUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _advanceRequestUiState.value = AdvanceRequestUiState(
+                    message = error.message ?: "미리받기 신청에 실패했어요. 잠시 후 다시 시도해 주세요.",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    fun refreshAdvanceRemoteState() {
+        val session = _authUiState.value.session
+        if (session == null) {
+            _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+            return
+        }
+
+        viewModelScope.launch {
+            loadAdvanceRemoteState(session)
+        }
+    }
+
+    private fun restoreAuthSession() {
+        viewModelScope.launch {
+            val session = authRepository.restore()
+            if (session == null) {
+                _authUiState.value = AuthUiState.unauthenticated()
+                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+            } else {
+                onAuthenticated(session)
+            }
+        }
+    }
+
+    private suspend fun onAuthenticated(session: AuthSession) {
+        _authUiState.value = AuthUiState.authenticated(session)
+        loadAdvanceRemoteState(session)
+    }
+
+    private suspend fun loadAdvanceRemoteState(session: AuthSession) {
+        _advanceRemoteState.value = AdvanceRemoteState.loading()
+        val remoteState = advanceRepository.load(session.accessToken)
+        if (!remoteState.isAuthenticated) {
+            clearAuthenticatedState(
+                AuthUiState.unauthenticated(
+                    remoteState.errorMessage ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            )
+            return
+        }
+        _advanceRemoteState.value = remoteState
+        syncSelectedAdvanceAmount(remoteState)
+    }
+
+    private fun syncSelectedAdvanceAmount(remoteState: AdvanceRemoteState) {
+        val availableAmount = remoteState.eligibility?.availableAmount?.toInt() ?: 0
+        if (availableAmount <= 0) {
+            _selectedAdvanceAmount.value = null
+            return
+        }
+        val current = _selectedAdvanceAmount.value
+        if (current != null && current in 1..availableAmount) {
+            return
+        }
+        _selectedAdvanceAmount.value = availableAmount
+    }
+
+    private fun mergeAdvanceRequestDetail(detail: AdvanceRequestDetailPayload) {
+        _advanceRemoteState.update { current ->
+            if (current.mode != AdvanceRemoteMode.CONTENT) {
+                return@update current
+            }
+
+            val mergedRequests = buildList {
+                add(
+                    AdvanceRequestItemPayload(
+                        requestId = detail.requestId,
+                        requestedAmount = detail.requestedAmount,
+                        approvedAmount = detail.approvedAmount,
+                        status = detail.status,
+                        repaymentDueDate = detail.repaymentDueDate
+                    )
+                )
+                addAll(current.requests.filterNot { it.requestId == detail.requestId })
+            }.sortedByDescending { it.requestId }
+
+            current.copy(
+                requests = mergedRequests,
+                requestDetailsById = current.requestDetailsById + (detail.requestId to detail)
+            )
+        }
+    }
+
+    private suspend fun expireSession(message: String?) {
+        clearAuthenticatedState(
+            AuthUiState.unauthenticated(
+                message ?: "세션이 만료되어 다시 로그인해 주세요."
+            )
+        )
+    }
+
+    private suspend fun clearAuthenticatedState(unauthenticatedState: AuthUiState) {
+        authRepository.logout()
+        _uiState.value = initialState
+        _authUiState.value = unauthenticatedState
+        _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(
+            unauthenticatedState.errorMessage ?: "로그인 후 실연동 데이터를 불러옵니다."
+        )
+        _selectedAdvanceAmount.value = null
+        _advanceRequestUiState.value = AdvanceRequestUiState()
+        _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
     }
 
     private fun scheduleTransferCompletion() {
