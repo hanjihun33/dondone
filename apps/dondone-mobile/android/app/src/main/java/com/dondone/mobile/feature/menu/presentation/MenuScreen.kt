@@ -3,6 +3,7 @@ package com.dondone.mobile.feature.menu.presentation
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,8 @@ import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
+import com.dondone.mobile.core.designsystem.pressableScale
+import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 
 private data class MenuServiceAction(
     val label: String,
@@ -201,11 +204,22 @@ private fun MenuServiceActionRow(
     action: MenuServiceAction,
     showDivider: Boolean
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = action.onClick)
+                .clip(RoundedCornerShape(16.dp))
+                .pressableScale(
+                    interactionSource = interactionSource,
+                    pressedScale = 0.99f
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = rememberDonDoneGrayRipple(bounded = true),
+                    onClick = action.onClick
+                )
                 .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -268,12 +282,22 @@ private fun MenuDocumentRow(
     showDivider: Boolean
 ) {
     val colors = menuDocumentColors(document.accent)
+    val interactionSource = remember { MutableInteractionSource() }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onOpenDetail)
+                .clip(RoundedCornerShape(16.dp))
+                .pressableScale(
+                    interactionSource = interactionSource,
+                    pressedScale = 0.99f
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = rememberDonDoneGrayRipple(bounded = true),
+                    onClick = onOpenDetail
+                )
                 .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top
@@ -341,6 +365,8 @@ private fun MenuDocumentActionButton(
     primary: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     val background = when {
         primary && enabled -> DawnSecondary
         primary -> DawnSurfaceAlt
@@ -355,7 +381,17 @@ private fun MenuDocumentActionButton(
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
-            .clickable(enabled = enabled, onClick = onClick),
+            .pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled,
+                pressedScale = 0.98f
+            )
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(18.dp),
         color = background,
         border = BorderStroke(1.dp, DawnBorder)
@@ -469,12 +505,19 @@ private fun MenuSheetHeader(
                 )
             }
         }
-        Text(
-            text = "닫기",
-            modifier = Modifier.clickable(onClick = onDismiss),
-            style = MaterialTheme.typography.labelLarge,
-            color = DawnTextSubtle
-        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(onClick = onDismiss)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "닫기",
+                style = MaterialTheme.typography.labelLarge,
+                color = DawnTextSubtle
+            )
+        }
     }
 }
 
@@ -639,15 +682,18 @@ private fun MenuClaimSheet(
 
         MenuSheetSection(title = "파일") {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = proofDocument != null) {
+                        if (proofDocument != null) onOpenProofDocument()
+                    }
+                    .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "문서로 이동",
-                    modifier = Modifier.clickable {
-                        if (proofDocument != null) onOpenProofDocument()
-                    },
                     style = MaterialTheme.typography.labelLarge,
                     color = DawnPrimary
                 )
@@ -960,11 +1006,22 @@ private fun MenuLanguageChip(
     onClick: () -> Unit,
     showDivider: Boolean
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .clip(RoundedCornerShape(16.dp))
+                .pressableScale(
+                    interactionSource = interactionSource,
+                    pressedScale = 0.99f
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = rememberDonDoneGrayRipple(bounded = true),
+                    onClick = onClick
+                )
                 .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
