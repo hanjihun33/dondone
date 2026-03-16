@@ -24,6 +24,8 @@ public class WageSummaryCalculator {
     private static final long DEDUCTIONS_UNKNOWN_TRIGGER_CAP = 50_000L;
     private static final long MIN_TRIGGER_AMOUNT = 1L;
     private static final int MINUTES_PER_HOUR = 60;
+    // lane 1 estimate is still reference-only, so it currently uses a conservative round-down policy until payroll rules are fixed.
+    private static final RoundingMode LANE1_ESTIMATE_ROUNDING_MODE = RoundingMode.DOWN;
 
     public WageSummarySnapshot summarize(WorkProofMonthlyMetrics metrics,
                                          long normalizedHourlyWage,
@@ -65,6 +67,7 @@ public class WageSummaryCalculator {
         );
     }
 
+    // This is a temporary lane 1 assumption, not a finalized payroll policy.
     public WageEstimateSnapshot estimate(CurrentContractResponse contract,
                                          WorkProofMonthlySummaryContractResponse summary) {
         // P0 규칙대로 기본급/연장/야간을 항목별로 따로 계산하고 floor 성격으로 내린다.
@@ -72,19 +75,19 @@ public class WageSummaryCalculator {
                 summary.integrity().verifiedMinutes(),
                 contract.normalizedHourlyWage(),
                 BigDecimal.ONE,
-                RoundingMode.DOWN
+                LANE1_ESTIMATE_ROUNDING_MODE
         );
         long overtimePremium = prorateAmount(
                 summary.overtimeMinutes(),
                 contract.normalizedHourlyWage(),
                 BigDecimal.valueOf(0.5),
-                RoundingMode.DOWN
+                LANE1_ESTIMATE_ROUNDING_MODE
         );
         long nightPremium = prorateAmount(
                 summary.nightMinutes(),
                 contract.normalizedHourlyWage(),
                 BigDecimal.valueOf(0.5),
-                RoundingMode.DOWN
+                LANE1_ESTIMATE_ROUNDING_MODE
         );
 
         return new WageEstimateSnapshot(

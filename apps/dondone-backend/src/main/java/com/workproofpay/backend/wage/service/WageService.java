@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -156,13 +157,15 @@ public class WageService {
         CurrentContractResponse contract = workProofLane1Service.getCurrentContract(userId, workplaceId);
         WorkProofRecordListResponse records = workProofLane1Service.getRecords(userId, month, workplaceId);
 
-        List<Long> includedRecordIds = records.records().stream()
-                .filter(this::isIncludedForWage)
-                .map(WorkProofRecordListItemResponse::recordId)
-                .toList();
-        int excludedPendingRecordCount = (int) records.records().stream()
-                .filter(record -> !isIncludedForWage(record))
-                .count();
+        List<Long> includedRecordIds = new ArrayList<>();
+        int excludedPendingRecordCount = 0;
+        for (WorkProofRecordListItemResponse record : records.records()) {
+            if (isIncludedForWage(record)) {
+                includedRecordIds.add(record.recordId());
+                continue;
+            }
+            excludedPendingRecordCount++;
+        }
 
         return new WageLane1Context(contract, summary, includedRecordIds, excludedPendingRecordCount);
     }
