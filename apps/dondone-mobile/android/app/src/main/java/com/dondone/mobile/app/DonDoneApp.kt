@@ -34,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,13 +51,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dondone.mobile.app.navigation.DonDoneNavGraph
 import com.dondone.mobile.app.navigation.Route
 import com.dondone.mobile.app.navigation.mainTabs
+import com.dondone.mobile.app.navigation.navigateToRootTab
 import com.dondone.mobile.app.navigation.resolveScreenChrome
+import com.dondone.mobile.app.navigation.shouldResetWorkproofUiState
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.DonDoneWordmark
 import com.dondone.mobile.core.designsystem.pressableScale
@@ -80,6 +82,16 @@ fun DonDoneApp(
     val currentRoute = currentDestination?.route.orEmpty()
     val remittance = uiState.remittance
     var isWorkproofDetailVisible by rememberSaveable { mutableStateOf(false) }
+    var workproofResetVersion by rememberSaveable { mutableStateOf(0) }
+    var previousRoute by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(currentRoute) {
+        if (shouldResetWorkproofUiState(previousRoute, currentRoute)) {
+            isWorkproofDetailVisible = false
+            workproofResetVersion += 1
+        }
+        previousRoute = currentRoute
+    }
 
     val chrome = resolveScreenChrome(
         route = currentRoute,
@@ -92,16 +104,6 @@ fun DonDoneApp(
     val headerDateText = uiState.demo.run {
         "$year.${month.toString().padStart(2, '0')}.${asOfDay.toString().padStart(2, '0')}"
     }.takeIf { chrome.showDate }
-
-    fun navigateToRootTab(route: String) {
-        navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) {
-                saveState = true
-            }
-            launchSingleTop = true
-            restoreState = true
-        }
-    }
 
     fun handleBack() {
         if (currentRoute != Route.TRANSFER) {
@@ -147,7 +149,7 @@ fun DonDoneApp(
                 headerTitle = headerTitle,
                 headerDateText = headerDateText,
                 onBack = ::handleBack,
-                onMenuClick = { navController.navigate(Route.MENU) }
+                onMenuClick = { navController.navigateToRootTab(Route.MENU) }
             )
         },
         bottomBar = {
@@ -155,7 +157,7 @@ fun DonDoneApp(
                 visible = chrome.showRootTabs,
                 currentDestination = currentDestination,
                 currentRoute = currentRoute,
-                onTabClick = ::navigateToRootTab
+                onTabClick = { route -> navController.navigateToRootTab(route) }
             )
         }
     ) { innerPadding ->
@@ -166,6 +168,8 @@ fun DonDoneApp(
             ),
             navController = navController,
             viewModel = viewModel,
+            workproofResetVersion = workproofResetVersion,
+            onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
             onWorkproofDetailVisibilityChange = { visible ->
                 isWorkproofDetailVisible = visible
             }

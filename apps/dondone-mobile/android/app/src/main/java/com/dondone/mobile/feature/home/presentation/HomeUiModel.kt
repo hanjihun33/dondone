@@ -56,6 +56,7 @@ data class HomeMoneyUiModel(
     val estimatedText: String,
     val actualText: String,
     val differenceText: String,
+    val showWorkActionCard: Boolean,
     val showPaydayCard: Boolean,
     val payday: HomePaydayUiModel,
     val nextAction: HomeNextActionUiModel
@@ -72,10 +73,11 @@ fun DemoState.toHomeUiModel(): HomeUiModel {
     val wageEstimate = WageEstimator.calculate(this)
     val advance = AdvanceCalculator.calculate(this)
     val progress = if (advance.progressTargetDays == 0) 1f else advance.verifiedDays / advance.progressTargetDays.toFloat()
-    val clockIn = workproof.today.clockIn ?: "-"
-    val clockOut = workproof.today.clockOut ?: "-"
     val formattedMonth = demo.month.toString().padStart(2, '0')
     fun formatDay(day: Int): String = day.toString().padStart(2, '0')
+    val currentDateText = "${demo.year}-$formattedMonth-${formatDay(demo.asOfDay)}"
+    val clockIn = workproof.today.clockIn?.let { "$currentDateText · $it" } ?: "-"
+    val clockOut = workproof.today.clockOut?.let { "$currentDateText · $it" } ?: "-"
 
     val workStatusText = when {
         workproof.today.clockOut != null -> "완료"
@@ -150,8 +152,8 @@ fun DemoState.toHomeUiModel(): HomeUiModel {
 
         hasDifference -> HomeNextActionUiModel(
             title = "다음 행동",
-            message = "확인 필요한 차이가 보여요.\n급여 점검에서 근거부터 확인해볼까요?",
-            buttonText = "급여 점검",
+            message = "실제 입금액과 예상 급여에 차이가 있어요.",
+            buttonText = "보기",
             actionTarget = HomeActionTarget.WAGE
         )
 
@@ -175,7 +177,7 @@ fun DemoState.toHomeUiModel(): HomeUiModel {
             balanceText = formatKrw(selectedAccount.balance)
         ),
         work = HomeWorkUiModel(
-            dateText = "${demo.year}-$formattedMonth-${formatDay(demo.asOfDay)} · ${workproof.workplaceName}",
+            dateText = currentDateText,
             statusText = workStatusText,
             statusTone = workStatusTone,
             canClockIn = workproof.today.clockIn == null,
@@ -203,6 +205,7 @@ fun DemoState.toHomeUiModel(): HomeUiModel {
             estimatedText = formatKrw(wageEstimate.total),
             actualText = formatKrw(wage.actualDeposit),
             differenceText = formatKrw(abs(wageEstimate.difference)),
+            showWorkActionCard = isDepositRecorded && hasDifference,
             showPaydayCard = isDepositRecorded && !hasDifference,
             payday = payday,
             nextAction = nextAction

@@ -19,6 +19,7 @@ class HomeUiModelTest {
 
         assertEquals("입금 대기", uiModel.money.statusText)
         assertEquals(HomeActionTarget.FINANCE, uiModel.money.nextAction.actionTarget)
+        assertFalse(uiModel.money.showWorkActionCard)
         assertFalse(uiModel.money.showPaydayCard)
     }
 
@@ -35,6 +36,7 @@ class HomeUiModelTest {
 
         assertEquals("확인 필요한 차이", uiModel.money.statusText)
         assertEquals(HomeActionTarget.WAGE, uiModel.money.nextAction.actionTarget)
+        assertTrue(uiModel.money.showWorkActionCard)
         assertFalse(uiModel.money.showPaydayCard)
     }
 
@@ -56,6 +58,7 @@ class HomeUiModelTest {
 
         assertEquals("이상 없음", uiModel.money.statusText)
         assertEquals(HomeActionTarget.MENU, uiModel.money.nextAction.actionTarget)
+        assertFalse(uiModel.money.showWorkActionCard)
         assertTrue(uiModel.money.showPaydayCard)
     }
 }
