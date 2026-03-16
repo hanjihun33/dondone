@@ -32,6 +32,7 @@ public enum ErrorCode {
     ACTIVE_CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "Active contract not found"),
     ACTIVE_WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "Active workproof not found"),
     WAGE_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Wage verification not found"),
+    ADVANCE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Advance request not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     ACTIVE_CONTRACT_REQUIRED(HttpStatus.CONFLICT, "Active contract is required"),
@@ -39,6 +40,12 @@ public enum ErrorCode {
     ACTIVE_WORKPROOF_EXISTS(HttpStatus.CONFLICT, "Active workproof already exists"),
     WORK_DATE_ALREADY_EXISTS(HttpStatus.CONFLICT, "A workproof already exists for the work date"),
     CHECK_OUT_BEFORE_CHECK_IN(HttpStatus.CONFLICT, "checkOut device time must be after the active checkIn time"),
+    ADVANCE_DUPLICATE_REQUEST(HttpStatus.CONFLICT, "Advance request already exists for the idempotency key"),
+    ADVANCE_NOT_ELIGIBLE(HttpStatus.CONFLICT, "Advance is not eligible"),
+    IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD(HttpStatus.CONFLICT, "Idempotency key was reused with a different payload"),
+
+    REQUEST_AMOUNT_EXCEEDS_LIMIT(HttpStatus.BAD_REQUEST, "Requested amount exceeds the available advance limit"),
+    IDEMPOTENCY_KEY_REQUIRED(HttpStatus.BAD_REQUEST, "Idempotency-Key header is required"),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
