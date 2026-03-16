@@ -9,4 +9,8 @@ object KakaoMapSupport {
         val primaryAbi = Build.SUPPORTED_ABIS.firstOrNull().orEmpty()
         return supportedAbiPrefixes.any { prefix -> primaryAbi.startsWith(prefix) }
     }
+
+    fun isMapAvailable(appKey: String): Boolean {
+        return appKey.isNotBlank() && isRuntimeSupported()
+    }
 }

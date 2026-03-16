@@ -1,5 +1,6 @@
 package com.dondone.mobile.feature.workproof.presentation
 
+import android.location.Location
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.WorkRecord
@@ -180,17 +181,13 @@ private fun calculateDistanceMeters(
     endLatitude: Double,
     endLongitude: Double
 ): Int {
-    val earthRadiusMeters = 6_371_000.0
-    val startLatitudeRadians = Math.toRadians(startLatitude)
-    val endLatitudeRadians = Math.toRadians(endLatitude)
-    val latitudeDeltaRadians = Math.toRadians(endLatitude - startLatitude)
-    val longitudeDeltaRadians = Math.toRadians(endLongitude - startLongitude)
-
-    val haversine = kotlin.math.sin(latitudeDeltaRadians / 2).let { it * it } +
-        kotlin.math.cos(startLatitudeRadians) *
-        kotlin.math.cos(endLatitudeRadians) *
-        kotlin.math.sin(longitudeDeltaRadians / 2).let { it * it }
-
-    val arc = 2 * kotlin.math.atan2(kotlin.math.sqrt(haversine), kotlin.math.sqrt(1 - haversine))
-    return (earthRadiusMeters * arc).toInt()
+    val result = FloatArray(1)
+    Location.distanceBetween(
+        startLatitude,
+        startLongitude,
+        endLatitude,
+        endLongitude,
+        result
+    )
+    return result.first().toInt()
 }

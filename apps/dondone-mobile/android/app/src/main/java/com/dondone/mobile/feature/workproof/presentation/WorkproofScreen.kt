@@ -436,7 +436,7 @@ private fun WorkproofWorkplaceMapCard(
     uiModel: WorkproofSummaryUiModel
 ) {
     val isKakaoMapAvailable = remember {
-        BuildConfig.KAKAO_NATIVE_APP_KEY.isNotBlank() && KakaoMapSupport.isRuntimeSupported()
+        KakaoMapSupport.isMapAvailable(BuildConfig.KAKAO_NATIVE_APP_KEY)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -680,6 +680,8 @@ private fun rememberKakaoMapViewWithLifecycle(): MapView {
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
+            mapView.pause()
+            mapView.finish()
         }
     }
 

@@ -7,7 +7,7 @@ import com.kakao.vectormap.KakaoMapSdk
 class DonDoneApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        if (BuildConfig.KAKAO_NATIVE_APP_KEY.isNotBlank() && KakaoMapSupport.isRuntimeSupported()) {
+        if (KakaoMapSupport.isMapAvailable(BuildConfig.KAKAO_NATIVE_APP_KEY)) {
             KakaoMapSdk.init(this, BuildConfig.KAKAO_NATIVE_APP_KEY)
         }
     }
