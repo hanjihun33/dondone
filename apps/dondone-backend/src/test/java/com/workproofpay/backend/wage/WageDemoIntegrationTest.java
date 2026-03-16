@@ -73,15 +73,18 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void returnsLane1MonthlySummaryAndEstimateFromWorkProofInputs() throws Exception {
+        // 근무지 등록 -> 계약 생성 -> 출퇴근 2건 생성 -> Wage lane1 summary/estimate 조회까지 read 흐름을 검증한다.
         User user = userRepository.save(User.register("lane1-wage@test.com", "hashed", "Tester"));
         String token = tokenFor(user);
         Lane1Fixture fixture = createLane1WorkplaceAndContract(token);
 
+        // 1. reflected 근무 2건을 만든다.
         Long firstRecordId = checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
         checkOut(token, LocalDateTime.of(2026, 3, 10, 18, 0));
         Long secondRecordId = checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 12, 21, 0));
         checkOut(token, LocalDateTime.of(2026, 3, 12, 23, 0));
 
+        // 2. WorkProof monthly summary를 입력으로 쓰는 Wage 월간 요약 응답을 검증한다.
         mockMvc.perform(get("/api/wage/monthly-summary")
                         .header("Authorization", bearer(token))
                         .param("month", "2026-03")
@@ -103,6 +106,7 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                         secondRecordId.intValue()
                 )));
 
+        // 3. 같은 입력축으로 reference-only estimate 응답이 계산되는지 확인한다.
         mockMvc.perform(get("/api/wage/estimate")
                         .header("Authorization", bearer(token))
                         .param("month", "2026-03")
@@ -128,6 +132,7 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void recordsDepositSummarizesWageAndFiltersDemoStateByAsOf() throws Exception {
+        // 기존 wage summary/deposit 흐름이 lane1 read endpoint 추가 후에도 유지되는지 회귀 검증한다.
         User user = userRepository.save(User.register("wage@test.com", "hashed", "Tester"));
         String token = tokenFor(user);
 
@@ -227,6 +232,7 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void returnsStructuredValidationDetailsForInvalidQueryParams() throws Exception {
+        // 기존 summary와 신규 lane1 read endpoint가 모두 구조화된 validation 오류를 유지하는지 검증한다.
         User user = userRepository.save(User.register("validation@test.com", "hashed", "Tester"));
         String token = tokenFor(user);
 
@@ -256,6 +262,7 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Test
     void usesLatestDepositVisibleAtAsOfAndDoesNotFlagZeroDifference() throws Exception {
+        // 기존 summary 흐름에서 asOf 기준 최신 입금 선택과 임계값 판정이 유지되는지 확인한다.
         User user = userRepository.save(User.register("latest@test.com", "hashed", "Tester"));
         String token = tokenFor(user);
 

@@ -29,6 +29,10 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+/**
+ * Wage lane 1에서는 WorkProof upstream 결과를 조합해 월간 요약과 참고용 예상 급여 조회를 먼저 연다.
+ * 실제 입금 비교와 verification 생성은 기존 summary/deposit 흐름과 별도 후속 단계로 남긴다.
+ */
 public class WageService {
 
     private static final String REFERENCE_ONLY_DISCLAIMER =
@@ -81,6 +85,9 @@ public class WageService {
     }
 
     @Transactional(readOnly = true)
+    /**
+     * WorkProof lane 1 월간 집계와 활성 계약을 조합해 Wage 월간 요약 응답을 만든다.
+     */
     public WageMonthlySummaryResponse getMonthlySummary(Long userId, String month, Long workplaceId) {
         WageLane1Context context = loadLane1Context(userId, month, workplaceId);
         return WageMonthlySummaryResponse.from(
@@ -92,6 +99,9 @@ public class WageService {
     }
 
     @Transactional(readOnly = true)
+    /**
+     * 같은 upstream 입력축에서 참고용 급여 추정 스냅샷까지 계산해 Wage estimate 응답을 만든다.
+     */
     public WageEstimateResponse getEstimate(Long userId, String month, Long workplaceId) {
         WageLane1Context context = loadLane1Context(userId, month, workplaceId);
         WageMonthlySummaryResponse summary = WageMonthlySummaryResponse.from(
@@ -140,6 +150,7 @@ public class WageService {
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
     }
 
+    // lane 1은 WorkProof의 summary/current-contract/records를 한 번에 읽어 Wage read-model로 고정한다.
     private WageLane1Context loadLane1Context(Long userId, String month, Long workplaceId) {
         WorkProofMonthlySummaryContractResponse summary = workProofLane1Service.getMonthlySummary(userId, month, workplaceId);
         CurrentContractResponse contract = workProofLane1Service.getCurrentContract(userId, workplaceId);

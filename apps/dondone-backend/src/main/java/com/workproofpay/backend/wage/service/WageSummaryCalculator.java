@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+/**
+ * Wage 계산 규칙을 한 곳에 모아 기존 summary 흐름과 lane 1 estimate 흐름이 같은 기준을 공유하게 한다.
+ */
 public class WageSummaryCalculator {
 
     private static final BigDecimal DEDUCTIONS_KNOWN_TRIGGER_RATIO = BigDecimal.valueOf(0.02);
@@ -64,6 +67,7 @@ public class WageSummaryCalculator {
 
     public WageEstimateSnapshot estimate(CurrentContractResponse contract,
                                          WorkProofMonthlySummaryContractResponse summary) {
+        // P0 규칙대로 기본급/연장/야간을 항목별로 따로 계산하고 floor 성격으로 내린다.
         long baseEstimate = prorateAmount(
                 summary.integrity().verifiedMinutes(),
                 contract.normalizedHourlyWage(),
