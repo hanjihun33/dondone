@@ -155,8 +155,7 @@ private fun HomeAccountHero(
         HomePrimaryButton(
             text = "송금하기",
             onClick = onOpenTransfer,
-            modifier = Modifier.fillMaxWidth(),
-            enablePressScale = false
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -460,8 +459,7 @@ private fun HomePrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    enablePressScale: Boolean = true
+    enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -471,14 +469,10 @@ private fun HomePrimaryButton(
         Button(
             onClick = onClick,
             enabled = enabled,
-            modifier = if (enablePressScale) {
-                modifier.pressableScale(
-                    interactionSource = interactionSource,
-                    enabled = enabled
-                )
-            } else {
-                modifier
-            },
+            modifier = modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
             interactionSource = interactionSource,
             shape = RoundedCornerShape(16.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),

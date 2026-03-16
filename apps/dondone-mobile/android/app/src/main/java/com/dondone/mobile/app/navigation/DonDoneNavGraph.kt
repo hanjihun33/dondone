@@ -40,6 +40,8 @@ fun DonDoneNavGraph(
         modifier = modifier,
         navController = navController,
         startDestination = Route.HOME,
+        // Navigation Compose applies a default crossfade/size transform. Disable it so
+        // route changes render as immediate swaps instead of overlapping old/new screens.
         enterTransition = { EnterTransition.None },
         exitTransition = { ExitTransition.None },
         popEnterTransition = { EnterTransition.None },

@@ -61,7 +61,6 @@ import com.dondone.mobile.app.navigation.resolveScreenChrome
 import com.dondone.mobile.app.navigation.shouldResetWorkproofUiState
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.DonDoneWordmark
-import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus

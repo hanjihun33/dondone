@@ -42,21 +42,15 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.composed
 
 private val DonDoneGrayRipple = Color(0x1F4E5968)
 
+@Suppress("UNUSED_PARAMETER")
 fun Modifier.pressableScale(
     interactionSource: InteractionSource,
     enabled: Boolean = true,
     pressedScale: Float = 0.97f
-): Modifier = composed {
-    // Keep the call sites stable while disabling press-scale motion globally.
-    interactionSource
-    enabled
-    pressedScale
-    this
-}
+): Modifier = this
 
 fun rememberDonDoneGrayRipple(
     bounded: Boolean = true,
