@@ -4,9 +4,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public record GetWorkProofMonthlySummaryQuery(
         @NotBlank(message = "month is required")
+        @Size(min = 7, max = 7, message = "month must be exactly 7 characters")
         @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "month must follow YYYY-MM")
         String month,
 

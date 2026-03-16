@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -241,6 +242,14 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
+
+        mockMvc.perform(get("/api/workproof/records")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-031")
+                        .param("workplaceId", workplaceId.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.details[*].message").value(hasItem("month must be exactly 7 characters")));
 
         // 3. 같은 근무지에 활성 계약이 이미 있으면 중복 생성이 막혀야 한다.
         mockMvc.perform(post("/api/workproof/contracts")
