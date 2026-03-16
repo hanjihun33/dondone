@@ -1,0 +1,108 @@
+package com.workproofpay.backend.documents.model;
+
+import com.workproofpay.backend.auth.model.User;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+/**
+ * 실제 렌더링 job이 없어도 request anchor와 idempotency를 먼저 고정하기 위한 문서 생성 요청 엔티티다.
+ */
+@Entity
+@Table(
+        name = "document_generation_requests",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_document_generation_requests_user_type_key",
+                        columnNames = {"user_id", "document_type", "idempotency_key"}
+                )
+        }
+)
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class DocumentGenerationRequest {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "request_id", nullable = false, unique = true, length = 36)
+    private String requestId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false, length = 30)
+    private DocumentType documentType;
+
+    @Column(name = "wage_verification_id", nullable = false)
+    private Long wageVerificationId;
+
+    @Column(name = "year_month", nullable = false, length = 7)
+    private String month;
+
+    @Column(name = "workplace_id", nullable = false)
+    private Long workplaceId;
+
+    @Column(name = "idempotency_key", nullable = false, length = 120)
+    private String idempotencyKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private DocumentGenerationStatus status;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    private DocumentGenerationRequest(User user,
+                                      DocumentType documentType,
+                                      Long wageVerificationId,
+                                      String month,
+                                      Long workplaceId,
+                                      String idempotencyKey) {
+        this.user = user;
+        this.documentType = documentType;
+        this.wageVerificationId = wageVerificationId;
+        this.month = month;
+        this.workplaceId = workplaceId;
+        this.idempotencyKey = idempotencyKey;
+        this.status = DocumentGenerationStatus.QUEUED;
+    }
+
+    public static DocumentGenerationRequest queueProofPack(User user,
+                                                           Long wageVerificationId,
+                                                           String month,
+                                                           Long workplaceId,
+                                                           String idempotencyKey) {
+        return new DocumentGenerationRequest(
+                user,
+                DocumentType.PROOF_PACK,
+                wageVerificationId,
+                month,
+                workplaceId,
+                idempotencyKey
+        );
+    }
+
+    @PrePersist
+    public void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.requestId = UUID.randomUUID().toString();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+}
