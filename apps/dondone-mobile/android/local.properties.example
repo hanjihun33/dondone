@@ -1,0 +1,4 @@
+# 이 파일을 각자 로컬 환경에서 `local.properties`로 복사한 뒤 값을 채워주세요.
+
+# Kakao Maps Android SDK 네이티브 앱 키
+KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY

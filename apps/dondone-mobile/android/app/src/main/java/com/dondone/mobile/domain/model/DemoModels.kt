@@ -33,6 +33,10 @@ data class WorkAudit(
 data class WorkproofData(
     val workplaceName: String,
     val workplaceAddress: String,
+    val workplaceLatitude: Double,
+    val workplaceLongitude: Double,
+    val currentLatitude: Double,
+    val currentLongitude: Double,
     val today: TodayWork,
     val records: List<WorkRecord>,
     val audit: List<WorkAudit>

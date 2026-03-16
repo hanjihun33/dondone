@@ -1,5 +1,6 @@
 package com.dondone.mobile.feature.workproof.presentation
 
+import android.location.Location
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.WorkRecord
@@ -26,7 +27,16 @@ data class WorkproofSummaryUiModel(
     val verifiedDays: Int,
     val auditCount: Int,
     val todayInTime: String?,
-    val todayOutTime: String?
+    val todayOutTime: String?,
+    val workplaceLatitude: Double,
+    val workplaceLongitude: Double,
+    val currentLatitude: Double,
+    val currentLongitude: Double,
+    val workplaceRadiusMeters: Int,
+    val distanceToWorkplaceMeters: Int,
+    val isWithinWorkplaceRadius: Boolean,
+    val locationStatusText: String,
+    val locationStatusDetailText: String
 )
 
 data class WorkproofCalendarCellUiModel(
@@ -65,6 +75,14 @@ data class WorkproofUiModel(
 fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val verifiedSnapshot = WorkproofCalculator.verify(this)
+    val workplaceRadiusMeters = 100
+    val distanceToWorkplaceMeters = calculateDistanceMeters(
+        startLatitude = workproof.currentLatitude,
+        startLongitude = workproof.currentLongitude,
+        endLatitude = workproof.workplaceLatitude,
+        endLongitude = workproof.workplaceLongitude
+    )
+    val isWithinWorkplaceRadius = distanceToWorkplaceMeters <= workplaceRadiusMeters
     val dayTones = (1..demo.monthLength).associateWith { day ->
         when {
             day > demo.asOfDay -> WorkproofCalendarTone.UNAVAILABLE
@@ -105,7 +123,24 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
             verifiedDays = verifiedSnapshot.verifiedDays,
             auditCount = workproof.audit.size,
             todayInTime = workproof.today.clockIn?.let { "$todayDateText · $it" },
-            todayOutTime = workproof.today.clockOut?.let { "$todayDateText · $it" }
+            todayOutTime = workproof.today.clockOut?.let { "$todayDateText · $it" },
+            workplaceLatitude = workproof.workplaceLatitude,
+            workplaceLongitude = workproof.workplaceLongitude,
+            currentLatitude = workproof.currentLatitude,
+            currentLongitude = workproof.currentLongitude,
+            workplaceRadiusMeters = workplaceRadiusMeters,
+            distanceToWorkplaceMeters = distanceToWorkplaceMeters,
+            isWithinWorkplaceRadius = isWithinWorkplaceRadius,
+            locationStatusText = if (isWithinWorkplaceRadius) {
+                "근무지 반경 안에 있어요"
+            } else {
+                "근무지 반경 밖이에요"
+            },
+            locationStatusDetailText = if (isWithinWorkplaceRadius) {
+                "현재 위치가 근무지 기준 ${workplaceRadiusMeters}m 안에 있어 출퇴근 버튼을 사용할 수 있어요."
+            } else {
+                "현재 위치가 근무지에서 ${distanceToWorkplaceMeters}m 떨어져 있어요. 반경 ${workplaceRadiusMeters}m 안에 들어오면 출퇴근 버튼이 활성화돼요."
+            }
         ),
         recentRecords = recentRecords,
         auditPreview = auditItems.firstOrNull(),
@@ -139,3 +174,20 @@ private fun formatDateText(
 ): String = "$year.${formatTwoDigits(month)}.${formatTwoDigits(day)}"
 
 private fun formatTwoDigits(value: Int): String = value.toString().padStart(2, '0')
+
+private fun calculateDistanceMeters(
+    startLatitude: Double,
+    startLongitude: Double,
+    endLatitude: Double,
+    endLongitude: Double
+): Int {
+    val result = FloatArray(1)
+    Location.distanceBetween(
+        startLatitude,
+        startLongitude,
+        endLatitude,
+        endLongitude,
+        result
+    )
+    return result.first().toInt()
+}

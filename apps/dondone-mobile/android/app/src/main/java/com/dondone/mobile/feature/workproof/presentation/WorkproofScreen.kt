@@ -29,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -52,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,9 +63,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.dondone.mobile.BuildConfig
 import com.dondone.mobile.R
 import com.dondone.mobile.core.designsystem.DawnBorder
-import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnPrimaryDeep
 import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
@@ -73,6 +78,20 @@ import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.core.map.KakaoMapSupport
+import com.kakao.vectormap.KakaoMap
+import com.kakao.vectormap.KakaoMapReadyCallback
+import com.kakao.vectormap.LatLng
+import com.kakao.vectormap.MapLifeCycleCallback
+import com.kakao.vectormap.MapView
+import com.kakao.vectormap.camera.CameraUpdateFactory
+import com.kakao.vectormap.label.LabelOptions
+import com.kakao.vectormap.label.LabelStyle
+import com.kakao.vectormap.label.LabelStyles
+import com.kakao.vectormap.shape.DotPoints
+import com.kakao.vectormap.shape.PolygonOptions
+import com.kakao.vectormap.shape.PolygonStyles
+import com.kakao.vectormap.shape.PolygonStylesSet
 import java.time.YearMonth
 
 private val WorkproofCanvas = Color.White
@@ -94,6 +113,8 @@ private val WorkproofCompleteText = Color(0xFF5E3CC5)
 private val WorkproofModifiedBackground = Color(0xFFF7E4F4)
 private val WorkproofModifiedBorder = Color(0xFFD98FD0)
 private val WorkproofModifiedText = Color(0xFFAA3E96)
+private val WorkproofMapWorkplacePin = DawnText
+private val WorkproofMapCurrentPin = DawnPrimaryDeep
 private val WorkproofWeekdays = listOf("일", "월", "화", "수", "목", "금", "토")
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -280,6 +301,8 @@ private fun WorkproofPunchCard(
     onClockOut: () -> Unit,
     onToggleDetails: () -> Unit
 ) {
+    val isClockActionEnabled = uiModel.isWithinWorkplaceRadius
+
     WorkproofSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             WorkproofSectionHeader(
@@ -301,6 +324,7 @@ private fun WorkproofPunchCard(
                     }
                 }
             )
+            WorkproofLocationStatusCard(uiModel = uiModel)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -308,17 +332,16 @@ private fun WorkproofPunchCard(
                 PrimaryActionButton(
                     text = stringResource(R.string.workproof_label_clock_in),
                     onClick = onClockIn,
-                    enabled = uiModel.canClockIn,
+                    enabled = uiModel.canClockIn && isClockActionEnabled,
                     modifier = Modifier.weight(1f)
                 )
                 SecondaryActionButton(
                     text = stringResource(R.string.workproof_label_clock_out),
                     onClick = onClockOut,
-                    enabled = uiModel.canClockOut,
+                    enabled = uiModel.canClockOut && isClockActionEnabled,
                     modifier = Modifier.weight(1f)
                 )
             }
-
             WorkproofKeyValueRow(
                 label = stringResource(R.string.workproof_label_clock_in),
                 value = timeOrPlaceholder(uiModel.todayInTime)
@@ -335,8 +358,304 @@ private fun WorkproofPunchCard(
                 label = stringResource(R.string.workproof_label_audits),
                 value = stringResource(R.string.workproof_value_audit_count, uiModel.auditCount)
             )
+            HorizontalDivider(color = WorkproofDivider)
+            WorkproofWorkplaceMapCard(uiModel = uiModel)
         }
     }
+}
+
+@Composable
+private fun WorkproofLocationStatusCard(
+    uiModel: WorkproofSummaryUiModel
+) {
+    val badgeBackground = if (uiModel.isWithinWorkplaceRadius) {
+        DawnSurfaceAlt
+    } else {
+        Color(0xFFFFF4DD)
+    }
+    val badgeColor = if (uiModel.isWithinWorkplaceRadius) {
+        DawnPrimaryDeep
+    } else {
+        WorkproofPartialText
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(badgeBackground)
+                .border(1.dp, DawnBorder, RoundedCornerShape(999.dp))
+                .padding(horizontal = 12.dp, vertical = 7.dp)
+        ) {
+            Text(
+                text = uiModel.locationStatusText,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                color = badgeColor
+            )
+        }
+        Text(
+            text = uiModel.locationStatusDetailText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DawnTextSubtle
+        )
+    }
+}
+
+@Composable
+private fun WorkproofWorkplaceMapCard(
+    uiModel: WorkproofSummaryUiModel
+) {
+    val isKakaoMapAvailable = remember {
+        KakaoMapSupport.isMapAvailable(BuildConfig.KAKAO_NATIVE_APP_KEY)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(
+            text = "위치",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+            color = DawnText
+        )
+
+        if (!isKakaoMapAvailable) {
+            WorkproofMapFallbackCard(
+                hasApiKey = BuildConfig.KAKAO_NATIVE_APP_KEY.isNotBlank(),
+                isRuntimeSupported = KakaoMapSupport.isRuntimeSupported()
+            )
+        } else {
+            KakaoWorkplaceMapView(
+                workplaceLatitude = uiModel.workplaceLatitude,
+                workplaceLongitude = uiModel.workplaceLongitude,
+                currentLatitude = uiModel.currentLatitude,
+                currentLongitude = uiModel.currentLongitude,
+                workplaceRadiusMeters = uiModel.workplaceRadiusMeters
+            )
+        }
+
+        Text(
+            text = "근무지 핀과 반경 원을 확인한 뒤, 반경 안에 들어오면 출퇴근 버튼을 사용할 수 있어요.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = DawnTextSubtle
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            WorkproofMapLegendItem(
+                color = WorkproofMapCurrentPin,
+                label = "현재 내 위치"
+            )
+            WorkproofMapLegendItem(
+                color = WorkproofMapWorkplacePin,
+                label = "근무지 위치"
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorkproofMapFallbackCard(
+    hasApiKey: Boolean,
+    isRuntimeSupported: Boolean
+) {
+    val message = when {
+        !hasApiKey -> "KAKAO_NATIVE_APP_KEY를 설정하면 지도가 표시돼요."
+        !isRuntimeSupported -> "현재 실행 환경에서는 카카오 지도를 지원하지 않아 지도 없이 표시돼요."
+        else -> "지도를 불러올 수 없어요."
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(210.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color(0xFFF7F9FC))
+            .border(1.dp, DawnBorder, RoundedCornerShape(28.dp))
+            .padding(horizontal = 20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyLarge,
+            color = DawnTextSubtle
+        )
+    }
+}
+
+@Composable
+private fun KakaoWorkplaceMapView(
+    workplaceLatitude: Double,
+    workplaceLongitude: Double,
+    currentLatitude: Double,
+    currentLongitude: Double,
+    workplaceRadiusMeters: Int
+) {
+    val mapView = rememberKakaoMapViewWithLifecycle()
+    var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
+    var isCameraInitialized by rememberSaveable { mutableStateOf(false) }
+    var isWorkplacePinAdded by rememberSaveable { mutableStateOf(false) }
+    var isCurrentPinAdded by rememberSaveable { mutableStateOf(false) }
+    var isRadiusCircleAdded by rememberSaveable { mutableStateOf(false) }
+    val workplacePosition = remember(workplaceLatitude, workplaceLongitude) {
+        LatLng.from(workplaceLatitude, workplaceLongitude)
+    }
+    val currentPosition = remember(currentLatitude, currentLongitude) {
+        LatLng.from(currentLatitude, currentLongitude)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(210.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .border(1.dp, DawnBorder, RoundedCornerShape(28.dp))
+        ) {
+            AndroidView(
+                factory = {
+                    mapView.apply {
+                        start(
+                            object : MapLifeCycleCallback() {
+                                override fun onMapDestroy() = Unit
+
+                                override fun onMapError(error: Exception) = Unit
+                            },
+                            object : KakaoMapReadyCallback() {
+                                override fun onMapReady(map: KakaoMap) {
+                                    kakaoMap = map
+                                    if (!isWorkplacePinAdded) {
+                                        map.labelManager?.let { labelManager ->
+                                            val labelStyles = labelManager.addLabelStyles(
+                                                LabelStyles.from(
+                                                    LabelStyle.from(R.drawable.ic_workplace_pin)
+                                                )
+                                            )
+                                            labelManager.layer?.let { labelLayer ->
+                                                labelLayer.addLabel(
+                                                    LabelOptions.from(workplacePosition)
+                                                        .setStyles(labelStyles)
+                                                )
+                                                isWorkplacePinAdded = true
+                                            }
+                                        }
+                                    }
+                                    if (!isCurrentPinAdded) {
+                                        map.labelManager?.let { labelManager ->
+                                            val currentLabelStyles = labelManager.addLabelStyles(
+                                                LabelStyles.from(
+                                                    LabelStyle.from(R.drawable.ic_current_location_pin)
+                                                )
+                                            )
+                                            labelManager.layer?.let { labelLayer ->
+                                                labelLayer.addLabel(
+                                                    LabelOptions.from(currentPosition)
+                                                        .setStyles(currentLabelStyles)
+                                                )
+                                                isCurrentPinAdded = true
+                                            }
+                                        }
+                                    }
+                                    if (!isRadiusCircleAdded) {
+                                        val radiusStyles = PolygonStylesSet.from(
+                                            PolygonStyles.from(
+                                                android.graphics.Color.parseColor("#1A7B68EE"),
+                                                1.0f,
+                                                android.graphics.Color.parseColor("#7B68EE")
+                                            )
+                                        )
+                                        map.shapeManager?.layer?.let { shapeLayer ->
+                                            shapeLayer.addPolygon(
+                                                PolygonOptions.from(
+                                                    DotPoints.fromCircle(
+                                                        workplacePosition,
+                                                        workplaceRadiusMeters.toFloat()
+                                                    )
+                                                ).setStylesSet(radiusStyles)
+                                            )
+                                            isRadiusCircleAdded = true
+                                        }
+                                    }
+                                    if (!isCameraInitialized) {
+                                        map.moveCamera(
+                                            CameraUpdateFactory.newCenterPosition(workplacePosition)
+                                        )
+                                        isCameraInitialized = true
+                                    }
+                                }
+                            }
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .border(1.dp, DawnBorder, RoundedCornerShape(16.dp))
+                .clickable {
+                    kakaoMap?.moveCamera(
+                        CameraUpdateFactory.newCenterPosition(currentPosition)
+                    )
+                }
+                .padding(vertical = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "현재 내 위치로 핀 이동",
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = DawnTextSubtle
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorkproofMapLegendItem(
+    color: Color,
+    label: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(color)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = DawnText
+        )
+    }
+}
+
+@Composable
+private fun rememberKakaoMapViewWithLifecycle(): MapView {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val mapView = remember { MapView(context) }
+
+    DisposableEffect(lifecycle, mapView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> mapView.resume()
+                Lifecycle.Event.ON_PAUSE -> mapView.pause()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            mapView.pause()
+            mapView.finish()
+        }
+    }
+
+    return mapView
 }
 
 @Composable
