@@ -298,10 +298,6 @@ private fun BackButton(
         contentDescription = "뒤로",
         modifier = Modifier
             .size(32.dp)
-            .pressableScale(
-                interactionSource = interactionSource,
-                pressedScale = 0.94f
-            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = rememberDonDoneGrayRipple(bounded = false),
@@ -376,10 +372,6 @@ private fun RowScope.RootTabItem(
         modifier = Modifier
             .weight(1f)
             .clip(RoundedCornerShape(20.dp))
-            .pressableScale(
-                interactionSource = interactionSource,
-                pressedScale = 0.96f
-            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = rememberDonDoneGrayRipple(),

@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,12 +26,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -46,8 +43,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.composed
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 
 private val DonDoneGrayRipple = Color(0x1F4E5968)
 
@@ -56,20 +51,11 @@ fun Modifier.pressableScale(
     enabled: Boolean = true,
     pressedScale: Float = 0.97f
 ): Modifier = composed {
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (enabled && isPressed) pressedScale else 1f,
-        animationSpec = spring(
-            dampingRatio = 0.72f,
-            stiffness = 520f
-        ),
-        label = "pressableScale"
-    )
-
-    graphicsLayer {
-        scaleX = scale
-        scaleY = scale
-    }
+    // Keep the call sites stable while disabling press-scale motion globally.
+    interactionSource
+    enabled
+    pressedScale
+    this
 }
 
 fun rememberDonDoneGrayRipple(

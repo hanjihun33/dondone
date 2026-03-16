@@ -6,13 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -245,30 +239,7 @@ fun WorkproofScreen(
             .fillMaxSize()
             .background(WorkproofCanvas)
     ) {
-        AnimatedContent(
-            targetState = showDetails,
-            transitionSpec = {
-                if (targetState) {
-                    slideInHorizontally(
-                        animationSpec = tween(260),
-                        initialOffsetX = { it / 3 }
-                    ) togetherWith slideOutHorizontally(
-                        animationSpec = tween(220),
-                        targetOffsetX = { -it / 6 }
-                    )
-                } else {
-                    slideInHorizontally(
-                        animationSpec = tween(260),
-                        initialOffsetX = { -it / 6 }
-                    ) togetherWith slideOutHorizontally(
-                        animationSpec = tween(220),
-                        targetOffsetX = { it / 3 }
-                    )
-                }
-            },
-            label = "workproofContentSwitch"
-        ) { detailVisible ->
-            if (detailVisible) {
+        if (showDetails) {
                 WorkproofDetailPage(
                     displayedMonthText = formatMonthText(displayedMonth),
                     calendarCountText = stringResource(R.string.workproof_calendar_recorded_count, recordedDayCount),
@@ -282,22 +253,21 @@ fun WorkproofScreen(
                     onBack = { showDetails = false },
                     onEditRecord = openEditSheet
                 )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    WorkproofPunchCard(
-                        uiModel = uiModel.summary,
-                        onClockIn = onClockIn,
-                        onClockOut = onClockOut,
-                        onToggleDetails = { showDetails = true }
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                WorkproofPunchCard(
+                    uiModel = uiModel.summary,
+                    onClockIn = onClockIn,
+                    onClockOut = onClockOut,
+                    onToggleDetails = { showDetails = true }
+                )
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -758,20 +728,11 @@ private fun WorkproofKeyValueRow(
             style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
-        AnimatedContent(
-            targetState = value,
-            transitionSpec = {
-                (fadeIn(tween(220)) + slideInHorizontally(initialOffsetX = { it / 6 })) togetherWith
-                    (fadeOut(tween(140)) + slideOutHorizontally(targetOffsetX = { -it / 8 }))
-            },
-            label = "workproofKeyValueValue"
-        ) { animatedValue ->
-            Text(
-                text = animatedValue,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
-                color = DawnText
-            )
-        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+            color = DawnText
+        )
     }
 }
 
