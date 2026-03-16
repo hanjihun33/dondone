@@ -324,7 +324,6 @@ private fun WorkproofPunchCard(
                     }
                 }
             )
-            WorkproofLocationStatusCard(uiModel = uiModel)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -365,43 +364,6 @@ private fun WorkproofPunchCard(
 }
 
 @Composable
-private fun WorkproofLocationStatusCard(
-    uiModel: WorkproofSummaryUiModel
-) {
-    val badgeBackground = if (uiModel.isWithinWorkplaceRadius) {
-        DawnSurfaceAlt
-    } else {
-        Color(0xFFFFF4DD)
-    }
-    val badgeColor = if (uiModel.isWithinWorkplaceRadius) {
-        DawnPrimaryDeep
-    } else {
-        WorkproofPartialText
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(badgeBackground)
-                .border(1.dp, DawnBorder, RoundedCornerShape(999.dp))
-                .padding(horizontal = 12.dp, vertical = 7.dp)
-        ) {
-            Text(
-                text = uiModel.locationStatusText,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                color = badgeColor
-            )
-        }
-        Text(
-            text = uiModel.locationStatusDetailText,
-            style = MaterialTheme.typography.bodyMedium,
-            color = DawnTextSubtle
-        )
-    }
-}
-
-@Composable
 private fun WorkproofWorkplaceMapCard(
     uiModel: WorkproofSummaryUiModel
 ) {
@@ -430,12 +392,6 @@ private fun WorkproofWorkplaceMapCard(
                 workplaceRadiusMeters = uiModel.workplaceRadiusMeters
             )
         }
-
-        Text(
-            text = "근무지 핀과 반경 원을 확인한 뒤, 반경 안에 들어오면 출퇴근 버튼을 사용할 수 있어요.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = DawnTextSubtle
-        )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             WorkproofMapLegendItem(
