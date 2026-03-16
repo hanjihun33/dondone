@@ -3,6 +3,10 @@ package com.dondone.mobile.core.designsystem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,9 +25,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -33,8 +42,44 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.composed
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+
+private val DonDoneGrayRipple = Color(0x1F4E5968)
+
+fun Modifier.pressableScale(
+    interactionSource: InteractionSource,
+    enabled: Boolean = true,
+    pressedScale: Float = 0.97f
+): Modifier = composed {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (enabled && isPressed) pressedScale else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.72f,
+            stiffness = 520f
+        ),
+        label = "pressableScale"
+    )
+
+    graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+fun rememberDonDoneGrayRipple(
+    bounded: Boolean = true,
+    radius: Dp = Dp.Unspecified
+) = ripple(
+    bounded = bounded,
+    radius = radius,
+    color = DonDoneGrayRipple
+)
 
 @Composable
 fun DonDoneWordmark(
@@ -206,16 +251,27 @@ fun PrimaryActionButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    Button(
-        modifier = modifier
-            .defaultMinSize(minHeight = 44.dp)
-            .sizeIn(minWidth = 96.dp),
-        enabled = enabled,
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(containerColor = DawnPrimary),
-        shape = RoundedCornerShape(18.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    CompositionLocalProvider(
+        LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(text = text)
+        Button(
+            modifier = modifier
+                .defaultMinSize(minHeight = 44.dp)
+                .sizeIn(minWidth = 96.dp)
+                .pressableScale(
+                    interactionSource = interactionSource,
+                    enabled = enabled
+                ),
+            enabled = enabled,
+            onClick = onClick,
+            interactionSource = interactionSource,
+            colors = ButtonDefaults.buttonColors(containerColor = DawnPrimary),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Text(text = text)
+        }
     }
 }
 
@@ -226,17 +282,28 @@ fun SecondaryActionButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    OutlinedButton(
-        modifier = modifier
-            .defaultMinSize(minHeight = 44.dp)
-            .sizeIn(minWidth = 96.dp),
-        enabled = enabled,
-        onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, DawnBorder),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = DawnSurface)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    CompositionLocalProvider(
+        LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(text = text)
+        OutlinedButton(
+            modifier = modifier
+                .defaultMinSize(minHeight = 44.dp)
+                .sizeIn(minWidth = 96.dp)
+                .pressableScale(
+                    interactionSource = interactionSource,
+                    enabled = enabled
+                ),
+            enabled = enabled,
+            onClick = onClick,
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, DawnBorder),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = DawnSurface)
+        ) {
+            Text(text = text)
+        }
     }
 }
 
@@ -246,13 +313,25 @@ fun PillButton(
     onClick: () -> Unit,
     enabled: Boolean = true
 ) {
-    OutlinedButton(
-        enabled = enabled,
-        onClick = onClick,
-        shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, DawnBorder),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = DawnSurface)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    CompositionLocalProvider(
+        LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge)
+        OutlinedButton(
+            enabled = enabled,
+            onClick = onClick,
+            interactionSource = interactionSource,
+            modifier = Modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled,
+                pressedScale = 0.98f
+            ),
+            shape = RoundedCornerShape(999.dp),
+            border = BorderStroke(1.dp, DawnBorder),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = DawnSurface)
+        ) {
+            Text(text = text, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }

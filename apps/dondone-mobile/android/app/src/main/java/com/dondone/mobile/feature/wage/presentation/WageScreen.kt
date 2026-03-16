@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +69,8 @@ import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DawnWarning
 import com.dondone.mobile.core.designsystem.StatusBadge
+import com.dondone.mobile.core.designsystem.pressableScale
+import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 
 private val WageCanvas = Color.White
 private val WageDivider = Color(0xFFE8EBF0)
@@ -702,12 +705,22 @@ private fun WageChip(
     text: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(Color.White.copy(alpha = 0.9f))
             .border(BorderStroke(1.dp, DawnBorder), RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.98f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
@@ -938,20 +951,27 @@ private fun WagePrimaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = DawnPrimary,
-            contentColor = Color.White
-        )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-        )
+        Button(
+            onClick = onClick,
+            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(18.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = DawnPrimary,
+                contentColor = Color.White
+            )
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 
@@ -961,21 +981,28 @@ private fun WageSecondaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, DawnBorder),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = Color(0xFFF8FAFC),
-            contentColor = DawnText
-        )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-        )
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, DawnBorder),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color(0xFFF8FAFC),
+                contentColor = DawnText
+            )
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 
@@ -985,20 +1012,31 @@ private fun WageCompactButton(
     onClick: () -> Unit,
     enabled: Boolean = true
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = DawnPrimary,
-            contentColor = Color.White
-        )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
-        )
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            interactionSource = interactionSource,
+            modifier = Modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
+            shape = RoundedCornerShape(16.dp),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = DawnPrimary,
+                contentColor = Color.White
+            )
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
     }
 }
 

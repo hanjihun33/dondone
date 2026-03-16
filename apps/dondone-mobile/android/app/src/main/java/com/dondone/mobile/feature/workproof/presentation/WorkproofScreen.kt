@@ -1,11 +1,14 @@
 package com.dondone.mobile.feature.workproof.presentation
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -13,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -47,20 +52,22 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
+import com.dondone.mobile.R
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnPrimaryDeep
@@ -70,24 +77,29 @@ import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
+import com.dondone.mobile.core.designsystem.pressableScale
+import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 import java.time.YearMonth
 
 private val WorkproofCanvas = Color.White
 private val WorkproofDivider = Color(0xFFE8EBF0)
+private val WorkproofGhostBorder = Color(0xFFF4F6F8)
+private val WorkproofCurrentDayBorder = Color(0xFFDDE4FF)
 private val WorkproofRowAccentBackground = Color(0xFFF2F3FF)
 private val WorkproofRowAccentTint = Color(0xFF6D68F5)
-private val WorkproofMissingBackground = Color(0xFFF1F5F9)
-private val WorkproofMissingBorder = Color(0xFFDBE3EE)
+private val WorkproofMissingBackground = Color.White
+private val WorkproofMissingBorder = Color.Transparent
 private val WorkproofMissingText = Color(0xFF64748B)
-private val WorkproofPartialBackground = Color(0xFFFEF3C7)
-private val WorkproofPartialBorder = Color(0xFFF8D26D)
-private val WorkproofPartialText = Color(0xFF92400E)
-private val WorkproofCompleteBackground = Color(0xFFBBF7D0)
-private val WorkproofCompleteBorder = Color(0xFF74E4A2)
-private val WorkproofCompleteText = Color(0xFF166534)
-private val WorkproofModifiedBackground = Color(0xFFFECACA)
-private val WorkproofModifiedBorder = Color(0xFFF59EA9)
-private val WorkproofModifiedText = Color(0xFF9F1239)
+private val WorkproofInactiveText = Color(0xFFCBD5E1)
+private val WorkproofPartialBackground = Color(0xFFEEE5FF)
+private val WorkproofPartialBorder = Color(0xFFC3A6FF)
+private val WorkproofPartialText = Color(0xFF6F42D9)
+private val WorkproofCompleteBackground = Color(0xFFE9DEFF)
+private val WorkproofCompleteBorder = Color(0xFFB89BFF)
+private val WorkproofCompleteText = Color(0xFF5E3CC5)
+private val WorkproofModifiedBackground = Color(0xFFF7E4F4)
+private val WorkproofModifiedBorder = Color(0xFFD98FD0)
+private val WorkproofModifiedText = Color(0xFFAA3E96)
 private val WorkproofWeekdays = listOf("일", "월", "화", "수", "목", "금", "토")
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,6 +109,7 @@ fun WorkproofScreen(
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
     onSaveEdit: (String, String, String, Boolean) -> Unit,
+    resetVersion: Int,
     onDetailVisibilityChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
@@ -104,12 +117,12 @@ fun WorkproofScreen(
         YearMonth.of(uiModel.calendarBaseYear, uiModel.calendarBaseMonth)
     }
     val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var monthOffset by rememberSaveable { mutableIntStateOf(0) }
-    var editingRecordId by rememberSaveable { mutableStateOf<String?>(null) }
-    var editReasonKey by rememberSaveable { mutableStateOf("") }
-    var editMemo by rememberSaveable { mutableStateOf("") }
-    var selectedAttachmentName by rememberSaveable { mutableStateOf<String?>(null) }
-    var showDetails by rememberSaveable { mutableStateOf(false) }
+    var monthOffset by remember(resetVersion) { mutableIntStateOf(0) }
+    var editingRecordId by remember(resetVersion) { mutableStateOf<String?>(null) }
+    var editReasonKey by remember(resetVersion) { mutableStateOf("") }
+    var editMemo by remember(resetVersion) { mutableStateOf("") }
+    var selectedAttachmentName by remember(resetVersion) { mutableStateOf<String?>(null) }
+    var showDetails by remember(resetVersion) { mutableStateOf(false) }
     var reasonMenuExpanded by remember { mutableStateOf(false) }
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -133,8 +146,8 @@ fun WorkproofScreen(
             dayTones = uiModel.calendarDayTones
         )
     }
-    val recordedDayCount = calendarCells.count {
-        it.tone != null && it.tone != WorkproofCalendarTone.MISSING
+    val recordedDayCount = calendarCells.count { cell ->
+        isRecordedCalendarTone(cell.tone)
     }
     val displayedRecentRecords = remember(isBaseMonth, uiModel.recentRecords) {
         if (isBaseMonth) uiModel.recentRecords else emptyList()
@@ -155,6 +168,11 @@ fun WorkproofScreen(
         selectedAttachmentName = null
         reasonMenuExpanded = false
     }
+    val resetTransientState = {
+        monthOffset = 0
+        resetEditDraft()
+        showDetails = false
+    }
     val openEditSheet: (WorkproofRecordUiModel) -> Unit = { record ->
         editingRecordId = record.id
         editReasonKey = ""
@@ -165,6 +183,25 @@ fun WorkproofScreen(
 
     LaunchedEffect(showDetails) {
         onDetailVisibilityChange(showDetails)
+    }
+
+    LaunchedEffect(resetVersion) {
+        resetTransientState()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            onDetailVisibilityChange(false)
+        }
+    }
+
+    BackHandler(
+        enabled = shouldInterceptWorkproofBack(
+            showDetails = showDetails,
+            editingRecordId = editingRecordId
+        )
+    ) {
+        showDetails = false
     }
 
     if (editingRecord != null) {
@@ -234,7 +271,7 @@ fun WorkproofScreen(
             if (detailVisible) {
                 WorkproofDetailPage(
                     displayedMonthText = formatMonthText(displayedMonth),
-                    calendarCountText = "기록 ${recordedDayCount}일",
+                    calendarCountText = stringResource(R.string.workproof_calendar_recorded_count, recordedDayCount),
                     calendarCells = calendarCells,
                     weekdays = WorkproofWeekdays,
                     records = displayedRecentRecords,
@@ -294,35 +331,40 @@ private fun WorkproofPunchCard(
                     }
                 }
             )
-
-            Text(
-                text = uiModel.todayMetaText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 PrimaryActionButton(
-                    text = "출근",
+                    text = stringResource(R.string.workproof_label_clock_in),
                     onClick = onClockIn,
                     enabled = uiModel.canClockIn,
                     modifier = Modifier.weight(1f)
                 )
                 SecondaryActionButton(
-                    text = "퇴근",
+                    text = stringResource(R.string.workproof_label_clock_out),
                     onClick = onClockOut,
                     enabled = uiModel.canClockOut,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            WorkproofKeyValueRow(label = "출근", value = uiModel.todayInText)
-            WorkproofKeyValueRow(label = "퇴근", value = uiModel.todayOutText)
-            WorkproofKeyValueRow(label = "근무일", value = uiModel.verifiedDaysText)
-            WorkproofKeyValueRow(label = "수정", value = uiModel.auditCountText)
+            WorkproofKeyValueRow(
+                label = stringResource(R.string.workproof_label_clock_in),
+                value = timeOrPlaceholder(uiModel.todayInTime)
+            )
+            WorkproofKeyValueRow(
+                label = stringResource(R.string.workproof_label_clock_out),
+                value = timeOrPlaceholder(uiModel.todayOutTime)
+            )
+            WorkproofKeyValueRow(
+                label = stringResource(R.string.workproof_label_work_days),
+                value = stringResource(R.string.workproof_value_day_count, uiModel.verifiedDays)
+            )
+            WorkproofKeyValueRow(
+                label = stringResource(R.string.workproof_label_audits),
+                value = stringResource(R.string.workproof_value_audit_count, uiModel.auditCount)
+            )
         }
     }
 }
@@ -520,9 +562,9 @@ private fun WorkproofAuditCard(
             WorkproofAuditPreviewRow(
                 uiModel = WorkproofAuditUiModel(
                     dateText = "",
-                    changeText = "아직 쌓인 변경 기록이 없어요.",
-                    attachmentText = "",
-                    reasonText = "수정이 생기면 사유와 첨부 여부가 여기에 먼저 표시돼요."
+                    changeText = stringResource(R.string.workproof_empty_audit_title),
+                    attachmentCount = 0,
+                    reasonText = stringResource(R.string.workproof_empty_audit_description)
                 )
             )
         }
@@ -576,7 +618,7 @@ private fun WorkproofRecentRecordRow(
                     color = DawnText
                 )
                 WorkproofStatusPill(
-                    text = record.statusText,
+                    text = recordStatusText(record.tone),
                     tone = record.tone
                 )
             }
@@ -586,20 +628,20 @@ private fun WorkproofRecentRecordRow(
                 color = DawnText
             )
             Text(
-                text = record.attachmentText,
+                text = formatAttachmentText(record.attachmentCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = DawnTextSubtle
             )
-            record.modifiedHintText?.let { hint ->
+            record.modifiedReason?.let { reason ->
                 Text(
-                    text = hint,
+                    text = stringResource(R.string.workproof_value_modified_reason, reason),
                     style = MaterialTheme.typography.bodySmall,
                     color = DawnTextSubtle
                 )
             }
         }
         WorkproofInlineActionButton(
-            text = "수정",
+            text = stringResource(R.string.workproof_action_edit),
             onClick = { onEditRecord(record) }
         )
     }
@@ -646,9 +688,9 @@ private fun WorkproofAuditPreviewRow(
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = DawnText
             )
-            if (uiModel.attachmentText.isNotBlank()) {
+            if (uiModel.attachmentCount > 0) {
                 Text(
-                    text = uiModel.attachmentText,
+                    text = formatAttachmentText(uiModel.attachmentCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = DawnTextSubtle
                 )
@@ -716,11 +758,20 @@ private fun WorkproofKeyValueRow(
             style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
-            color = DawnText
-        )
+        AnimatedContent(
+            targetState = value,
+            transitionSpec = {
+                (fadeIn(tween(220)) + slideInHorizontally(initialOffsetX = { it / 6 })) togetherWith
+                    (fadeOut(tween(140)) + slideOutHorizontally(targetOffsetX = { -it / 8 }))
+            },
+            label = "workproofKeyValueValue"
+        ) { animatedValue ->
+            Text(
+                text = animatedValue,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+        }
     }
 }
 
@@ -729,10 +780,20 @@ private fun WorkproofMonthButton(
     icon: @Composable () -> Unit,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = Modifier
             .size(32.dp)
-            .clickable(onClick = onClick),
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.94f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(bounded = false),
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         icon()
@@ -744,12 +805,22 @@ private fun WorkproofInlineActionButton(
     text: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
             .border(1.dp, DawnBorder, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.98f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
             .padding(horizontal = 12.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -767,13 +838,23 @@ private fun WorkproofSelectionField(
     isPlaceholder: Boolean,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(Color.White)
             .border(1.dp, DawnBorder, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.99f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -839,12 +920,19 @@ private fun WorkproofEditSheet(
                     color = DawnTextSubtle
                 )
             }
-            Text(
-                text = "닫기",
-                modifier = Modifier.clickable(onClick = onClose),
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                color = DawnTextSubtle
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onClose)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "닫기",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                    color = DawnTextSubtle
+                )
+            }
         }
 
         WorkproofKeyValueRow(label = "출근", value = timeParts.first)
@@ -964,47 +1052,67 @@ private fun WorkproofCalendarCell(
     uiModel: WorkproofCalendarCellUiModel,
     modifier: Modifier = Modifier
 ) {
-    if (uiModel.dayLabel.isBlank() || uiModel.tone == null) {
+    if (uiModel.dayLabel.isBlank()) {
         Box(modifier = modifier.aspectRatio(1f))
         return
     }
 
     val background = when (uiModel.tone) {
+        null,
+        WorkproofCalendarTone.UNAVAILABLE -> Color.Transparent
         WorkproofCalendarTone.MISSING -> WorkproofMissingBackground
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBackground
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBackground
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBackground
     }
     val border = when (uiModel.tone) {
+        null,
+        WorkproofCalendarTone.UNAVAILABLE -> Color.Transparent
         WorkproofCalendarTone.MISSING -> WorkproofMissingBorder
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBorder
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBorder
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBorder
     }
     val textColor = when (uiModel.tone) {
+        null,
+        WorkproofCalendarTone.UNAVAILABLE -> WorkproofInactiveText
         WorkproofCalendarTone.MISSING -> WorkproofMissingText
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialText
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteText
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedText
     }
 
+    val isRecordedDay = isRecordedCalendarTone(uiModel.tone)
+    val cellShape = if (isRecordedDay) CircleShape else RoundedCornerShape(999.dp)
+
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(10.dp))
-            .background(background)
-            .border(
-                width = if (uiModel.isCurrent) 2.dp else 1.dp,
-                color = if (uiModel.isCurrent) DawnPrimary else border,
-                shape = RoundedCornerShape(10.dp)
-            ),
+        modifier = modifier.aspectRatio(1f),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = uiModel.dayLabel,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-            color = textColor
-        )
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(cellShape)
+                .background(background)
+                .then(
+                    if (uiModel.isCurrent || isRecordedDay) {
+                        Modifier.border(
+                            width = if (uiModel.isCurrent) 2.dp else 1.dp,
+                            color = if (uiModel.isCurrent) WorkproofCurrentDayBorder else border,
+                            shape = cellShape
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = uiModel.dayLabel,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                color = textColor
+            )
+        }
     }
 }
 
@@ -1014,13 +1122,15 @@ private fun WorkproofLegendItem(
     tone: WorkproofCalendarTone
 ) {
     val color = when (tone) {
+        WorkproofCalendarTone.UNAVAILABLE -> Color.Transparent
         WorkproofCalendarTone.MISSING -> WorkproofMissingBackground
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBackground
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBackground
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBackground
     }
     val border = when (tone) {
-        WorkproofCalendarTone.MISSING -> WorkproofMissingBorder
+        WorkproofCalendarTone.UNAVAILABLE -> Color.Transparent
+        WorkproofCalendarTone.MISSING -> WorkproofGhostBorder
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBorder
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBorder
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBorder
@@ -1033,9 +1143,13 @@ private fun WorkproofLegendItem(
         Box(
             modifier = Modifier
                 .size(10.dp)
-                .clip(RoundedCornerShape(3.dp))
+                .clip(if (tone == WorkproofCalendarTone.MISSING || tone == WorkproofCalendarTone.UNAVAILABLE) RoundedCornerShape(999.dp) else CircleShape)
                 .background(color)
-                .border(1.dp, border, RoundedCornerShape(3.dp))
+                .border(
+                    width = if (tone == WorkproofCalendarTone.MISSING || tone == WorkproofCalendarTone.UNAVAILABLE) 1.dp else 0.dp,
+                    color = border,
+                    shape = if (tone == WorkproofCalendarTone.MISSING || tone == WorkproofCalendarTone.UNAVAILABLE) RoundedCornerShape(999.dp) else CircleShape
+                )
         )
         Text(
             text = label,
@@ -1088,7 +1202,7 @@ private fun WorkproofStatusPill(
     }
 }
 
-private fun buildWorkproofCalendarCells(
+internal fun buildWorkproofCalendarCells(
     displayedMonth: YearMonth,
     baseMonth: YearMonth,
     currentDay: Int,
@@ -1106,10 +1220,10 @@ private fun buildWorkproofCalendarCells(
             add(
                 WorkproofCalendarCellUiModel(
                     dayLabel = day.toString(),
-                    tone = if (isBaseMonth) {
-                        dayTones[day] ?: WorkproofCalendarTone.MISSING
-                    } else {
-                        WorkproofCalendarTone.MISSING
+                    tone = when {
+                        !isBaseMonth -> WorkproofCalendarTone.UNAVAILABLE
+                        day > currentDay -> WorkproofCalendarTone.UNAVAILABLE
+                        else -> dayTones[day] ?: WorkproofCalendarTone.MISSING
                     },
                     isCurrent = isBaseMonth && day == currentDay
                 )
@@ -1128,10 +1242,44 @@ private fun formatMonthText(month: YearMonth): String {
     return "$year.$monthValue"
 }
 
+private fun isRecordedCalendarTone(tone: WorkproofCalendarTone?): Boolean {
+    return tone == WorkproofCalendarTone.PARTIAL ||
+        tone == WorkproofCalendarTone.COMPLETE ||
+        tone == WorkproofCalendarTone.MODIFIED
+}
+
+internal fun shouldInterceptWorkproofBack(
+    showDetails: Boolean,
+    editingRecordId: String?
+): Boolean = showDetails && editingRecordId == null
+
+@Composable
+private fun timeOrPlaceholder(time: String?): String {
+    return time ?: stringResource(R.string.workproof_value_time_placeholder)
+}
+
+
+@Composable
+private fun recordStatusText(tone: WorkproofRecordTone): String = when (tone) {
+    WorkproofRecordTone.DEFAULT -> stringResource(R.string.workproof_status_default)
+    WorkproofRecordTone.ACTIVE -> stringResource(R.string.workproof_status_active)
+    WorkproofRecordTone.MODIFIED -> stringResource(R.string.workproof_status_modified)
+}
+
+@Composable
+private fun formatAttachmentText(attachmentCount: Int): String {
+    return if (attachmentCount > 0) {
+        stringResource(R.string.workproof_value_attachment_count, attachmentCount)
+    } else {
+        stringResource(R.string.workproof_value_attachment_none)
+    }
+}
+
+@Composable
 private fun formatRecordTimeLine(timeText: String): String {
     val parts = timeText.split(" - ")
     if (parts.size != 2) return timeText
-    return "출근 ${parts[0]} / 퇴근 ${parts[1]}"
+    return stringResource(R.string.workproof_record_time_line, parts[0], parts[1])
 }
 
 private fun resolveAttachmentName(context: Context, uri: Uri): String {
