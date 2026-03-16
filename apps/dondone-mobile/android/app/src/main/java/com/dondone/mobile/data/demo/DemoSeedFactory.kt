@@ -24,6 +24,10 @@ object DemoSeedFactory {
             workproof = WorkproofData(
                 workplaceName = "Green Farm",
                 workplaceAddress = "경북 구미시",
+                workplaceLatitude = 36.1195,
+                workplaceLongitude = 128.3446,
+                currentLatitude = 36.1211,
+                currentLongitude = 128.3418,
                 today = TodayWork(clockIn = null, clockOut = null),
                 records = listOf(
                     WorkRecord("WP-0327-01", 27, "09:01", "18:03", false, 0),

@@ -19,6 +19,15 @@ enum class WorkproofRecordTone {
 data class WorkproofSummaryUiModel(
     val canClockIn: Boolean,
     val canClockOut: Boolean,
+    val workplaceLatitude: Double,
+    val workplaceLongitude: Double,
+    val currentLatitude: Double,
+    val currentLongitude: Double,
+    val workplaceRadiusMeters: Int,
+    val distanceToWorkplaceMeters: Int,
+    val isWithinWorkplaceRadius: Boolean,
+    val locationStatusText: String,
+    val locationStatusDetailText: String,
     val verifiedDaysText: String,
     val auditCountText: String,
     val todayMetaText: String,
@@ -62,6 +71,14 @@ data class WorkproofUiModel(
 
 fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
+    val workplaceRadiusMeters = 100
+    val distanceToWorkplaceMeters = calculateDistanceMeters(
+        startLatitude = workproof.currentLatitude,
+        startLongitude = workproof.currentLongitude,
+        endLatitude = workproof.workplaceLatitude,
+        endLongitude = workproof.workplaceLongitude
+    )
+    val isWithinWorkplaceRadius = distanceToWorkplaceMeters <= workplaceRadiusMeters
     val dayTones = (1..demo.monthLength).associateWith { day ->
         val record = visibleRecords.firstOrNull { it.day == day }
         when {
@@ -118,6 +135,23 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
         summary = WorkproofSummaryUiModel(
             canClockIn = workproof.today.clockIn == null,
             canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null,
+            workplaceLatitude = workproof.workplaceLatitude,
+            workplaceLongitude = workproof.workplaceLongitude,
+            currentLatitude = workproof.currentLatitude,
+            currentLongitude = workproof.currentLongitude,
+            workplaceRadiusMeters = workplaceRadiusMeters,
+            distanceToWorkplaceMeters = distanceToWorkplaceMeters,
+            isWithinWorkplaceRadius = isWithinWorkplaceRadius,
+            locationStatusText = if (isWithinWorkplaceRadius) {
+                "근무지 반경 안에 있어요"
+            } else {
+                "근무지 반경 밖이에요"
+            },
+            locationStatusDetailText = if (isWithinWorkplaceRadius) {
+                "현재 위치가 근무지 기준 ${workplaceRadiusMeters}m 안에 있어 출퇴근 버튼을 사용할 수 있어요."
+            } else {
+                "현재 위치가 근무지에서 ${distanceToWorkplaceMeters}m 떨어져 있어요. 반경 ${workplaceRadiusMeters}m 안에 들어오면 출퇴근 버튼이 활성화돼요."
+            },
             verifiedDaysText = "${visibleRecords.count { it.inTime != "-" && it.outTime != "-" }}\uC77C",
             auditCountText = "${workproof.audit.size}\uAC74",
             todayMetaText = "${demo.year}.${formatTwoDigits(demo.month)}.${formatTwoDigits(demo.asOfDay)} / ${workproof.workplaceName}",
@@ -137,3 +171,24 @@ private fun formatDateText(
 ): String = "$year.${formatTwoDigits(month)}.${formatTwoDigits(day)}"
 
 private fun formatTwoDigits(value: Int): String = value.toString().padStart(2, '0')
+
+private fun calculateDistanceMeters(
+    startLatitude: Double,
+    startLongitude: Double,
+    endLatitude: Double,
+    endLongitude: Double
+): Int {
+    val earthRadiusMeters = 6_371_000.0
+    val startLatitudeRadians = Math.toRadians(startLatitude)
+    val endLatitudeRadians = Math.toRadians(endLatitude)
+    val latitudeDeltaRadians = Math.toRadians(endLatitude - startLatitude)
+    val longitudeDeltaRadians = Math.toRadians(endLongitude - startLongitude)
+
+    val haversine = kotlin.math.sin(latitudeDeltaRadians / 2).let { it * it } +
+        kotlin.math.cos(startLatitudeRadians) *
+        kotlin.math.cos(endLatitudeRadians) *
+        kotlin.math.sin(longitudeDeltaRadians / 2).let { it * it }
+
+    val arc = 2 * kotlin.math.atan2(kotlin.math.sqrt(haversine), kotlin.math.sqrt(1 - haversine))
+    return (earthRadiusMeters * arc).toInt()
+}
