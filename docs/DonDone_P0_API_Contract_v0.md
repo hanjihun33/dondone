@@ -667,6 +667,7 @@ Response:
 
 배경: 신청 계열은 중복 호출 시 혼선이 커서 `Idempotency-Key`를 필수로 둔다.
 v0 메모: 실제 대출 집행이 아니라 데모 시뮬레이션 승인/거절 결과를 돌려준다.
+현재 구현 가정: P0 데모에서는 적격 시 즉시 `APPROVED` 응답을 반환하고, 동일 `Idempotency-Key` + 동일 payload 재시도는 기존 응답을 재생한다.
 
 Headers:
 | 헤더 | 규칙 | 설명 |
@@ -689,6 +690,9 @@ Response `201 Created`:
 | `feeAmount` | - |
 | `repaymentDueDate` | - |
 | `eligibilitySnapshot` | object. 하위 필드: availableAmount, maxCap, policyRate, reflectedWorkDays, reflectedWorkMinutes, needsReviewRecordCount |
+
+Replay `200 OK`:
+- 동일 `Idempotency-Key`와 동일 요청 본문을 다시 보내면 새 신청을 만들지 않고 기존 결과를 재반환할 수 있다.
 
 주요 에러:
 | HTTP | Code | 설명 |

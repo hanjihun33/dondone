@@ -92,6 +92,54 @@ private val TransferAmountChipBackground = Color(0xFFF1F3F5)
 private val TransferAmountKeyText = Color(0xFF3C4453)
 private val TransferAmountActionBackground = Color(0xFF6D68F5)
 private val TransferReviewSheetScrim = Color(0x33000000)
+private val TransferAmountActionBarHeight = 62.dp
+private val TransferNumberPadHeight = 358.dp
+private val TransferNumberPadBottomPadding = 12.dp
+private val TransferAmountActionVerticalPadding = 14.dp
+private val TransferScreenHorizontalPadding = 16.dp
+private val TransferNumberPadRows = listOf(
+    listOf("1", "2", "3"),
+    listOf("4", "5", "6"),
+    listOf("7", "8", "9")
+)
+private const val TransferAmountMaxDigits = 9
+private const val TransferKrwPerUsdc = 1_450.0
+
+private data class TransferDestinationSummary(
+    val title: String,
+    val subtitle: String
+)
+
+private data class TransferAmountStepCopy(
+    val promptText: String,
+    val assistText: String,
+    val destination: TransferDestinationSummary,
+    val amountDisplay: String,
+    val hasAmountInput: Boolean,
+    val canUseBalanceShortcut: Boolean,
+    val fullBalanceInput: String
+)
+
+private data class TransferTrackerCopy(
+    val headline: String,
+    val statusText: String
+)
+
+private data class TransferReviewCopy(
+    val recipientDetail: String,
+    val headline: String,
+    val headlineSuffix: String,
+    val recipientLabel: String,
+    val recipientDetailLabel: String,
+    val recipientDetailFontFamily: FontFamily?,
+    val confirmActionText: String
+)
+
+private enum class TransferReviewOverlay {
+    None,
+    RecipientEditor,
+    AccountSheet
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,55 +151,51 @@ fun TransferScreen(
     onUpdateRecipientDisplayName: (String) -> Unit,
     onUpdateAmount: (Int) -> Unit,
     onChangeRecipient: () -> Unit,
-    onChangeAccountFromRecipient: () -> Unit,
     onChangeAccountFromAmount: () -> Unit,
     onSubmitTransfer: () -> Unit,
     onDismissTransferConfirmation: () -> Unit,
     onConfirmTransfer: () -> Unit,
     onResetTransfer: () -> Unit
 ) {
-    if (uiModel.showTrackerScreen) {
-        TransferTrackerScreen(
+    when {
+        uiModel.showTrackerScreen -> TransferTrackerScreen(
             uiModel = uiModel,
             onResetTransfer = onResetTransfer
         )
-    } else if (uiModel.showReviewScreen) {
-        TransferReviewScreen(
+
+        uiModel.showReviewScreen -> TransferReviewScreen(
             uiModel = uiModel,
             onDismiss = onDismissTransferConfirmation,
             onConfirm = onConfirmTransfer,
             onUpdateRecipientDisplayName = onUpdateRecipientDisplayName
         )
-    } else if (uiModel.flowStep == TransferFlowStep.AMOUNT) {
-        AmountStepCard(
+
+        uiModel.flowStep == TransferFlowStep.AMOUNT -> AmountStepCard(
             uiModel = uiModel,
             onUpdateAmount = onUpdateAmount,
             onChangeRecipient = onChangeRecipient,
             onChangeAccount = onChangeAccountFromAmount,
             onPrimaryAction = onSubmitTransfer
         )
-    } else {
-        Column(
+
+        else -> Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = TransferScreenHorizontalPadding),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            when (uiModel.flowStep) {
-                TransferFlowStep.ACCOUNT -> AccountStepCard(
+            if (uiModel.flowStep == TransferFlowStep.ACCOUNT) {
+                AccountStepCard(
                     uiModel = uiModel,
                     onSelectAccount = onSelectAccount
                 )
-
-                TransferFlowStep.RECIPIENT -> RecipientStepCard(
+            } else {
+                RecipientStepCard(
                     uiModel = uiModel,
                     onSelectDestinationMode = onSelectDestinationMode,
-                    onSelectRecipient = onSelectRecipient,
-                    onChangeAccount = onChangeAccountFromRecipient
+                    onSelectRecipient = onSelectRecipient
                 )
-
-                TransferFlowStep.AMOUNT -> Unit
             }
         }
     }
@@ -188,44 +232,16 @@ private fun AccountStepCard(
 private fun RecipientStepCard(
     uiModel: TransferUiModel,
     onSelectDestinationMode: (TransferDestinationMode) -> Unit,
-    onSelectRecipient: (String) -> Unit,
-    onChangeAccount: () -> Unit
+    onSelectRecipient: (String) -> Unit
 ) {
-    var selectedTab by remember(uiModel.destinationMode) {
-        mutableStateOf(
-            if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-                RecipientPickerTab.Account
-            } else {
-                RecipientPickerTab.Contact
-            }
-        )
-    }
+    val selectedTab = uiModel.destinationMode.toRecipientPickerTab()
     var query by remember { mutableStateOf("") }
     val filteredSections = remember(uiModel.recipientSections, query, selectedTab) {
-        val keyword = query.trim()
-        uiModel.recipientSections.mapNotNull { section ->
-            val items = section.items.filter { recipient ->
-                if (keyword.isBlank()) {
-                    true
-                } else {
-                    val target = buildString {
-                        append(recipient.name)
-                        append(' ')
-                        append(recipient.relationship)
-                        append(' ')
-                        append(
-                            if (selectedTab == RecipientPickerTab.Account) {
-                                recipient.accountLabel
-                            } else {
-                                recipient.contactLabel
-                            }
-                        )
-                    }
-                    target.contains(keyword, ignoreCase = true)
-                }
-            }
-            if (items.isEmpty()) null else section.copy(items = items)
-        }
+        filterRecipientSections(
+            sections = uiModel.recipientSections,
+            query = query,
+            selectedTab = selectedTab
+        )
     }
 
     Column(
@@ -243,16 +259,7 @@ private fun RecipientStepCard(
 
         TransferRecipientSegmentedTabs(
             selectedTab = selectedTab,
-            onSelectTab = {
-                selectedTab = it
-                onSelectDestinationMode(
-                    if (it == RecipientPickerTab.Account) {
-                        TransferDestinationMode.ACCOUNT
-                    } else {
-                        TransferDestinationMode.WALLET
-                    }
-                )
-            }
+            onSelectTab = { onSelectDestinationMode(it.toDestinationMode()) }
         )
 
         OutlinedTextField(
@@ -262,11 +269,9 @@ private fun RecipientStepCard(
             singleLine = true,
             placeholder = {
                 Text(
-                    text = if (selectedTab == RecipientPickerTab.Account) {
-                        uiModel.recipientSearchPlaceholderText
-                    } else {
-                        "지갑주소 입력"
-                    },
+                    text = selectedTab.searchPlaceholder(
+                        accountPlaceholder = uiModel.recipientSearchPlaceholderText
+                    ),
                     color = DawnTextSubtle
                 )
             },
@@ -292,16 +297,15 @@ private fun RecipientStepCard(
         )
 
         if (filteredSections.isEmpty()) {
-            TransferRecipientEmptyState()
+            TransferRecipientEmptyState(
+                description = selectedTab.emptyStateDescription()
+            )
         } else {
             filteredSections.forEach { section ->
                 TransferRecipientSection(
-                    title = resolveRecipientSectionTitle(
-                        baseTitle = section.title,
-                        accountStyle = selectedTab == RecipientPickerTab.Account
-                    ),
+                    title = selectedTab.resolveSectionTitle(section.title),
                     recipients = section.items,
-                    accountStyle = selectedTab == RecipientPickerTab.Account,
+                    selectedTab = selectedTab,
                     onSelectRecipient = onSelectRecipient
                 )
             }
@@ -391,7 +395,7 @@ private fun TransferRecipientSegmentedTabs(
 private fun TransferRecipientSection(
     title: String,
     recipients: List<TransferRecipientUiModel>,
-    accountStyle: Boolean,
+    selectedTab: RecipientPickerTab,
     onSelectRecipient: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -403,7 +407,7 @@ private fun TransferRecipientSection(
         recipients.forEach { recipient ->
             TransferRecipientRow(
                 uiModel = recipient,
-                accountStyle = accountStyle,
+                selectedTab = selectedTab,
                 onClick = { onSelectRecipient(recipient.id) }
             )
         }
@@ -413,7 +417,7 @@ private fun TransferRecipientSection(
 @Composable
 private fun TransferRecipientRow(
     uiModel: TransferRecipientUiModel,
-    accountStyle: Boolean,
+    selectedTab: RecipientPickerTab,
     onClick: () -> Unit
 ) {
     Row(
@@ -457,7 +461,7 @@ private fun TransferRecipientRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = if (accountStyle) uiModel.accountLabel else uiModel.contactLabel,
+                text = uiModel.secondaryLabel(selectedTab),
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnTextSubtle,
                 maxLines = 1,
@@ -473,7 +477,9 @@ private fun TransferRecipientRow(
 }
 
 @Composable
-private fun TransferRecipientEmptyState() {
+private fun TransferRecipientEmptyState(
+    description: String
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -488,7 +494,7 @@ private fun TransferRecipientEmptyState() {
             color = DawnText
         )
         Text(
-            text = "다른 이름이나 계좌번호 형식으로 다시 찾아보세요.",
+            text = description,
             style = MaterialTheme.typography.bodySmall,
             color = DawnTextSubtle
         )
@@ -504,54 +510,14 @@ private fun AmountStepCard(
     onPrimaryAction: () -> Unit
 ) {
     var amountInput by remember(uiModel.destinationMode, uiModel.flowStep) {
-        mutableStateOf(
-            when (uiModel.destinationMode) {
-                TransferDestinationMode.ACCOUNT -> ""
-                TransferDestinationMode.WALLET -> uiModel.amountUsd.takeUnless { it == "0" }.orEmpty()
-            }
-        )
+        mutableStateOf(resolveInitialAmountInput(uiModel))
     }
-
-    val promptText = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-        "얼마나 옮길까요?"
-    } else {
-        "얼마나 보낼까요?"
-    }
-    val assistText = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-        "잔액 · ${uiModel.selectedAccountBalanceText} 입력"
-    } else {
-        "지갑 송금 · USDC 입력"
-    }
-    val destinationTitle = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-        "내 ${uiModel.selectedRecipientName} 계좌로"
-    } else {
-        "${uiModel.selectedRecipientName} 지갑으로"
-    }
-    val destinationSubtitle = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-        uiModel.selectedRecipientAccountLabel
-    } else {
-        uiModel.selectedRecipientWalletLabel
-    }
-    val amountDisplay = when (uiModel.destinationMode) {
-        TransferDestinationMode.ACCOUNT -> amountInput.toIntOrNull()?.let(::formatKrw).orEmpty()
-        TransferDestinationMode.WALLET -> amountInput.ifBlank { "0" } + " USDC"
-    }
-    val hasAmountInput = amountInput.isNotBlank() && amountInput != "0"
-    val actionBarReservedHeight = 62.dp
-    val numberPadHeight = 358.dp
-    val bottomContentReservedHeight = actionBarReservedHeight + numberPadHeight
-    val actionBarVisible = hasAmountInput
+    val amountStepCopy = resolveAmountStepCopy(uiModel = uiModel, amountInput = amountInput)
+    val bottomContentReservedHeight = TransferAmountActionBarHeight + TransferNumberPadHeight
 
     fun syncAmount(nextInput: String) {
         amountInput = nextInput
-        val nextAmount = when (uiModel.destinationMode) {
-            TransferDestinationMode.ACCOUNT -> {
-                val krw = nextInput.toIntOrNull() ?: 0
-                (krw / 1_450.0).toInt()
-            }
-            TransferDestinationMode.WALLET -> nextInput.toIntOrNull() ?: 0
-        }
-        onUpdateAmount(nextAmount)
+        onUpdateAmount(convertTransferAmountInput(uiModel.destinationMode, nextInput))
     }
 
     Box(
@@ -563,7 +529,7 @@ private fun AmountStepCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = TransferScreenHorizontalPadding)
                 .padding(bottom = bottomContentReservedHeight)
         ) {
             TransferAmountSummaryBlock(
@@ -573,31 +539,30 @@ private fun AmountStepCard(
             )
             Spacer(modifier = Modifier.height(28.dp))
             TransferAmountSummaryBlock(
-                title = destinationTitle,
-                subtitle = destinationSubtitle,
+                title = amountStepCopy.destination.title,
+                subtitle = amountStepCopy.destination.subtitle,
                 onClick = onChangeRecipient
             )
             Spacer(modifier = Modifier.height(36.dp))
             Text(
-                text = if (hasAmountInput) amountDisplay else promptText,
-                style = if (hasAmountInput) {
+                text = if (amountStepCopy.hasAmountInput) amountStepCopy.amountDisplay else amountStepCopy.promptText,
+                style = if (amountStepCopy.hasAmountInput) {
                     MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Black)
                 } else {
                     MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black)
                 },
-                color = if (hasAmountInput) DawnText else TransferAmountPrompt
+                color = if (amountStepCopy.hasAmountInput) DawnText else TransferAmountPrompt
             )
             Spacer(modifier = Modifier.height(14.dp))
-            if (!hasAmountInput) {
+            if (!amountStepCopy.hasAmountInput) {
                 Text(
-                    text = assistText,
+                    text = amountStepCopy.assistText,
                     modifier = Modifier
                         .background(TransferAmountChipBackground, RoundedCornerShape(10.dp))
                         .clickable(
-                            enabled = uiModel.destinationMode == TransferDestinationMode.ACCOUNT
+                            enabled = amountStepCopy.canUseBalanceShortcut
                         ) {
-                            val fullBalance = uiModel.selectedAccountBalanceText.filter(Char::isDigit)
-                            syncAmount(fullBalance)
+                            syncAmount(amountStepCopy.fullBalanceInput)
                         }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
@@ -615,7 +580,7 @@ private fun AmountStepCard(
             TransferNumberPad(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = TransferNumberPadBottomPadding),
                 onNumberClick = { key ->
                     syncAmount(appendTransferAmountInput(amountInput, key))
                 },
@@ -623,7 +588,7 @@ private fun AmountStepCard(
                     syncAmount(removeLastTransferAmountDigit(amountInput))
                 }
             )
-            if (actionBarVisible) {
+            if (amountStepCopy.hasAmountInput) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -633,7 +598,7 @@ private fun AmountStepCard(
                             enabled = uiModel.canSubmit,
                             onClick = onPrimaryAction
                         )
-                        .padding(vertical = 14.dp),
+                        .padding(vertical = TransferAmountActionVerticalPadding),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -682,11 +647,7 @@ private fun TransferNumberPad(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        listOf(
-            listOf("1", "2", "3"),
-            listOf("4", "5", "6"),
-            listOf("7", "8", "9")
-        ).forEach { row ->
+        TransferNumberPadRows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
@@ -754,20 +715,7 @@ private fun TransferTrackerScreen(
     uiModel: TransferUiModel,
     onResetTransfer: () -> Unit
 ) {
-    val completedHeadline = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-        "내 ${uiModel.selectedRecipientName} 계좌로"
-    } else {
-        "${uiModel.selectedRecipientName} 지갑으로"
-    }
-    val completedSuffix = if (uiModel.transferStatus == TransferStatus.CONFIRMED) {
-        if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-            "옮겼어요"
-        } else {
-            "보냈어요"
-        }
-    } else {
-        "확인하고 있어요"
-    }
+    val trackerCopy = resolveTrackerCopy(uiModel)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -812,7 +760,7 @@ private fun TransferTrackerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = completedHeadline,
+                    text = trackerCopy.headline,
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
                     color = DawnText,
                     textAlign = TextAlign.Center
@@ -824,7 +772,7 @@ private fun TransferTrackerScreen(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = completedSuffix,
+                    text = trackerCopy.statusText,
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
                     color = DawnText,
                     textAlign = TextAlign.Center
@@ -883,34 +831,24 @@ private fun TransferReviewScreen(
     onConfirm: () -> Unit,
     onUpdateRecipientDisplayName: (String) -> Unit
 ) {
-    var showAccountSheet by remember { mutableStateOf(false) }
-    var showRecipientDisplayEditor by remember { mutableStateOf(false) }
+    var activeOverlay by remember { mutableStateOf(TransferReviewOverlay.None) }
     var draftRecipientDisplayName by remember(uiModel.selectedRecipientName) {
         mutableStateOf(uiModel.selectedRecipientName)
     }
     val accountSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val recipientDetail = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-        uiModel.selectedRecipientAccountLabel
-    } else {
-        uiModel.selectedRecipientWalletLabel
-    }
-    val headlineSuffix = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-        "옮길까요?"
-    } else {
-        "보낼까요?"
-    }
+    val reviewCopy = resolveReviewCopy(uiModel)
 
-    if (showRecipientDisplayEditor) {
+    if (activeOverlay == TransferReviewOverlay.RecipientEditor) {
         TransferRecipientDisplayNameEditor(
             value = draftRecipientDisplayName,
             onValueChange = { draftRecipientDisplayName = it },
             onClose = {
                 draftRecipientDisplayName = uiModel.selectedRecipientName
-                showRecipientDisplayEditor = false
+                activeOverlay = TransferReviewOverlay.None
             },
             onDone = {
                 onUpdateRecipientDisplayName(draftRecipientDisplayName)
-                showRecipientDisplayEditor = false
+                activeOverlay = TransferReviewOverlay.None
             }
         )
     } else {
@@ -930,11 +868,7 @@ private fun TransferReviewScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-                            "내 ${uiModel.selectedRecipientName} 계좌로"
-                        } else {
-                            "${uiModel.selectedRecipientName} 지갑으로"
-                        },
+                        text = reviewCopy.headline,
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
                         color = DawnText,
                         textAlign = TextAlign.Center
@@ -948,7 +882,7 @@ private fun TransferReviewScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = headlineSuffix,
+                        text = reviewCopy.headlineSuffix,
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
                         color = DawnText,
                         textAlign = TextAlign.Center
@@ -963,15 +897,11 @@ private fun TransferReviewScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 TransferReviewInfoRow(
-                    label = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-                        "받는 분에게 표시"
-                    } else {
-                        "받는 지갑"
-                    },
+                    label = reviewCopy.recipientLabel,
                     value = uiModel.selectedRecipientName,
                     onClick = {
                         draftRecipientDisplayName = uiModel.selectedRecipientName
-                        showRecipientDisplayEditor = true
+                        activeOverlay = TransferReviewOverlay.RecipientEditor
                     },
                     withDivider = false,
                     showTrailingIcon = true
@@ -979,21 +909,17 @@ private fun TransferReviewScreen(
                 TransferReviewInfoRow(
                     label = "출금 계좌",
                     value = uiModel.selectedAccountName,
-                    onClick = { showAccountSheet = true },
+                    onClick = { activeOverlay = TransferReviewOverlay.AccountSheet },
                     withDivider = false,
                     showTrailingIcon = true
                 )
                 TransferReviewInfoRow(
-                    label = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-                        "입금 계좌"
-                    } else {
-                        "지갑 주소"
-                    },
-                    value = recipientDetail,
-                    onClick = onDismiss,
+                    label = reviewCopy.recipientDetailLabel,
+                    value = reviewCopy.recipientDetail,
+                    onClick = null,
                     withDivider = false,
                     showTrailingIcon = false,
-                    valueFontFamily = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) null else FontFamily.Monospace
+                    valueFontFamily = reviewCopy.recipientDetailFontFamily
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -1006,7 +932,7 @@ private fun TransferReviewScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) "옮기기" else "보내기",
+                        text = reviewCopy.confirmActionText,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = Color.White
                     )
@@ -1016,9 +942,9 @@ private fun TransferReviewScreen(
         }
     }
 
-    if (showAccountSheet) {
+    if (activeOverlay == TransferReviewOverlay.AccountSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showAccountSheet = false },
+            onDismissRequest = { activeOverlay = TransferReviewOverlay.None },
             sheetState = accountSheetState,
             containerColor = Color.White,
             scrimColor = TransferReviewSheetScrim,
@@ -1034,7 +960,7 @@ private fun TransferReviewScreen(
         ) {
             TransferAccountBottomSheet(
                 uiModel = uiModel,
-                onConfirm = { showAccountSheet = false }
+                onConfirm = { activeOverlay = TransferReviewOverlay.None }
             )
         }
     }
@@ -1135,11 +1061,11 @@ private fun TransferAccountBottomSheet(
         Box(
             modifier = Modifier
                 .size(68.dp)
-                .background(Color(0xFFFFD54F), CircleShape),
+                .background(Color(0xFFE5E7EB), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "KB",
+                text = resolveAccountBadgeText(uiModel.selectedAccountName),
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
                 color = Color(0xFF1F2937)
             )
@@ -1183,7 +1109,7 @@ private fun TransferAccountBottomSheet(
 private fun TransferReviewInfoRow(
     label: String,
     value: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     withDivider: Boolean = true,
     showTrailingIcon: Boolean = true,
     valueFontFamily: FontFamily? = null
@@ -1191,7 +1117,13 @@ private fun TransferReviewInfoRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                }
+            ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
@@ -1288,7 +1220,7 @@ private fun TransferRow(
 
 private enum class RecipientPickerTab(val label: String) {
     Account("계좌"),
-    Contact("지갑")
+    Wallet("지갑")
 }
 
 private fun recipientToneColor(tone: TransferRecipientTone): Color =
@@ -1299,6 +1231,186 @@ private fun recipientToneColor(tone: TransferRecipientTone): Color =
         TransferRecipientTone.Teal -> TransferRecipientTeal
     }
 
+private fun RecipientPickerTab.toDestinationMode(): TransferDestinationMode =
+    when (this) {
+        RecipientPickerTab.Account -> TransferDestinationMode.ACCOUNT
+        RecipientPickerTab.Wallet -> TransferDestinationMode.WALLET
+    }
+
+private fun TransferDestinationMode.toRecipientPickerTab(): RecipientPickerTab =
+    when (this) {
+        TransferDestinationMode.ACCOUNT -> RecipientPickerTab.Account
+        TransferDestinationMode.WALLET -> RecipientPickerTab.Wallet
+    }
+
+private fun RecipientPickerTab.searchPlaceholder(accountPlaceholder: String): String =
+    if (this == RecipientPickerTab.Account) {
+        accountPlaceholder
+    } else {
+        "지갑주소 입력"
+    }
+
+private fun RecipientPickerTab.emptyStateDescription(): String =
+    if (this == RecipientPickerTab.Account) {
+        "다른 이름이나 계좌번호 형식으로 다시 찾아보세요."
+    } else {
+        "다른 이름이나 지갑 주소 형식으로 다시 찾아보세요."
+    }
+
+private fun RecipientPickerTab.resolveSectionTitle(baseTitle: String): String =
+    when (baseTitle) {
+        "자주 보내는 지갑" -> if (this == RecipientPickerTab.Account) "자주 보내는 계좌" else baseTitle
+        "최근 보낸 지갑" -> if (this == RecipientPickerTab.Account) "최근 보낸 계좌" else baseTitle
+        else -> baseTitle
+    }
+
+private fun filterRecipientSections(
+    sections: List<TransferRecipientSectionUiModel>,
+    query: String,
+    selectedTab: RecipientPickerTab
+): List<TransferRecipientSectionUiModel> {
+    val keyword = query.trim()
+    return sections.mapNotNull { section ->
+        val items = section.items.filter { recipient ->
+            keyword.isBlank() || buildRecipientSearchTarget(recipient, selectedTab)
+                .contains(keyword, ignoreCase = true)
+        }
+        if (items.isEmpty()) {
+            null
+        } else {
+            section.copy(items = items)
+        }
+    }
+}
+
+private fun buildRecipientSearchTarget(
+    recipient: TransferRecipientUiModel,
+    selectedTab: RecipientPickerTab
+): String = buildString {
+    append(recipient.name)
+    append(' ')
+    append(recipient.relationship)
+    append(' ')
+    append(recipient.secondaryLabel(selectedTab))
+}
+
+private fun TransferRecipientUiModel.secondaryLabel(selectedTab: RecipientPickerTab): String =
+    if (selectedTab == RecipientPickerTab.Account) {
+        accountLabel
+    } else {
+        contactLabel
+    }
+
+private fun resolveDestinationSummary(uiModel: TransferUiModel): TransferDestinationSummary =
+    if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
+        TransferDestinationSummary(
+            title = "내 ${uiModel.selectedRecipientName} 계좌로",
+            subtitle = uiModel.selectedRecipientAccountLabel
+        )
+    } else {
+        TransferDestinationSummary(
+            title = "${uiModel.selectedRecipientName} 지갑으로",
+            subtitle = uiModel.selectedRecipientWalletLabel
+        )
+    }
+
+private fun resolveAmountStepCopy(
+    uiModel: TransferUiModel,
+    amountInput: String
+): TransferAmountStepCopy {
+    val hasAmountInput = amountInput.isNotBlank() && amountInput != "0"
+    val promptText = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
+        "얼마나 옮길까요?"
+    } else {
+        "얼마나 보낼까요?"
+    }
+    val assistText = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
+        "잔액 · ${uiModel.selectedAccountBalanceText} 입력"
+    } else {
+        "지갑 송금 · USDC 입력"
+    }
+    val amountDisplay = when (uiModel.destinationMode) {
+        TransferDestinationMode.ACCOUNT -> amountInput.toIntOrNull()?.let(::formatKrw).orEmpty()
+        TransferDestinationMode.WALLET -> amountInput.ifBlank { "0" } + " USDC"
+    }
+
+    return TransferAmountStepCopy(
+        promptText = promptText,
+        assistText = assistText,
+        destination = resolveDestinationSummary(uiModel),
+        amountDisplay = amountDisplay,
+        hasAmountInput = hasAmountInput,
+        canUseBalanceShortcut = uiModel.destinationMode == TransferDestinationMode.ACCOUNT,
+        fullBalanceInput = uiModel.selectedAccountBalanceText.filter(Char::isDigit)
+    )
+}
+
+private fun resolveInitialAmountInput(uiModel: TransferUiModel): String =
+    when (uiModel.destinationMode) {
+        TransferDestinationMode.ACCOUNT -> uiModel.amountUsd
+            .takeUnless { it == "0" }
+            ?.toIntOrNull()
+            ?.let { formatKrw(it * TransferKrwPerUsdc.toInt()).filter(Char::isDigit) }
+            .orEmpty()
+        TransferDestinationMode.WALLET -> uiModel.amountUsd.takeUnless { it == "0" }.orEmpty()
+    }
+
+private fun convertTransferAmountInput(
+    destinationMode: TransferDestinationMode,
+    amountInput: String
+): Int =
+    when (destinationMode) {
+        TransferDestinationMode.ACCOUNT -> {
+            val krw = amountInput.toIntOrNull() ?: 0
+            (krw / TransferKrwPerUsdc).toInt()
+        }
+        TransferDestinationMode.WALLET -> amountInput.toIntOrNull() ?: 0
+    }
+
+private fun resolveTrackerCopy(uiModel: TransferUiModel): TransferTrackerCopy {
+    val destination = resolveDestinationSummary(uiModel)
+    val statusText = if (uiModel.transferStatus == TransferStatus.CONFIRMED) {
+        if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
+            "옮겼어요"
+        } else {
+            "보냈어요"
+        }
+    } else {
+        "확인하고 있어요"
+    }
+
+    return TransferTrackerCopy(
+        headline = destination.title,
+        statusText = statusText
+    )
+}
+
+private fun resolveReviewCopy(uiModel: TransferUiModel): TransferReviewCopy =
+    if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
+        TransferReviewCopy(
+            recipientDetail = uiModel.selectedRecipientAccountLabel,
+            headline = "내 ${uiModel.selectedRecipientName} 계좌로",
+            headlineSuffix = "옮길까요?",
+            recipientLabel = "받는 분에게 표시",
+            recipientDetailLabel = "입금 계좌",
+            recipientDetailFontFamily = null,
+            confirmActionText = "옮기기"
+        )
+    } else {
+        TransferReviewCopy(
+            recipientDetail = uiModel.selectedRecipientWalletLabel,
+            headline = "${uiModel.selectedRecipientName} 지갑으로",
+            headlineSuffix = "보낼까요?",
+            recipientLabel = "받는 분에게 표시",
+            recipientDetailLabel = "지갑 주소",
+            recipientDetailFontFamily = FontFamily.Monospace,
+            confirmActionText = "보내기"
+        )
+    }
+
+private fun resolveAccountBadgeText(accountName: String): String =
+    accountName.trim().take(2).ifBlank { "계좌" }
+
 private fun appendTransferAmountInput(
     current: String,
     next: String
@@ -1308,20 +1420,10 @@ private fun appendTransferAmountInput(
     } else {
         current + next
     }
-    return candidate.trimStart('0').ifBlank { "0" }.take(9)
+    return candidate.trimStart('0').ifBlank { "0" }.take(TransferAmountMaxDigits)
 }
 
 private fun removeLastTransferAmountDigit(current: String): String =
     current
         .filter(Char::isDigit)
         .dropLast(1)
-
-private fun resolveRecipientSectionTitle(
-    baseTitle: String,
-    accountStyle: Boolean
-): String =
-    when (baseTitle) {
-        "자주 보내는 지갑" -> if (accountStyle) "자주 보내는 계좌" else "자주 보내는 지갑"
-        "최근 보낸 지갑" -> if (accountStyle) "최근 보낸 계좌" else "최근 보낸 지갑"
-        else -> baseTitle
-    }

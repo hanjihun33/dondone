@@ -7,10 +7,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.dondone.mobile.app.DonDoneApp
 import com.dondone.mobile.app.session.DemoSessionViewModel
+import com.dondone.mobile.app.session.DemoSessionViewModelFactory
 import com.dondone.mobile.core.designsystem.DonDoneTheme
 
 class MainActivity : ComponentActivity() {
-    private val viewModel by viewModels<DemoSessionViewModel>()
+    private val viewModel by viewModels<DemoSessionViewModel> {
+        DemoSessionViewModelFactory(applicationContext)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,4 +26,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

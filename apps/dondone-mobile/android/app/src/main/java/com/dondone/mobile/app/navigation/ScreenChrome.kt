@@ -4,7 +4,7 @@ import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 
 data class ScreenChrome(
-    val title: String,
+    val headerTitle: String?,
     val showRootTabs: Boolean,
     val showSettingsAction: Boolean,
     val showDate: Boolean
@@ -18,36 +18,48 @@ fun resolveScreenChrome(
 ): ScreenChrome {
     return if (isRootRoute(route)) {
         ScreenChrome(
-            title = when {
-                route == Route.HOME -> "DonDone"
-                route == Route.WORKPROOF && isWorkproofDetailVisible -> ""
+            headerTitle = when {
+                route == Route.HOME -> null
+                route == Route.WORKPROOF && isWorkproofDetailVisible -> null
                 else -> routeTitle(route)
             },
             showRootTabs = true,
             showSettingsAction = route == Route.HOME,
-            showDate = route != Route.HOME && route != Route.FINANCE_HOME && route != Route.WORKPROOF && route != Route.MENU
+            showDate = false
         )
     } else {
         ScreenChrome(
-            title = when (route) {
-                Route.WAGE -> ""
-                Route.TRANSFER -> {
-                    if (transferStatus == TransferStatus.SUBMITTED || transferStatus == TransferStatus.CONFIRMED) {
-                        ""
-                    } else {
-                        when (transferStep) {
-                            TransferFlowStep.ACCOUNT -> "계좌 선택"
-                            TransferFlowStep.RECIPIENT -> ""
-                            TransferFlowStep.AMOUNT -> ""
-                        }
-                    }
-                }
-
-                else -> routeTitle(route)
-            },
+            headerTitle = resolveChildHeaderTitle(route, transferStep, transferStatus),
             showRootTabs = false,
             showSettingsAction = false,
             showDate = route != Route.TRANSFER && route != Route.WAGE
         )
+    }
+}
+
+private fun resolveChildHeaderTitle(
+    route: String,
+    transferStep: TransferFlowStep,
+    transferStatus: TransferStatus
+): String? {
+    return when (route) {
+        Route.WAGE -> null
+        Route.TRANSFER -> resolveTransferHeaderTitle(transferStep, transferStatus)
+        else -> routeTitle(route)
+    }
+}
+
+private fun resolveTransferHeaderTitle(
+    transferStep: TransferFlowStep,
+    transferStatus: TransferStatus
+): String? {
+    if (transferStatus == TransferStatus.SUBMITTED || transferStatus == TransferStatus.CONFIRMED) {
+        return null
+    }
+
+    return when (transferStep) {
+        TransferFlowStep.ACCOUNT -> "계좌 선택"
+        TransferFlowStep.RECIPIENT -> null
+        TransferFlowStep.AMOUNT -> null
     }
 }

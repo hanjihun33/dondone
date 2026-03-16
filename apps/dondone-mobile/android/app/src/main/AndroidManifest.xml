@@ -6,8 +6,9 @@
 
     <application
         android:name=".DonDoneApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:label="@string/app_name"
+        android:usesCleartextTraffic="true"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         <activity
@@ -22,4 +23,3 @@
     </application>
 
 </manifest>
-

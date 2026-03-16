@@ -2,8 +2,12 @@ package com.dondone.mobile.feature.home.presentation
 
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
+import com.dondone.mobile.data.advance.AdvanceRemoteMode
+import com.dondone.mobile.data.advance.AdvanceRemoteState
 import com.dondone.mobile.domain.calculator.AdvanceCalculator
 import com.dondone.mobile.domain.calculator.WageEstimator
+import com.dondone.mobile.domain.advance.AdvanceSurfaceState
+import com.dondone.mobile.domain.advance.toAdvanceContractState
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferStatus
 import kotlin.math.abs
@@ -68,11 +72,23 @@ data class HomeUiModel(
     val money: HomeMoneyUiModel
 )
 
-fun DemoState.toHomeUiModel(): HomeUiModel {
+fun DemoState.toHomeUiModel(remoteState: AdvanceRemoteState? = null): HomeUiModel {
     val selectedAccount = remittance.selectedAccount()
     val wageEstimate = WageEstimator.calculate(this)
     val advance = AdvanceCalculator.calculate(this)
-    val progress = if (advance.progressTargetDays == 0) 1f else advance.verifiedDays / advance.progressTargetDays.toFloat()
+    val advanceContractState = toAdvanceContractState(remoteState)
+    val usesRemoteAdvance = remoteState != null
+    val progress = if (usesRemoteAdvance) {
+        when (advanceContractState.surfaceState) {
+            AdvanceSurfaceState.SUCCESS -> 1f
+            AdvanceSurfaceState.BLOCKED -> 0.2f
+            else -> 0f
+        }
+    } else if (advance.progressTargetDays == 0) {
+        1f
+    } else {
+        advance.verifiedDays / advance.progressTargetDays.toFloat()
+    }
     val formattedMonth = demo.month.toString().padStart(2, '0')
     fun formatDay(day: Int): String = day.toString().padStart(2, '0')
     val currentDateText = "${demo.year}-$formattedMonth-${formatDay(demo.asOfDay)}"
@@ -185,10 +201,30 @@ fun DemoState.toHomeUiModel(): HomeUiModel {
             clockInText = clockIn,
             clockOutText = clockOut,
             impactText = "오늘 기록이 저장되어 다음 반영 후보에 포함돼요.",
-            advanceAvailableText = formatKrw(advance.available),
-            advanceProgressText = "${advance.verifiedDays}일 / ${advance.progressTargetDays}일",
+            advanceAvailableText = formatKrw(
+                if (usesRemoteAdvance) {
+                    (advanceContractState.availableAmountOverride ?: 0L).toInt()
+                } else {
+                    advance.available
+                }
+            ),
+            advanceProgressText = if (usesRemoteAdvance) {
+                when (remoteState?.mode) {
+                    AdvanceRemoteMode.CONTENT -> "실연동 한도 기준"
+                    AdvanceRemoteMode.LOADING -> "실연동 확인 중"
+                    AdvanceRemoteMode.EMPTY -> "실연동 비어 있음"
+                    AdvanceRemoteMode.ERROR -> "실연동 재확인 필요"
+                    else -> "로그인 필요"
+                }
+            } else {
+                "${advance.verifiedDays}일 / ${advance.progressTargetDays}일"
+            },
             advanceProgress = progress,
-            advanceHintText = if (advance.nextTierInDays > 0) {
+            advanceHintText = if (usesRemoteAdvance) {
+                advanceContractState.stateBodyText
+            } else if (advanceContractState.surfaceState == AdvanceSurfaceState.BLOCKED) {
+                advanceContractState.stateBodyText
+            } else if (advance.nextTierInDays > 0) {
                 "다음 구간까지 ${advance.nextTierInDays}일 · 예상 증가 ${formatKrw(advance.nextTierGain)}"
             } else {
                 "이번 달 최고 구간에 도달했어요."

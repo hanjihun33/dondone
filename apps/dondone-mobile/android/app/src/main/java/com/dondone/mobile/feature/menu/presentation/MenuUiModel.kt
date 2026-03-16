@@ -1,6 +1,7 @@
 package com.dondone.mobile.feature.menu.presentation
 
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.domain.model.DemoState
 
 enum class MenuDocumentAccent {
@@ -20,11 +21,23 @@ data class MenuDocumentUiModel(
 )
 
 data class MenuUiModel(
+    val session: MenuSessionUiModel?,
     val documents: List<MenuDocumentUiModel>
 )
 
-fun DemoState.toMenuUiModel(): MenuUiModel {
+data class MenuSessionUiModel(
+    val name: String,
+    val email: String
+)
+
+fun DemoState.toMenuUiModel(session: AuthSession?): MenuUiModel {
     return MenuUiModel(
+        session = session?.let {
+            MenuSessionUiModel(
+                name = it.name,
+                email = it.email
+            )
+        },
         documents = documents.map { document ->
             val accent = when {
                 document.id.contains("PROOF") -> MenuDocumentAccent.Proof

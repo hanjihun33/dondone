@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.activity.compose.BackHandler
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -301,7 +301,11 @@ private fun WorkproofPunchCard(
     onClockOut: () -> Unit,
     onToggleDetails: () -> Unit
 ) {
-    val isClockActionEnabled = uiModel.isWithinWorkplaceRadius
+    val context = LocalContext.current
+    val canClockIn = uiModel.canClockIn && uiModel.isWithinWorkplaceRadius
+    val canClockOut = uiModel.canClockOut && uiModel.isWithinWorkplaceRadius
+    val showClockInRadiusFeedback = uiModel.canClockIn && !uiModel.isWithinWorkplaceRadius
+    val showClockOutRadiusFeedback = uiModel.canClockOut && !uiModel.isWithinWorkplaceRadius
 
     WorkproofSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -324,23 +328,36 @@ private fun WorkproofPunchCard(
                     }
                 }
             )
-            WorkproofLocationStatusCard(uiModel = uiModel)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                PrimaryActionButton(
-                    text = stringResource(R.string.workproof_label_clock_in),
-                    onClick = onClockIn,
-                    enabled = uiModel.canClockIn && isClockActionEnabled,
+                WorkproofActionButtonWithFeedback(
+                    enabled = canClockIn,
+                    showDisabledFeedback = showClockInRadiusFeedback,
+                    onDisabledClick = { showWorkproofRadiusToast(context) },
                     modifier = Modifier.weight(1f)
-                )
-                SecondaryActionButton(
-                    text = stringResource(R.string.workproof_label_clock_out),
-                    onClick = onClockOut,
-                    enabled = uiModel.canClockOut && isClockActionEnabled,
+                ) {
+                    PrimaryActionButton(
+                        text = stringResource(R.string.workproof_label_clock_in),
+                        onClick = onClockIn,
+                        enabled = canClockIn,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                WorkproofActionButtonWithFeedback(
+                    enabled = canClockOut,
+                    showDisabledFeedback = showClockOutRadiusFeedback,
+                    onDisabledClick = { showWorkproofRadiusToast(context) },
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+                    SecondaryActionButton(
+                        text = stringResource(R.string.workproof_label_clock_out),
+                        onClick = onClockOut,
+                        enabled = canClockOut,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
             WorkproofKeyValueRow(
                 label = stringResource(R.string.workproof_label_clock_in),
@@ -365,39 +382,23 @@ private fun WorkproofPunchCard(
 }
 
 @Composable
-private fun WorkproofLocationStatusCard(
-    uiModel: WorkproofSummaryUiModel
+private fun WorkproofActionButtonWithFeedback(
+    enabled: Boolean,
+    showDisabledFeedback: Boolean,
+    onDisabledClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
 ) {
-    val badgeBackground = if (uiModel.isWithinWorkplaceRadius) {
-        DawnSurfaceAlt
-    } else {
-        Color(0xFFFFF4DD)
-    }
-    val badgeColor = if (uiModel.isWithinWorkplaceRadius) {
-        DawnPrimaryDeep
-    } else {
-        WorkproofPartialText
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(badgeBackground)
-                .border(1.dp, DawnBorder, RoundedCornerShape(999.dp))
-                .padding(horizontal = 12.dp, vertical = 7.dp)
-        ) {
-            Text(
-                text = uiModel.locationStatusText,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                color = badgeColor
+    Box(modifier = modifier) {
+        content()
+        if (!enabled && showDisabledFeedback) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable(onClick = onDisabledClick)
             )
         }
-        Text(
-            text = uiModel.locationStatusDetailText,
-            style = MaterialTheme.typography.bodyMedium,
-            color = DawnTextSubtle
-        )
     }
 }
 
@@ -430,12 +431,6 @@ private fun WorkproofWorkplaceMapCard(
                 workplaceRadiusMeters = uiModel.workplaceRadiusMeters
             )
         }
-
-        Text(
-            text = "근무지 핀과 반경 원을 확인한 뒤, 반경 안에 들어오면 출퇴근 버튼을 사용할 수 있어요.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = DawnTextSubtle
-        )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             WorkproofMapLegendItem(
@@ -1577,6 +1572,14 @@ private fun resolveAttachmentName(context: Context, uri: Uri): String {
         }
     }
     return uri.lastPathSegment ?: "선택한 첨부"
+}
+
+private fun showWorkproofRadiusToast(context: Context) {
+    Toast.makeText(
+        context,
+        "근무지 반경 밖에서는 출퇴근할 수 없어요.",
+        Toast.LENGTH_SHORT
+    ).show()
 }
 
 private data class WorkproofEditReasonOption(
