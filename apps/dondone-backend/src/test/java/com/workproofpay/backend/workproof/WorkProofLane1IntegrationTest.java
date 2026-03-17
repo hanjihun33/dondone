@@ -71,6 +71,23 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void providesTemporarySsafyWorkplaceWhenUserHasNoWorkplace() throws Exception {
+        User user = userRepository.save(User.register("ssafy-temp@test.com", "hashed", "Temp"));
+        String token = tokenFor(user);
+
+        mockMvc.perform(get("/api/workproof/workplaces")
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.workplaces.length()").value(1))
+                .andExpect(jsonPath("$.data.workplaces[0].name").value("SSAFY (임시)"))
+                .andExpect(jsonPath("$.data.workplaces[0].address").value("광주광역시 광산구 하남산단 6번로 107"))
+                .andExpect(jsonPath("$.data.workplaces[0].latitude").value(35.2031092))
+                .andExpect(jsonPath("$.data.workplaces[0].longitude").value(126.8083831))
+                .andExpect(jsonPath("$.data.workplaces[0].allowedRadiusMeters").value(1000))
+                .andExpect(jsonPath("$.data.workplaces[0].hasActiveContract").value(false));
+    }
+
+    @Test
     void createsLane1WorkplaceContractAndRecordFlow() throws Exception {
         // 근무지 등록 -> 활성 계약 생성 -> 출근/퇴근 -> 목록/상세/월간 요약까지 lane 1 happy path를 검증한다.
         User user = userRepository.save(User.register("lane1@test.com", "hashed", "Lane1"));
@@ -91,6 +108,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                         .content(objectMapper.writeValueAsString(workplaceRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.name").value("DonDone Cafe"))
+                .andExpect(jsonPath("$.data.allowedRadiusMeters").value(1000))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -102,6 +120,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workplaces.length()").value(1))
+                .andExpect(jsonPath("$.data.workplaces[0].allowedRadiusMeters").value(1000))
                 .andExpect(jsonPath("$.data.workplaces[0].hasActiveContract").value(false));
 
         // 3. 활성 계약 생성
@@ -307,6 +326,63 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void rejectsClockInAndClockOutOutsideAllowedRadius() throws Exception {
+        User user = userRepository.save(User.register("geofence@test.com", "hashed", "Geofence"));
+        String token = tokenFor(user);
+        Long workplaceId = createWorkplaceAndContract(token);
+
+        mockMvc.perform(post("/api/workproof/records/check-in")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckInWorkProofRequest(
+                                workplaceId,
+                                LocalDateTime.of(2026, 3, 16, 9, 0),
+                                37.52,
+                                127.02,
+                                "Outside radius"
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKPLACE_RADIUS_EXCEEDED"));
+
+        mockMvc.perform(post("/api/workproof/records/check-in")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckInWorkProofRequest(
+                                workplaceId,
+                                LocalDateTime.of(2026, 3, 16, 9, 5),
+                                37.5004,
+                                127.0004,
+                                "Front door"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("CHECKED_IN"));
+
+        mockMvc.perform(post("/api/workproof/records/check-out")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckOutWorkProofRequest(
+                                LocalDateTime.of(2026, 3, 16, 18, 0),
+                                37.52,
+                                127.02,
+                                "Outside radius"
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKPLACE_RADIUS_EXCEEDED"));
+
+        mockMvc.perform(post("/api/workproof/records/check-out")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckOutWorkProofRequest(
+                                LocalDateTime.of(2026, 3, 16, 18, 5),
+                                37.5006,
+                                127.0006,
+                                "Front door"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CHECKED_OUT"));
+    }
+
+    @Test
     void hidesForeignWorkplaceAndRecordOwnership() throws Exception {
         // 타인 소유 근무지와 근무 기록은 404로 은닉되는지 확인한다.
         User owner = userRepository.save(User.register("owner-l1@test.com", "hashed", "Owner"));
@@ -359,6 +435,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                                 127.0
                         ))))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.allowedRadiusMeters").value(1000))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

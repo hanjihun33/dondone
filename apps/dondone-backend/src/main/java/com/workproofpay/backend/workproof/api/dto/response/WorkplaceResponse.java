@@ -9,6 +9,7 @@ public record WorkplaceResponse(
         String mapLabel,
         Double latitude,
         Double longitude,
+        Integer allowedRadiusMeters,
         Boolean hasActiveContract,
         LocalDateTime createdAt
 ) {

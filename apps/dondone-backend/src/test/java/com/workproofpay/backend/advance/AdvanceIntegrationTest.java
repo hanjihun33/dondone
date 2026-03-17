@@ -223,7 +223,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 "Gumi",
                 "Front gate",
                 36.1,
-                128.3
+                128.3,
+                1_000
         ));
         WorkContract contract = workContractRepository.save(WorkContract.activate(
                 workplace,

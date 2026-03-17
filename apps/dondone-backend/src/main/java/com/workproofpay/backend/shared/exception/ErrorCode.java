@@ -44,6 +44,7 @@ public enum ErrorCode {
     ACTIVE_CONTRACT_EXISTS(HttpStatus.CONFLICT, "Active contract already exists"),
     ACTIVE_WORKPROOF_EXISTS(HttpStatus.CONFLICT, "Active workproof already exists"),
     WORK_DATE_ALREADY_EXISTS(HttpStatus.CONFLICT, "A workproof already exists for the work date"),
+    WORKPLACE_RADIUS_EXCEEDED(HttpStatus.CONFLICT, "Current location is outside the allowed workplace radius"),
     CHECK_OUT_BEFORE_CHECK_IN(HttpStatus.CONFLICT, "checkOut device time must be after the active checkIn time"),
     DOCUMENT_DUPLICATE_REQUEST(HttpStatus.CONFLICT, "Document request already exists for the given idempotency key"),
     ADVANCE_DUPLICATE_REQUEST(HttpStatus.CONFLICT, "Advance request already exists for the idempotency key"),

@@ -44,8 +44,15 @@ import java.util.List;
 public class WorkProofLane1Service {
 
     private static final int DEFAULT_DAILY_WORK_MINUTES = 480;
-    // Assumption: keep a small configurable default until PRD fixes the concrete monthly baseline.
+    private static final int DEFAULT_ALLOWED_RADIUS_METERS = 1_000;
+    // PRD에서 월 기준 시간이 고정되기 전까지는 작은 기본값으로 유지한다.
     private static final int DEFAULT_MONTHLY_WORK_MINUTES = 12_540;
+    private static final double EARTH_RADIUS_METERS = 6_371_000d;
+    private static final String TEMPORARY_WORKPLACE_NAME = "SSAFY (임시)";
+    private static final String TEMPORARY_WORKPLACE_ADDRESS = "광주광역시 광산구 하남산단 6번로 107";
+    private static final String TEMPORARY_WORKPLACE_MAP_LABEL = "광주 SSAFY";
+    private static final double TEMPORARY_WORKPLACE_LATITUDE = 35.2031092d;
+    private static final double TEMPORARY_WORKPLACE_LONGITUDE = 126.8083831d;
 
     private final UserRepository userRepository;
     private final WorkplaceRepository workplaceRepository;
@@ -65,7 +72,8 @@ public class WorkProofLane1Service {
                 request.address(),
                 request.mapLabel(),
                 request.latitude(),
-                request.longitude()
+                request.longitude(),
+                DEFAULT_ALLOWED_RADIUS_METERS
         ));
         return toWorkplaceResponse(saved, false);
     }
@@ -73,9 +81,9 @@ public class WorkProofLane1Service {
     /**
      * 근무지 목록과 각 근무지의 활성 계약 존재 여부를 함께 돌려준다.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public WorkplaceListResponse getWorkplaces(Long userId) {
-        List<WorkplaceResponse> workplaces = workplaceRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+        List<WorkplaceResponse> workplaces = getOrCreateSelectableWorkplaces(userId).stream()
                 .map(workplace -> toWorkplaceResponse(
                         workplace,
                         workContractRepository.existsByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNull(workplace.getId(), userId)
@@ -134,6 +142,8 @@ public class WorkProofLane1Service {
             throw new ApiException(ErrorCode.WORK_DATE_ALREADY_EXISTS);
         }
 
+        validateWithinAllowedRadius(workplace, request.latitude(), request.longitude());
+
         WorkProof saved = workProofRepository.save(WorkProof.checkIn(
                 findUser(userId),
                 workplace,
@@ -156,6 +166,9 @@ public class WorkProofLane1Service {
                 .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_WORKPROOF_NOT_FOUND));
 
         draftValidator.validateCheckOutSequence(active.getDeviceClockInAt(), request);
+        if (active.getWorkplace() != null) {
+            validateWithinAllowedRadius(active.getWorkplace(), request.latitude(), request.longitude());
+        }
         active.completeCheckOut(
                 request.deviceAt(),
                 LocalDateTime.now(),
@@ -284,9 +297,57 @@ public class WorkProofLane1Service {
         return List.copyOf(flags);
     }
 
+    // 고용주 등록 기능이 들어오기 전까지는 lane 1 출퇴근 흐름이 끊기지 않도록 임시 근무지를 보장한다.
+    private List<Workplace> getOrCreateSelectableWorkplaces(Long userId) {
+        List<Workplace> workplaces = workplaceRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        if (!workplaces.isEmpty()) {
+            return workplaces;
+        }
+
+        Workplace temporary = workplaceRepository.save(Workplace.create(
+                findUser(userId),
+                TEMPORARY_WORKPLACE_NAME,
+                TEMPORARY_WORKPLACE_ADDRESS,
+                TEMPORARY_WORKPLACE_MAP_LABEL,
+                TEMPORARY_WORKPLACE_LATITUDE,
+                TEMPORARY_WORKPLACE_LONGITUDE,
+                DEFAULT_ALLOWED_RADIUS_METERS
+        ));
+        return List.of(temporary);
+    }
+
     private Workplace getOwnedWorkplace(Long userId, Long workplaceId) {
         return workplaceRepository.findByIdAndUserId(workplaceId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+    }
+
+    // P0에서는 GPS를 백그라운드 추적이 아니라 출퇴근 허용 범위를 막는 1차 차단 규칙으로 쓴다.
+    private void validateWithinAllowedRadius(Workplace workplace, Double latitude, Double longitude) {
+        double distanceMeters = calculateDistanceMeters(
+                workplace.getLatitude(),
+                workplace.getLongitude(),
+                latitude,
+                longitude
+        );
+        if (distanceMeters > workplace.resolveAllowedRadiusMeters(DEFAULT_ALLOWED_RADIUS_METERS)) {
+            throw new ApiException(ErrorCode.WORKPLACE_RADIUS_EXCEEDED);
+        }
+    }
+
+    private double calculateDistanceMeters(double startLatitude,
+                                           double startLongitude,
+                                           double endLatitude,
+                                           double endLongitude) {
+        double latitudeDelta = Math.toRadians(endLatitude - startLatitude);
+        double longitudeDelta = Math.toRadians(endLongitude - startLongitude);
+        double startLatitudeRadians = Math.toRadians(startLatitude);
+        double endLatitudeRadians = Math.toRadians(endLatitude);
+
+        double haversine = Math.pow(Math.sin(latitudeDelta / 2), 2)
+                + Math.cos(startLatitudeRadians) * Math.cos(endLatitudeRadians)
+                * Math.pow(Math.sin(longitudeDelta / 2), 2);
+        double angularDistance = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+        return EARTH_RADIUS_METERS * angularDistance;
     }
 
     private WorkContract getActiveContract(Long userId, Long workplaceId, ErrorCode errorCode) {
@@ -342,6 +403,7 @@ public class WorkProofLane1Service {
                 workplace.getMapLabel(),
                 workplace.getLatitude(),
                 workplace.getLongitude(),
+                workplace.resolveAllowedRadiusMeters(DEFAULT_ALLOWED_RADIUS_METERS),
                 hasActiveContract,
                 workplace.getCreatedAt()
         );
