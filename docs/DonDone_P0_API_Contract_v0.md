@@ -490,7 +490,8 @@ Request:
 | `locationLabel` | - |
 
 추가 메모:
-- check-out도 active workproof의 workplace 중심 좌표와 `allowedRadiusMeters`를 비교해, 반경 밖 좌표면 기록을 마감하지 않는다.
+- check-out도 active workproof의 workplace 중심 좌표와 `allowedRadiusMeters`를 비교한다.
+- 반경 밖 좌표여도 기록은 저장하되 `reflectionStatus=NEEDS_REVIEW`와 risk flag로 남기고, reflected 집계에서는 제외한다.
 
 Response:
 | 필드 | 설명 |
@@ -502,13 +503,13 @@ Response:
 | `checkOut` | object 또는 null. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
 | `workedMinutes` | - |
 | `reflectionStatus` | `REFLECTED` 또는 `NEEDS_REVIEW` |
+| `riskFlags[]` | array<string>. 예: `CHECK_OUT_OUTSIDE_RADIUS` |
 
 주요 에러:
 | HTTP | Code | 설명 |
 | --- | --- | --- |
 | `404` | `ACTIVE_WORKPROOF_NOT_FOUND` | - |
 | `409` | `CHECK_OUT_BEFORE_CHECK_IN` | - |
-| `409` | `WORKPLACE_RADIUS_EXCEEDED` | 근무지 허용 반경 밖 |
 
 ### 2.8 `POST /api/workproof/records/missing`
 
@@ -599,7 +600,7 @@ Response:
 | --- | --- |
 | `month` | - |
 | `workplaceId` | - |
-| `records[]` | array<object>. 배열 항목: recordId, workDate, status, checkInDeviceAt, checkOutDeviceAt, workedMinutes, modified, reflectionStatus |
+| `records[]` | array<object>. 배열 항목: recordId, workDate, status, checkInDeviceAt, checkOutDeviceAt, workedMinutes, modified, reflectionStatus, riskFlags[] |
 
 ### 2.11 `GET /api/workproof/records/{recordId}`
 
@@ -615,7 +616,9 @@ Response:
 | `contract` | object. 하위 필드: contractId, payUnit, basePayAmount, dailyWorkMinutes, monthlyWorkMinutes, normalizedHourlyWage, effectiveFrom, isActive |
 | `checkIn` | object. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
 | `checkOut` | object 또는 null. 하위 필드: deviceAt, serverAt, latitude, longitude, locationLabel |
+| `reflectionStatus` | `PENDING`, `REFLECTED`, `NEEDS_REVIEW` |
 | `workedMinutes` | - |
+| `riskFlags[]` | array<string>. 예: `CHECK_OUT_OUTSIDE_RADIUS` |
 | `modified` | - |
 | `modifications[]` | array<object>. 배열 항목: modificationId, status, reasonCode, reasonMemo, modifiedAt, attachmentCount |
 | `attachments[]` | array<object>. 배열 항목: attachmentId, fileName, contentType, size, uploadedAt |
@@ -638,6 +641,9 @@ Response:
 | `reflection` | object. 하위 필드: reflectedRecordCount, needsReviewRecordCount, excludedRecordCount |
 | `integrity` | object. 하위 필드: recordedWorkDays, reflectedWorkDays, verifiedMinutes, pendingMinutes, workproofRiskFlags[] |
 | `financeReadiness` | object. 하위 필드: advanceEligibleWorkDays, wageUsableWorkDays |
+
+추가 메모:
+- `workproofRiskFlags[]`에는 `MODIFIED_RECORD_PRESENT`, `PENDING_WORKPROOF_PRESENT`, `CHECK_OUT_OUTSIDE_RADIUS_PRESENT`가 포함될 수 있다.
 
 ## 3. Advance
 
