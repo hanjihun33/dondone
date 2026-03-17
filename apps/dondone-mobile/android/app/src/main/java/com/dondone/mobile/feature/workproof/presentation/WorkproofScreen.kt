@@ -74,6 +74,7 @@ import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.designsystem.DonDoneErrorPanel
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.pressableScale
@@ -482,12 +483,14 @@ private fun KakaoWorkplaceMapView(
     currentLongitude: Double,
     workplaceRadiusMeters: Int
 ) {
-    val mapView = rememberKakaoMapViewWithLifecycle()
+    var retryToken by rememberSaveable { mutableIntStateOf(0) }
+    val mapView = rememberKakaoMapViewWithLifecycle(retryToken)
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
     var isCameraInitialized by rememberSaveable { mutableStateOf(false) }
     var isWorkplacePinAdded by rememberSaveable { mutableStateOf(false) }
     var isCurrentPinAdded by rememberSaveable { mutableStateOf(false) }
     var isRadiusCircleAdded by rememberSaveable { mutableStateOf(false) }
+    var mapErrorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val workplacePosition = remember(workplaceLatitude, workplaceLongitude) {
         LatLng.from(workplaceLatitude, workplaceLongitude)
     }
@@ -503,83 +506,104 @@ private fun KakaoWorkplaceMapView(
                 .clip(RoundedCornerShape(28.dp))
                 .border(1.dp, DawnBorder, RoundedCornerShape(28.dp))
         ) {
-            AndroidView(
-                factory = {
-                    mapView.apply {
-                        start(
-                            object : MapLifeCycleCallback() {
-                                override fun onMapDestroy() = Unit
+            if (mapErrorMessage != null) {
+                DonDoneErrorPanel(
+                    title = "지도를 불러오지 못했어요",
+                    message = mapErrorMessage ?: "잠시 후 다시 시도해 주세요.",
+                    actionLabel = "다시 시도",
+                    onAction = {
+                        mapErrorMessage = null
+                        kakaoMap = null
+                        isCameraInitialized = false
+                        isWorkplacePinAdded = false
+                        isCurrentPinAdded = false
+                        isRadiusCircleAdded = false
+                        retryToken += 1
+                    },
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else {
+                AndroidView(
+                    factory = {
+                        mapView.apply {
+                            start(
+                                object : MapLifeCycleCallback() {
+                                    override fun onMapDestroy() = Unit
 
-                                override fun onMapError(error: Exception) = Unit
-                            },
-                            object : KakaoMapReadyCallback() {
-                                override fun onMapReady(map: KakaoMap) {
-                                    kakaoMap = map
-                                    if (!isWorkplacePinAdded) {
-                                        map.labelManager?.let { labelManager ->
-                                            val labelStyles = labelManager.addLabelStyles(
-                                                LabelStyles.from(
-                                                    LabelStyle.from(R.drawable.ic_workplace_pin)
-                                                )
-                                            )
-                                            labelManager.layer?.let { labelLayer ->
-                                                labelLayer.addLabel(
-                                                    LabelOptions.from(workplacePosition)
-                                                        .setStyles(labelStyles)
-                                                )
-                                                isWorkplacePinAdded = true
-                                            }
-                                        }
+                                    override fun onMapError(error: Exception) {
+                                        mapErrorMessage = error.message ?: "카카오 지도 초기화에 실패했습니다."
                                     }
-                                    if (!isCurrentPinAdded) {
-                                        map.labelManager?.let { labelManager ->
-                                            val currentLabelStyles = labelManager.addLabelStyles(
-                                                LabelStyles.from(
-                                                    LabelStyle.from(R.drawable.ic_current_location_pin)
-                                                )
-                                            )
-                                            labelManager.layer?.let { labelLayer ->
-                                                labelLayer.addLabel(
-                                                    LabelOptions.from(currentPosition)
-                                                        .setStyles(currentLabelStyles)
-                                                )
-                                                isCurrentPinAdded = true
-                                            }
-                                        }
-                                    }
-                                    if (!isRadiusCircleAdded) {
-                                        val radiusStyles = PolygonStylesSet.from(
-                                            PolygonStyles.from(
-                                                android.graphics.Color.parseColor("#1A7B68EE"),
-                                                1.0f,
-                                                android.graphics.Color.parseColor("#7B68EE")
-                                            )
-                                        )
-                                        map.shapeManager?.layer?.let { shapeLayer ->
-                                            shapeLayer.addPolygon(
-                                                PolygonOptions.from(
-                                                    DotPoints.fromCircle(
-                                                        workplacePosition,
-                                                        workplaceRadiusMeters.toFloat()
+                                },
+                                object : KakaoMapReadyCallback() {
+                                    override fun onMapReady(map: KakaoMap) {
+                                        mapErrorMessage = null
+                                        kakaoMap = map
+                                        if (!isWorkplacePinAdded) {
+                                            map.labelManager?.let { labelManager ->
+                                                val labelStyles = labelManager.addLabelStyles(
+                                                    LabelStyles.from(
+                                                        LabelStyle.from(R.drawable.ic_workplace_pin)
                                                     )
-                                                ).setStylesSet(radiusStyles)
-                                            )
-                                            isRadiusCircleAdded = true
+                                                )
+                                                labelManager.layer?.let { labelLayer ->
+                                                    labelLayer.addLabel(
+                                                        LabelOptions.from(workplacePosition)
+                                                            .setStyles(labelStyles)
+                                                    )
+                                                    isWorkplacePinAdded = true
+                                                }
+                                            }
                                         }
-                                    }
-                                    if (!isCameraInitialized) {
-                                        map.moveCamera(
-                                            CameraUpdateFactory.newCenterPosition(workplacePosition)
-                                        )
-                                        isCameraInitialized = true
+                                        if (!isCurrentPinAdded) {
+                                            map.labelManager?.let { labelManager ->
+                                                val currentLabelStyles = labelManager.addLabelStyles(
+                                                    LabelStyles.from(
+                                                        LabelStyle.from(R.drawable.ic_current_location_pin)
+                                                    )
+                                                )
+                                                labelManager.layer?.let { labelLayer ->
+                                                    labelLayer.addLabel(
+                                                        LabelOptions.from(currentPosition)
+                                                            .setStyles(currentLabelStyles)
+                                                    )
+                                                    isCurrentPinAdded = true
+                                                }
+                                            }
+                                        }
+                                        if (!isRadiusCircleAdded) {
+                                            val radiusStyles = PolygonStylesSet.from(
+                                                PolygonStyles.from(
+                                                    android.graphics.Color.parseColor("#1A7B68EE"),
+                                                    1.0f,
+                                                    android.graphics.Color.parseColor("#7B68EE")
+                                                )
+                                            )
+                                            map.shapeManager?.layer?.let { shapeLayer ->
+                                                shapeLayer.addPolygon(
+                                                    PolygonOptions.from(
+                                                        DotPoints.fromCircle(
+                                                            workplacePosition,
+                                                            workplaceRadiusMeters.toFloat()
+                                                        )
+                                                    ).setStylesSet(radiusStyles)
+                                                )
+                                                isRadiusCircleAdded = true
+                                            }
+                                        }
+                                        if (!isCameraInitialized) {
+                                            map.moveCamera(
+                                                CameraUpdateFactory.newCenterPosition(workplacePosition)
+                                            )
+                                            isCameraInitialized = true
+                                        }
                                     }
                                 }
-                            }
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
         Box(
@@ -629,10 +653,12 @@ private fun WorkproofMapLegendItem(
 }
 
 @Composable
-private fun rememberKakaoMapViewWithLifecycle(): MapView {
+private fun rememberKakaoMapViewWithLifecycle(
+    retryToken: Int
+): MapView {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val mapView = remember { MapView(context) }
+    val mapView = remember(retryToken) { MapView(context) }
 
     DisposableEffect(lifecycle, mapView) {
         val observer = LifecycleEventObserver { _, event ->

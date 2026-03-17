@@ -66,7 +66,7 @@ class TransferUiModelTest {
             DemoSeedFactory.create().remittance.recipients.first().address,
             uiModel.selectedRecipientWalletLabel
         )
-        assertEquals("$360 USDC", uiModel.confirmationAmountText)
+        assertEquals("${'$'}360 USDC", uiModel.confirmationAmountText)
     }
 
     @Test
