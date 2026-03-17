@@ -10,5 +10,15 @@ public interface DocumentGenerationRequestRepository extends JpaRepository<Docum
 
     boolean existsByUserIdAndDocumentTypeAndIdempotencyKey(Long userId, DocumentType documentType, String idempotencyKey);
 
+    Optional<DocumentGenerationRequest> findByRequestIdAndUserId(String requestId, Long userId);
+
+    Optional<DocumentGenerationRequest> findByIdAndUserId(Long id, Long userId);
+
     Optional<DocumentGenerationRequest> findByIdAndUserIdAndDocumentType(Long id, Long userId, DocumentType documentType);
+
+    Optional<DocumentGenerationRequest> findFirstByUserIdAndWageVerificationIdAndDocumentTypeOrderByCreatedAtDesc(
+            Long userId,
+            Long wageVerificationId,
+            DocumentType documentType
+    );
 }

@@ -59,6 +59,7 @@ public class WageService {
     private final WorkProofService workProofService;
     private final WorkProofLane1Service workProofLane1Service;
     private final WageSummaryCalculator wageSummaryCalculator;
+    private final WageVerificationRelatedActionsService wageVerificationRelatedActionsService;
 
     @Transactional
     public WageDepositResponse createDeposit(Long userId, CreateWageDepositRequest request) {
@@ -160,7 +161,7 @@ public class WageService {
         return WageVerificationDetailResponse.from(
                 verification,
                 buildEmployerSupport(verification),
-                buildRelatedActions(verification)
+                buildRelatedActions(userId, verification)
         );
     }
 
@@ -243,17 +244,8 @@ public class WageService {
         );
     }
 
-    /**
-     * downstream 문서/Claim 흐름이 아직 없으므로,
-     * detail 응답에는 verification 결과 기준의 진행 가능 여부만 노출한다.
-     */
-    private WageVerificationDetailResponse.RelatedActionsSnapshot buildRelatedActions(WageVerification verification) {
-        boolean ready = requiresEmployerFollowUp(verification.getStatus());
-        return new WageVerificationDetailResponse.RelatedActionsSnapshot(
-                ready,
-                ready,
-                ready
-        );
+    private WageVerificationDetailResponse.RelatedActionsSnapshot buildRelatedActions(Long userId, WageVerification verification) {
+        return wageVerificationRelatedActionsService.build(userId, verification);
     }
 
     private WageMonthlySummaryResponse toMonthlySummaryResponse(WageLane1Context context) {

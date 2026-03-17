@@ -5,6 +5,8 @@ import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.claim.api.dto.request.CreateClaimPreparationRequest;
 import com.workproofpay.backend.claim.model.ClaimPreparationTone;
+import com.workproofpay.backend.documents.api.dto.request.CreateClaimKitRequest;
+import com.workproofpay.backend.documents.model.DocumentFileFormat;
 import com.workproofpay.backend.claim.repo.ClaimPreparationRepository;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
@@ -32,6 +34,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -154,6 +157,75 @@ class ClaimPreparationIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.code").value("WAGE_VERIFICATION_NOT_FOUND"));
     }
 
+    @Test
+    void getsClaimPreparationDetailWithLinkedClaimKit() throws Exception {
+        // claim kit를 poll로 documentId까지 연결한 뒤 preparation detail 재조회가 같은 문맥을 다시 보여주는지 검증한다.
+        User user = userRepository.save(User.register("claim-detail@test.com", "hashed", "Claim"));
+        String token = tokenFor(user);
+        Long verificationId = createVerification(token);
+        Long claimKitDocumentId = createClaimKitDocument(token, verificationId);
+
+        String createBody = mockMvc.perform(post("/api/claim/preparations")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateClaimPreparationRequest(
+                                verificationId,
+                                claimKitDocumentId,
+                                "ko-KR",
+                                ClaimPreparationTone.DEFAULT
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.relatedDocuments.length()").value(1))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long preparationId = readId(createBody, "preparationId");
+
+        mockMvc.perform(get("/api/claim/preparations/{preparationId}", preparationId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.preparationId").value(preparationId))
+                .andExpect(jsonPath("$.data.status").value("READY"))
+                .andExpect(jsonPath("$.data.summaryText").exists())
+                .andExpect(jsonPath("$.data.checklist.length()").value(2))
+                .andExpect(jsonPath("$.data.suggestedRoutes.length()").value(3))
+                .andExpect(jsonPath("$.data.relatedDocuments[0].documentId").value(claimKitDocumentId))
+                .andExpect(jsonPath("$.data.createdAt").exists());
+    }
+
+    @Test
+    void hidesOtherUsersPreparationDetail() throws Exception {
+        // preparation detail도 타인 resource는 404로 숨긴다.
+        User owner = userRepository.save(User.register("claim-detail-owner@test.com", "hashed", "Owner"));
+        String ownerToken = tokenFor(owner);
+        Long verificationId = createVerification(ownerToken);
+
+        String createBody = mockMvc.perform(post("/api/claim/preparations")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateClaimPreparationRequest(
+                                verificationId,
+                                null,
+                                "ko-KR",
+                                ClaimPreparationTone.DEFAULT
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long preparationId = readId(createBody, "preparationId");
+
+        User other = userRepository.save(User.register("claim-detail-other@test.com", "hashed", "Other"));
+        String otherToken = tokenFor(other);
+
+        mockMvc.perform(get("/api/claim/preparations/{preparationId}", preparationId)
+                        .header("Authorization", bearer(otherToken)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLAIM_PREPARATION_NOT_FOUND"));
+    }
+
     private Long createVerification(String token) throws Exception {
         // 근무지 등록 -> 계약 생성 -> 출퇴근 1건 -> CHECK_REQUIRED verification 생성까지 Claim fixture를 만든다.
         String workplaceBody = mockMvc.perform(post("/api/workproof/workplaces")
@@ -229,6 +301,36 @@ class ClaimPreparationIntegrationTest extends PostgresIntegrationTestSupport {
 
     private Long readId(String json, String fieldName) throws Exception {
         return objectMapper.readTree(json).path("data").path(fieldName).asLong();
+    }
+
+    private String readText(String json, String fieldName) throws Exception {
+        return objectMapper.readTree(json).path("data").path(fieldName).asText();
+    }
+
+    private Long createClaimKitDocument(String token, Long verificationId) throws Exception {
+        String acceptedBody = mockMvc.perform(post("/api/documents/claim-kits")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "claim-kit-for-preparation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateClaimKitRequest(
+                                verificationId,
+                                true,
+                                DocumentFileFormat.ZIP
+                        ))))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String requestId = readText(acceptedBody, "requestId");
+        String pollBody = mockMvc.perform(get("/api/documents/requests/{requestId}", requestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return readId(pollBody, "documentId");
     }
 
     private String tokenFor(User user) {
