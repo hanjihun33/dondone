@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -123,7 +124,6 @@ fun MenuScreen(
 
     val serviceActions = buildList {
         add(MenuServiceAction("급여 점검", Icons.Default.Description, onOpenWage))
-        add(MenuServiceAction("신고 준비", Icons.Default.Warning) { activeSheet = MenuOverlaySheet.Claim })
         add(MenuServiceAction("계좌 지갑 관리", Icons.Default.AccountBalanceWallet, onOpenAccount))
         add(MenuServiceAction("설정", Icons.Default.Settings) { activeSheet = MenuOverlaySheet.Settings })
     }
@@ -322,6 +322,53 @@ private fun MenuServiceActionRow(
     action: MenuServiceAction,
     showDivider: Boolean
 ) {
+    MenuSectionListRow(
+        showDivider = showDivider,
+        onClick = action.onClick
+    ) {
+        MenuServiceLeadingIcon(icon = action.icon)
+        Text(
+            text = action.label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = DawnTextSubtle,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun MenuServiceLeadingIcon(
+    icon: ImageVector
+) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(DawnSurfaceAlt),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = DawnPrimary
+        )
+    }
+}
+
+@Composable
+private fun MenuSectionListRow(
+    showDivider: Boolean,
+    onClick: () -> Unit,
+    verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    content: @Composable RowScope.() -> Unit
+) {
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -336,39 +383,14 @@ private fun MenuServiceActionRow(
                 .clickable(
                     interactionSource = interactionSource,
                     indication = rememberDonDoneGrayRipple(bounded = true),
-                    onClick = action.onClick
+                    onClick = onClick
                 )
                 .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(DawnSurfaceAlt),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = action.icon,
-                    contentDescription = null,
-                    tint = DawnPrimary
-                )
-            }
-            Text(
-                text = action.label,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = DawnTextSubtle,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+            verticalAlignment = verticalAlignment,
+            content = content
+        )
+
         if (showDivider) {
             HorizontalDivider(color = MenuDivider)
         }
@@ -400,76 +422,60 @@ private fun MenuDocumentRow(
     showDivider: Boolean
 ) {
     val colors = menuDocumentColors(document.accent)
-    val interactionSource = remember { MutableInteractionSource() }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .pressableScale(
-                    interactionSource = interactionSource,
-                    pressedScale = 0.99f
-                )
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = rememberDonDoneGrayRipple(bounded = true),
-                    onClick = onOpenDetail
-                )
-                .padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top
+    MenuSectionListRow(
+        showDivider = showDivider,
+        onClick = onOpenDetail,
+        verticalAlignment = Alignment.Top
+    ) {
+        MenuDocumentAccentBox(document.accent, colors)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            MenuDocumentAccentBox(document.accent, colors)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = document.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = DawnText
-                        )
-                        Text(
-                            text = document.updatedAtText,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = DawnTextSubtle
-                        )
-                    }
+                    Text(
+                        text = document.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = DawnText
+                    )
+                    Text(
+                        text = document.updatedAtText,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = DawnTextSubtle
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     StatusBadge(
                         text = document.statusText,
                         tone = document.statusTone
                     )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = DawnTextSubtle,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
-
-                Text(
-                    text = document.summaryText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = DawnTextSubtle,
-                    maxLines = 1
-                )
             }
 
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = DawnTextSubtle,
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(16.dp)
+            Text(
+                text = document.summaryText,
+                style = MaterialTheme.typography.labelMedium,
+                color = DawnTextSubtle,
+                maxLines = 1
             )
-        }
-        if (showDivider) {
-            HorizontalDivider(color = MenuDivider)
         }
     }
 }
