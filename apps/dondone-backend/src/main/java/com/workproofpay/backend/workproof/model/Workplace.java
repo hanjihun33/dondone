@@ -50,6 +50,9 @@ public class Workplace {
     @Column(nullable = false)
     private Double longitude;
 
+    @Column(name = "allowed_radius_meters")
+    private Integer allowedRadiusMeters;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -61,13 +64,15 @@ public class Workplace {
                       String address,
                       String mapLabel,
                       Double latitude,
-                      Double longitude) {
+                      Double longitude,
+                      Integer allowedRadiusMeters) {
         this.user = user;
         this.name = name;
         this.address = address;
         this.mapLabel = mapLabel;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.allowedRadiusMeters = allowedRadiusMeters;
     }
 
     public static Workplace create(User user,
@@ -75,8 +80,14 @@ public class Workplace {
                                    String address,
                                    String mapLabel,
                                    Double latitude,
-                                   Double longitude) {
-        return new Workplace(user, name, address, mapLabel, latitude, longitude);
+                                   Double longitude,
+                                   Integer allowedRadiusMeters) {
+        return new Workplace(user, name, address, mapLabel, latitude, longitude, allowedRadiusMeters);
+    }
+
+    // 기존 row에는 반경 값이 없을 수 있어서 lane 1 기본 반경을 fallback으로 쓴다.
+    public int resolveAllowedRadiusMeters(int defaultAllowedRadiusMeters) {
+        return allowedRadiusMeters == null ? defaultAllowedRadiusMeters : allowedRadiusMeters;
     }
 
     @PrePersist
