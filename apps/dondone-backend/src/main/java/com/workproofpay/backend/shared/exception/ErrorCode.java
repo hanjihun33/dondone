@@ -34,7 +34,9 @@ public enum ErrorCode {
     ACTIVE_CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "Active contract not found"),
     ACTIVE_WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "Active workproof not found"),
     WAGE_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Wage verification not found"),
+    DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Document not found"),
     CLAIM_KIT_NOT_FOUND(HttpStatus.NOT_FOUND, "Claim kit not found"),
+    CLAIM_PREPARATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Claim preparation not found"),
     ADVANCE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Advance request not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),

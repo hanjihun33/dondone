@@ -3,7 +3,9 @@ package com.workproofpay.backend.documents;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.documents.api.dto.request.CreateClaimKitRequest;
 import com.workproofpay.backend.documents.api.dto.request.CreateProofPackRequest;
+import com.workproofpay.backend.documents.model.DocumentFileFormat;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
 import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
@@ -30,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -142,6 +145,110 @@ class DocumentsIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.code").value("WAGE_VERIFICATION_NOT_FOUND"));
     }
 
+    @Test
+    void createsClaimKitRequestFromVerificationAnchor() throws Exception {
+        // claim kit도 month/workplace 재입력 없이 verification anchor 하나로 요청을 만든다.
+        User user = userRepository.save(User.register("claim-kit-doc@test.com", "hashed", "Documents"));
+        String token = tokenFor(user);
+        Long verificationId = createVerification(token);
+
+        mockMvc.perform(post("/api/documents/claim-kits")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "claim-kit-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateClaimKitRequest(
+                                verificationId,
+                                true,
+                                DocumentFileFormat.ZIP
+                        ))))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.documentType").value("CLAIM_KIT"))
+                .andExpect(jsonPath("$.data.status").value("QUEUED"))
+                .andExpect(jsonPath("$.data.pollUrl").exists());
+    }
+
+    @Test
+    void connectsPollUrlToDocumentDetailEndpoint() throws Exception {
+        // 문서 생성 응답의 pollUrl을 따라가면 documentId와 detail 경로를 얻고, detail에서 최소 문서 정보를 다시 읽을 수 있어야 한다.
+        User user = userRepository.save(User.register("poll-doc@test.com", "hashed", "Documents"));
+        String token = tokenFor(user);
+        Long verificationId = createVerification(token);
+
+        String acceptedBody = mockMvc.perform(post("/api/documents/proof-packs")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "poll-proof-pack")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateProofPackRequest(verificationId))))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String requestId = readText(acceptedBody, "requestId");
+        String pollBody = mockMvc.perform(get("/api/documents/requests/{requestId}", requestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requestId").value(requestId))
+                .andExpect(jsonPath("$.data.documentType").value("PROOF_PACK"))
+                .andExpect(jsonPath("$.data.documentUrl").exists())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long documentId = readId(pollBody, "documentId");
+
+        mockMvc.perform(get("/api/documents/{documentId}", documentId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.documentId").value(documentId))
+                .andExpect(jsonPath("$.data.type").value("PROOF_PACK"))
+                .andExpect(jsonPath("$.data.title").value("2026-03 Proof Pack"))
+                .andExpect(jsonPath("$.data.summary").exists())
+                .andExpect(jsonPath("$.data.relatedLinks[0].href").value("/api/wage/verifications/" + verificationId))
+                .andExpect(jsonPath("$.data.downloadable").value(false));
+    }
+
+    @Test
+    void hidesOtherUsersDocumentPollAndDetail() throws Exception {
+        // 문서 poll/detail도 기존 보호 규칙처럼 타인 요청은 404로 숨긴다.
+        User owner = userRepository.save(User.register("owner-request@test.com", "hashed", "Owner"));
+        String ownerToken = tokenFor(owner);
+        Long verificationId = createVerification(ownerToken);
+
+        String acceptedBody = mockMvc.perform(post("/api/documents/proof-packs")
+                        .header("Authorization", bearer(ownerToken))
+                        .header("Idempotency-Key", "owner-proof-pack")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateProofPackRequest(verificationId))))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String requestId = readText(acceptedBody, "requestId");
+        String pollBody = mockMvc.perform(get("/api/documents/requests/{requestId}", requestId)
+                        .header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long documentId = readId(pollBody, "documentId");
+
+        User other = userRepository.save(User.register("other-request@test.com", "hashed", "Other"));
+        String otherToken = tokenFor(other);
+
+        mockMvc.perform(get("/api/documents/requests/{requestId}", requestId)
+                        .header("Authorization", bearer(otherToken)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+
+        mockMvc.perform(get("/api/documents/{documentId}", documentId)
+                        .header("Authorization", bearer(otherToken)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+    }
+
     private Long createVerification(String token) throws Exception {
         // 근무지 등록 -> 계약 생성 -> 출퇴근 1건 -> verification 생성까지 Documents fixture를 만든다.
         String workplaceBody = mockMvc.perform(post("/api/workproof/workplaces")
@@ -217,6 +324,10 @@ class DocumentsIntegrationTest extends PostgresIntegrationTestSupport {
 
     private Long readId(String json, String fieldName) throws Exception {
         return objectMapper.readTree(json).path("data").path(fieldName).asLong();
+    }
+
+    private String readText(String json, String fieldName) throws Exception {
+        return objectMapper.readTree(json).path("data").path(fieldName).asText();
     }
 
     private String tokenFor(User user) {

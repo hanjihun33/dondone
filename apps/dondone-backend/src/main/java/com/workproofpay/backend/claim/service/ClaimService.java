@@ -1,5 +1,6 @@
 package com.workproofpay.backend.claim.service;
 
+import com.workproofpay.backend.claim.api.dto.response.ClaimPreparationDetailResponse;
 import com.workproofpay.backend.claim.api.dto.request.CreateClaimPreparationRequest;
 import com.workproofpay.backend.claim.api.dto.response.ClaimPreparationResponse;
 import com.workproofpay.backend.claim.model.ClaimPreparation;
@@ -59,6 +60,22 @@ public class ClaimService {
                 saved,
                 buildChecklist(verification, claimKit),
                 buildSuggestedRoutes(request.locale()),
+                buildRelatedDocuments(claimKit)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ClaimPreparationDetailResponse getPreparation(Long userId, Long preparationId) {
+        ClaimPreparation preparation = claimPreparationRepository.findByIdAndUserId(preparationId, userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.CLAIM_PREPARATION_NOT_FOUND));
+
+        WageVerification verification = wageVerificationQueryService.getOwnedVerification(userId, preparation.getWageVerificationId());
+        DocumentGenerationRequest claimKit = loadClaimKit(userId, verification.getId(), preparation.getClaimKitDocumentId());
+
+        return ClaimPreparationDetailResponse.from(
+                preparation,
+                buildChecklist(verification, claimKit),
+                buildSuggestedRoutes(preparation.getLocale()),
                 buildRelatedDocuments(claimKit)
         );
     }

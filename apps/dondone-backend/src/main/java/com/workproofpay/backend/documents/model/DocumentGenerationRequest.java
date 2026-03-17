@@ -50,6 +50,13 @@ public class DocumentGenerationRequest {
     @Column(name = "workplace_id", nullable = false)
     private Long workplaceId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "output_format", nullable = false, length = 10)
+    private DocumentFileFormat outputFormat;
+
+    @Column(name = "include_attachments", nullable = false)
+    private boolean includeAttachments;
+
     @Column(name = "idempotency_key", nullable = false, length = 120)
     private String idempotencyKey;
 
@@ -68,12 +75,16 @@ public class DocumentGenerationRequest {
                                       Long wageVerificationId,
                                       String month,
                                       Long workplaceId,
+                                      DocumentFileFormat outputFormat,
+                                      boolean includeAttachments,
                                       String idempotencyKey) {
         this.user = user;
         this.documentType = documentType;
         this.wageVerificationId = wageVerificationId;
         this.month = month;
         this.workplaceId = workplaceId;
+        this.outputFormat = outputFormat;
+        this.includeAttachments = includeAttachments;
         this.idempotencyKey = idempotencyKey;
         this.status = DocumentGenerationStatus.QUEUED;
     }
@@ -89,6 +100,27 @@ public class DocumentGenerationRequest {
                 wageVerificationId,
                 month,
                 workplaceId,
+                DocumentFileFormat.PDF,
+                false,
+                idempotencyKey
+        );
+    }
+
+    public static DocumentGenerationRequest queueClaimKit(User user,
+                                                          Long wageVerificationId,
+                                                          String month,
+                                                          Long workplaceId,
+                                                          DocumentFileFormat outputFormat,
+                                                          boolean includeAttachments,
+                                                          String idempotencyKey) {
+        return new DocumentGenerationRequest(
+                user,
+                DocumentType.CLAIM_KIT,
+                wageVerificationId,
+                month,
+                workplaceId,
+                outputFormat,
+                includeAttachments,
                 idempotencyKey
         );
     }

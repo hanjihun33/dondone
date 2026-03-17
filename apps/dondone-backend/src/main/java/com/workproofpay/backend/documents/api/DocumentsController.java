@@ -1,16 +1,21 @@
 package com.workproofpay.backend.documents.api;
 
+import com.workproofpay.backend.documents.api.dto.request.CreateClaimKitRequest;
+import com.workproofpay.backend.documents.api.dto.response.DocumentDetailResponse;
 import com.workproofpay.backend.documents.api.dto.request.CreateProofPackRequest;
 import com.workproofpay.backend.documents.api.dto.response.DocumentGenerationAcceptedResponse;
+import com.workproofpay.backend.documents.api.dto.response.DocumentGenerationRequestStatusResponse;
 import com.workproofpay.backend.documents.service.DocumentsService;
 import com.workproofpay.backend.shared.api.ApiResponse;
 import com.workproofpay.backend.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,5 +48,30 @@ public class DocumentsController {
             @Valid @RequestBody CreateProofPackRequest request
     ) {
         return ApiResponse.accepted(documentsService.createProofPack(user.userId(), idempotencyKey, request));
+    }
+
+    @PostMapping("/claim-kits")
+    public ResponseEntity<ApiResponse<DocumentGenerationAcceptedResponse>> createClaimKit(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestHeader("Idempotency-Key") @NotBlank(message = "Idempotency-Key header is required") String idempotencyKey,
+            @Valid @RequestBody CreateClaimKitRequest request
+    ) {
+        return ApiResponse.accepted(documentsService.createClaimKit(user.userId(), idempotencyKey, request));
+    }
+
+    @GetMapping("/requests/{requestId}")
+    public ResponseEntity<ApiResponse<DocumentGenerationRequestStatusResponse>> getRequestStatus(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable String requestId
+    ) {
+        return ApiResponse.success(documentsService.getRequestStatus(user.userId(), requestId));
+    }
+
+    @GetMapping("/{documentId}")
+    public ResponseEntity<ApiResponse<DocumentDetailResponse>> getDocumentDetail(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable @Positive(message = "documentId must be greater than 0") Long documentId
+    ) {
+        return ApiResponse.success(documentsService.getDocumentDetail(user.userId(), documentId));
     }
 }

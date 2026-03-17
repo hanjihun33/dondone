@@ -842,7 +842,7 @@ Response:
 | `possibleCauses[]` | array<object>. 배열 항목: code, title, detail |
 | `evidence` | object. 하위 필드: overtimeMinutes, nightMinutes, modifiedRecordCount, recordIds |
 | `employerSupport` | object. 하위 필드: available, recommended, status (`NOT_REQUESTED`, `REQUEST_RECOMMENDED`, `PENDING_RESPONSE`, `RESOLVED`) |
-| `relatedActions` | object. 하위 필드: proofPackReady, claimKitReady, instantClaimAvailable |
+| `relatedActions` | object. 하위 필드: proofPackReady, claimKitReady, instantClaimAvailable, proofPackDocumentId, claimKitDocumentId, preparationId |
 
 ## 5. Documents
 
@@ -940,6 +940,7 @@ Response `202 Accepted`:
 추가 메모:
 - Proof Pack은 legacy `POST /api/wage/deposits`, `GET /api/wage/summary`를 직접 입력으로 받지 않는다.
 - 급여 계산/차액/threshold 설명은 verification 생성 시점 snapshot을 재사용한다.
+- 현재 backend는 `pollUrl`을 `/api/documents/requests/{requestId}`로 연결하고, poll 응답에서 `documentId`와 `documentUrl`을 함께 돌려 detail endpoint로 이어지게 한다.
 
 ### 5.5 `POST /api/documents/claim-kits`
 
@@ -954,8 +955,6 @@ Headers:
 Request:
 | 필드 | 설명 |
 | --- | --- |
-| `month` | - |
-| `workplaceId` | - |
 | `wageVerificationId` | - |
 | `includeAttachments` | boolean |
 | `format` | `PDF`, `ZIP` |
@@ -967,6 +966,10 @@ Response `202 Accepted`:
 | `documentType` | `CLAIM_KIT` |
 | `status` | - |
 | `pollUrl` | - |
+
+추가 메모:
+- Claim Kit도 `month`, `workplaceId`를 직접 입력으로 받지 않고 verification snapshot에서 파생한다.
+- `claimKitDocumentId`가 필요한 downstream은 `pollUrl`이 가리키는 endpoint에서 `documentId`를 확인한 뒤 detail / claim preparation에 넘긴다.
 
 ### 5.6 `POST /api/documents/transfer-receipts`
 

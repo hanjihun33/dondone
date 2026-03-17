@@ -175,7 +175,13 @@ public record WageVerificationDetailResponse(
             @Schema(description = "Whether a claim kit request can be started from this verification", example = "true")
             boolean claimKitReady,
             @Schema(description = "Whether Instant Claim preparation can start from this verification", example = "true")
-            boolean instantClaimAvailable
+            boolean instantClaimAvailable,
+            @Schema(description = "Latest proof pack document ID linked to this verification", example = "12")
+            Long proofPackDocumentId,
+            @Schema(description = "Latest claim kit document ID linked to this verification", example = "13")
+            Long claimKitDocumentId,
+            @Schema(description = "Latest claim preparation ID linked to this verification", example = "7")
+            Long preparationId
     ) {
     }
 

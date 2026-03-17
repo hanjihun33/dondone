@@ -3,11 +3,19 @@ package com.workproofpay.backend.wage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.claim.api.dto.request.CreateClaimPreparationRequest;
+import com.workproofpay.backend.claim.model.ClaimPreparationTone;
+import com.workproofpay.backend.claim.repo.ClaimPreparationRepository;
+import com.workproofpay.backend.documents.api.dto.request.CreateClaimKitRequest;
+import com.workproofpay.backend.documents.api.dto.request.CreateProofPackRequest;
+import com.workproofpay.backend.documents.model.DocumentFileFormat;
+import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
 import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
 import com.workproofpay.backend.wage.api.dto.request.CreateWageDepositRequest;
 import com.workproofpay.backend.wage.api.dto.request.CreateWageVerificationRequest;
 import com.workproofpay.backend.wage.repo.WageDepositRepository;
+import com.workproofpay.backend.wage.repo.WageVerificationRepository;
 import com.workproofpay.backend.workproof.api.dto.request.CheckInWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CheckOutWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CreateContractRequest;
@@ -61,10 +69,22 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
     private WageDepositRepository wageDepositRepository;
 
     @Autowired
+    private WageVerificationRepository wageVerificationRepository;
+
+    @Autowired
+    private DocumentGenerationRequestRepository documentGenerationRequestRepository;
+
+    @Autowired
+    private ClaimPreparationRepository claimPreparationRepository;
+
+    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @BeforeEach
     void setUp() {
+        claimPreparationRepository.deleteAll();
+        documentGenerationRequestRepository.deleteAll();
+        wageVerificationRepository.deleteAll();
         wageDepositRepository.deleteAll();
         workProofRepository.deleteAll();
         workContractRepository.deleteAll();
@@ -222,6 +242,86 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.relatedActions.proofPackReady").value(true))
                 .andExpect(jsonPath("$.data.relatedActions.claimKitReady").value(true))
                 .andExpect(jsonPath("$.data.relatedActions.instantClaimAvailable").value(true));
+    }
+
+    @Test
+    void includesLatestDownstreamResourceIdsInVerificationDetail() throws Exception {
+        // verification detail의 relatedActions가 proof pack / claim kit / claim preparation 실제 연결 ID를 같이 노출하는지 검증한다.
+        User user = userRepository.save(User.register("verification-links@test.com", "hashed", "Verifier"));
+        String token = tokenFor(user);
+        Lane1Fixture fixture = createLane1WorkplaceAndContract(token);
+
+        checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 10, 18, 0));
+
+        String verificationBody = mockMvc.perform(post("/api/wage/verifications")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWageVerificationRequest(
+                                "2026-03",
+                                fixture.workplaceId(),
+                                60_000L,
+                                true,
+                                "Need downstream links"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long verificationId = readId(verificationBody, "verificationId");
+
+        String proofPackAccepted = mockMvc.perform(post("/api/documents/proof-packs")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "wage-proof-pack")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateProofPackRequest(verificationId))))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long proofPackDocumentId = pollDocumentId(token, readText(proofPackAccepted, "requestId"));
+
+        String claimKitAccepted = mockMvc.perform(post("/api/documents/claim-kits")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "wage-claim-kit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateClaimKitRequest(
+                                verificationId,
+                                true,
+                                DocumentFileFormat.ZIP
+                        ))))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long claimKitDocumentId = pollDocumentId(token, readText(claimKitAccepted, "requestId"));
+
+        String preparationBody = mockMvc.perform(post("/api/claim/preparations")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateClaimPreparationRequest(
+                                verificationId,
+                                claimKitDocumentId,
+                                "ko-KR",
+                                ClaimPreparationTone.DEFAULT
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long preparationId = readId(preparationBody, "preparationId");
+
+        mockMvc.perform(get("/api/wage/verifications/{verificationId}", verificationId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.relatedActions.proofPackReady").value(true))
+                .andExpect(jsonPath("$.data.relatedActions.claimKitReady").value(true))
+                .andExpect(jsonPath("$.data.relatedActions.instantClaimAvailable").value(true))
+                .andExpect(jsonPath("$.data.relatedActions.proofPackDocumentId").value(proofPackDocumentId))
+                .andExpect(jsonPath("$.data.relatedActions.claimKitDocumentId").value(claimKitDocumentId))
+                .andExpect(jsonPath("$.data.relatedActions.preparationId").value(preparationId));
     }
 
     @Test
@@ -570,6 +670,21 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
 
     private Long readId(String json, String fieldName) throws Exception {
         return objectMapper.readTree(json).path("data").path(fieldName).asLong();
+    }
+
+    private String readText(String json, String fieldName) throws Exception {
+        return objectMapper.readTree(json).path("data").path(fieldName).asText();
+    }
+
+    private Long pollDocumentId(String token, String requestId) throws Exception {
+        String pollBody = mockMvc.perform(get("/api/documents/requests/{requestId}", requestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return readId(pollBody, "documentId");
     }
 
     private String bearer(String token) {
