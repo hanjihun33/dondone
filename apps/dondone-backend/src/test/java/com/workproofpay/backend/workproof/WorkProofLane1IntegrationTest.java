@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -175,6 +176,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                         .content(objectMapper.writeValueAsString(checkInRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.status").value("CHECKED_IN"))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("PENDING"))
                 .andExpect(jsonPath("$.data.workplace.workplaceId").value(workplaceId))
                 .andExpect(jsonPath("$.data.contract.contractId").value(contractId))
                 .andExpect(jsonPath("$.data.checkOut").doesNotExist())
@@ -199,6 +201,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recordId").value(recordId))
                 .andExpect(jsonPath("$.data.status").value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("REFLECTED"))
                 .andExpect(jsonPath("$.data.workedMinutes").value(540));
 
         // 7. 월별 목록과 상세 조회가 같은 근무 기록을 반환하는지 검증
@@ -216,6 +219,8 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recordId").value(recordId))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("REFLECTED"))
+                .andExpect(jsonPath("$.data.riskFlags.length()").value(0))
                 .andExpect(jsonPath("$.data.modifications.length()").value(0))
                 .andExpect(jsonPath("$.data.attachments.length()").value(0));
 
@@ -326,7 +331,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void rejectsClockInAndClockOutOutsideAllowedRadius() throws Exception {
+    void rejectsClockInOutsideAllowedRadiusAndMarksOutsideCheckOutForReview() throws Exception {
         User user = userRepository.save(User.register("geofence@test.com", "hashed", "Geofence"));
         String token = tokenFor(user);
         Long workplaceId = createWorkplaceAndContract(token);
@@ -344,7 +349,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("WORKPLACE_RADIUS_EXCEEDED"));
 
-        mockMvc.perform(post("/api/workproof/records/check-in")
+        String checkInBody = mockMvc.perform(post("/api/workproof/records/check-in")
                         .header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CheckInWorkProofRequest(
@@ -355,7 +360,12 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                                 "Front door"
                         ))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.status").value("CHECKED_IN"));
+                .andExpect(jsonPath("$.data.status").value("CHECKED_IN"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long recordId = readId(checkInBody, "recordId");
 
         mockMvc.perform(post("/api/workproof/records/check-out")
                         .header("Authorization", bearer(token))
@@ -366,20 +376,97 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                                 127.02,
                                 "Outside radius"
                         ))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("WORKPLACE_RADIUS_EXCEEDED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recordId").value(recordId))
+                .andExpect(jsonPath("$.data.status").value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.workedMinutes").value(535))
+                .andExpect(jsonPath("$.data.riskFlags[0]").value("CHECK_OUT_OUTSIDE_RADIUS"));
+
+        mockMvc.perform(get("/api/workproof/records")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-03")
+                        .param("workplaceId", workplaceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].recordId").value(recordId))
+                .andExpect(jsonPath("$.data.records[0].reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.records[0].riskFlags[0]").value("CHECK_OUT_OUTSIDE_RADIUS"));
+
+        mockMvc.perform(get("/api/workproof/records/{recordId}", recordId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recordId").value(recordId))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.riskFlags[0]").value("CHECK_OUT_OUTSIDE_RADIUS"));
+
+        mockMvc.perform(get("/api/workproof/monthly-summary")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-03")
+                        .param("workplaceId", workplaceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.integrity.pendingMinutes").value(535))
+                .andExpect(jsonPath("$.data.integrity.workproofRiskFlags").value(hasItem("CHECK_OUT_OUTSIDE_RADIUS_PRESENT")));
+    }
+
+    @Test
+    void keepsNeedsReviewAfterEditingOutsideRadiusCheckOutRecord() throws Exception {
+        User user = userRepository.save(User.register("review-edit@test.com", "hashed", "ReviewEdit"));
+        String token = tokenFor(user);
+        Long workplaceId = createWorkplaceAndContract(token);
+
+        String checkInBody = mockMvc.perform(post("/api/workproof/records/check-in")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckInWorkProofRequest(
+                                workplaceId,
+                                LocalDateTime.of(2026, 3, 17, 9, 0),
+                                37.5004,
+                                127.0004,
+                                "Front door"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long recordId = readId(checkInBody, "recordId");
 
         mockMvc.perform(post("/api/workproof/records/check-out")
                         .header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CheckOutWorkProofRequest(
-                                LocalDateTime.of(2026, 3, 16, 18, 5),
-                                37.5006,
-                                127.0006,
-                                "Front door"
+                                LocalDateTime.of(2026, 3, 17, 18, 0),
+                                37.52,
+                                127.02,
+                                "Outside radius"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("CHECKED_OUT"));
+                .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"));
+
+        String updateRequest = """
+                {
+                  "clockInAt": "2026-03-17T09:10:00",
+                  "clockOutAt": "2026-03-17T18:10:00",
+                  "editReason": "반경 밖에서 퇴근해 시간을 정정합니다.",
+                  "memo": "집 도착 후 퇴근 처리",
+                  "attachmentCount": 0
+                }
+                """;
+
+        mockMvc.perform(patch("/api/workproof/{workProofId}", recordId)
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(recordId))
+                .andExpect(jsonPath("$.data.financialStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.workedMinutes").doesNotExist());
+
+        mockMvc.perform(get("/api/workproof/records/{recordId}", recordId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.riskFlags[0]").value("CHECK_OUT_OUTSIDE_RADIUS"));
     }
 
     @Test

@@ -74,6 +74,10 @@ public class WorkProof {
     @Column(name = "clock_out_location_label", length = 100)
     private String clockOutLocationLabel;
 
+    @Column(name = "clock_out_outside_allowed_radius")
+    // 반경 밖 퇴근 여부를 남겨 review 사유를 상세/요약 응답에서 다시 설명한다.
+    private Boolean clockOutOutsideAllowedRadius;
+
     @Column(length = 500)
     private String memo;
 
@@ -113,6 +117,7 @@ public class WorkProof {
                       Double clockOutLongitude,
                       String clockInLocationLabel,
                       String clockOutLocationLabel,
+                      Boolean clockOutOutsideAllowedRadius,
                       String memo,
                       String editReason,
                       int attachmentCount,
@@ -134,6 +139,7 @@ public class WorkProof {
         this.clockOutLongitude = clockOutLongitude;
         this.clockInLocationLabel = clockInLocationLabel;
         this.clockOutLocationLabel = clockOutLocationLabel;
+        this.clockOutOutsideAllowedRadius = clockOutOutsideAllowedRadius;
         this.memo = memo;
         this.editReason = editReason;
         this.attachmentCount = attachmentCount;
@@ -172,6 +178,7 @@ public class WorkProof {
                 clockOutLongitude,
                 null,
                 null,
+                null,
                 memo,
                 editReason,
                 attachmentCount == null ? 0 : attachmentCount,
@@ -207,6 +214,7 @@ public class WorkProof {
                 null,
                 null,
                 null,
+                null,
                 0,
                 null,
                 WorkProofFinancialStatus.PENDING
@@ -215,6 +223,14 @@ public class WorkProof {
 
     public boolean isReflected() {
         return financialStatus == WorkProofFinancialStatus.REFLECTED && clockOutAt != null;
+    }
+
+    public boolean isNeedsReview() {
+        return financialStatus == WorkProofFinancialStatus.NEEDS_REVIEW && clockOutAt != null;
+    }
+
+    public boolean isClockOutOutsideAllowedRadius() {
+        return Boolean.TRUE.equals(clockOutOutsideAllowedRadius);
     }
 
     public boolean isEdited() {
@@ -238,27 +254,36 @@ public class WorkProof {
                             String memo,
                             int attachmentCount,
                             String attachmentMetadataJson) {
+        // 일반 수정만으로 위치 이슈를 해소했다고 볼 수 없어서 별도 승인 흐름 전까지 review 상태를 유지한다.
+        boolean keepNeedsReview = isClockOutOutsideAllowedRadius();
         this.clockInAt = clockInAt;
         this.clockOutAt = clockOutAt;
         this.editReason = editReason;
         this.memo = memo != null ? memo : this.memo;
         this.attachmentCount = attachmentCount;
         this.attachmentMetadataJson = attachmentMetadataJson;
-        this.financialStatus = WorkProofFinancialStatus.REFLECTED;
+        this.clockOutOutsideAllowedRadius = keepNeedsReview ? Boolean.TRUE : Boolean.FALSE;
+        this.financialStatus = keepNeedsReview
+                ? WorkProofFinancialStatus.NEEDS_REVIEW
+                : WorkProofFinancialStatus.REFLECTED;
     }
 
     public void completeCheckOut(LocalDateTime deviceAt,
                                  LocalDateTime serverAt,
                                  Double latitude,
                                  Double longitude,
-                                 String locationLabel) {
+                                 String locationLabel,
+                                 boolean outsideAllowedRadius) {
         this.clockOutAt = deviceAt;
         this.deviceClockOutAt = deviceAt;
         this.serverClockOutAt = serverAt;
         this.clockOutLatitude = latitude;
         this.clockOutLongitude = longitude;
         this.clockOutLocationLabel = locationLabel;
-        this.financialStatus = WorkProofFinancialStatus.REFLECTED;
+        this.clockOutOutsideAllowedRadius = outsideAllowedRadius;
+        this.financialStatus = outsideAllowedRadius
+                ? WorkProofFinancialStatus.NEEDS_REVIEW
+                : WorkProofFinancialStatus.REFLECTED;
     }
 
     @PrePersist

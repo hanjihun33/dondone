@@ -15,7 +15,9 @@ public record WorkProofRecordResponse(
         CurrentContractResponse contract,
         EvidenceCaptureResponse checkIn,
         EvidenceCaptureResponse checkOut,
+        WorkProofReflectionStatus reflectionStatus,
         Long workedMinutes,
+        List<String> riskFlags,
         boolean modified,
         List<ModificationSummary> modifications,
         List<AttachmentSummary> attachments

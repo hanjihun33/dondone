@@ -45,6 +45,8 @@ public class WorkProofLane1Service {
 
     private static final int DEFAULT_DAILY_WORK_MINUTES = 480;
     private static final int DEFAULT_ALLOWED_RADIUS_METERS = 1_000;
+    private static final String RECORD_RISK_FLAG_CHECK_OUT_OUTSIDE_RADIUS = "CHECK_OUT_OUTSIDE_RADIUS";
+    private static final String AGGREGATE_RISK_FLAG_CHECK_OUT_OUTSIDE_RADIUS_PRESENT = "CHECK_OUT_OUTSIDE_RADIUS_PRESENT";
     // PRD에서 월 기준 시간이 고정되기 전까지는 작은 기본값으로 유지한다.
     private static final int DEFAULT_MONTHLY_WORK_MINUTES = 12_540;
     private static final double EARTH_RADIUS_METERS = 6_371_000d;
@@ -166,15 +168,16 @@ public class WorkProofLane1Service {
                 .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_WORKPROOF_NOT_FOUND));
 
         draftValidator.validateCheckOutSequence(active.getDeviceClockInAt(), request);
-        if (active.getWorkplace() != null) {
-            validateWithinAllowedRadius(active.getWorkplace(), request.latitude(), request.longitude());
-        }
+        // 퇴근은 기록을 남기되, 반경 밖이면 반영 대신 review 대상으로 남긴다.
+        boolean outsideAllowedRadius = active.getWorkplace() != null
+                && isOutsideAllowedRadius(active.getWorkplace(), request.latitude(), request.longitude());
         active.completeCheckOut(
                 request.deviceAt(),
                 LocalDateTime.now(),
                 request.latitude(),
                 request.longitude(),
-                request.locationLabel()
+                request.locationLabel(),
+                outsideAllowedRadius
         );
         return toRecordResponse(active);
     }
@@ -228,7 +231,7 @@ public class WorkProofLane1Service {
 
         // v1 요약은 reflected record만 급여 계산 입력으로 간주하고, recorded/reflected 차이는 integrity에 남긴다.
         List<WorkProof> reflected = records.stream().filter(WorkProof::isReflected).toList();
-        List<WorkProof> needsReview = records.stream().filter(record -> !record.isReflected() || record.isEdited()).toList();
+        List<WorkProof> needsReview = records.stream().filter(record -> !record.isReflected()).toList();
         int recordedWorkDays = (int) records.stream().map(WorkProof::getWorkDate).distinct().count();
         int reflectedWorkDays = (int) reflected.stream().map(WorkProof::getWorkDate).distinct().count();
         long totalWorkMinutes = reflected.stream().mapToLong(WorkProof::workedMinutes).sum();
@@ -294,6 +297,17 @@ public class WorkProofLane1Service {
         if (records.stream().anyMatch(record -> !record.isReflected())) {
             flags.add("PENDING_WORKPROOF_PRESENT");
         }
+        if (records.stream().anyMatch(WorkProof::isClockOutOutsideAllowedRadius)) {
+            flags.add(AGGREGATE_RISK_FLAG_CHECK_OUT_OUTSIDE_RADIUS_PRESENT);
+        }
+        return List.copyOf(flags);
+    }
+
+    private List<String> buildRecordRiskFlags(WorkProof workProof) {
+        java.util.ArrayList<String> flags = new java.util.ArrayList<>();
+        if (workProof.isClockOutOutsideAllowedRadius()) {
+            flags.add(RECORD_RISK_FLAG_CHECK_OUT_OUTSIDE_RADIUS);
+        }
         return List.copyOf(flags);
     }
 
@@ -323,15 +337,19 @@ public class WorkProofLane1Service {
 
     // P0에서는 GPS를 백그라운드 추적이 아니라 출퇴근 허용 범위를 막는 1차 차단 규칙으로 쓴다.
     private void validateWithinAllowedRadius(Workplace workplace, Double latitude, Double longitude) {
+        if (isOutsideAllowedRadius(workplace, latitude, longitude)) {
+            throw new ApiException(ErrorCode.WORKPLACE_RADIUS_EXCEEDED);
+        }
+    }
+
+    private boolean isOutsideAllowedRadius(Workplace workplace, Double latitude, Double longitude) {
         double distanceMeters = calculateDistanceMeters(
                 workplace.getLatitude(),
                 workplace.getLongitude(),
                 latitude,
                 longitude
         );
-        if (distanceMeters > workplace.resolveAllowedRadiusMeters(DEFAULT_ALLOWED_RADIUS_METERS)) {
-            throw new ApiException(ErrorCode.WORKPLACE_RADIUS_EXCEEDED);
-        }
+        return distanceMeters > workplace.resolveAllowedRadiusMeters(DEFAULT_ALLOWED_RADIUS_METERS);
     }
 
     private double calculateDistanceMeters(double startLatitude,
@@ -431,15 +449,17 @@ public class WorkProofLane1Service {
                 workProof.isCheckedIn() ? WorkProofRecordStatus.CHECKED_IN : WorkProofRecordStatus.CHECKED_OUT,
                 workProof.getDeviceClockInAt(),
                 workProof.getDeviceClockOutAt(),
-                workProof.isReflected() ? workProof.workedMinutes() : null,
+                resolveWorkedMinutes(workProof),
                 workProof.isEdited(),
-                workProof.isReflected() ? WorkProofReflectionStatus.REFLECTED : WorkProofReflectionStatus.PENDING
+                resolveReflectionStatus(workProof),
+                buildRecordRiskFlags(workProof)
         );
     }
 
     private WorkProofRecordResponse toRecordResponse(WorkProof workProof) {
         Workplace workplace = workProof.getWorkplace();
         WorkContract contract = workProof.getContract();
+        List<String> riskFlags = buildRecordRiskFlags(workProof);
         return new WorkProofRecordResponse(
                 workProof.getId(),
                 workProof.getWorkDate(),
@@ -467,10 +487,26 @@ public class WorkProofLane1Service {
                         workProof.getClockOutLongitude(),
                         workProof.getClockOutLocationLabel()
                 ),
-                workProof.isReflected() ? workProof.workedMinutes() : null,
+                resolveReflectionStatus(workProof),
+                resolveWorkedMinutes(workProof),
+                riskFlags,
                 workProof.isEdited(),
                 List.of(),
                 List.of()
         );
+    }
+
+    private WorkProofReflectionStatus resolveReflectionStatus(WorkProof workProof) {
+        if (workProof.isReflected()) {
+            return WorkProofReflectionStatus.REFLECTED;
+        }
+        if (workProof.isNeedsReview()) {
+            return WorkProofReflectionStatus.NEEDS_REVIEW;
+        }
+        return WorkProofReflectionStatus.PENDING;
+    }
+
+    private Long resolveWorkedMinutes(WorkProof workProof) {
+        return workProof.getClockOutAt() == null ? null : workProof.workedMinutes();
     }
 }
