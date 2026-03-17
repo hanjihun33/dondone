@@ -37,7 +37,7 @@ public class WorkProofRequestValidator {
     }
 
     public void validateForUpdate(WorkProof workProof, UpdateWorkProofRequest request) {
-        if (!workProof.isReflected()) {
+        if (!workProof.isReflected() && !workProof.isNeedsReview()) {
             throw new ApiException(ErrorCode.WORKPROOF_EDIT_NOT_ALLOWED);
         }
         if (!workProof.getWorkDate().equals(request.clockInAt().toLocalDate())) {

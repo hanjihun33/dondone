@@ -253,7 +253,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                     checkIn.plusHours(8).plusMinutes(1),
                     36.1,
                     128.3,
-                    "Front gate"
+                    "Front gate",
+                    false
             );
             workProofRepository.save(record);
         }

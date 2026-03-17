@@ -2,6 +2,7 @@ package com.workproofpay.backend.workproof.api.dto.response;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record WorkProofRecordListItemResponse(
         Long recordId,
@@ -11,6 +12,7 @@ public record WorkProofRecordListItemResponse(
         LocalDateTime checkOutDeviceAt,
         Long workedMinutes,
         boolean modified,
-        WorkProofReflectionStatus reflectionStatus
+        WorkProofReflectionStatus reflectionStatus,
+        List<String> riskFlags
 ) {
 }
