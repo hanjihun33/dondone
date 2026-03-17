@@ -254,14 +254,18 @@ public class WorkProof {
                             String memo,
                             int attachmentCount,
                             String attachmentMetadataJson) {
+        // 일반 수정만으로 위치 이슈를 해소했다고 볼 수 없어서 별도 승인 흐름 전까지 review 상태를 유지한다.
+        boolean keepNeedsReview = isClockOutOutsideAllowedRadius();
         this.clockInAt = clockInAt;
         this.clockOutAt = clockOutAt;
         this.editReason = editReason;
         this.memo = memo != null ? memo : this.memo;
         this.attachmentCount = attachmentCount;
         this.attachmentMetadataJson = attachmentMetadataJson;
-        this.clockOutOutsideAllowedRadius = Boolean.FALSE;
-        this.financialStatus = WorkProofFinancialStatus.REFLECTED;
+        this.clockOutOutsideAllowedRadius = keepNeedsReview ? Boolean.TRUE : Boolean.FALSE;
+        this.financialStatus = keepNeedsReview
+                ? WorkProofFinancialStatus.NEEDS_REVIEW
+                : WorkProofFinancialStatus.REFLECTED;
     }
 
     public void completeCheckOut(LocalDateTime deviceAt,

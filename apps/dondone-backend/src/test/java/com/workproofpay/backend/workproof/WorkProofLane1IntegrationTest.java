@@ -409,7 +409,7 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void allowsEditingNeedsReviewRecordAndReflectsIt() throws Exception {
+    void keepsNeedsReviewAfterEditingOutsideRadiusCheckOutRecord() throws Exception {
         User user = userRepository.save(User.register("review-edit@test.com", "hashed", "ReviewEdit"));
         String token = tokenFor(user);
         Long workplaceId = createWorkplaceAndContract(token);
@@ -459,14 +459,14 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                         .content(updateRequest))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(recordId))
-                .andExpect(jsonPath("$.data.financialStatus").value("REFLECTED"))
-                .andExpect(jsonPath("$.data.workedMinutes").value(540));
+                .andExpect(jsonPath("$.data.financialStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.workedMinutes").doesNotExist());
 
         mockMvc.perform(get("/api/workproof/records/{recordId}", recordId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reflectionStatus").value("REFLECTED"))
-                .andExpect(jsonPath("$.data.riskFlags.length()").value(0));
+                .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.riskFlags[0]").value("CHECK_OUT_OUTSIDE_RADIUS"));
     }
 
     @Test
