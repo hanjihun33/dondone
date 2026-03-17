@@ -48,9 +48,6 @@ public class ClaimPreparation {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     private ClaimPreparation(User user,
                              Long wageVerificationId,
                              Long claimKitDocumentId,
@@ -77,13 +74,6 @@ public class ClaimPreparation {
 
     @PrePersist
     public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
     }
 }

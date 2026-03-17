@@ -1,7 +1,6 @@
 package com.workproofpay.backend.wage.model;
 
 import com.workproofpay.backend.auth.model.User;
-import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -36,31 +35,6 @@ public class WageVerification {
     @Column(name = "workplace_id", nullable = false)
     private Long workplaceId;
 
-    @Column(name = "contract_id", nullable = false)
-    private Long contractId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "pay_unit", nullable = false, length = 20)
-    private WorkProofPayUnit payUnit;
-
-    @Column(name = "base_pay_amount", nullable = false, precision = 19, scale = 2)
-    private BigDecimal basePayAmount;
-
-    @Column(name = "daily_work_minutes")
-    private Integer dailyWorkMinutes;
-
-    @Column(name = "monthly_work_minutes")
-    private Integer monthlyWorkMinutes;
-
-    @Column(name = "normalized_hourly_wage", nullable = false, precision = 19, scale = 2)
-    private BigDecimal normalizedHourlyWage;
-
-    @Column(name = "work_day_count", nullable = false)
-    private int workDayCount;
-
-    @Column(name = "verified_work_minutes", nullable = false)
-    private long verifiedWorkMinutes;
-
     @Column(name = "overtime_minutes", nullable = false)
     private long overtimeMinutes;
 
@@ -69,9 +43,6 @@ public class WageVerification {
 
     @Column(name = "modified_record_count", nullable = false)
     private int modifiedRecordCount;
-
-    @Column(name = "excluded_pending_record_count", nullable = false)
-    private int excludedPendingRecordCount;
 
     @Column(name = "actual_deposit_amount", nullable = false)
     private long actualDepositAmount;
@@ -144,18 +115,9 @@ public class WageVerification {
         this.user = user;
         this.month = draft.month();
         this.workplaceId = draft.workplaceId();
-        this.contractId = draft.contractId();
-        this.payUnit = draft.payUnit();
-        this.basePayAmount = draft.basePayAmount();
-        this.dailyWorkMinutes = draft.dailyWorkMinutes();
-        this.monthlyWorkMinutes = draft.monthlyWorkMinutes();
-        this.normalizedHourlyWage = draft.normalizedHourlyWage();
-        this.workDayCount = draft.workDayCount();
-        this.verifiedWorkMinutes = draft.verifiedWorkMinutes();
         this.overtimeMinutes = draft.overtimeMinutes();
         this.nightMinutes = draft.nightMinutes();
         this.modifiedRecordCount = draft.modifiedRecordCount();
-        this.excludedPendingRecordCount = draft.excludedPendingRecordCount();
         this.actualDepositAmount = draft.actualDepositAmount();
         this.deductionsKnown = draft.deductionsKnown();
         this.memo = draft.memo();
