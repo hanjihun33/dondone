@@ -13,6 +13,9 @@ Implement backend features for DonDone based on `docs/DonDone_PRD_v1.5.md`.
 - Do not hardcode secrets; use env/config.
 - Keep security endpoints explicit in `SecurityConfig`.
 - Add tests for auth and business-rule changes.
+- Treat backend DB schema as migration-owned; do not rely on Hibernate `ddl-auto: update` for backend schema changes.
+- Use `db-migration-checklist` when a backend task adds, removes, renames, or retypes tables/columns, or changes indexes, constraints, Flyway config, or persistence-owned enums.
+- Keep migration files and related entity/service changes in the same change set.
 
 ## Run
 - `./gradlew bootRun`
