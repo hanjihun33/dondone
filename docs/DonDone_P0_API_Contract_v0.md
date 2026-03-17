@@ -335,6 +335,7 @@ Response:
 | `mapLabel` | - |
 | `latitude` | - |
 | `longitude` | - |
+| `allowedRadiusMeters` | 현재 허용 반경. v0 기본값 `1000` |
 | `createdAt` | - |
 
 주요 에러:
@@ -349,7 +350,11 @@ Response:
 Response:
 | 필드 | 설명 |
 | --- | --- |
-| `workplaces[]` | array<object>. 배열 항목: workplaceId, name, address, mapLabel, latitude, longitude, hasActiveContract |
+| `workplaces[]` | array<object>. 배열 항목: workplaceId, name, address, mapLabel, latitude, longitude, allowedRadiusMeters, hasActiveContract |
+
+추가 메모:
+- 현재 backend는 사용자의 workplace가 하나도 없으면 `SSAFY (임시)` workplace를 자동으로 1건 보장한다.
+- `allowedRadiusMeters`는 현재 `1000` 기본값으로 내려간다.
 
 ### 2.3 `POST /api/workproof/contracts`
 
@@ -448,6 +453,9 @@ Request:
 | `longitude` | - |
 | `locationLabel` | - |
 
+추가 메모:
+- check-in은 선택한 workplace 중심 좌표와 `allowedRadiusMeters`를 비교해, 반경 밖 좌표면 기록을 생성하지 않는다.
+
 Response:
 | 필드 | 설명 |
 | --- | --- |
@@ -467,6 +475,7 @@ Response:
 | `409` | `ACTIVE_CONTRACT_REQUIRED` | - |
 | `409` | `ACTIVE_WORKPROOF_EXISTS` | - |
 | `409` | `WORK_DATE_ALREADY_EXISTS` | - |
+| `409` | `WORKPLACE_RADIUS_EXCEEDED` | 근무지 허용 반경 밖 |
 
 ### 2.7 `POST /api/workproof/records/check-out`
 
@@ -479,6 +488,9 @@ Request:
 | `latitude` | - |
 | `longitude` | - |
 | `locationLabel` | - |
+
+추가 메모:
+- check-out도 active workproof의 workplace 중심 좌표와 `allowedRadiusMeters`를 비교해, 반경 밖 좌표면 기록을 마감하지 않는다.
 
 Response:
 | 필드 | 설명 |
@@ -496,6 +508,7 @@ Response:
 | --- | --- | --- |
 | `404` | `ACTIVE_WORKPROOF_NOT_FOUND` | - |
 | `409` | `CHECK_OUT_BEFORE_CHECK_IN` | - |
+| `409` | `WORKPLACE_RADIUS_EXCEEDED` | 근무지 허용 반경 밖 |
 
 ### 2.8 `POST /api/workproof/records/missing`
 
