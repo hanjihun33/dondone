@@ -2,10 +2,10 @@ spring:
   application:
     name: dondone-backend
   datasource:
-    url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:dondone}}}
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${POSTGRES_DB}}
     driver-class-name: org.postgresql.Driver
-    username: ${DB_USERNAME:${SPRING_DATASOURCE_USERNAME:dondone}}
-    password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:dondone}}
+    username: ${DB_USERNAME:${POSTGRES_USER}}
+    password: ${DB_PASSWORD:${POSTGRES_PASSWORD}}
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -25,7 +25,7 @@ server:
   port: 8080
 
 jwt:
-  secret: ${JWT_SECRET:dondone-local-secret-key-change-this-at-least-32chars}
+  secret: ${JWT_SECRET}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:86400000}
 
 springdoc:
