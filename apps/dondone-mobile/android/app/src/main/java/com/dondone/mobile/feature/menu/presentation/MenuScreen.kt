@@ -97,7 +97,7 @@ fun MenuScreen(
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit,
     onLogout: () -> Unit,
-    onShowToast: (String) -> Unit
+    onShowToast: (String, BadgeTone) -> Unit
 ) {
     val context = LocalContext.current
     var showClaimSheet by rememberSaveable { mutableStateOf(false) }
@@ -214,12 +214,12 @@ fun MenuScreen(
                 receipt = uiModel.receipt,
                 onOpenExplorer = {
                     if (!openMenuReceiptExplorer(context, uiModel.receipt.explorerUrl)) {
-                        onShowToast("Explorer를 열 수 없어요.")
+                        onShowToast("Explorer를 열 수 없어요.", BadgeTone.Warning)
                     }
                 },
                 onShare = {
                     if (!shareMenuReceipt(context, uiModel.receipt.shareText)) {
-                        onShowToast("공유할 수 없어요.")
+                        onShowToast("공유할 수 없어요.", BadgeTone.Warning)
                     }
                 },
                 onDismiss = { showReceiptSheet = false }

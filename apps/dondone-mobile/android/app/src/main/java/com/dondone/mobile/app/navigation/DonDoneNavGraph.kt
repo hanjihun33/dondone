@@ -11,6 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.dondone.mobile.app.session.DemoSessionViewModel
+import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.feature.finance.presentation.AccountManageScreen
 import com.dondone.mobile.feature.finance.presentation.FinanceHomeScreen
 import com.dondone.mobile.feature.finance.presentation.toAccountManageUiModel
@@ -34,7 +35,7 @@ fun DonDoneNavGraph(
     workproofResetVersion: Int,
     onNavigateToRootTab: (String) -> Unit,
     onWorkproofDetailVisibilityChange: (Boolean) -> Unit,
-    onShowToast: (String) -> Unit
+    onShowToast: (String, BadgeTone) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()

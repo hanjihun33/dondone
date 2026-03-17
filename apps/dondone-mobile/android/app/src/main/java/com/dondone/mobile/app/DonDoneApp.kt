@@ -131,8 +131,8 @@ private fun AuthenticatedDonDoneAppShell(
                 workproofResetVersion = workproofShellState.resetVersion,
                 onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
                 onWorkproofDetailVisibilityChange = workproofShellState.onDetailVisibilityChange,
-                onShowToast = { message ->
-                    toastState.show(message = message, tone = BadgeTone.Warning)
+                onShowToast = { message, tone ->
+                    toastState.show(message = message, tone = tone)
                 }
             )
         }
