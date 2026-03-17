@@ -1,0 +1,63 @@
+{
+  "seedName": "normal-case-001",
+  "user": {
+    "userId": "user_001",
+    "displayName": "Demo Worker"
+  },
+  "wallet": {
+    "privateKey": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    "createdAt": "2026-03-01T09:00:00Z"
+  },
+  "recipients": [
+    {
+      "recipientId": "rcp_001",
+      "alias": "Mina",
+      "walletAddress": "0x1111111111111111111111111111111111111111",
+      "relation": "family",
+      "allowed": true,
+      "updatedAt": "2026-03-01T09:30:00Z"
+    }
+  ],
+  "transfers": [
+    {
+      "transferId": "tr_seed_001",
+      "recipientId": "rcp_001",
+      "recipientAddress": "0x1111111111111111111111111111111111111111",
+      "asset": "USDC",
+      "amountAtomic": 50000,
+      "status": "CONFIRMED",
+      "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "failureCode": null,
+      "idempotencyKey": "seed-idem-001",
+      "highAmountConfirmed": false,
+      "createdAt": "2026-03-05T10:00:00Z",
+      "updatedAt": "2026-03-05T10:00:10Z"
+    }
+  ],
+  "jobs": [
+    {
+      "transferId": "tr_seed_001",
+      "jobType": "SUBMIT_TRANSFER",
+      "status": "DONE",
+      "attemptCount": 1,
+      "runAt": "2026-03-05T10:00:00Z",
+      "lastError": null
+    },
+    {
+      "transferId": "tr_seed_001",
+      "jobType": "POLL_TRANSFER_RECEIPT",
+      "status": "DONE",
+      "attemptCount": 1,
+      "runAt": "2026-03-05T10:00:05Z",
+      "lastError": null
+    },
+    {
+      "transferId": "tr_seed_001",
+      "jobType": "RENDER_TRANSFER_RECEIPT",
+      "status": "DONE",
+      "attemptCount": 1,
+      "runAt": "2026-03-05T10:00:10Z",
+      "lastError": null
+    }
+  ]
+}

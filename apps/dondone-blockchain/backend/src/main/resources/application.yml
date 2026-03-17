@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:remitdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+app:
+  chain:
+    mode: demo
+    rpc-url: ${SEPOLIA_RPC_URL:}
+    chain-id: ${SEPOLIA_CHAIN_ID:11155111}
+    token-address: ${SEPOLIA_TOKEN_ADDRESS:}
+    gas-limit: ${SEPOLIA_GAS_LIMIT:120000}
+  wallet:
+    encryption-key: ${WALLET_ENCRYPTION_KEY:}
+  remittance:
+    high-amount-threshold: 100000
+    cooldown-seconds: 86400
+    receipt-link-ttl-seconds: 900
+  worker:
+    poll-interval-ms: 2000
+    receipt-confirm-delay-seconds: 5
