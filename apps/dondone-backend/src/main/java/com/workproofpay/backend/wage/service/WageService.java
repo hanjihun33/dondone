@@ -202,10 +202,8 @@ public class WageService {
         return new VerificationDraftAssembler(
                 month,
                 request,
-                context.contract(),
                 context.summary(),
                 context.includedRecordIds(),
-                context.excludedPendingRecordCount(),
                 verificationSnapshot
         ).assemble();
     }
@@ -302,25 +300,19 @@ public class WageService {
 
         private final String month;
         private final CreateWageVerificationRequest request;
-        private final CurrentContractResponse contract;
         private final WorkProofMonthlySummaryContractResponse summary;
         private final List<Long> includedRecordIds;
-        private final int excludedPendingRecordCount;
         private final WageSummaryCalculator.WageVerificationSnapshot verificationSnapshot;
 
         private VerificationDraftAssembler(String month,
                                            CreateWageVerificationRequest request,
-                                           CurrentContractResponse contract,
                                            WorkProofMonthlySummaryContractResponse summary,
                                            List<Long> includedRecordIds,
-                                           int excludedPendingRecordCount,
                                            WageSummaryCalculator.WageVerificationSnapshot verificationSnapshot) {
             this.month = month;
             this.request = request;
-            this.contract = contract;
             this.summary = summary;
             this.includedRecordIds = includedRecordIds;
-            this.excludedPendingRecordCount = excludedPendingRecordCount;
             this.verificationSnapshot = verificationSnapshot;
         }
 
@@ -331,18 +323,9 @@ public class WageService {
             return new WageVerificationDraft(
                     month,
                     request.workplaceId(),
-                    contract.contractId(),
-                    contract.payUnit(),
-                    contract.basePayAmount(),
-                    contract.dailyWorkMinutes(),
-                    contract.monthlyWorkMinutes(),
-                    contract.normalizedHourlyWage(),
-                    summary.workDayCount(),
-                    summary.integrity().verifiedMinutes(),
                     summary.overtimeMinutes(),
                     summary.nightMinutes(),
                     summary.modifiedRecordCount(),
-                    excludedPendingRecordCount,
                     request.actualDepositAmount(),
                     request.deductionsKnown(),
                     request.memo(),

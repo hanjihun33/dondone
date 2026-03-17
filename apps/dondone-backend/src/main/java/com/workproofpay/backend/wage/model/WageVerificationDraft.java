@@ -1,7 +1,5 @@
 package com.workproofpay.backend.wage.model;
 
-import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
-
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -12,18 +10,9 @@ import java.util.List;
 public record WageVerificationDraft(
         String month,
         Long workplaceId,
-        Long contractId,
-        WorkProofPayUnit payUnit,
-        BigDecimal basePayAmount,
-        Integer dailyWorkMinutes,
-        Integer monthlyWorkMinutes,
-        BigDecimal normalizedHourlyWage,
-        int workDayCount,
-        long verifiedWorkMinutes,
         long overtimeMinutes,
         long nightMinutes,
         int modifiedRecordCount,
-        int excludedPendingRecordCount,
         long actualDepositAmount,
         boolean deductionsKnown,
         String memo,
