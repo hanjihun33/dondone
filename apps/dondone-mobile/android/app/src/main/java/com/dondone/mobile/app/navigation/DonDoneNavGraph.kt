@@ -6,10 +6,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.dondone.mobile.app.session.DemoSessionViewModel
+import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.feature.finance.presentation.AccountManageScreen
 import com.dondone.mobile.feature.finance.presentation.FinanceHomeScreen
 import com.dondone.mobile.feature.finance.presentation.toAccountManageUiModel
@@ -32,7 +34,8 @@ fun DonDoneNavGraph(
     viewModel: DemoSessionViewModel,
     workproofResetVersion: Int,
     onNavigateToRootTab: (String) -> Unit,
-    onWorkproofDetailVisibilityChange: (Boolean) -> Unit
+    onWorkproofDetailVisibilityChange: (Boolean) -> Unit,
+    onShowToast: (String, BadgeTone) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
@@ -119,7 +122,17 @@ fun DonDoneNavGraph(
                 onSubmitTransfer = viewModel::submitTransfer,
                 onDismissTransferConfirmation = viewModel::dismissTransferConfirmation,
                 onConfirmTransfer = viewModel::confirmTransfer,
-                onResetTransfer = { navigateWithinApp(Route.HOME, onNavigateToRootTab) { target -> navController.navigate(target) } }
+                onResetTransfer = {
+                    viewModel.resetTransfer()
+                    navController.navigate(Route.HOME) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            inclusive = false
+                            saveState = false
+                        }
+                        launchSingleTop = true
+                        restoreState = false
+                    }
+                }
             )
         }
         composable(Route.ACCOUNT) {
@@ -133,7 +146,8 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toMenuUiModel(authUiState.session),
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
-                onLogout = viewModel::logout
+                onLogout = viewModel::logout,
+                onShowToast = onShowToast
             )
         }
     }

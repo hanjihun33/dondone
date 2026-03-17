@@ -25,14 +25,14 @@ fun resolveScreenChrome(
             },
             showRootTabs = true,
             showSettingsAction = route == Route.HOME,
-            showDate = false
+            showDate = route != Route.HOME && route != Route.MENU
         )
     } else {
         ScreenChrome(
             headerTitle = resolveChildHeaderTitle(route, transferStep, transferStatus),
             showRootTabs = false,
             showSettingsAction = false,
-            showDate = route != Route.TRANSFER && route != Route.WAGE
+            showDate = route != Route.TRANSFER
         )
     }
 }

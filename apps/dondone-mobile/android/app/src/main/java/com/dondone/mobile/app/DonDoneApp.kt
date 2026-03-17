@@ -1,6 +1,7 @@
 package com.dondone.mobile.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -10,7 +11,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -23,6 +26,9 @@ import com.dondone.mobile.app.navigation.resolveScreenChrome
 import com.dondone.mobile.app.navigation.showTransferStep
 import com.dondone.mobile.app.navigation.shouldResetWorkproofUiState
 import com.dondone.mobile.app.session.DemoSessionViewModel
+import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.designsystem.DonDoneToastHost
+import com.dondone.mobile.core.designsystem.rememberDonDoneToastState
 import com.dondone.mobile.domain.model.DemoInfo
 import com.dondone.mobile.feature.auth.presentation.LoginLoadingScreen
 import com.dondone.mobile.feature.auth.presentation.LoginScreen
@@ -56,6 +62,7 @@ private fun AuthenticatedDonDoneAppShell(
     viewModel: DemoSessionViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val toastState = rememberDonDoneToastState()
     val navController = rememberNavController()
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
     val currentRoute = currentDestination?.route.orEmpty()
@@ -83,6 +90,7 @@ private fun AuthenticatedDonDoneAppShell(
             AppBackAction.DismissTransferConfirmation -> {
                 viewModel.dismissTransferConfirmation()
             }
+
             is AppBackAction.ShowTransferStep -> {
                 viewModel.showTransferStep(action.step)
             }
@@ -94,34 +102,46 @@ private fun AuthenticatedDonDoneAppShell(
         onBack = ::handleBack
     )
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = ChromeSurface,
-        topBar = {
-            AppTopBar(
-                state = topBarState,
-                onBack = ::handleBack,
-                onMenuClick = { navController.navigateToRootTab(Route.MENU) }
-            )
-        },
-        bottomBar = {
-            RootBottomBar(
-                visible = chrome.showRootTabs,
-                tabs = rootTabs,
-                onTabClick = { route -> navController.navigateToRootTab(route) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = ChromeSurface,
+            topBar = {
+                AppTopBar(
+                    state = topBarState,
+                    onBack = ::handleBack,
+                    onMenuClick = { navController.navigateToRootTab(Route.MENU) }
+                )
+            },
+            bottomBar = {
+                RootBottomBar(
+                    visible = chrome.showRootTabs,
+                    tabs = rootTabs,
+                    onTabClick = { route -> navController.navigateToRootTab(route) }
+                )
+            }
+        ) { innerPadding ->
+            DonDoneNavGraph(
+                modifier = Modifier.padding(
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding()
+                ),
+                navController = navController,
+                viewModel = viewModel,
+                workproofResetVersion = workproofShellState.resetVersion,
+                onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
+                onWorkproofDetailVisibilityChange = workproofShellState.onDetailVisibilityChange,
+                onShowToast = { message, tone ->
+                    toastState.show(message = message, tone = tone)
+                }
             )
         }
-    ) { innerPadding ->
-        DonDoneNavGraph(
-            modifier = Modifier.padding(
-                top = innerPadding.calculateTopPadding(),
-                bottom = innerPadding.calculateBottomPadding()
-            ),
-            navController = navController,
-            viewModel = viewModel,
-            workproofResetVersion = workproofShellState.resetVersion,
-            onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
-            onWorkproofDetailVisibilityChange = workproofShellState.onDetailVisibilityChange
+
+        DonDoneToastHost(
+            state = toastState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 20.dp, vertical = 28.dp)
         )
     }
 }

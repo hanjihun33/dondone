@@ -140,7 +140,6 @@ private enum class TransferReviewOverlay {
     RecipientEditor,
     AccountSheet
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransferScreen(

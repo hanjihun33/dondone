@@ -21,14 +21,20 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -42,8 +48,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 private val DonDoneGrayRipple = Color(0x1F4E5968)
+private const val DonDoneToastDurationMillis = 2200L
 
 @Suppress("UNUSED_PARAMETER")
 fun Modifier.pressableScale(
@@ -199,6 +207,170 @@ fun StatusBadge(text: String, tone: BadgeTone) {
     ) {
         Text(text = text, color = foreground, style = MaterialTheme.typography.labelMedium)
     }
+}
+
+internal data class DonDoneToastVisual(
+    val id: Long,
+    val message: String,
+    val tone: BadgeTone
+)
+
+class DonDoneToastState {
+    internal var current by mutableStateOf<DonDoneToastVisual?>(null)
+        private set
+
+    fun show(
+        message: String,
+        tone: BadgeTone = BadgeTone.Info
+    ) {
+        current = DonDoneToastVisual(
+            id = System.currentTimeMillis(),
+            message = message,
+            tone = tone
+        )
+    }
+
+    fun dismiss() {
+        current = null
+    }
+}
+
+@Composable
+fun rememberDonDoneToastState(): DonDoneToastState = remember { DonDoneToastState() }
+
+@Composable
+fun DonDoneToastHost(
+    state: DonDoneToastState,
+    modifier: Modifier = Modifier
+) {
+    val current = state.current ?: return
+
+    LaunchedEffect(current.id) {
+        delay(DonDoneToastDurationMillis)
+        state.dismiss()
+    }
+
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        val background = when (current.tone) {
+            BadgeTone.Info -> DawnPrimaryDeep
+            BadgeTone.Success -> DawnSuccess
+            BadgeTone.Warning -> DawnWarning
+        }
+
+        Text(
+            text = current.message,
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(background)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun FeedbackPanel(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+    tone: BadgeTone = BadgeTone.Info,
+    leading: @Composable (() -> Unit)? = null
+) {
+    val accent = when (tone) {
+        BadgeTone.Info -> DawnPrimaryDeep
+        BadgeTone.Success -> DawnSuccess
+        BadgeTone.Warning -> DawnWarning
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(DawnSurfaceAlt)
+            .border(BorderStroke(1.dp, DawnBorder), RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        leading?.invoke()
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = DawnTextSubtle
+            )
+        }
+        if (actionLabel != null && onAction != null) {
+            OutlinedButton(
+                onClick = onAction,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, accent),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = DawnSurface)
+            ) {
+                Text(text = actionLabel, color = accent)
+            }
+        }
+    }
+}
+
+@Composable
+fun DonDoneLoadingPanel(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    FeedbackPanel(
+        title = title,
+        message = message,
+        modifier = modifier,
+        leading = {
+            CircularProgressIndicator(
+                color = DawnPrimaryDeep,
+                strokeWidth = 2.5.dp
+            )
+        }
+    )
+}
+
+@Composable
+fun DonDoneEmptyPanel(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    FeedbackPanel(
+        title = title,
+        message = message,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun DonDoneErrorPanel(
+    title: String,
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FeedbackPanel(
+        title = title,
+        message = message,
+        modifier = modifier,
+        actionLabel = actionLabel,
+        onAction = onAction,
+        tone = BadgeTone.Warning
+    )
 }
 
 @Composable
