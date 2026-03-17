@@ -85,6 +85,18 @@ private data class MenuDocumentColors(
     val iconColor: Color
 )
 
+private enum class MenuOverlaySheet {
+    Claim,
+    Receipt,
+    Settings
+}
+
+private enum class ClaimSummaryTone {
+    Default,
+    Firm,
+    Short
+}
+
 private val MenuCanvas = Color.White
 private val MenuDivider = Color(0xFFE8EBF0)
 private val MenuReceiptHashBackground = Color(0xFFF1F5F9)
@@ -100,24 +112,20 @@ fun MenuScreen(
     onShowToast: (String, BadgeTone) -> Unit
 ) {
     val context = LocalContext.current
-    var showClaimSheet by rememberSaveable { mutableStateOf(false) }
-    var showReceiptSheet by rememberSaveable { mutableStateOf(false) }
-    var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
+    var activeSheet by rememberSaveable { mutableStateOf<MenuOverlaySheet?>(null) }
     var selectedLanguage by rememberSaveable { mutableStateOf("ko") }
     var selectedDocumentId by remember { mutableStateOf<String?>(null) }
 
     val selectedDocument = uiModel.documents.firstOrNull { it.id == selectedDocumentId }
     val proofDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Proof }
     val claimDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Claim }
+    val selectedReceipt = if (activeSheet == MenuOverlaySheet.Receipt) uiModel.receipt else null
 
     val serviceActions = buildList {
         add(MenuServiceAction("급여 점검", Icons.Default.Description, onOpenWage))
-        if (uiModel.receipt != null) {
-            add(MenuServiceAction("송금 영수증", Icons.Default.AccountBalanceWallet) { showReceiptSheet = true })
-        }
-        add(MenuServiceAction("신고 준비", Icons.Default.Warning) { showClaimSheet = true })
+        add(MenuServiceAction("신고 준비", Icons.Default.Warning) { activeSheet = MenuOverlaySheet.Claim })
         add(MenuServiceAction("계좌 지갑 관리", Icons.Default.AccountBalanceWallet, onOpenAccount))
-        add(MenuServiceAction("설정", Icons.Default.Settings) { showSettingsSheet = true })
+        add(MenuServiceAction("설정", Icons.Default.Settings) { activeSheet = MenuOverlaySheet.Settings })
     }
 
     Column(
@@ -140,19 +148,25 @@ fun MenuScreen(
         MenuDocumentsSection(
             documents = uiModel.documents,
             onOpenDetail = { document ->
-                if (document.accent == MenuDocumentAccent.Claim && document.statusTone != BadgeTone.Success) {
-                    showClaimSheet = true
-                } else {
-                    selectedDocumentId = document.id
+                when {
+                    document.accent == MenuDocumentAccent.Receipt && uiModel.receipt != null -> {
+                        activeSheet = MenuOverlaySheet.Receipt
+                    }
+                    document.accent == MenuDocumentAccent.Claim && document.statusTone != BadgeTone.Success -> {
+                        activeSheet = MenuOverlaySheet.Claim
+                    }
+                    else -> {
+                        selectedDocumentId = document.id
+                    }
                 }
             }
         )
         Spacer(modifier = Modifier.height(24.dp))
     }
 
-    if (showClaimSheet) {
+    if (activeSheet == MenuOverlaySheet.Claim) {
         ModalBottomSheet(
-            onDismissRequest = { showClaimSheet = false },
+            onDismissRequest = { activeSheet = null },
             containerColor = DawnSurface,
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
@@ -160,31 +174,31 @@ fun MenuScreen(
                 proofDocument = proofDocument,
                 claimDocument = claimDocument,
                 onOpenProofDocument = {
-                    showClaimSheet = false
+                    activeSheet = null
                     selectedDocumentId = proofDocument?.id
                 },
                 onOpenClaimDocument = {
-                    showClaimSheet = false
+                    activeSheet = null
                     selectedDocumentId = claimDocument?.id
                 },
                 onOpenWage = {
-                    showClaimSheet = false
+                    activeSheet = null
                     onOpenWage()
                 },
-                onDismiss = { showClaimSheet = false }
+                onDismiss = { activeSheet = null }
             )
         }
     }
 
-    if (showSettingsSheet) {
+    if (activeSheet == MenuOverlaySheet.Settings) {
         ModalBottomSheet(
-            onDismissRequest = { showSettingsSheet = false },
+            onDismissRequest = { activeSheet = null },
             containerColor = DawnSurface
         ) {
             MenuSettingsSheet(
                 selectedLanguage = selectedLanguage,
                 onSelectLanguage = { selectedLanguage = it },
-                onDismiss = { showSettingsSheet = false }
+                onDismiss = { activeSheet = null }
             )
         }
     }
@@ -198,31 +212,31 @@ fun MenuScreen(
                 document = selectedDocument,
                 onOpenClaimFlow = {
                     selectedDocumentId = null
-                    showClaimSheet = true
+                    activeSheet = MenuOverlaySheet.Claim
                 },
                 onDismiss = { selectedDocumentId = null }
             )
         }
     }
 
-    if (showReceiptSheet && uiModel.receipt != null) {
+    if (selectedReceipt != null) {
         ModalBottomSheet(
-            onDismissRequest = { showReceiptSheet = false },
+            onDismissRequest = { activeSheet = null },
             containerColor = DawnSurface
         ) {
             MenuReceiptSheet(
-                receipt = uiModel.receipt,
+                receipt = selectedReceipt,
                 onOpenExplorer = {
-                    if (!openMenuReceiptExplorer(context, uiModel.receipt.explorerUrl)) {
+                    if (!openMenuReceiptExplorer(context, selectedReceipt.explorerUrl)) {
                         onShowToast("Explorer를 열 수 없어요.", BadgeTone.Warning)
                     }
                 },
                 onShare = {
-                    if (!shareMenuReceipt(context, uiModel.receipt.shareText)) {
+                    if (!shareMenuReceipt(context, selectedReceipt.shareText)) {
                         onShowToast("공유할 수 없어요.", BadgeTone.Warning)
                     }
                 },
-                onDismiss = { showReceiptSheet = false }
+                onDismiss = { activeSheet = null }
             )
         }
     }
@@ -532,6 +546,7 @@ private fun MenuDocumentAccentBox(
     val icon = when (accent) {
         MenuDocumentAccent.Proof -> Icons.Default.Description
         MenuDocumentAccent.Claim -> Icons.Default.Warning
+        MenuDocumentAccent.Receipt -> Icons.Default.AccountBalanceWallet
     }
 
     Box(
@@ -654,6 +669,10 @@ private fun menuDocumentColors(accent: MenuDocumentAccent): MenuDocumentColors {
             iconBackground = Color(0xFFF1F5F9),
             iconColor = Color(0xFF475569)
         )
+        MenuDocumentAccent.Receipt -> MenuDocumentColors(
+            iconBackground = Color(0xFFECFDF3),
+            iconColor = Color(0xFF047857)
+        )
     }
 }
 
@@ -694,6 +713,7 @@ private fun MenuDocumentSheet(
                 text = when (document.accent) {
                     MenuDocumentAccent.Proof -> "근무 기록과 차액 검토 근거가 반영된 최신 증빙 문서예요."
                     MenuDocumentAccent.Claim -> "차액 검토 결과를 토대로 신고 준비 흐름으로 이어지는 묶음 문서예요."
+                    MenuDocumentAccent.Receipt -> "최근 테스트넷 송금 내역과 전송 해시를 확인할 수 있는 영수증 문서예요."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnText
@@ -830,11 +850,11 @@ private fun MenuClaimSheet(
     onOpenWage: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedTone by rememberSaveable { mutableStateOf("default") }
+    var selectedTone by rememberSaveable { mutableStateOf(ClaimSummaryTone.Default) }
     val summaryText = when (selectedTone) {
-        "firm" -> "근무 기록과 차액 근거를 바탕으로 접수 사실을 정중하게 정리한 초안입니다. 제출 전에 문장을 한 번 더 다듬어 주세요."
-        "short" -> "차액과 근거를 짧게 정리해 신고 준비를 빠르게 시작할 수 있도록 요약한 문장입니다."
-        else -> "자동 제출이 아니라 제출 전에 문장과 자료를 빠르게 정리해 보는 데모 단계예요."
+        ClaimSummaryTone.Firm -> "근무 기록과 차액 근거를 바탕으로 접수 사실을 정중하게 정리한 초안입니다. 제출 전에 문장을 한 번 더 다듬어 주세요."
+        ClaimSummaryTone.Short -> "차액과 근거를 짧게 정리해 신고 준비를 빠르게 시작할 수 있도록 요약한 문장입니다."
+        ClaimSummaryTone.Default -> "자동 제출이 아니라 제출 전에 문장과 자료를 빠르게 정리해 보는 데모 단계예요."
     }
 
     Column(
@@ -862,16 +882,22 @@ private fun MenuClaimSheet(
                     Text(text = "제출 문장 요약", style = MaterialTheme.typography.bodyLarge)
                     SecondaryActionButton(
                         text = "문장 만들기",
-                        onClick = { selectedTone = "default" }
+                        onClick = { selectedTone = ClaimSummaryTone.Default }
                     )
                 }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MenuSheetChip("기본", selectedTone == "default") { selectedTone = "default" }
-                    MenuSheetChip("정중하게", selectedTone == "firm") { selectedTone = "firm" }
-                    MenuSheetChip("짧게", selectedTone == "short") { selectedTone = "short" }
+                    MenuSheetChip("기본", selectedTone == ClaimSummaryTone.Default) {
+                        selectedTone = ClaimSummaryTone.Default
+                    }
+                    MenuSheetChip("정중하게", selectedTone == ClaimSummaryTone.Firm) {
+                        selectedTone = ClaimSummaryTone.Firm
+                    }
+                    MenuSheetChip("짧게", selectedTone == ClaimSummaryTone.Short) {
+                        selectedTone = ClaimSummaryTone.Short
+                    }
                 }
                 Text(
                     text = summaryText,
