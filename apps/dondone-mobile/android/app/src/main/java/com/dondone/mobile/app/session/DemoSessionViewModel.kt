@@ -1,4 +1,5 @@
 package com.dondone.mobile.app.session
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
@@ -236,6 +237,12 @@ class DemoSessionViewModel(
         _workproofActionUiState.value = WorkproofActionUiState()
         refreshAdvanceRemoteState()
         refreshWorkproofRemoteState()
+    }
+
+    fun clearWorkproofActionMessage() {
+        if (!_workproofActionUiState.value.isSubmitting && _workproofActionUiState.value.message != null) {
+            _workproofActionUiState.value = WorkproofActionUiState()
+        }
     }
 
     fun login(email: String, password: String) {
@@ -598,8 +605,6 @@ class DemoSessionViewModel(
                 workplaceAddress = payload.workplace.address,
                 workplaceLatitude = payload.workplace.latitude,
                 workplaceLongitude = payload.workplace.longitude,
-                currentLatitude = payload.workplace.latitude,
-                currentLongitude = payload.workplace.longitude,
                 today = TodayWork(
                     clockIn = selectedTodayRecord?.checkInDeviceAt?.toLocalTime()?.toString()?.take(5),
                     clockOut = selectedTodayRecord?.checkOutDeviceAt?.toLocalTime()?.toString()?.take(5)

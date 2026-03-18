@@ -17,8 +17,6 @@ import java.time.LocalDateTime
 import java.time.YearMonth
 
 private const val SESSION_EXPIRED_MESSAGE = "세션이 만료되어 다시 로그인해 주세요."
-private const val DEFAULT_DAILY_WORK_MINUTES = 480
-private const val DEFAULT_BASE_PAY_AMOUNT = 96_000
 private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 class BackendWorkproofRepository(
@@ -173,44 +171,12 @@ class BackendWorkproofRepository(
                 throw WorkproofUnauthorizedException()
             }
             if (response.code == 404) {
-                createDefaultContract(token, workplaceId)
-                return
+                throw BackendApiException("활성 근로 계약이 없어 출퇴근을 진행할 수 없어요.")
             }
             throw BackendApiException(
                 parseBackendErrorMessage(
                     responseBody = responseBody,
                     fallbackMessage = "활성 계약을 확인하지 못했어요."
-                )
-            )
-        }
-    }
-
-    private fun createDefaultContract(token: String, workplaceId: Long) {
-        val body = JSONObject()
-            .put("workplaceId", workplaceId)
-            .put("payUnit", "DAILY")
-            .put("basePayAmount", DEFAULT_BASE_PAY_AMOUNT)
-            .put("dailyWorkMinutes", DEFAULT_DAILY_WORK_MINUTES)
-            .put("effectiveFrom", LocalDate.now().toString())
-            .toString()
-        val request = Request.Builder()
-            .url("${BackendApiSupport.baseUrl}/api/workproof/contracts")
-            .header("Authorization", "Bearer $token")
-            .post(body.toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            val responseBody = response.body?.string().orEmpty()
-            if (response.isSuccessful || response.code == 409) {
-                return
-            }
-            if (response.code == 401 || response.code == 403) {
-                throw WorkproofUnauthorizedException()
-            }
-            throw BackendApiException(
-                parseBackendErrorMessage(
-                    responseBody = responseBody,
-                    fallbackMessage = "기본 근로 계약을 준비하지 못했어요."
                 )
             )
         }
