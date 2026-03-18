@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.dondone.mobile.data.advance.BackendAdvanceRepository
 import com.dondone.mobile.data.auth.AuthSessionStore
 import com.dondone.mobile.data.auth.BackendAuthRepository
+import com.dondone.mobile.data.workproof.BackendWorkproofRepository
 import okhttp3.OkHttpClient
 
 class DemoSessionViewModelFactory(
@@ -22,7 +23,8 @@ class DemoSessionViewModelFactory(
                     sessionStore = AuthSessionStore(appContext),
                     client = client
                 ),
-                advanceRepository = BackendAdvanceRepository(client = client)
+                advanceRepository = BackendAdvanceRepository(client = client),
+                workproofRepository = BackendWorkproofRepository(client = client)
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
