@@ -43,7 +43,9 @@ object DemoSeedFactory {
                         attachments = 1,
                         at = "2026-03-18 20:11"
                     )
-                )
+                ),
+                workplaceId = null,
+                allowedRadiusMeters = 100
             ),
             wage = WageData(
                 workDays = 18,

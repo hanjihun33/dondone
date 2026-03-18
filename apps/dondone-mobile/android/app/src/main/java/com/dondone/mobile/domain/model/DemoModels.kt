@@ -39,7 +39,9 @@ data class WorkproofData(
     val currentLongitude: Double,
     val today: TodayWork,
     val records: List<WorkRecord>,
-    val audit: List<WorkAudit>
+    val audit: List<WorkAudit>,
+    val workplaceId: Long? = null,
+    val allowedRadiusMeters: Int = 100
 )
 
 data class WageData(

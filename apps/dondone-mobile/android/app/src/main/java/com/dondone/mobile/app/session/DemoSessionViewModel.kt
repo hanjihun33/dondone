@@ -12,7 +12,15 @@ import com.dondone.mobile.data.advance.BackendAdvanceRepository
 import com.dondone.mobile.data.auth.AuthRepository
 import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.workproof.BackendWorkproofRepository
+import com.dondone.mobile.data.workproof.WorkproofRemotePayload
+import com.dondone.mobile.data.workproof.WorkproofRemoteMode
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
+import com.dondone.mobile.data.workproof.WorkproofRepository
+import com.dondone.mobile.data.workproof.WorkproofUnauthorizedException
 import com.dondone.mobile.domain.model.DemoState
+import com.dondone.mobile.domain.model.TodayWork
+import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
@@ -25,10 +33,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
+private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 실연동 데이터를 불러옵니다."
+private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
 
 class DemoSessionViewModel(
     private val authRepository: AuthRepository,
-    private val advanceRepository: AdvanceRepository = BackendAdvanceRepository()
+    private val advanceRepository: AdvanceRepository = BackendAdvanceRepository(),
+    private val workproofRepository: WorkproofRepository = BackendWorkproofRepository()
 ) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
@@ -37,8 +48,12 @@ class DemoSessionViewModel(
     private val _authUiState = MutableStateFlow(AuthUiState.restoring())
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
     private val _advanceRemoteState =
-        MutableStateFlow(AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다."))
+        MutableStateFlow(AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE))
     val advanceRemoteState: StateFlow<AdvanceRemoteState> = _advanceRemoteState.asStateFlow()
+    private val _workproofRemoteState =
+        MutableStateFlow(WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE))
+    private val _workproofActionUiState = MutableStateFlow(WorkproofActionUiState())
+    val workproofActionUiState: StateFlow<WorkproofActionUiState> = _workproofActionUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
@@ -114,11 +129,62 @@ class DemoSessionViewModel(
     }
 
     fun clockIn() {
-        _uiState.update { state -> DemoSessionReducer.clockIn(state) }
+        submitWorkproofAction(
+            fallback = { state -> DemoSessionReducer.clockIn(state) },
+            remoteCall = { session -> workproofRepository.clockIn(session.accessToken, _uiState.value.workproof) },
+            successMessage = "출근 기록이 백엔드에 저장됐어요.",
+            failureMessage = "출근 기록을 저장하지 못했어요."
+        )
     }
 
     fun clockOut() {
-        _uiState.update { state -> DemoSessionReducer.clockOut(state) }
+        submitWorkproofAction(
+            fallback = { state -> DemoSessionReducer.clockOut(state) },
+            remoteCall = { session -> workproofRepository.clockOut(session.accessToken, _uiState.value.workproof) },
+            successMessage = "퇴근 기록이 백엔드에 저장됐어요.",
+            failureMessage = "퇴근 기록을 저장하지 못했어요."
+        )
+    }
+
+    private fun submitWorkproofAction(
+        fallback: (DemoState) -> DemoState,
+        remoteCall: suspend (AuthSession) -> WorkproofRemoteState,
+        successMessage: String,
+        failureMessage: String
+    ) {
+        val session = _authUiState.value.session
+        if (session == null) {
+            _uiState.update { state -> fallback(state) }
+            return
+        }
+
+        viewModelScope.launch {
+            _workproofActionUiState.value = WorkproofActionUiState(isSubmitting = true)
+            try {
+                val remoteState = remoteCall(session)
+                if (remoteState.mode != WorkproofRemoteMode.CONTENT) {
+                    _workproofRemoteState.value = remoteState
+                    _workproofActionUiState.value = WorkproofActionUiState(
+                        message = remoteState.errorMessage ?: failureMessage,
+                        isError = true
+                    )
+                    return@launch
+                }
+                applyWorkproofRemoteState(remoteState)
+                _workproofActionUiState.value = WorkproofActionUiState(message = successMessage)
+            } catch (error: WorkproofUnauthorizedException) {
+                expireSession(error.message)
+                _workproofActionUiState.value = WorkproofActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _workproofActionUiState.value = WorkproofActionUiState(
+                    message = error.message ?: failureMessage,
+                    isError = true
+                )
+            }
+        }
     }
 
     fun submitTransfer() {
@@ -168,7 +234,15 @@ class DemoSessionViewModel(
         _uiState.value = initialState
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
+        _workproofActionUiState.value = WorkproofActionUiState()
         refreshAdvanceRemoteState()
+        refreshWorkproofRemoteState()
+    }
+
+    fun clearWorkproofActionMessage() {
+        if (!_workproofActionUiState.value.isSubmitting && _workproofActionUiState.value.message != null) {
+            _workproofActionUiState.value = WorkproofActionUiState()
+        }
     }
 
     fun login(email: String, password: String) {
@@ -187,7 +261,8 @@ class DemoSessionViewModel(
                 _authUiState.value = AuthUiState.unauthenticated(
                     error.message ?: "로그인에 실패했어요. 잠시 후 다시 시도해 주세요."
                 )
-                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
+                _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
             }
         }
     }
@@ -213,7 +288,8 @@ class DemoSessionViewModel(
                 _authUiState.value = AuthUiState.unauthenticated(
                     error.message ?: "회원가입에 실패했어요. 잠시 후 다시 시도해 주세요."
                 )
-                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
+                _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
             }
         }
     }
@@ -340,7 +416,7 @@ class DemoSessionViewModel(
     fun refreshAdvanceRemoteState() {
         val session = _authUiState.value.session
         if (session == null) {
-            _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+            _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
             return
         }
 
@@ -349,12 +425,25 @@ class DemoSessionViewModel(
         }
     }
 
+    fun refreshWorkproofRemoteState() {
+        val session = _authUiState.value.session
+        if (session == null) {
+            _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
+            return
+        }
+
+        viewModelScope.launch {
+            loadWorkproofRemoteState(session)
+        }
+    }
+
     private fun restoreAuthSession() {
         viewModelScope.launch {
             val session = authRepository.restore()
             if (session == null) {
                 _authUiState.value = AuthUiState.unauthenticated()
-                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+                _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
+                _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
             } else {
                 onAuthenticated(session)
             }
@@ -364,6 +453,10 @@ class DemoSessionViewModel(
     private suspend fun onAuthenticated(session: AuthSession) {
         _authUiState.value = AuthUiState.authenticated(session)
         loadAdvanceRemoteState(session)
+        if (!_authUiState.value.isAuthenticated) {
+            return
+        }
+        loadWorkproofRemoteState(session)
     }
 
     private suspend fun loadAdvanceRemoteState(session: AuthSession) {
@@ -379,6 +472,27 @@ class DemoSessionViewModel(
         }
         _advanceRemoteState.value = remoteState
         syncSelectedAdvanceAmount(remoteState)
+    }
+
+    private suspend fun loadWorkproofRemoteState(session: AuthSession) {
+        _workproofRemoteState.value = WorkproofRemoteState.loading()
+        val remoteState = workproofRepository.load(session.accessToken)
+        applyWorkproofRemoteState(remoteState)
+    }
+
+    private suspend fun applyWorkproofRemoteState(remoteState: WorkproofRemoteState) {
+        if (!remoteState.isAuthenticated) {
+            clearAuthenticatedState(
+                AuthUiState.unauthenticated(
+                    remoteState.errorMessage ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            )
+            return
+        }
+
+        _workproofRemoteState.value = remoteState
+        val payload = remoteState.payload ?: return
+        _uiState.update { current -> current.syncRemoteWorkproof(payload) }
     }
 
     private fun syncSelectedAdvanceAmount(remoteState: AdvanceRemoteState) {
@@ -433,11 +547,15 @@ class DemoSessionViewModel(
         _uiState.value = initialState
         _authUiState.value = unauthenticatedState
         _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(
-            unauthenticatedState.errorMessage ?: "로그인 후 실연동 데이터를 불러옵니다."
+            unauthenticatedState.errorMessage ?: ADVANCE_REMOTE_LOGIN_MESSAGE
+        )
+        _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(
+            unauthenticatedState.errorMessage ?: WORKPROOF_REMOTE_LOGIN_MESSAGE
         )
         _selectedAdvanceAmount.value = null
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
+        _workproofActionUiState.value = WorkproofActionUiState()
     }
 
     private fun scheduleTransferCompletion() {
@@ -451,5 +569,51 @@ class DemoSessionViewModel(
     private fun cancelTransferCompletion() {
         transferCompletionJob?.cancel()
         transferCompletionJob = null
+    }
+
+    private fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): DemoState {
+        val systemToday = java.time.LocalDate.now()
+        val activeRecord = payload.records.firstOrNull { record ->
+            record.status == "CHECKED_IN" && record.checkOutDeviceAt == null
+        }
+        val selectedTodayRecord = activeRecord
+            ?: payload.records.firstOrNull { it.workDate == systemToday }
+            ?: payload.records.firstOrNull()
+        val selectedDate = selectedTodayRecord?.workDate ?: systemToday
+        val nextRecords = payload.records
+            .sortedByDescending { it.workDate }
+            .map { record ->
+                WorkRecord(
+                    id = record.recordId.toString(),
+                    day = record.workDate.dayOfMonth,
+                    inTime = record.checkInDeviceAt.toLocalTime().toString().take(5),
+                    outTime = record.checkOutDeviceAt?.toLocalTime()?.toString()?.take(5) ?: "-",
+                    modified = record.modified,
+                    attachments = 0
+                )
+            }
+
+        return copy(
+            demo = demo.copy(
+                year = selectedDate.year,
+                month = selectedDate.monthValue,
+                monthLength = selectedDate.lengthOfMonth(),
+                asOfDay = selectedDate.dayOfMonth
+            ),
+            workproof = workproof.copy(
+                workplaceName = payload.workplace.name,
+                workplaceAddress = payload.workplace.address,
+                workplaceLatitude = payload.workplace.latitude,
+                workplaceLongitude = payload.workplace.longitude,
+                today = TodayWork(
+                    clockIn = selectedTodayRecord?.checkInDeviceAt?.toLocalTime()?.toString()?.take(5),
+                    clockOut = selectedTodayRecord?.checkOutDeviceAt?.toLocalTime()?.toString()?.take(5)
+                ),
+                records = nextRecords,
+                audit = emptyList(),
+                workplaceId = payload.workplace.workplaceId,
+                allowedRadiusMeters = payload.workplace.allowedRadiusMeters
+            )
+        )
     }
 }
