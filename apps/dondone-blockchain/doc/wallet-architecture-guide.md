@@ -34,8 +34,8 @@
 
 관련 코드:
 
-- `/home/ssafy/crypto-pjt/backend/src/main/java/com/workproofpay/remittance/domain/UserWalletEntity.java`
-- `/home/ssafy/crypto-pjt/backend/src/main/java/com/workproofpay/remittance/service/UserWalletService.java`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend/src/main/java/com/workproofpay/remittance/domain/UserWalletEntity.java`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend/src/main/java/com/workproofpay/remittance/service/UserWalletService.java`
 
 ### 2-2) private key 암호화
 
@@ -45,7 +45,7 @@
 
 관련 코드:
 
-- `/home/ssafy/crypto-pjt/backend/src/main/java/com/workproofpay/remittance/service/WalletCryptoService.java`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend/src/main/java/com/workproofpay/remittance/service/WalletCryptoService.java`
 
 ### 2-3) 송금 서명
 
@@ -54,9 +54,9 @@
 
 관련 코드:
 
-- `/home/ssafy/crypto-pjt/backend/src/main/java/com/workproofpay/remittance/service/TransferService.java`
-- `/home/ssafy/crypto-pjt/backend/src/main/java/com/workproofpay/remittance/job/TransferJobWorker.java`
-- `/home/ssafy/crypto-pjt/backend/src/main/java/com/workproofpay/remittance/gateway/SepoliaErc20Gateway.java`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend/src/main/java/com/workproofpay/remittance/service/TransferService.java`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend/src/main/java/com/workproofpay/remittance/job/TransferJobWorker.java`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend/src/main/java/com/workproofpay/remittance/gateway/SepoliaErc20Gateway.java`
 
 ## 3. API 사용 흐름
 
@@ -64,14 +64,14 @@
 
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/wallets/me' \
-  -H 'X-User-Id: user_001'
+  -H 'X-User-Id: 1'
 ```
 
 ### 3-2) wallet 조회
 
 ```bash
 curl -s 'http://localhost:8080/api/v1/remittance/wallets/me' \
-  -H 'X-User-Id: user_001'
+  -H 'X-User-Id: 1'
 ```
 
 ### 3-3) 송금
@@ -79,7 +79,7 @@ curl -s 'http://localhost:8080/api/v1/remittance/wallets/me' \
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -H 'Idempotency-Key: idem-001' \
   -d '{
     "recipientId":"rcp_001",
@@ -89,7 +89,7 @@ curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers' \
   }'
 ```
 
-이 요청이 들어오면 서버는 `user_001`의 wallet private key로 서명한다.
+이 요청이 들어오면 서버는 `1`의 wallet private key로 서명한다.
 
 ## 4. 운영 시 꼭 필요한 환경변수
 

@@ -79,7 +79,7 @@ public class TransferJobWorker {
 
         String senderPrivateKey = userWalletService.getDecryptedPrivateKey(transfer.getUserId());
         String txHash = erc20Gateway.submitTransfer(
-                "demo-token",
+                transfer.getAsset(),
                 transfer.getRecipientAddress(),
                 transfer.getAmountAtomic(),
                 senderPrivateKey

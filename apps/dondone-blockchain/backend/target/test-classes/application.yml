@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:remitdb;MODE=PostgreSQL;INIT=CREATE SCHEMA IF NOT EXISTS test\\;SET SCHEMA test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: test
+  sql:
+    init:
+      mode: always
+app:
+  chain:
+    onboarding:
+      enabled: false
+  wallet:
+    allow-generated-key: true

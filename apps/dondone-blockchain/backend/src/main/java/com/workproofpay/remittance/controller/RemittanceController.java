@@ -46,7 +46,7 @@ public class RemittanceController {
     public UserWalletResponse createMyWallet(
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return userWalletService.createWalletIfAbsent(userId);
     }
 
@@ -54,7 +54,7 @@ public class RemittanceController {
     public UserWalletResponse getMyWallet(
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return userWalletService.getWallet(userId);
     }
 
@@ -62,7 +62,7 @@ public class RemittanceController {
     public RecipientListResponse getRecipients(
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return new RecipientListResponse(recipientService.getRecipients(userId));
     }
 
@@ -72,7 +72,7 @@ public class RemittanceController {
             @PathVariable String recipientId,
             @Valid @RequestBody RecipientUpsertRequest request
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return recipientService.upsertRecipient(userId, recipientId, request);
     }
 
@@ -81,7 +81,7 @@ public class RemittanceController {
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @Valid @RequestBody TransferPrecheckRequest request
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return transferService.precheck(userId, request);
     }
 
@@ -92,7 +92,7 @@ public class RemittanceController {
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreateTransferRequest request
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         String senderAddress = userContext.resolveSenderAddress(senderAddressHeader);
         return transferService.createTransfer(userId, senderAddress, idempotencyKey, request);
     }
@@ -102,7 +102,7 @@ public class RemittanceController {
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable String transferId
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return transferService.getTransfer(userId, transferId);
     }
 
@@ -111,7 +111,7 @@ public class RemittanceController {
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable String transferId
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return transferIntegrityService.generateForTransfer(userId, transferId);
     }
 
@@ -120,7 +120,7 @@ public class RemittanceController {
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable String transferId
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         return transferService.issueReceiptLink(userId, transferId);
     }
 
@@ -130,7 +130,7 @@ public class RemittanceController {
             @PathVariable String transferId,
             @RequestParam("token") String token
     ) {
-        String userId = userContext.resolveUserId(userIdHeader);
+        Long userId = userContext.resolveUserId(userIdHeader);
         if (token == null || token.isBlank()) {
             throw new IllegalArgumentException("token is required");
         }

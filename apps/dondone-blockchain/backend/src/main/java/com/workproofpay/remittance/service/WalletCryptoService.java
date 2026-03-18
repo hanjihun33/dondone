@@ -23,6 +23,9 @@ public class WalletCryptoService {
     public WalletCryptoService(AppProperties appProperties) {
         String encodedKey = appProperties.getWallet().getEncryptionKey();
         if (encodedKey == null || encodedKey.isBlank()) {
+            if (!appProperties.getWallet().isAllowGeneratedKey()) {
+                throw new IllegalStateException("WALLET_ENCRYPTION_KEY is required for persistent wallet storage");
+            }
             encodedKey = generateBase64Key();
         }
         byte[] keyBytes = Base64.getDecoder().decode(encodedKey);

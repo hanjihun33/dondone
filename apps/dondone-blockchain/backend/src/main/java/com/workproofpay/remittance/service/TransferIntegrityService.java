@@ -26,7 +26,7 @@ public class TransferIntegrityService {
     }
 
     @Transactional(readOnly = true)
-    public IntegrityHashResponse generateForTransfer(String userId, String transferId) {
+    public IntegrityHashResponse generateForTransfer(Long userId, String transferId) {
         TransferEntity transfer = transferRepository.findByTransferIdAndUserId(transferId, userId)
                 .orElseThrow(() -> new ApiException(404, "TRANSFER_NOT_FOUND", "Transfer not found", null));
 

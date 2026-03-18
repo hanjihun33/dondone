@@ -34,7 +34,8 @@ public class TransferService {
     }
 
     @Transactional(readOnly = true)
-    public TransferPrecheckResponse precheck(String userId, TransferPrecheckRequest request) {
+    public TransferPrecheckResponse precheck(Long userId, TransferPrecheckRequest request) {
+        validateAndNormalizeAsset(request.asset());
         PolicyDecision policy = evaluatePolicy(userId, request.recipientId(), request.amount(), request.highAmountConfirmed());
         return new TransferPrecheckResponse(
                 policy.allowed,
@@ -46,7 +47,7 @@ public class TransferService {
 
     @Transactional
     public CreateTransferResponse createTransfer(
-            String userId,
+            Long userId,
             String senderAddress,
             String idempotencyKey,
             CreateTransferRequest request
@@ -54,6 +55,7 @@ public class TransferService {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new ApiException(400, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key is required", null);
         }
+        String stablecoinSymbol = validateAndNormalizeAsset(request.asset());
 
         TransferEntity existing = transferRepository
                 .findByUserIdAndIdempotencyKey(userId, idempotencyKey)
@@ -83,7 +85,7 @@ public class TransferService {
         transfer.setTransferId(generateTransferId());
         transfer.setUserId(userId);
         transfer.setRecipientId(request.recipientId());
-        transfer.setAsset(request.asset());
+        transfer.setAsset(stablecoinSymbol);
         transfer.setAmountAtomic(request.amount());
         transfer.setSenderAddress(wallet.walletAddress());
         transfer.setRecipientAddress(recipient.getWalletAddress());
@@ -102,14 +104,14 @@ public class TransferService {
     }
 
     @Transactional(readOnly = true)
-    public TransferDetailResponse getTransfer(String userId, String transferId) {
+    public TransferDetailResponse getTransfer(Long userId, String transferId) {
         TransferEntity transfer = transferRepository.findByTransferIdAndUserId(transferId, userId)
                 .orElseThrow(() -> new ApiException(404, "TRANSFER_NOT_FOUND", "Transfer not found", null));
         return toDetailResponse(transfer);
     }
 
     @Transactional(readOnly = true)
-    public ReceiptLinkResponse issueReceiptLink(String userId, String transferId) {
+    public ReceiptLinkResponse issueReceiptLink(Long userId, String transferId) {
         TransferEntity transfer = transferRepository.findByTransferIdAndUserId(transferId, userId)
                 .orElseThrow(() -> new ApiException(404, "TRANSFER_NOT_FOUND", "Transfer not found", null));
 
@@ -120,7 +122,7 @@ public class TransferService {
     }
 
     @Transactional(readOnly = true)
-    public String renderReceiptText(String userId, String transferId) {
+    public String renderReceiptText(Long userId, String transferId) {
         TransferEntity transfer = transferRepository.findByTransferIdAndUserId(transferId, userId)
                 .orElseThrow(() -> new ApiException(404, "TRANSFER_NOT_FOUND", "Transfer not found", null));
         return "TRANSFER RECEIPT\n"
@@ -134,7 +136,7 @@ public class TransferService {
                 + "updatedAt=" + transfer.getUpdatedAt() + "\n";
     }
 
-    private PolicyDecision evaluatePolicy(String userId, String recipientId, long amount, boolean highAmountConfirmed) {
+    private PolicyDecision evaluatePolicy(Long userId, String recipientId, long amount, boolean highAmountConfirmed) {
         RecipientEntity recipient = recipientService.getRequiredRecipient(userId, recipientId);
         if (!recipient.isAllowed()) {
             return new PolicyDecision(false, PolicyCode.RECIPIENT_NOT_ALLOWED.name(), 0);
@@ -152,6 +154,22 @@ public class TransferService {
         }
 
         return new PolicyDecision(true, null, 0);
+    }
+
+    private String validateAndNormalizeAsset(String asset) {
+        String stablecoinSymbol = appProperties.getChain().getStablecoinSymbol();
+        if (stablecoinSymbol == null || stablecoinSymbol.isBlank()) {
+            throw new IllegalStateException("app.chain.stablecoin-symbol must be configured");
+        }
+        if (asset == null || !stablecoinSymbol.equalsIgnoreCase(asset.trim())) {
+            throw new ApiException(
+                    400,
+                    "UNSUPPORTED_ASSET",
+                    "Only the configured stablecoin can be transferred",
+                    Map.of("supportedAsset", stablecoinSymbol)
+            );
+        }
+        return stablecoinSymbol;
     }
 
     private CreateTransferResponse toCreateResponse(TransferEntity t, String policyCode, Instant cooldownEndsAt) {

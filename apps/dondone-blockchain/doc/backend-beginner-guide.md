@@ -10,7 +10,7 @@
 - 송금 시 해당 사용자 wallet private key로 서명한다.
 
 ## 1. 위치
-- 백엔드 루트: `/home/ssafy/crypto-pjt/backend`
+- 백엔드 루트: `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend`
 
 ## 2. 선행 설치
 
@@ -33,7 +33,7 @@ sudo apt-get install -y maven
 ## 3. 실행
 
 ```bash
-cd /home/ssafy/crypto-pjt/backend
+cd /home/ssafy/S14P21C202/apps/dondone-blockchain/backend
 mvn spring-boot:run
 ```
 
@@ -66,25 +66,25 @@ curl -s -X POST 'http://localhost:8080/api/v1/remittance/demo/seed' | jq
 ### 5.0 내 wallet 생성
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/wallets/me' \
-  -H 'X-User-Id: user_001' | jq
+  -H 'X-User-Id: 1' | jq
 ```
 
 설명:
 
-- 이 API를 호출하면 `user_001` 전용 wallet이 생성된다.
+- 이 API를 호출하면 `1` 전용 wallet이 생성된다.
 - 호출하지 않아도 첫 송금 시 자동 생성되지만, 가이드에서는 흐름을 눈으로 확인하기 위해 먼저 만든다.
 
 ### 5.0-1 내 wallet 조회
 ```bash
 curl -s 'http://localhost:8080/api/v1/remittance/wallets/me' \
-  -H 'X-User-Id: user_001' | jq
+  -H 'X-User-Id: 1' | jq
 ```
 
 ### 5.1 수신자 등록(허용목록)
 ```bash
 curl -s -X PUT 'http://localhost:8080/api/v1/remittance/recipients/rcp_001' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -d '{
     "alias":"Mom",
     "walletAddress":"0x7F0000000000000000000000000000000000A1",
@@ -96,14 +96,14 @@ curl -s -X PUT 'http://localhost:8080/api/v1/remittance/recipients/rcp_001' \
 ### 5.2 수신자 조회
 ```bash
 curl -s 'http://localhost:8080/api/v1/remittance/recipients' \
-  -H 'X-User-Id: user_001' | jq
+  -H 'X-User-Id: 1' | jq
 ```
 
 ### 5.3 송금 사전 점검(precheck)
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers/precheck' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -d '{
     "recipientId":"rcp_001",
     "amount":50000,
@@ -116,7 +116,7 @@ curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers/precheck' \
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -H 'Idempotency-Key: idem-001' \
   -d '{
     "recipientId":"rcp_001",
@@ -137,7 +137,7 @@ echo $TRANSFER_ID
 ```bash
 for i in $(seq 1 8); do
   curl -s "http://localhost:8080/api/v1/remittance/transfers/${TRANSFER_ID}" \
-    -H 'X-User-Id: user_001' | jq
+    -H 'X-User-Id: 1' | jq
   sleep 2
 done
 ```
@@ -153,7 +153,7 @@ done
 ### 5.6 무결성 해시 조회
 ```bash
 curl -s 'http://localhost:8080/api/v1/remittance/transfers/tr_seed_001/integrity-hash' \
-  -H 'X-User-Id: user_001' | jq
+  -H 'X-User-Id: 1' | jq
 ```
 
 설명:
@@ -165,13 +165,13 @@ curl -s 'http://localhost:8080/api/v1/remittance/transfers/tr_seed_001/integrity
 ### 5.7 영수증 링크 발급
 ```bash
 curl -s -X POST "http://localhost:8080/api/v1/remittance/transfers/${TRANSFER_ID}/receipt-link" \
-  -H 'X-User-Id: user_001' | tee /tmp/receipt-link.json | jq
+  -H 'X-User-Id: 1' | tee /tmp/receipt-link.json | jq
 ```
 
 링크 열기:
 ```bash
 URL_PATH=$(jq -r '.downloadUrl' /tmp/receipt-link.json)
-curl -s "http://localhost:8080${URL_PATH}" -H 'X-User-Id: user_001'
+curl -s "http://localhost:8080${URL_PATH}" -H 'X-User-Id: 1'
 ```
 
 ## 6. 데모용 실패 케이스
@@ -182,7 +182,7 @@ curl -s "http://localhost:8080${URL_PATH}" -H 'X-User-Id: user_001'
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -H 'Idempotency-Key: idem-fail-001' \
   -d '{
     "recipientId":"rcp_001",
