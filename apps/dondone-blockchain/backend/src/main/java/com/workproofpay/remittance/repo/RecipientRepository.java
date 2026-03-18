@@ -7,6 +7,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RecipientRepository extends JpaRepository<RecipientEntity, String> {
-    List<RecipientEntity> findByUserIdOrderByUpdatedAtDesc(String userId);
-    Optional<RecipientEntity> findByRecipientIdAndUserId(String recipientId, String userId);
+    List<RecipientEntity> findByUserIdOrderByUpdatedAtDesc(Long userId);
+    Optional<RecipientEntity> findByRecipientIdAndUserId(String recipientId, Long userId);
 }

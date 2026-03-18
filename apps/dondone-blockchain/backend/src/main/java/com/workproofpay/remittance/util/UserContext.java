@@ -4,11 +4,15 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class UserContext {
-    public String resolveUserId(String xUserIdHeader) {
+    public Long resolveUserId(String xUserIdHeader) {
         if (xUserIdHeader == null || xUserIdHeader.isBlank()) {
-            return "demo-user";
+            return 1L;
         }
-        return xUserIdHeader;
+        try {
+            return Long.parseLong(xUserIdHeader);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("X-User-Id must be a numeric bigint user id");
+        }
     }
 
     public String resolveSenderAddress(String xSenderAddressHeader) {

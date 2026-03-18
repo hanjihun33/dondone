@@ -15,6 +15,7 @@ Spring Boot 기반 송금 API 서버입니다.
   - 회원별 wallet을 자동 생성해 DB에 저장합니다.
   - private key는 암호화해서 저장합니다.
   - 송금 시 해당 사용자 wallet private key를 복호화해서 서명합니다.
+  - 새 wallet이 처음 생성되면 treasury 지갑이 소량의 Sepolia ETH와 stablecoin을 자동 지급할 수 있습니다.
 
 정리하면, 현재는 `사용자별 내부 wallet(custodial wallet)을 서버가 관리하는 구조`입니다.
 
@@ -25,11 +26,25 @@ Spring Boot 기반 송금 API 서버입니다.
 - Java 17
 - Maven 3.9+
 
+기본 실행 DB는 PostgreSQL입니다.
+
+- host: `localhost`
+- port: `5433`
+- database: `dondone`
+- schema: `test`
+- username: `ssafy`
+- password: `ssafy`
+
+추가로 아래 환경변수가 필요합니다.
+
+- `WALLET_ENCRYPTION_KEY`
+
 Sepolia까지 쓸 경우 추가로 필요:
 
 - `SEPOLIA_RPC_URL`
 - `SEPOLIA_TOKEN_ADDRESS`
-- `WALLET_ENCRYPTION_KEY`
+- `SEPOLIA_STABLECOIN_SYMBOL` 선택, 기본값 `dUSDC`
+- `SEPOLIA_FUNDING_PRIVATE_KEY` 선택, 미지정 시 `PRIVATE_KEY` fallback
 
 버전 확인:
 
@@ -40,10 +55,19 @@ mvn -version
 
 ## 2. 서버 실행 (Demo 모드, 가장 쉬움)
 
-프로젝트 루트(`/home/ssafy/crypto-pjt`)에서 실행:
+먼저 wallet 암호화 키를 준비합니다.
 
 ```bash
-cd /home/ssafy/crypto-pjt/backend
+openssl rand -base64 32
+export WALLET_ENCRYPTION_KEY=<base64_aes_key>
+```
+
+이 값이 없으면 서버는 시작하지 않습니다. PostgreSQL에 저장된 encrypted private key를 재기동 후에도 복호화하려면 같은 키를 계속 써야 합니다.
+
+프로젝트 루트(`/home/ssafy/S14P21C202/apps/dondone-blockchain`)에서 실행:
+
+```bash
+cd /home/ssafy/S14P21C202/apps/dondone-blockchain/backend
 mvn spring-boot:run
 ```
 
@@ -54,15 +78,6 @@ curl -i http://localhost:8080/api/v1/remittance/recipients
 ```
 
 `200 OK`가 나오면 정상입니다.
-
-선택:
-
-운영과 비슷하게 wallet 암호화 키를 직접 넣고 싶으면 아래를 먼저 실행합니다.
-
-```bash
-openssl rand -base64 32
-export WALLET_ENCRYPTION_KEY=<base64_aes_key>
-```
 
 ## 3. Demo 모드에서 송금 API 빠르게 확인
 
@@ -81,31 +96,32 @@ curl -s -X POST 'http://localhost:8080/api/v1/remittance/demo/seed'
 
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/wallets/me' \
-  -H 'X-User-Id: user_001'
+  -H 'X-User-Id: 1'
 ```
 
 응답 예시:
 
 ```json
 {
-    "userId": "user_001",
+    "userId": 1,
     "walletAddress": "0x0690f77613ca53787b1dd66f4bff7045d38c6ee5",
     "createdAt": "2026-03-11T02:42:20.618940745Z"
 }
 ```
 
-이 주소가 앞으로 `user_001`의 송신 wallet 주소입니다.
+이 주소가 앞으로 `1`의 송신 wallet 주소입니다.
 
 참고:
 
-- `POST /wallets/me`를 미리 호출하지 않아도, 첫 송금 생성 시 서버가 wallet을 자동 생성합니다.
-- 다만 처음 보는 사람은 `POST /wallets/me`를 먼저 호출해 주소를 확인하는 편이 더 이해하기 쉽습니다.
+  - `POST /wallets/me`를 미리 호출하지 않아도, 첫 송금 생성 시 서버가 wallet을 자동 생성합니다.
+  - 다만 처음 보는 사람은 `POST /wallets/me`를 먼저 호출해 주소를 확인하는 편이 더 이해하기 쉽습니다.
+  - Sepolia 모드에서는 새 wallet 생성 직후 onboarding funding이 켜져 있으면 ETH와 stablecoin이 자동 지급됩니다.
 
 ### 3-0-1) 내 wallet 조회
 
 ```bash
 curl -s 'http://localhost:8080/api/v1/remittance/wallets/me' \
-  -H 'X-User-Id: user_001'
+  -H 'X-User-Id: 1'
 ```
 
 ### 3-1) 수신자 등록
@@ -113,7 +129,7 @@ curl -s 'http://localhost:8080/api/v1/remittance/wallets/me' \
 ```bash
 curl -s -X PUT 'http://localhost:8080/api/v1/remittance/recipients/rcp_001' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -d '{
     "alias":"Mina",
     "walletAddress":"0x1111111111111111111111111111111111111111",
@@ -127,10 +143,10 @@ curl -s -X PUT 'http://localhost:8080/api/v1/remittance/recipients/rcp_001' \
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers/precheck' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -d '{
     "recipientId":"rcp_001",
-    "asset":"USDC",
+    "asset":"dUSDC",
     "amount":1000,
     "highAmountConfirmed":false
   }'
@@ -141,11 +157,11 @@ curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers/precheck' \
 ```bash
 curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers' \
   -H 'Content-Type: application/json' \
-  -H 'X-User-Id: user_001' \
+  -H 'X-User-Id: 1' \
   -H 'Idempotency-Key: idem-001' \
   -d '{
     "recipientId":"rcp_001",
-    "asset":"USDC",
+    "asset":"dUSDC",
     "amount":1000,
     "highAmountConfirmed":false
   }'
@@ -159,7 +175,7 @@ curl -s -X POST 'http://localhost:8080/api/v1/remittance/transfers' \
 
 ```bash
 curl -s "http://localhost:8080/api/v1/remittance/transfers/<TRANSFER_ID>" \
-  -H 'X-User-Id: user_001'
+  -H 'X-User-Id: 1'
 ```
 
 상태는 `REQUESTED -> SUBMITTED -> CONFIRMED/FAILED` 순서로 바뀝니다.
@@ -168,7 +184,7 @@ curl -s "http://localhost:8080/api/v1/remittance/transfers/<TRANSFER_ID>" \
 
 ```bash
 curl -s 'http://localhost:8080/api/v1/remittance/transfers/tr_seed_001/integrity-hash' \
-  -H 'X-User-Id: user_001'
+  -H 'X-User-Id: 1'
 ```
 
 이 응답에는 아래 값이 들어 있습니다.
@@ -185,6 +201,8 @@ curl -s 'http://localhost:8080/api/v1/remittance/transfers/tr_seed_001/integrity
 
 - `SEPOLIA_RPC_URL`: 예) Alchemy/Infura Sepolia HTTPS URL
 - `SEPOLIA_TOKEN_ADDRESS`: Sepolia ERC20 토큰 컨트랙트 주소
+- `SEPOLIA_STABLECOIN_SYMBOL`: 기본값 `dUSDC`
+- `SEPOLIA_FUNDING_PRIVATE_KEY`: onboarding ETH/stablecoin 지급용 treasury private key
 - `WALLET_ENCRYPTION_KEY`: 사용자 wallet private key 암복호화용 Base64 AES 키
 
 키 생성 예시:
@@ -196,9 +214,11 @@ openssl rand -base64 32
 ### 4-2) 실행
 
 ```bash
-cd /home/ssafy/crypto-pjt/backend
+cd /home/ssafy/S14P21C202/apps/dondone-blockchain/backend
 export SEPOLIA_RPC_URL=<sepolia_rpc_url>
 export SEPOLIA_TOKEN_ADDRESS=<erc20_token_address>
+export SEPOLIA_STABLECOIN_SYMBOL=dUSDC
+export SEPOLIA_FUNDING_PRIVATE_KEY=<treasury_private_key>
 export WALLET_ENCRYPTION_KEY=<base64_aes_key>
 mvn spring-boot:run -Dspring-boot.run.arguments="--app.chain.mode=sepolia"
 ```
@@ -208,6 +228,9 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--app.chain.mode=sepolia"
 중요:
 
 - Sepolia 모드에서는 각 사용자 wallet private key로 서명합니다.
+- Sepolia 모드에서는 `POST /wallets/me`로 새 wallet을 만들면 onboarding funding이 자동 실행될 수 있습니다.
+- onboarding funding은 treasury 지갑에서 새 wallet으로 `ETH + stablecoin`을 보냅니다.
+- 실제 송금 요청은 설정된 stablecoin symbol만 허용합니다. 다른 asset 이름을 넣으면 `UNSUPPORTED_ASSET`가 반환됩니다.
 - 응답의 `senderAddress`는 해당 사용자의 wallet address입니다.
 - 사용자는 private key를 직접 알 필요가 없습니다.
 
@@ -219,8 +242,10 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--app.chain.mode=sepolia"
   - 수신자를 방금 수정한 경우 24시간 쿨다운입니다. (테스트 1분 설정)
 - `RECIPIENT_NOT_ALLOWED`
   - 수신자 `allowed`가 `true`인지 확인하세요.
+- `UNSUPPORTED_ASSET`
+  - 현재 서버는 설정된 stablecoin만 전송합니다. 기본값은 `dUSDC`입니다.
 - Sepolia 모드에서 시작 직후 에러
-  - `SEPOLIA_RPC_URL`, `SEPOLIA_TOKEN_ADDRESS`, `WALLET_ENCRYPTION_KEY` 3개가 비어 있지 않은지 확인하세요.
+  - `SEPOLIA_RPC_URL`, `SEPOLIA_TOKEN_ADDRESS`, `WALLET_ENCRYPTION_KEY`가 비어 있지 않은지 확인하세요.
 - `WALLET_NOT_FOUND`
   - 먼저 `POST /api/v1/remittance/wallets/me`로 wallet을 생성하세요.
 
@@ -239,6 +264,6 @@ mvn spring-boot:run -Dspring-boot.run.arguments="--app.chain.mode=sepolia"
 
 추가 상세 가이드는 아래 문서 참고:
 
-- `pjt/backend-beginner-guide.md`
-- `pjt/wallet-architecture-guide.md`
-- `pjt/hash-spec.md`
+- `doc/backend-beginner-guide.md`
+- `doc/wallet-architecture-guide.md`
+- `doc/hash-spec.md`

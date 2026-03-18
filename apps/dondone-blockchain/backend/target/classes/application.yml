@@ -3,17 +3,20 @@ server:
 
 spring:
   datasource:
-    url: jdbc:h2:mem:remitdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
+    url: jdbc:postgresql://localhost:5433/dondone?currentSchema=test
+    driver-class-name: org.postgresql.Driver
+    username: ssafy
+    password: ssafy
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
+    properties:
+      hibernate:
+        default_schema: test
+  sql:
+    init:
+      mode: always
 
 app:
   chain:
@@ -21,9 +24,16 @@ app:
     rpc-url: ${SEPOLIA_RPC_URL:}
     chain-id: ${SEPOLIA_CHAIN_ID:11155111}
     token-address: ${SEPOLIA_TOKEN_ADDRESS:}
+    stablecoin-symbol: ${SEPOLIA_STABLECOIN_SYMBOL:dUSDC}
     gas-limit: ${SEPOLIA_GAS_LIMIT:120000}
+    onboarding:
+      enabled: ${SEPOLIA_ONBOARDING_ENABLED:true}
+      funding-private-key: ${SEPOLIA_FUNDING_PRIVATE_KEY:${PRIVATE_KEY:}}
+      eth-amount-wei: ${SEPOLIA_ONBOARDING_ETH_AMOUNT_WEI:10000000000000000}
+      stablecoin-amount-atomic: ${SEPOLIA_ONBOARDING_STABLECOIN_AMOUNT_ATOMIC:200000000}
   wallet:
     encryption-key: ${WALLET_ENCRYPTION_KEY:}
+    allow-generated-key: false
   remittance:
     high-amount-threshold: 100000
     cooldown-seconds: 86400
