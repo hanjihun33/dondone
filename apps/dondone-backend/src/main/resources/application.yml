@@ -6,13 +6,10 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:${POSTGRES_USER}}
     password: ${DB_PASSWORD:${POSTGRES_PASSWORD}}
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

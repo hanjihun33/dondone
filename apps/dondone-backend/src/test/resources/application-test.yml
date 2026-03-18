@@ -1,9 +1,7 @@
 spring:
-  flyway:
-    enabled: true
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: create-drop
 
 jwt:
   secret: test-dondone-secret-key-change-this-at-least-32chars

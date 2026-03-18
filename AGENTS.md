@@ -83,7 +83,6 @@ If requirements remain ambiguous, state assumptions explicitly before coding.
 - Before coding, produce or update an execution plan under `docs/execplans/` for non-trivial work.
 - For tasks that change workflow tooling or process guidance under `.codex/`, `.agents/`, or `docs/CODEX_WORKFLOW.md`, read `docs/CODEX_WORKFLOW.md` first.
 - Prefer repository skills for repeatable steps:
-  - `db-migration-checklist`
   - `prd-breakdown`
   - `execplan-writer`
   - `implement-checklist`
