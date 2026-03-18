@@ -1,19 +1,19 @@
 package com.workproofpay.backend.wage.model;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "wage_deposits")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class WageDeposit {
+public class WageDeposit extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,12 +38,6 @@ public class WageDeposit {
     @Column(length = 500)
     private String note;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     private WageDeposit(User user, String yearMonth, LocalDate depositDate, Long actualDepositAmount, boolean deductionsKnown, String note) {
         this.user = user;
         this.yearMonth = yearMonth;
@@ -60,17 +54,5 @@ public class WageDeposit {
                                      boolean deductionsKnown,
                                      String note) {
         return new WageDeposit(user, yearMonth, depositDate, actualDepositAmount, deductionsKnown, note);
-    }
-
-    @PrePersist
-    public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

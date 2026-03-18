@@ -1,5 +1,6 @@
 package com.workproofpay.backend.workproof.model;
 
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,8 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -28,7 +27,7 @@ import java.time.LocalDateTime;
 /**
  * 근무지별 활성 급여 계약을 표현하며 WorkProof/Wage 계산의 공통 기준이 된다.
  */
-public class WorkContract {
+public class WorkContract extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -59,12 +58,6 @@ public class WorkContract {
 
     @Column(name = "effective_to")
     private LocalDate effectiveTo;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     private WorkContract(Workplace workplace,
                          WorkProofPayUnit payUnit,
@@ -105,17 +98,5 @@ public class WorkContract {
 
     public boolean isActive() {
         return effectiveTo == null;
-    }
-
-    @PrePersist
-    public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }
