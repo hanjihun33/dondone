@@ -2,3 +2,11 @@
 
 # Kakao Maps Android SDK 네이티브 앱 키
 KAKAO_NATIVE_APP_KEY=YOUR_KAKAO_NATIVE_APP_KEY
+
+# 모바일 앱이 연결할 백엔드 기본 주소
+# Android 에뮬레이터에서 로컬 PC 백엔드에 붙을 때는 10.0.2.2를 사용합니다.
+# 예시 1) 로컬 백엔드
+# DONDONE_API_BASE_URL=http://10.0.2.2:8080
+# 예시 2) 운영 백엔드
+# DONDONE_API_BASE_URL=https://dondone.duckdns.org
+DONDONE_API_BASE_URL=http://10.0.2.2:8080
