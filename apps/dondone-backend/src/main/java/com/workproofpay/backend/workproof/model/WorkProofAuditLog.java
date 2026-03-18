@@ -1,5 +1,6 @@
 package com.workproofpay.backend.workproof.model;
 
+import com.workproofpay.backend.shared.persistence.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 @Table(name = "work_proof_audit_logs")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class WorkProofAuditLog {
+public class WorkProofAuditLog extends BaseCreatedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,9 +62,6 @@ public class WorkProofAuditLog {
     @Lob
     @Column(name = "after_attachment_metadata_json", columnDefinition = "TEXT")
     private String afterAttachmentMetadataJson;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     private WorkProofAuditLog(WorkProof workProof,
                               Long actorUserId,
@@ -125,10 +123,5 @@ public class WorkProofAuditLog {
                 beforeAttachmentMetadataJson,
                 afterAttachmentMetadataJson
         );
-    }
-
-    @PrePersist
-    public void onCreate() {
-        this.createdAt = LocalDateTime.now();
     }
 }

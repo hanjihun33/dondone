@@ -1,17 +1,16 @@
 package com.workproofpay.backend.auth.model;
 
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User {
+public class User extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,12 +29,6 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     private User(String email, String passwordHash, String name, UserRole role) {
         this.email = email;
         this.passwordHash = passwordHash;
@@ -45,17 +38,5 @@ public class User {
 
     public static User register(String email, String encodedPassword, String name) {
         return new User(email, encodedPassword, name, UserRole.USER);
-    }
-
-    @PrePersist
-    public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

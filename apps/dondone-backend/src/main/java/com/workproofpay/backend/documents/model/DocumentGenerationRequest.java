@@ -1,12 +1,12 @@
 package com.workproofpay.backend.documents.model;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -24,7 +24,7 @@ import java.util.UUID;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DocumentGenerationRequest {
+public class DocumentGenerationRequest extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -63,12 +63,6 @@ public class DocumentGenerationRequest {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private DocumentGenerationStatus status;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     private DocumentGenerationRequest(User user,
                                       DocumentType documentType,
@@ -127,14 +121,8 @@ public class DocumentGenerationRequest {
 
     @PrePersist
     public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.requestId = UUID.randomUUID().toString();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        if (this.requestId == null) {
+            this.requestId = UUID.randomUUID().toString();
+        }
     }
 }
