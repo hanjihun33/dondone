@@ -1,6 +1,7 @@
 package com.workproofpay.backend.advance.model;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.shared.persistence.BaseCreatedEntity;
 import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.model.Workplace;
 import jakarta.persistence.*;
@@ -21,7 +22,7 @@ import java.time.LocalDateTime;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AdvanceRequest {
+public class AdvanceRequest extends BaseCreatedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -81,9 +82,6 @@ public class AdvanceRequest {
 
     @Column(name = "snapshot_needs_review_record_count", nullable = false)
     private Integer snapshotNeedsReviewRecordCount;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     private AdvanceRequest(
             User user,
@@ -167,10 +165,5 @@ public class AdvanceRequest {
                 && workplace.getId().equals(workplaceId)
                 && this.requestedAmount.equals(requestedAmount)
                 && this.requestedAt.equals(requestedAt);
-    }
-
-    @PrePersist
-    public void onCreate() {
-        this.createdAt = LocalDateTime.now();
     }
 }
