@@ -18,6 +18,12 @@ val kakaoNativeAppKey = (
         ?: ""
 ).trim()
 
+val dondoneApiBaseUrl = (
+    localProperties.getProperty("DONDONE_API_BASE_URL")
+        ?: System.getenv("DONDONE_API_BASE_URL")
+        ?: "http://10.0.2.2:8080"
+).trim()
+
 android {
     namespace = "com.dondone.mobile"
     compileSdk = 36
@@ -29,7 +35,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"${kakaoNativeAppKey.replace("\"", "\\\"")}\"")
-        buildConfigField("String", "DONDONE_API_BASE_URL", "\"http://10.0.2.2:8080\"")
+        buildConfigField("String", "DONDONE_API_BASE_URL", "\"${dondoneApiBaseUrl.replace("\"", "\\\"")}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
