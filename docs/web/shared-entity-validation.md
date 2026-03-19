@@ -121,3 +121,7 @@
 
 ## 결과 기록 위치
 - 실제 검증 결과와 리스크는 `docs/reviews/active/`에 기록한다.
+
+## Follow-up 메모
+- 반경 밖 `check-out` 예외를 employer web review queue와 어떻게 연결할지는 shared domain follow-up 대상이다.
+- 현재 단계에서는 `웹에서 review 대상이 될 수 있다`는 정책 방향만 유지하고, worker-side 사유 입력 방식과 check-out request 계약 변경은 추후 app/web 공통 리팩토링 범위에서 정리한다.

@@ -104,6 +104,13 @@
 - 승인 후 추가 정정이 필요하면 새 request를 생성한다.
 - 하나의 WorkProof에 동시에 열린 `PENDING` request는 1건만 허용한다.
 
+## correction request와 checkout 예외 review의 경계
+- 반경 밖 `check-out`으로 인해 생성되는 review 대상 기록은 employer web의 이슈 큐에서 함께 다뤄질 수 있다.
+- 다만 이것을 현재 문서 단계에서 `correction request`와 완전히 같은 도메인으로 고정하지는 않는다.
+- 시간 수정 요청은 worker가 제출하는 `correction request`로 보고, 위치 이탈 퇴근은 `review 대상 예외 기록`으로 구분하는 편이 MVP 문맥에서 더 안전하다.
+- worker 앱에서 반경 밖 `check-out` 시 사유를 어떻게 입력받을지, worker-side check-out request 계약을 어떻게 바꿀지는 현재 웹 문서 범위를 넘는다.
+- 이 부분은 추후 app/web 공통 리팩토링 단계에서 worker API, employer queue, WorkProof evidence 정책을 함께 보며 일관되게 정리한다.
+
 ## 검증해야 할 edge case
 - employer가 승인하려는 시점에 원본 WorkProof가 이미 다른 경로로 수정된 경우
 - request 생성 후 workplace settings가 바뀐 경우
