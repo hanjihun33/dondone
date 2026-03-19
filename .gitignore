@@ -3,6 +3,7 @@ S14P11C205/
 .private/
 mockup-*.png
 .tmp-qa/
+.gradle-user-home/
 # backend IDE/build output
 apps/dondone-backend/bin/
 
