@@ -166,7 +166,12 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
         assertThat(snapshot.worker().name()).isEqualTo("Assembler User");
         assertThat(snapshot.workplace().name()).isEqualTo("Proof Pack Cafe");
         assertThat(snapshot.contract().payUnit()).isEqualTo("시급");
+        assertThat(snapshot.statement().title()).isEqualTo("근무 기록 문서");
+        assertThat(snapshot.statement().subtitle()).contains("출퇴근 기록");
+        assertThat(snapshot.period().periodLabel()).isEqualTo("대상 기간: 2026-03-01 ~ 2026-03-31");
         assertThat(snapshot.summary().totalRecordCount()).isEqualTo(2);
+        assertThat(snapshot.summary().totalWorkDayCount()).isEqualTo(2);
+        assertThat(snapshot.summary().totalWorkDayCountLabel()).isEqualTo("2일");
         assertThat(snapshot.summary().reflectedCount()).isEqualTo(1);
         assertThat(snapshot.summary().needsReviewCount()).isEqualTo(1);
         assertThat(snapshot.summary().editedCount()).isEqualTo(1);
@@ -174,6 +179,10 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
         assertThat(snapshot.summary().totalWorkedMinutes()).isEqualTo(1_140L);
         assertThat(snapshot.records()).hasSize(2);
         assertThat(snapshot.audits()).hasSize(1);
+        assertThat(snapshot.records())
+                .anyMatch(item -> item.locationSummaryLabel().contains("출근"))
+                .anyMatch(item -> item.memoOrReason().contains("사유: Correction"));
+        assertThat(snapshot.audits().get(0).changeSummary()).contains("출근 09:00→09:10");
         assertThat(snapshot.notices())
                 .anyMatch(notice -> notice.contains("검토 필요"))
                 .anyMatch(notice -> notice.contains("허용 반경 밖"))
@@ -248,9 +257,14 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
 
         assertThat(snapshot.meta().documentType()).isEqualTo("WORKPROOF_STATEMENT");
         assertThat(snapshot.meta().documentNumber()).startsWith("WS-");
+        assertThat(snapshot.statement().title()).isEqualTo("근무 기록 문서");
         assertThat(snapshot.period().startDate()).isEqualTo("2026-01-01");
         assertThat(snapshot.period().endDate()).isEqualTo("2026-02-23");
         assertThat(snapshot.period().yearMonth()).isEqualTo("2026-01-01 ~ 2026-02-23");
+        assertThat(snapshot.period().periodLabel()).isEqualTo("대상 기간: 2026-01-01 ~ 2026-02-23");
+        assertThat(snapshot.summary().totalWorkDayCount()).isEqualTo(1);
+        assertThat(snapshot.summary().totalWorkDayCountLabel()).isEqualTo("1일");
         assertThat(snapshot.records()).hasSize(1);
+        assertThat(snapshot.records().get(0).locationSummaryLabel()).isEqualTo("출근 Side door / 퇴근 Side door");
     }
 }
