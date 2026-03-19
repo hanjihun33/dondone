@@ -5,6 +5,7 @@ import com.workproofpay.backend.documents.api.dto.response.DocumentDetailRespons
 import com.workproofpay.backend.documents.api.dto.request.CreateProofPackRequest;
 import com.workproofpay.backend.documents.api.dto.response.DocumentGenerationAcceptedResponse;
 import com.workproofpay.backend.documents.api.dto.response.DocumentGenerationRequestStatusResponse;
+import com.workproofpay.backend.documents.pdf.RenderedPdf;
 import com.workproofpay.backend.documents.service.DocumentsService;
 import com.workproofpay.backend.shared.api.ApiResponse;
 import com.workproofpay.backend.shared.security.AuthenticatedUser;
@@ -12,7 +13,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,5 +76,19 @@ public class DocumentsController {
             @PathVariable @Positive(message = "documentId must be greater than 0") Long documentId
     ) {
         return ApiResponse.success(documentsService.getDocumentDetail(user.userId(), documentId));
+    }
+
+    @GetMapping("/{documentId}/download")
+    public ResponseEntity<byte[]> downloadDocument(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable @Positive(message = "documentId must be greater than 0") Long documentId
+    ) {
+        RenderedPdf renderedPdf = documentsService.generateProofPackPdf(user.userId(), documentId);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + renderedPdf.fileName() + "\"")
+                .header("X-Document-Sha256", renderedPdf.sha256())
+                .contentType(MediaType.parseMediaType(renderedPdf.contentType()))
+                .body(renderedPdf.bytes());
     }
 }
