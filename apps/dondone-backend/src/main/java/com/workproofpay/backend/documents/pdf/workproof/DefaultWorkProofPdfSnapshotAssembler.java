@@ -96,6 +96,10 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
         Optional<WorkContract> contract = resolveContract(command.userId(), workplaceId, records);
 
         int totalRecordCount = records.size();
+        int totalWorkDayCount = (int) records.stream()
+                .map(WorkProof::getWorkDate)
+                .distinct()
+                .count();
         int reflectedCount = countByStatus(records, WorkProofFinancialStatus.REFLECTED);
         int needsReviewCount = countByStatus(records, WorkProofFinancialStatus.NEEDS_REVIEW);
         int editedCount = (int) records.stream().filter(WorkProof::isEdited).count();
@@ -107,13 +111,14 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 .toList();
 
         List<WorkProofPdfSnapshot.WorkProofAuditItem> auditItems = audits.stream()
-                .map(this::toAuditItem)
+                .map(audit -> toAuditItem(audit, locale))
                 .toList();
 
         List<String> notices = buildNotices(records, contract.isEmpty(), locale);
 
         return new WorkProofPdfSnapshot(
                 buildMeta(request, yearMonth, zoneId, locale),
+                buildStatementInfo(locale),
                 new WorkProofPdfSnapshot.WorkerInfo(
                         request.getUser().getId(),
                         nullToDash(request.getUser().getName()),
@@ -129,16 +134,19 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 new WorkProofPdfSnapshot.PeriodInfo(
                         formatDate(startDate),
                         formatDate(endDate),
-                        request.getMonth() == null ? formatYearMonth(startDate, endDate) : request.getMonth()
+                        request.getMonth() == null ? formatYearMonth(startDate, endDate) : request.getMonth(),
+                        formatPeriodLabel(startDate, endDate, locale)
                 ),
                 new WorkProofPdfSnapshot.SummaryInfo(
                         totalRecordCount,
+                        totalWorkDayCount,
                         reflectedCount,
                         needsReviewCount,
                         editedCount,
                         totalAttachmentCount,
                         totalWorkedMinutes,
-                        formatMinutesLabel(totalWorkedMinutes, locale)
+                        formatMinutesLabel(totalWorkedMinutes, locale),
+                        formatWorkDayCountLabel(totalWorkDayCount, locale)
                 ),
                 recordItems,
                 auditItems,
@@ -207,6 +215,18 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
         );
     }
 
+    private WorkProofPdfSnapshot.StatementInfo buildStatementInfo(Locale locale) {
+        return new WorkProofPdfSnapshot.StatementInfo(
+                isKorean(locale) ? "근무 기록 문서" : "WorkProof Statement",
+                isKorean(locale)
+                        ? "선택한 기간의 출퇴근 기록과 변경 이력을 정리한 문서"
+                        : "A statement of attendance records and change history for the selected period",
+                isKorean(locale)
+                        ? "근로자 확인, 고용주 검토, 진정/상담 첨부용으로 활용할 수 있습니다."
+                        : "Can be used for worker review, employer review, and complaint/support attachments."
+        );
+    }
+
     private WorkProofPdfSnapshot.ContractInfo buildContractInfo(WorkContract contract, Locale locale) {
         if (contract == null) {
             return new WorkProofPdfSnapshot.ContractInfo(
@@ -248,15 +268,17 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 record.isEdited(),
                 record.isClockOutOutsideAllowedRadius(),
                 record.isClockOutOutsideAllowedRadius() ? outsideAllowedRadiusLabel(locale) : localizedNotApplicable(locale),
+                buildLocationSummary(record, locale),
                 blankToDash(record.getEditReason()),
                 blankToDash(record.getMemo()),
+                buildMemoOrReason(record, locale),
                 record.getAttachmentCount(),
                 formatDateTime(record.getCreatedAt()),
                 formatDateTime(record.getUpdatedAt())
         );
     }
 
-    private WorkProofPdfSnapshot.WorkProofAuditItem toAuditItem(WorkProofAuditLog audit) {
+    private WorkProofPdfSnapshot.WorkProofAuditItem toAuditItem(WorkProofAuditLog audit, Locale locale) {
         return new WorkProofPdfSnapshot.WorkProofAuditItem(
                 audit.getId(),
                 audit.getWorkProof().getId(),
@@ -268,7 +290,8 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 blankToDash(audit.getBeforeMemo()),
                 blankToDash(audit.getAfterMemo()),
                 blankToDash(audit.getBeforeEditReason()),
-                blankToDash(audit.getAfterEditReason())
+                blankToDash(audit.getAfterEditReason()),
+                buildAuditChangeSummary(audit, locale)
         );
     }
 
@@ -354,6 +377,12 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 : "%dh %02dm".formatted(hours, remainMinutes);
     }
 
+    private String formatWorkDayCountLabel(int totalWorkDayCount, Locale locale) {
+        return isKorean(locale)
+                ? "%d일".formatted(totalWorkDayCount)
+                : "%d days".formatted(totalWorkDayCount);
+    }
+
     private String formatDate(LocalDate date) {
         return date == null ? "-" : DATE_FORMATTER.format(date);
     }
@@ -366,6 +395,11 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
             return "%04d-%02d".formatted(startDate.getYear(), startDate.getMonthValue());
         }
         return "%s ~ %s".formatted(formatDate(startDate), formatDate(endDate));
+    }
+
+    private String formatPeriodLabel(LocalDate startDate, LocalDate endDate, Locale locale) {
+        String range = "%s ~ %s".formatted(formatDate(startDate), formatDate(endDate));
+        return isKorean(locale) ? "대상 기간: " + range : "Period: " + range;
     }
 
     private String formatDateTime(LocalDateTime dateTime) {
@@ -424,6 +458,55 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
         return isKorean(locale)
                 ? "계약 정보가 확인되지 않아 계약 요약 일부가 비어 있습니다."
                 : "Contract summary is partially unavailable because no contract snapshot was found.";
+    }
+
+    private String buildLocationSummary(WorkProof record, Locale locale) {
+        String inLabel = blankToDash(record.getClockInLocationLabel());
+        String outLabel = blankToDash(record.getClockOutLocationLabel());
+        return isKorean(locale)
+                ? "출근 %s / 퇴근 %s".formatted(inLabel, outLabel)
+                : "In %s / Out %s".formatted(inLabel, outLabel);
+    }
+
+    private String buildMemoOrReason(WorkProof record, Locale locale) {
+        boolean hasMemo = !isBlank(record.getMemo());
+        boolean hasReason = !isBlank(record.getEditReason());
+        if (hasMemo && hasReason) {
+            return isKorean(locale)
+                    ? "사유: %s / 메모: %s".formatted(record.getEditReason(), record.getMemo())
+                    : "Reason: %s / Memo: %s".formatted(record.getEditReason(), record.getMemo());
+        }
+        if (hasReason) {
+            return isKorean(locale) ? "사유: " + record.getEditReason() : "Reason: " + record.getEditReason();
+        }
+        if (hasMemo) {
+            return isKorean(locale) ? "메모: " + record.getMemo() : "Memo: " + record.getMemo();
+        }
+        return localizedNotApplicable(locale);
+    }
+
+    private String buildAuditChangeSummary(WorkProofAuditLog audit, Locale locale) {
+        String timeSummary = isKorean(locale)
+                ? "출근 %s→%s / 퇴근 %s→%s".formatted(
+                formatTime(audit.getBeforeClockInAt()),
+                formatTime(audit.getAfterClockInAt()),
+                formatTime(audit.getBeforeClockOutAt()),
+                formatTime(audit.getAfterClockOutAt())
+        )
+                : "In %s→%s / Out %s→%s".formatted(
+                formatTime(audit.getBeforeClockInAt()),
+                formatTime(audit.getAfterClockInAt()),
+                formatTime(audit.getBeforeClockOutAt()),
+                formatTime(audit.getAfterClockOutAt())
+        );
+
+        if (!isBlank(audit.getAfterEditReason())) {
+            return isKorean(locale)
+                    ? "%s / 사유: %s".formatted(timeSummary, audit.getAfterEditReason())
+                    : "%s / Reason: %s".formatted(timeSummary, audit.getAfterEditReason());
+        }
+
+        return timeSummary;
     }
 
     private String nullToDash(String value) {
