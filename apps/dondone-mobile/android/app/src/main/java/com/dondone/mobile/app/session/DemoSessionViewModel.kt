@@ -12,6 +12,10 @@ import com.dondone.mobile.data.advance.BackendAdvanceRepository
 import com.dondone.mobile.data.auth.AuthRepository
 import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.documents.BackendWorkproofDocumentRepository
+import com.dondone.mobile.data.documents.WorkproofDocumentPreviewPayload
+import com.dondone.mobile.data.documents.WorkproofDocumentRepository
+import com.dondone.mobile.data.documents.WorkproofDocumentUnauthorizedException
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
@@ -24,6 +28,10 @@ import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiModel
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiState
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +47,8 @@ private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실�
 class DemoSessionViewModel(
     private val authRepository: AuthRepository,
     private val advanceRepository: AdvanceRepository = BackendAdvanceRepository(),
-    private val workproofRepository: WorkproofRepository = BackendWorkproofRepository()
+    private val workproofRepository: WorkproofRepository = BackendWorkproofRepository(),
+    private val workproofDocumentRepository: WorkproofDocumentRepository = BackendWorkproofDocumentRepository()
 ) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
@@ -54,6 +63,8 @@ class DemoSessionViewModel(
         MutableStateFlow(WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE))
     private val _workproofActionUiState = MutableStateFlow(WorkproofActionUiState())
     val workproofActionUiState: StateFlow<WorkproofActionUiState> = _workproofActionUiState.asStateFlow()
+    private val _workproofPdfPreviewUiState = MutableStateFlow(WorkproofPdfPreviewUiState())
+    val workproofPdfPreviewUiState: StateFlow<WorkproofPdfPreviewUiState> = _workproofPdfPreviewUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
@@ -235,6 +246,7 @@ class DemoSessionViewModel(
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
+        _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
         refreshAdvanceRemoteState()
         refreshWorkproofRemoteState()
     }
@@ -243,6 +255,55 @@ class DemoSessionViewModel(
         if (!_workproofActionUiState.value.isSubmitting && _workproofActionUiState.value.message != null) {
             _workproofActionUiState.value = WorkproofActionUiState()
         }
+    }
+
+    fun previewWorkproofPdf(startDate: LocalDate, endDate: LocalDate) {
+        val session = _authUiState.value.session ?: run {
+            _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState(
+                errorMessage = "로그인 후 문서 미리보기를 확인할 수 있어요."
+            )
+            return
+        }
+        val workplaceId = _uiState.value.workproof.workplaceId ?: run {
+            _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState(
+                errorMessage = "연결된 근무지 정보를 다시 불러와 주세요."
+            )
+            return
+        }
+        if (startDate.isAfter(endDate)) {
+            _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState(
+                errorMessage = "종료일은 시작일보다 빠를 수 없어요."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState(isLoading = true)
+            try {
+                val payload = workproofDocumentRepository.preview(
+                    accessToken = session.accessToken,
+                    workplaceId = workplaceId,
+                    startDate = startDate,
+                    endDate = endDate
+                )
+                _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState(
+                    preview = payload.toUiModel()
+                )
+            } catch (error: WorkproofDocumentUnauthorizedException) {
+                expireSession(error.message)
+                _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState(
+                    errorMessage = error.message ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            } catch (error: Exception) {
+                _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState(
+                    errorMessage = error.message ?: "문서 미리보기를 불러오지 못했어요."
+                )
+            }
+        }
+    }
+
+    fun clearWorkproofPdfPreview() {
+        _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
     }
 
     fun login(email: String, password: String) {
@@ -556,6 +617,7 @@ class DemoSessionViewModel(
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
+        _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
     }
 
     private fun scheduleTransferCompletion() {
@@ -616,4 +678,18 @@ class DemoSessionViewModel(
             )
         )
     }
+
+    private fun WorkproofDocumentPreviewPayload.toUiModel(): WorkproofPdfPreviewUiModel {
+        return WorkproofPdfPreviewUiModel(
+            workplaceName = workplaceName,
+            periodText = "${startDate.format(WorkproofPdfPreviewDateFormatter)} - ${endDate.format(WorkproofPdfPreviewDateFormatter)}",
+            totalRecordCountText = "${totalRecordCount}건",
+            editedCountText = "${editedCount}건",
+            attachmentCountText = "${attachmentCount}건",
+            totalWorkedHoursText = totalWorkedHoursText,
+            sectionSummaryText = "출퇴근 기록, 수정 이력, 기간 요약"
+        )
+    }
 }
+
+private val WorkproofPdfPreviewDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")

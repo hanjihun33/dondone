@@ -135,9 +135,12 @@ private val WorkproofPdfDateFormatter: DateTimeFormatter = DateTimeFormatter.ofP
 @Composable
 fun WorkproofScreen(
     uiModel: WorkproofUiModel,
+    pdfPreviewUiState: WorkproofPdfPreviewUiState,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
     onSaveEdit: (String, String, String, Boolean) -> Unit,
+    onRefreshPdfPreview: (LocalDate, LocalDate) -> Unit,
+    onClearPdfPreview: () -> Unit,
     resetVersion: Int,
     onDetailVisibilityChange: (Boolean) -> Unit
 ) {
@@ -200,21 +203,6 @@ fun WorkproofScreen(
     val isPdfDateRangeValid = remember(pdfStartDateEpochDay, pdfEndDateEpochDay) {
         pdfStartDateEpochDay <= pdfEndDateEpochDay
     }
-    val pdfPreview = remember(
-        pdfStartDateEpochDay,
-        pdfEndDateEpochDay,
-        uiModel.summary.verifiedDays,
-        uiModel.summary.auditCount,
-        uiModel.recentRecords
-    ) {
-        WorkproofPdfPreviewUiModel(
-            periodText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
-            verifiedDaysText = "${uiModel.summary.verifiedDays}일",
-            auditCountText = "${uiModel.summary.auditCount}건",
-            attachmentCountText = "${uiModel.recentRecords.sumOf(WorkproofRecordUiModel::attachmentCount)}건",
-            sectionSummaryText = "출퇴근 기록, 변경 기록, 기간 요약"
-        )
-    }
     fun clearEditDraft() {
         editReasonKey = ""
         editMemo = ""
@@ -234,6 +222,18 @@ fun WorkproofScreen(
         onDetailVisibilityChange(showDetails)
     }
 
+    LaunchedEffect(showPdfDateRangeSheet, pdfStartDateEpochDay, pdfEndDateEpochDay, isPdfDateRangeValid) {
+        if (!showPdfDateRangeSheet) {
+            onClearPdfPreview()
+            return@LaunchedEffect
+        }
+        if (isPdfDateRangeValid) {
+            onRefreshPdfPreview(pdfStartDate, pdfEndDate)
+        } else {
+            onClearPdfPreview()
+        }
+    }
+
     LaunchedEffect(resetVersion) {
         monthOffset = 0
         resetEditDraft()
@@ -245,6 +245,7 @@ fun WorkproofScreen(
         pdfEndDateEpochDay = baseMonth.atEndOfMonth().toEpochDay()
         isGeneratingPdf = false
         generatedPdfFileName = null
+        onClearPdfPreview()
     }
 
     DisposableEffect(Unit) {
@@ -297,7 +298,10 @@ fun WorkproofScreen(
 
     if (showPdfDateRangeSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showPdfDateRangeSheet = false },
+            onDismissRequest = {
+                showPdfDateRangeSheet = false
+                onClearPdfPreview()
+            },
             containerColor = DawnSurface
         ) {
             WorkproofPdfDateRangeSheet(
@@ -305,7 +309,7 @@ fun WorkproofScreen(
                 startDate = pdfStartDate,
                 endDate = pdfEndDate,
                 isDateRangeValid = isPdfDateRangeValid,
-                preview = pdfPreview,
+                previewUiState = pdfPreviewUiState,
                 isGenerating = isGeneratingPdf,
                 onSelectPreset = { preset ->
                     pdfDatePreset = preset
@@ -345,7 +349,9 @@ fun WorkproofScreen(
                     )
                 },
                 onGenerate = {
-                    if (!isPdfDateRangeValid || isGeneratingPdf) return@WorkproofPdfDateRangeSheet
+                    if (!isPdfDateRangeValid || isGeneratingPdf || pdfPreviewUiState.preview == null) {
+                        return@WorkproofPdfDateRangeSheet
+                    }
                     isGeneratingPdf = true
                     coroutineScope.launch {
                         delay(900)
@@ -355,7 +361,10 @@ fun WorkproofScreen(
                         showPdfGenerationResultSheet = true
                     }
                 },
-                onDismiss = { showPdfDateRangeSheet = false }
+                onDismiss = {
+                    showPdfDateRangeSheet = false
+                    onClearPdfPreview()
+                }
             )
         }
     }
@@ -927,7 +936,7 @@ private fun WorkproofPdfDateRangeSheet(
     startDate: LocalDate,
     endDate: LocalDate,
     isDateRangeValid: Boolean,
-    preview: WorkproofPdfPreviewUiModel,
+    previewUiState: WorkproofPdfPreviewUiState,
     isGenerating: Boolean,
     onSelectPreset: (WorkproofPdfDatePreset) -> Unit,
     onOpenStartDatePicker: () -> Unit,
@@ -992,7 +1001,29 @@ private fun WorkproofPdfDateRangeSheet(
             )
         }
 
-        WorkproofPdfPreviewCard(preview = preview)
+        when {
+            previewUiState.isLoading -> {
+                DonDoneLoadingPanel(
+                    title = "미리보기 불러오는 중",
+                    message = "선택한 기간의 근무 기록 요약을 확인하고 있어요.",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            previewUiState.errorMessage != null -> {
+                DonDoneErrorPanel(
+                    title = "미리보기를 불러오지 못했어요",
+                    message = previewUiState.errorMessage,
+                    actionLabel = "기간 다시 선택",
+                    onAction = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            previewUiState.preview != null -> {
+                WorkproofPdfPreviewCard(preview = previewUiState.preview)
+            }
+        }
 
         if (isGenerating) {
             DonDoneLoadingPanel(
@@ -1005,11 +1036,11 @@ private fun WorkproofPdfDateRangeSheet(
         SecondaryActionButton(
             text = if (isGenerating) "PDF 생성 중..." else "PDF 생성",
             onClick = onGenerate,
-            enabled = isDateRangeValid && !isGenerating,
+            enabled = isDateRangeValid && !isGenerating && previewUiState.preview != null,
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = "현재 화면 기준 요약을 먼저 보여주고, 실제 API 연동은 다음 단계에서 이어집니다.",
+            text = "선택한 기간 기준 실제 근무 기록 요약을 확인한 뒤 문서를 생성할 수 있어요.",
             style = MaterialTheme.typography.bodySmall,
             color = DawnTextSubtle
         )
@@ -1036,20 +1067,28 @@ private fun WorkproofPdfPreviewCard(
             color = DawnText
         )
         WorkproofKeyValueRow(
+            label = "근무지",
+            value = preview.workplaceName
+        )
+        WorkproofKeyValueRow(
             label = "선택 기간",
             value = preview.periodText
         )
         WorkproofKeyValueRow(
-            label = "확인된 근무일",
-            value = preview.verifiedDaysText
+            label = "기록 수",
+            value = preview.totalRecordCountText
         )
         WorkproofKeyValueRow(
-            label = "변경 기록",
-            value = preview.auditCountText
+            label = "수정 기록",
+            value = preview.editedCountText
         )
         WorkproofKeyValueRow(
-            label = "첨부된 근거",
+            label = "첨부 수",
             value = preview.attachmentCountText
+        )
+        WorkproofKeyValueRow(
+            label = "총 근무시간",
+            value = preview.totalWorkedHoursText
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -1171,10 +1210,12 @@ private fun WorkproofPdfGenerationResultSheet(
 
         WorkproofPdfPreviewCard(
             preview = WorkproofPdfPreviewUiModel(
+                workplaceName = "생성 완료",
                 periodText = periodText,
-                verifiedDaysText = "준비됨",
-                auditCountText = "준비됨",
+                totalRecordCountText = "준비됨",
+                editedCountText = "준비됨",
                 attachmentCountText = "준비됨",
+                totalWorkedHoursText = fileName,
                 sectionSummaryText = fileName
             )
         )
@@ -2136,14 +2177,6 @@ private enum class WorkproofPdfDatePreset {
     LAST_MONTH,
     CUSTOM
 }
-
-private data class WorkproofPdfPreviewUiModel(
-    val periodText: String,
-    val verifiedDaysText: String,
-    val auditCountText: String,
-    val attachmentCountText: String,
-    val sectionSummaryText: String
-)
 
 private data class WorkproofEditReasonOption(
     val key: String,
