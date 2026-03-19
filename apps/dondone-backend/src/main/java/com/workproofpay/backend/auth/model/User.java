@@ -1,5 +1,6 @@
 package com.workproofpay.backend.auth.model;
 
+import com.workproofpay.backend.auth.support.EmailNormalizer;
 import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -33,12 +34,13 @@ public class User extends BaseTimeEntity {
     private UserRole role;
 
     private User(String email, String passwordHash, String name, String phoneNumber, UserRole role) {
-        this.email = email;
+        this.email = EmailNormalizer.normalize(email);
         this.passwordHash = passwordHash;
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.role = role;
     }
+
 
     public static User register(String email, String encodedPassword, String name) {
         return register(email, encodedPassword, name, null);
@@ -52,4 +54,9 @@ public class User extends BaseTimeEntity {
         this.name = name;
         this.phoneNumber = phoneNumber;
     }
+
+    public static User registerEmployer(String email, String encodedPassword, String name) {
+        return new User(email, encodedPassword, name, null, UserRole.EMPLOYER);
+    }   
+
 }

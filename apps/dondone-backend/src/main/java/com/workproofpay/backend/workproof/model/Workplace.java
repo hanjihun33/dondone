@@ -32,6 +32,9 @@ public class Workplace extends BaseTimeEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(nullable = false, length = 100)
     private String name;
 
@@ -51,6 +54,7 @@ public class Workplace extends BaseTimeEntity {
     private Integer allowedRadiusMeters;
 
     private Workplace(User user,
+                      Long companyId,
                       String name,
                       String address,
                       String mapLabel,
@@ -58,6 +62,7 @@ public class Workplace extends BaseTimeEntity {
                       Double longitude,
                       Integer allowedRadiusMeters) {
         this.user = user;
+        this.companyId = companyId;
         this.name = name;
         this.address = address;
         this.mapLabel = mapLabel;
@@ -73,7 +78,18 @@ public class Workplace extends BaseTimeEntity {
                                    Double latitude,
                                    Double longitude,
                                    Integer allowedRadiusMeters) {
-        return new Workplace(user, name, address, mapLabel, latitude, longitude, allowedRadiusMeters);
+        return new Workplace(user, null, name, address, mapLabel, latitude, longitude, allowedRadiusMeters);
+    }
+
+    public static Workplace create(User user,
+                                   Long companyId,
+                                   String name,
+                                   String address,
+                                   String mapLabel,
+                                   Double latitude,
+                                   Double longitude,
+                                   Integer allowedRadiusMeters) {
+        return new Workplace(user, companyId, name, address, mapLabel, latitude, longitude, allowedRadiusMeters);
     }
 
     // 기존 row에는 반경 값이 없을 수 있어서 lane 1 기본 반경을 fallback으로 쓴다.

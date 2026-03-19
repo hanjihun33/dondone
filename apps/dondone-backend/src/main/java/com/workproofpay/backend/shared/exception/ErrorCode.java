@@ -28,8 +28,13 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "You do not have permission to access this resource"),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Token is invalid or expired"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid credentials"),
+    INVALID_EMPLOYER_INVITATION(HttpStatus.UNAUTHORIZED, "Employer invitation is invalid or expired"),
+    EMPLOYER_PROFILE_INACTIVE(HttpStatus.FORBIDDEN, "Employer profile is inactive"),
+    EMPLOYER_SCOPE_NOT_READY(HttpStatus.CONFLICT, "Employer profile is missing company or workplace linkage"),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
+    COMPANY_NOT_FOUND(HttpStatus.NOT_FOUND, "Company not found"),
+    EMPLOYER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "Employer profile not found"),
     WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "WorkProof not found"),
     WORKPROOF_EDIT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Only reflected WorkProof can be edited"),
     WORKPLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "Workplace not found"),
