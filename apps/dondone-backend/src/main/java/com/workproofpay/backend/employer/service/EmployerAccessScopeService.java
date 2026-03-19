@@ -42,6 +42,11 @@ public class EmployerAccessScopeService {
     }
 
     @Transactional(readOnly = true)
+    public Workplace getRequiredScopedWorkplace(EmployerAccessScope scope) {
+        return getRequiredWorkplaceBoundToCompany(scope.companyId(), scope.defaultWorkplaceId());
+    }
+
+    @Transactional(readOnly = true)
     public void assertCompanyWorkplaceBinding(Long companyId, Long workplaceId) {
         companyRepository.findById(companyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.COMPANY_NOT_FOUND));
