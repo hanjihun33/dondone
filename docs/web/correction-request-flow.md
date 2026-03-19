@@ -1,5 +1,16 @@
 # Correction Request Flow
 
+## 2026-03-20 Addendum
+- `PATCH /api/workproof/{id}` is kept only as a deprecated legacy endpoint.
+- New clients must use `POST /api/workproof/{workProofId}/correction-requests`.
+- Mobile direct edit is still a local-only mock flow, so removal timing for the legacy endpoint stays deferred until mobile/client scope opens.
+- Employer approve/reject changes `CorrectionRequest`, `WorkProof`, `WorkProofAuditLog`, and `CorrectionDecisionAudit` in one transaction.
+- MVP invalidation policy is fixed as `next query re-reads source-of-truth`.
+  - no explicit cache eviction
+  - no event-driven read-model refresh
+  - dashboard, workers, wage summary, and docs/PDF refresh on the next query by re-reading source tables
+- Additional invalidation work only opens later if a cache, projection store, or precomputed artifact is introduced.
+
 ## 목적
 - 웹에서 가장 위험한 공유 도메인인 정정 요청 흐름을 별도 문서로 고정한다.
 
@@ -120,7 +131,9 @@
 - 저장소 경로, 다운로드 URL, raw `fileRef` 노출 여부는 후속 계약으로 남긴다.
 - employer issue queue는 장기적으로 worker correction request와 review가 필요한 record를 함께 다루는 방향으로 본다.
 - 승인 후 화면은 즉시 최신처럼 보여야 하며, foundation 단계 구현은 관련 화면 재조회 방식으로 먼저 고정한다.
-- 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`는 현재 legacy surface로 남아 있고, 유지/deprecated/제거 정책은 follow-up으로 남긴다.
+- 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`는 현재 legacy surface로 유지하되 deprecated로 명시한다.
+- 신규 client나 새 정책은 이 endpoint를 확장하지 않고 `POST /api/workproof/{workProofId}/correction-requests`를 우선 사용한다.
+- 제거 시점 판단은 mobile/client 범위가 다시 열릴 때 후속으로 본다.
 
 ## 운영상 보수적 가정
 - 부분 승인 기능은 넣지 않는다.

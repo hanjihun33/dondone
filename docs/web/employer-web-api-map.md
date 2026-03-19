@@ -1,5 +1,10 @@
 # Employer Web API Map
 
+## 2026-03-20 Addendum
+- `PATCH /api/workproof/{id}` is a deprecated legacy worker endpoint and is not part of the new employer correction flow.
+- After employer approve/reject, employer dashboard/workers/issues and worker wage/docs surfaces rely on the next query to re-read source-of-truth data.
+- No separate cache/event invalidation contract is part of MVP Slice 5.
+
 ## 목적
 - 웹 화면과 백엔드 API 요구사항을 1:1로 매핑한다.
 - 구현 전에 `새로 만들 API`와 `공유 도메인 검증이 필요한 API`를 구분한다.
@@ -122,6 +127,7 @@
   - reject는 `WorkProof`를 수정하지 않고 request status와 `CorrectionDecisionAudit`만 기록한다.
   - employer issue queue는 correction request와 review가 필요한 record를 모두 담는 방향으로 확장 가능해야 한다.
   - correction request history/command는 `/api/employer/correction-requests/*`에 남기고, employer issue queue는 `/api/employer/issues`에서 action queue read-model로 분리한다.
+  - 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`는 deprecated legacy surface로 유지하고, 신규 client는 correction request submit flow를 우선 사용한다.
 - scope 규칙
   - `requestId`만으로 처리하지 않고, 대상 request snapshot의 `companyId/workplaceId`가 현재 employer scope와 일치하는지 다시 검증한다.
   - scope 불일치 시 `403 FORBIDDEN`으로 처리한다.

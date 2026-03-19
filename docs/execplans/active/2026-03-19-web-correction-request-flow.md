@@ -1,4 +1,10 @@
 # Source Inputs
+
+## 2026-03-20 Addendum
+- `PATCH /api/workproof/{id}` remains as a deprecated legacy surface during Slice 5.
+- New worker-facing clients should submit correction requests instead of calling direct edit.
+- Dashboard, workers, wage summary, and docs/PDF have no dedicated cache/projection invalidation in MVP.
+- Freshness after approve/reject is achieved by the next query re-reading `WorkProof`, `CorrectionRequest`, audit logs, and wage/document source tables.
 - 사용자 요청:
   - Slice 5 `Correction request flow` backend 시작
   - 목록/상세/승인/반려 계약 초안 고정
@@ -189,12 +195,13 @@ Single lane
 - worker-side request 생성 endpoint는 열었고, mobile/client migration을 어느 시점에 어떤 범위로 붙일지
 - attachment metadata는 request detail에 `type`, `fileName`까지만 노출하고 storage/download contract를 언제 열지
 - `NEEDS_REVIEW` record에 대한 별도 detail/command surface를 열지, issue queue read-model만 유지할지
-- 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`를 legacy 유지/deprecated/제거 중 무엇으로 둘지
+- 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`는 legacy surface로 유지하되 deprecated 상태를 언제 제거로 전환할지
 - 승인 후 wage summary와 dashboard invalidation을 명시적 캐시 무효화 없이 조회 시 재계산만으로 충분히 볼지
 
 # Assumptions
 - Slice 5 1차 목표는 employer-side correction queue foundation을 여는 것이지 worker 생성 흐름까지 닫는 것이 아니다.
 - worker correction request create backend는 additive surface로만 열고, mobile/client migration은 현재 slice 범위 밖에 둔다.
+- 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`는 deprecated legacy surface로 유지하고, 새 client는 correction request submit flow를 우선 사용한다.
 - correction request는 시간 수정 요청만 대상으로 시작하고 반경 밖 `check-out` review는 별도 축으로 유지한다.
 - request snapshot의 `companyId/workplaceId`는 employer scope 검증에 사용할 수 있는 조직 연결 근거로 본다.
 - approve 시 `editReason`에는 correction request의 요청 사유를 연결하고, `memo`는 기존 WorkProof 값을 유지한다.

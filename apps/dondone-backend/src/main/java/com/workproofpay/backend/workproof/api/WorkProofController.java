@@ -22,6 +22,7 @@ import com.workproofpay.backend.workproof.service.WorkProofCorrectionRequestServ
 import com.workproofpay.backend.workproof.service.WorkProofLane1Service;
 import com.workproofpay.backend.workproof.service.WorkProofMonthlyMetrics;
 import com.workproofpay.backend.workproof.service.WorkProofService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -142,6 +143,12 @@ public class WorkProofController {
     }
 
     @PatchMapping("/{workProofId}")
+    @Deprecated
+    @Operation(
+            summary = "Update work proof directly (legacy)",
+            description = "Legacy direct edit endpoint. New clients should submit correction requests instead of calling this endpoint directly.",
+            deprecated = true
+    )
     public ResponseEntity<ApiResponse<WorkProofResponse>> update(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable Long workProofId,

@@ -1,5 +1,15 @@
 # Implementation Slices
 
+## 2026-03-20 Slice 5 Update
+- `GET /api/employer/issues` foundation is done.
+- `PATCH /api/workproof/{id}` legacy lifecycle is fixed as `deprecated legacy`.
+- Slice 5 MVP invalidation policy is fixed as `re-read source-of-truth on next query`, without separate cache/event invalidation.
+- Current Slice 5 next work order:
+  1. attachment/detail download/display contract
+  2. `NEEDS_REVIEW` record detail/command surface
+  3. worker direct edit flow migration
+  4. web issues API wiring
+
 ## 목적
 - 웹 구현 순서를 위험도 기준으로 고정한다.
 - 공유 도메인 변경이 큰 작업을 뒤섞지 않고 단계적으로 진행한다.
@@ -42,15 +52,14 @@
 | 2 | Auth and profile foundation | `done` | `POST /api/employer-auth/invitations/accept`, `POST /api/employer-auth/login`, `GET /api/employer/profile`, `EMPLOYER` role, `EmployerProfile`, `EmployerInvitationToken`, `EmploymentMembership` authz foundation을 구현했고 리뷰 이슈와 backend 테스트를 정리함 | Slice 3 `Workplace settings` 계약과 설정 변경 효력 규칙을 고정한다 | `auth-and-role-policy.md`, `shared-entity-validation.md` |
 | 3 | Workplace settings | `done` | `GET/PUT /api/employer/workplace-settings`, employer 전용 DTO/service/controller, `Workplace` settings metadata additive 필드, settings authz/validation 테스트, `WorkProof` workplace snapshot 고정, 관련 문서 정리를 완료함 | Slice 4 read-model scope와 worker list/dashboard 입력 소스를 고정한다 | `workplace-settings-contract.md`, `shared-entity-validation.md` |
 | 4 | Worker directory and dashboard read-model | `done` | `GET /api/employer/workers`, `GET /api/employer/workers/{workerId}`, `GET /api/employer/dashboard/summary`, `GET /api/employer/dashboard/attendance-board` foundation, active membership/week overlap scope, `recordStatus/reflectionStatus + attendanceStatus` 조합, search/status filter/pagination backend 테스트를 추가함 | shared-policy pending 항목은 follow-up note에서 계속 추적한다 | `employer-web-api-map.md`, `employer-worker-domain-map.md` |
-| 5 | Correction request flow | `in_progress` | `GET /api/employer/issues`, `GET /api/employer/correction-requests`, `GET /api/employer/correction-requests/{requestId}`, `POST /api/employer/correction-requests/{requestId}/approve`, `POST /api/employer/correction-requests/{requestId}/reject`, `POST /api/workproof/{workProofId}/correction-requests`, `CorrectionRequest`, `CorrectionDecisionAudit`, `WorkProofAuditLog` 연동 foundation과 correction detail attachment metadata(`type`, `fileName`) 노출을 추가함 | legacy direct edit endpoint 정책, invalidation 규칙, review-required record 후속 surface 같은 backend/docs 후속 항목을 정리한다 | `correction-request-flow.md`, `shared-entity-validation.md` |
+| 5 | Correction request flow | `in_progress` | `GET /api/employer/issues`, `GET /api/employer/correction-requests`, `GET /api/employer/correction-requests/{requestId}`, `POST /api/employer/correction-requests/{requestId}/approve`, `POST /api/employer/correction-requests/{requestId}/reject`, `POST /api/workproof/{workProofId}/correction-requests`, `CorrectionRequest`, `CorrectionDecisionAudit`, `WorkProofAuditLog` 연동 foundation, correction detail attachment metadata(`type`, `fileName`) 노출, legacy direct edit endpoint deprecated 정책 고정을 추가함 | invalidation 규칙, review-required record 후속 surface, attachment download/display 후속 같은 backend/docs 항목을 정리한다 | `correction-request-flow.md`, `shared-entity-validation.md` |
 | 6 | Hardening | `not_started` | 미시작 | 테스트, 리뷰, 리스크 정리와 prior slice follow-up 회수 | 관련 review note |
 
 ## 지금 기준 다음에 해야 할 일
-1. legacy worker direct edit endpoint `PATCH /api/workproof/{id}`를 유지/deprecated/제거 중 무엇으로 둘지 정리한다.
-2. 승인 후 화면 갱신은 재조회로 유지하고, cache/event invalidation은 hardening에서 재평가한다.
-3. correction detail attachment의 web 표시 위치와 download contract를 정리한다.
-4. `NEEDS_REVIEW` record detail/resolve surface를 열지 accepted risk로 둘지 정리한다.
-5. worker direct edit flow migration은 mobile/client 범위가 열릴 때 follow-up으로 회수한다.
+1. 승인 후 화면 갱신은 재조회로 유지하고, cache/event invalidation은 hardening에서 재평가한다.
+2. correction detail attachment의 web 표시 위치와 download contract를 정리한다.
+3. `NEEDS_REVIEW` record detail/resolve surface를 열지 accepted risk로 둘지 정리한다.
+4. worker direct edit flow migration은 mobile/client 범위가 열릴 때 follow-up으로 회수한다.
 
 ## Hardening 재확인 backlog
 - `docs/reviews/active/2026-03-19-web-auth-profile-followups.md`
