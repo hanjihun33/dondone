@@ -102,6 +102,7 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
         this.includeAttachments = includeAttachments;
         this.idempotencyKey = idempotencyKey;
         this.status = DocumentGenerationStatus.QUEUED;
+        validateAnchorFields();
     }
 
     public static DocumentGenerationRequest queueProofPack(User user,
@@ -190,8 +191,28 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
 
     @PrePersist
     public void onCreate() {
+        validateAnchorFields();
         if (this.requestId == null) {
             this.requestId = UUID.randomUUID().toString();
+        }
+    }
+
+    private void validateAnchorFields() {
+        if (documentType == null) {
+            return;
+        }
+
+        if (documentType.usesPeriodRange()) {
+            if (startDate == null || endDate == null) {
+                throw new IllegalStateException(documentType + " requires startDate and endDate.");
+            }
+            if (startDate.isAfter(endDate)) {
+                throw new IllegalStateException(documentType + " requires startDate to be on or before endDate.");
+            }
+        }
+
+        if (documentType.usesYearMonth() && (month == null || month.isBlank())) {
+            throw new IllegalStateException(documentType + " requires yearMonth.");
         }
     }
 }
