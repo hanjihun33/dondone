@@ -28,7 +28,7 @@
 ## 1. attachment detail surface
 - 라벨: `temporary`, `shared_policy_pending`
 - 현재 임시 처리
-  - correction detail 응답은 `attachmentCount`와 attachment metadata(`type`, `fileName`)까지만 노출한다.
+  - correction detail 응답은 `attachmentCount`와 attachment metadata(`type`, `fileName`, `downloadAvailable=false`)까지만 노출한다.
   - request와 `WorkProof`에는 attachment metadata json을 내부 보존용으로 저장한다.
 - 지금 확정하지 않은 이유
   - employer web에서 첨부를 목록/상세 어디에 어떻게 보여줄지와 download contract가 아직 닫히지 않았다.

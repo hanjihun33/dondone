@@ -264,7 +264,8 @@ public class EmployerCorrectionRequestService {
             return attachments.stream()
                     .map(attachment -> new EmployerCorrectionRequestDetailResponse.AttachmentResponse(
                             attachment.type() == null ? null : attachment.type().name(),
-                            attachment.fileName()
+                            attachment.fileName(),
+                            false
                     ))
                     .toList();
         } catch (Exception exception) {

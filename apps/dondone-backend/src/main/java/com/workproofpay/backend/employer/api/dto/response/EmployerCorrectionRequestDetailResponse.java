@@ -32,7 +32,8 @@ public record EmployerCorrectionRequestDetailResponse(
 ) {
     public record AttachmentResponse(
             String type,
-            String fileName
+            String fileName,
+            boolean downloadAvailable
     ) {
     }
 }

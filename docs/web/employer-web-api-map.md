@@ -4,6 +4,7 @@
 - `PATCH /api/workproof/{id}` is a deprecated legacy worker endpoint and is not part of the new employer correction flow.
 - After employer approve/reject, employer dashboard/workers/issues and worker wage/docs surfaces rely on the next query to re-read source-of-truth data.
 - No separate cache/event invalidation contract is part of MVP Slice 5.
+- correction detail attachment metadata is currently exposed only as `type`, `fileName`, `downloadAvailable=false`.
 
 ## 목적
 - 웹 화면과 백엔드 API 요구사항을 1:1로 매핑한다.

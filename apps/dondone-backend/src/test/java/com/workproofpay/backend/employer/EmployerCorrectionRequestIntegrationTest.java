@@ -145,8 +145,10 @@ class EmployerCorrectionRequestIntegrationTest {
                 .andExpect(jsonPath("$.data.attachmentCount").value(2))
                 .andExpect(jsonPath("$.data.attachments[0].type").value("MEMO"))
                 .andExpect(jsonPath("$.data.attachments[0].fileName").value("note.txt"))
+                .andExpect(jsonPath("$.data.attachments[0].downloadAvailable").value(false))
                 .andExpect(jsonPath("$.data.attachments[1].type").value("PHOTO"))
                 .andExpect(jsonPath("$.data.attachments[1].fileName").value("photo.jpg"))
+                .andExpect(jsonPath("$.data.attachments[1].downloadAvailable").value(false))
                 .andExpect(jsonPath("$.data.status").value("PENDING"));
     }
 

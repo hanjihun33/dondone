@@ -9,6 +9,11 @@
   - no explicit cache eviction
   - no event-driven read-model refresh
   - dashboard, workers, wage summary, and docs/PDF refresh on the next query by re-reading source tables
+- Correction detail attachment response is limited to safe metadata:
+  - `type`
+  - `fileName`
+  - `downloadAvailable=false`
+- raw `fileRef`, storage path, and download URL stay hidden until a dedicated download contract is added.
 - Additional invalidation work only opens later if a cache, projection store, or precomputed artifact is introduced.
 
 ## 목적
