@@ -17,6 +17,11 @@ interface WorkproofDocumentRepository {
         startDate: LocalDate,
         endDate: LocalDate
     ): WorkproofDocumentCreatePayload
+
+    suspend fun getRequestStatus(
+        accessToken: String,
+        requestId: String
+    ): WorkproofDocumentRequestStatusPayload
 }
 
 data class WorkproofDocumentPreviewPayload(
@@ -39,6 +44,15 @@ data class WorkproofDocumentCreatePayload(
     val documentType: String,
     val status: String,
     val pollUrl: String
+)
+
+data class WorkproofDocumentRequestStatusPayload(
+    val requestId: String,
+    val documentId: Long?,
+    val documentType: String,
+    val status: String,
+    val pollUrl: String,
+    val documentUrl: String?
 )
 
 class WorkproofDocumentUnauthorizedException(

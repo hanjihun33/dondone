@@ -378,7 +378,7 @@ fun WorkproofScreen(
         ) {
             WorkproofPdfGenerationResultSheet(
                 periodText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
-                requestId = pdfCreateUiState.requestId.orEmpty(),
+                createUiState = pdfCreateUiState,
                 fileName = buildWorkproofPdfFileName(pdfStartDate, pdfEndDate),
                 onOpen = { showWorkproofPdfOpenToast(context) },
                 onShare = { showWorkproofPdfShareToast(context) },
@@ -1180,13 +1180,37 @@ private fun WorkproofPdfDateField(
 @Composable
 private fun WorkproofPdfGenerationResultSheet(
     periodText: String,
-    requestId: String,
+    createUiState: WorkproofPdfCreateUiState,
     fileName: String,
     onOpen: () -> Unit,
     onShare: () -> Unit,
     onOpenDocuments: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val isReady = createUiState.isReady
+    val isFailed = createUiState.isFailed
+    val isPolling = createUiState.isPolling
+    val title = when {
+        isReady -> "PDF 생성 완료"
+        isFailed -> "PDF 생성 실패"
+        isPolling -> "PDF 생성 중"
+        else -> "PDF 생성 요청 완료"
+    }
+    val description = when {
+        isReady -> "선택한 기간의 근무 기록 문서가 준비됐어요."
+        isFailed -> createUiState.errorMessage ?: "문서 생성에 실패했어요."
+        isPolling -> "문서 준비 상태를 확인하고 있어요. 잠시만 기다려 주세요."
+        else -> "선택한 기간의 근무 기록 문서 생성 요청이 접수됐어요."
+    }
+    val statusLabel = when (createUiState.status) {
+        "QUEUED" -> "대기 중"
+        "RUNNING" -> "생성 중"
+        "READY" -> "준비 완료"
+        "FAILED" -> "실패"
+        null -> "요청 접수"
+        else -> createUiState.status
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1205,7 +1229,11 @@ private fun WorkproofPdfGenerationResultSheet(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.CheckCircle,
+                    imageVector = when {
+                        isReady -> Icons.Default.CheckCircle
+                        isFailed -> Icons.Default.SyncAlt
+                        else -> Icons.Default.Schedule
+                    },
                     contentDescription = null,
                     tint = WorkproofRowAccentTint,
                     modifier = Modifier.size(22.dp)
@@ -1213,29 +1241,39 @@ private fun WorkproofPdfGenerationResultSheet(
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "PDF 생성 요청 완료",
+                    text = title,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
                     color = DawnText
                 )
                 Text(
-                    text = "선택한 기간의 근무 기록 문서 생성 요청이 접수됐어요.",
+                    text = description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
             }
         }
 
-        WorkproofPdfPreviewCard(
-            preview = WorkproofPdfPreviewUiModel(
-                workplaceName = "요청 접수됨",
-                periodText = periodText,
-                totalRecordCountText = "대기 중",
-                editedCountText = "대기 중",
-                attachmentCountText = "대기 중",
-                totalWorkedHoursText = fileName,
-                sectionSummaryText = "요청 ID: $requestId"
-            )
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(DawnSurfaceAlt)
+                .border(1.dp, DawnBorder, RoundedCornerShape(24.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            WorkproofKeyValueRow(label = "선택 기간", value = periodText)
+            WorkproofKeyValueRow(label = "생성 상태", value = statusLabel)
+            WorkproofKeyValueRow(label = "요청 ID", value = createUiState.requestId.orEmpty())
+            WorkproofKeyValueRow(label = "파일명", value = fileName)
+            if (createUiState.errorMessage != null) {
+                Text(
+                    text = createUiState.errorMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1244,11 +1282,13 @@ private fun WorkproofPdfGenerationResultSheet(
             PrimaryActionButton(
                 text = "열기",
                 onClick = onOpen,
+                enabled = isReady,
                 modifier = Modifier.weight(1f)
             )
             SecondaryActionButton(
                 text = "공유",
                 onClick = onShare,
+                enabled = isReady,
                 modifier = Modifier.weight(1f)
             )
         }

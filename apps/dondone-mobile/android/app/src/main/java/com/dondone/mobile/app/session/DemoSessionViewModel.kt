@@ -44,6 +44,8 @@ import kotlinx.coroutines.launch
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 실연동 데이터를 불러옵니다."
 private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
+private const val WORKPROOF_PDF_POLL_INTERVAL_MS = 1000L
+private const val WORKPROOF_PDF_POLL_MAX_ATTEMPTS = 10
 
 class DemoSessionViewModel(
     private val authRepository: AuthRepository,
@@ -53,6 +55,7 @@ class DemoSessionViewModel(
 ) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
+    private var workproofPdfPollingJob: Job? = null
     private val _uiState = MutableStateFlow(initialState)
     val uiState: StateFlow<DemoState> = _uiState.asStateFlow()
     private val _authUiState = MutableStateFlow(AuthUiState.restoring())
@@ -245,6 +248,7 @@ class DemoSessionViewModel(
 
     fun resetSeed() {
         cancelTransferCompletion()
+        cancelWorkproofPdfPolling()
         _uiState.value = initialState
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
@@ -341,7 +345,12 @@ class DemoSessionViewModel(
                 )
                 _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
                     requestId = payload.requestId,
+                    status = payload.status,
                     pollUrl = payload.pollUrl
+                )
+                startWorkproofPdfPolling(
+                    accessToken = session.accessToken,
+                    requestId = payload.requestId
                 )
             } catch (error: WorkproofDocumentUnauthorizedException) {
                 expireSession(error.message)
@@ -357,6 +366,7 @@ class DemoSessionViewModel(
     }
 
     fun clearWorkproofPdfCreateState() {
+        cancelWorkproofPdfPolling()
         _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
     }
 
@@ -417,6 +427,7 @@ class DemoSessionViewModel(
 
     fun logout() {
         cancelTransferCompletion()
+        cancelWorkproofPdfPolling()
         viewModelScope.launch {
             clearAuthenticatedState(AuthUiState.unauthenticated())
         }
@@ -658,6 +669,7 @@ class DemoSessionViewModel(
     }
 
     private suspend fun clearAuthenticatedState(unauthenticatedState: AuthUiState) {
+        cancelWorkproofPdfPolling()
         authRepository.logout()
         _uiState.value = initialState
         _authUiState.value = unauthenticatedState
@@ -686,6 +698,63 @@ class DemoSessionViewModel(
     private fun cancelTransferCompletion() {
         transferCompletionJob?.cancel()
         transferCompletionJob = null
+    }
+
+    private fun startWorkproofPdfPolling(
+        accessToken: String,
+        requestId: String
+    ) {
+        cancelWorkproofPdfPolling()
+        workproofPdfPollingJob = viewModelScope.launch {
+            repeat(WORKPROOF_PDF_POLL_MAX_ATTEMPTS) {
+                try {
+                    val payload = workproofDocumentRepository.getRequestStatus(accessToken, requestId)
+                    val isTerminal = payload.status == "READY" || payload.status == "FAILED"
+                    _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                        isPolling = !isTerminal,
+                        requestId = payload.requestId,
+                        documentId = payload.documentId,
+                        documentUrl = payload.documentUrl,
+                        status = payload.status,
+                        pollUrl = payload.pollUrl,
+                        errorMessage = if (payload.status == "FAILED") {
+                            "근무 기록 문서 생성에 실패했어요."
+                        } else {
+                            null
+                        }
+                    )
+                    if (isTerminal) {
+                        return@launch
+                    }
+                } catch (error: WorkproofDocumentUnauthorizedException) {
+                    expireSession(error.message)
+                    _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                        requestId = requestId,
+                        errorMessage = error.message ?: "세션이 만료되어 다시 로그인해 주세요."
+                    )
+                    return@launch
+                } catch (_: Exception) {
+                    // Keep polling within the retry window before surfacing a delay message.
+                }
+                delay(WORKPROOF_PDF_POLL_INTERVAL_MS)
+            }
+
+            _workproofPdfCreateUiState.update { current ->
+                if (current.isReady || current.isFailed) {
+                    current
+                } else {
+                    current.copy(
+                        isPolling = false,
+                        errorMessage = "문서 생성이 지연되고 있어요. 잠시 후 다시 확인해 주세요."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun cancelWorkproofPdfPolling() {
+        workproofPdfPollingJob?.cancel()
+        workproofPdfPollingJob = null
     }
 
     private fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): DemoState {

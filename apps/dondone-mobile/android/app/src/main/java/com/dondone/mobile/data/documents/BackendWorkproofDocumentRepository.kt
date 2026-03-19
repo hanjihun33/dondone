@@ -117,4 +117,44 @@ class BackendWorkproofDocumentRepository(
             )
         }
     }
+
+    override suspend fun getRequestStatus(
+        accessToken: String,
+        requestId: String
+    ): WorkproofDocumentRequestStatusPayload = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) {
+            throw WorkproofDocumentUnauthorizedException()
+        }
+
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/documents/requests/$requestId")
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                if (response.code == 401 || response.code == 403) {
+                    throw WorkproofDocumentUnauthorizedException()
+                }
+                throw BackendApiException(
+                    parseBackendErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "근무 기록 문서 상태를 확인하지 못했어요."
+                    )
+                )
+            }
+
+            val data = JSONObject(responseBody.ifBlank { "{}" }).getJSONObject("data")
+            return@withContext WorkproofDocumentRequestStatusPayload(
+                requestId = data.getString("requestId"),
+                documentId = if (data.isNull("documentId")) null else data.getLong("documentId"),
+                documentType = data.getString("documentType"),
+                status = data.getString("status"),
+                pollUrl = data.getString("pollUrl"),
+                documentUrl = if (data.isNull("documentUrl")) null else data.getString("documentUrl")
+            )
+        }
+    }
 }
