@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material3.DropdownMenu
@@ -263,7 +264,8 @@ fun WorkproofScreen(
                 onPreviousMonth = { monthOffset -= 1 },
                 onNextMonth = { monthOffset += 1 },
                 onBack = { showDetails = false },
-                onEditRecord = ::openEditSheet
+                onEditRecord = ::openEditSheet,
+                onOpenPdfCreation = { showWorkproofPdfEntryToast(context) }
             )
         } else {
             Column(
@@ -680,7 +682,8 @@ private fun WorkproofDetailPage(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onBack: () -> Unit,
-    onEditRecord: (WorkproofRecordUiModel) -> Unit
+    onEditRecord: (WorkproofRecordUiModel) -> Unit,
+    onOpenPdfCreation: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -713,6 +716,10 @@ private fun WorkproofDetailPage(
             onNextMonth = onNextMonth
         )
         WorkproofSectionDivider()
+        WorkproofPdfEntryCard(
+            onOpenPdfCreation = onOpenPdfCreation
+        )
+        WorkproofSectionDivider()
         WorkproofRecentLogsCard(
             records = records,
             onEditRecord = onEditRecord
@@ -722,6 +729,58 @@ private fun WorkproofDetailPage(
             auditItems = auditItems
         )
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun WorkproofPdfEntryCard(
+    onOpenPdfCreation: () -> Unit
+) {
+    WorkproofSurfaceCard {
+        WorkproofSectionHeader(title = "근무 기록 문서")
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(WorkproofRowAccentBackground),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = null,
+                    tint = WorkproofRowAccentTint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "선택한 기간의 출퇴근 기록을 PDF로 정리해요.",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+                    color = DawnText
+                )
+                Text(
+                    text = "근무 기록 확인용 문서이자 임금체불 진정 시 첨부 문서로 활용할 수 있도록 준비 중이에요.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnTextSubtle
+                )
+            }
+        }
+
+        PrimaryActionButton(
+            text = "근무 기록 문서 만들기",
+            onClick = onOpenPdfCreation,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -1584,6 +1643,14 @@ private fun showWorkproofRadiusToast(context: Context) {
     Toast.makeText(
         context,
         "근무지 반경 밖에서는 출퇴근할 수 없어요.",
+        Toast.LENGTH_SHORT
+    ).show()
+}
+
+private fun showWorkproofPdfEntryToast(context: Context) {
+    Toast.makeText(
+        context,
+        "기간 선택과 PDF 생성 화면은 다음 단계에서 연결됩니다.",
         Toast.LENGTH_SHORT
     ).show()
 }
