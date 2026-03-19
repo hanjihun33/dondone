@@ -46,6 +46,7 @@ data class WageQuickActionUiModel(
 
 data class WageDepositUiModel(
     val recorded: Boolean,
+    val isSubmitting: Boolean,
     val statusText: String,
     val statusTone: BadgeTone,
     val headerText: String,
@@ -223,6 +224,7 @@ fun DemoState.toWageUiModel(
         evidenceBadgeText = if (verification != null) "확인 결과 반영" else "근거 준비",
         deposit = WageDepositUiModel(
             recorded = isRecorded,
+            isSubmitting = actionUiState.isSubmittingDeposit,
             statusText = if (isRecorded) "입금 기록 완료" else "입금 기록 필요",
             statusTone = if (isRecorded) BadgeTone.Info else BadgeTone.Warning,
             headerText = if (isRecorded) "입금 기록이 반영되었습니다" else "실제 입금액을 입력해 주세요",
@@ -238,7 +240,7 @@ fun DemoState.toWageUiModel(
             inputHelperText = if (actionUiState.isSubmittingDeposit) {
                 "입금액을 저장하는 중입니다."
             } else {
-                "숫자만 입력하면 바로 저장할 수 있습니다."
+                "숫자를 입력한 뒤 적용 버튼으로 저장합니다."
             },
             deductionBadgeText = if ((summary?.deductionsKnown ?: wage.deductionsKnown)) "공제 반영" else "공제 미확인",
             thresholdBadgeText = verification?.threshold?.absoluteWon?.toInt()?.let {

@@ -141,18 +141,12 @@ fun MenuScreen(
         val request = launchRequest ?: return@LaunchedEffect
         when (request.target) {
             MenuLaunchTarget.PROOF_DOCUMENT -> {
-                if (proofDocument != null) {
-                    selectedDocumentId = proofDocument.id
-                } else {
-                    activeSheet = MenuOverlaySheet.Claim
-                }
+                val document = proofDocument ?: return@LaunchedEffect
+                selectedDocumentId = document.id
             }
             MenuLaunchTarget.CLAIM_DOCUMENT -> {
-                if (claimDocument != null) {
-                    selectedDocumentId = claimDocument.id
-                } else {
-                    activeSheet = MenuOverlaySheet.Claim
-                }
+                val document = claimDocument ?: return@LaunchedEffect
+                selectedDocumentId = document.id
             }
             MenuLaunchTarget.CLAIM_SHEET -> {
                 activeSheet = MenuOverlaySheet.Claim

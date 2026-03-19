@@ -220,7 +220,9 @@ private fun WageCheckCard(
         mutableStateOf(uiModel.deposit.actualDepositText.filter(Char::isDigit))
     }
     val actualDepositValue = actualDepositInput.toIntOrNull()
-    val canApplyDeposit = actualDepositValue != null && actualDepositValue > 0
+    val hasActualDepositInput = actualDepositInput.isNotBlank()
+    val canAdjustDeposit = hasActualDepositInput && !uiModel.deposit.isSubmitting
+    val canApplyDeposit = actualDepositValue != null && actualDepositValue > 0 && !uiModel.deposit.isSubmitting
 
     WageSurfaceCard {
         WageSectionHeader(title = uiModel.titleText)
@@ -266,7 +268,8 @@ private fun WageCheckCard(
                 if (uiModel.deposit.actionButtonText != null) {
                     WageCompactButton(
                         text = "입력",
-                        onClick = { focusRequester.requestFocus() }
+                        onClick = { focusRequester.requestFocus() },
+                        enabled = !uiModel.deposit.isSubmitting
                     )
                 } else {
                     StatusBadge(
@@ -300,6 +303,7 @@ private fun WageCheckCard(
                     onValueChange = { value ->
                         actualDepositInput = value.filter(Char::isDigit)
                     },
+                    enabled = !uiModel.deposit.isSubmitting,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     placeholder = {
                         Text(
@@ -343,18 +347,24 @@ private fun WageCheckCard(
                 WageSecondaryButton(
                     text = "-5만",
                     onClick = {
-                        actualDepositInput = (actualDepositValue ?: 0)
-                            .minus(50_000)
-                            .coerceAtLeast(0)
-                            .toString()
+                        actualDepositInput = actualDepositValue
+                            ?.minus(50_000)
+                            ?.coerceAtLeast(0)
+                            ?.toString()
+                            ?: actualDepositInput
                     },
+                    enabled = canAdjustDeposit,
                     modifier = Modifier.weight(1f)
                 )
                 WageSecondaryButton(
                     text = "+5만",
                     onClick = {
-                        actualDepositInput = ((actualDepositValue ?: 0) + 50_000).toString()
+                        actualDepositInput = actualDepositValue
+                            ?.plus(50_000)
+                            ?.toString()
+                            ?: actualDepositInput
                     },
+                    enabled = canAdjustDeposit,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1014,6 +1024,7 @@ private fun WagePrimaryButton(
 private fun WageSecondaryButton(
     text: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -1023,7 +1034,11 @@ private fun WageSecondaryButton(
     ) {
         OutlinedButton(
             onClick = onClick,
-            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            enabled = enabled,
+            modifier = modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
             interactionSource = interactionSource,
             shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.dp, DawnBorder),
