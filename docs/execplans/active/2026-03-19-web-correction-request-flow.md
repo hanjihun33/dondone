@@ -3,6 +3,7 @@
 ## 2026-03-20 Addendum
 - `PATCH /api/workproof/{id}` remains as a deprecated legacy surface during Slice 5.
 - New worker-facing clients should submit correction requests instead of calling direct edit.
+- `GET /api/employer/issues/review-records/{workProofId}` can be used as a scoped read-only detail surface for `NEEDS_REVIEW` records.
 - Dashboard, workers, wage summary, and docs/PDF have no dedicated cache/projection invalidation in MVP.
 - Freshness after approve/reject is achieved by the next query re-reading `WorkProof`, `CorrectionRequest`, audit logs, and wage/document source tables.
 - 사용자 요청:

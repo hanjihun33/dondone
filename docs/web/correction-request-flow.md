@@ -4,6 +4,8 @@
 - `PATCH /api/workproof/{id}` is kept only as a deprecated legacy endpoint.
 - New clients must use `POST /api/workproof/{workProofId}/correction-requests`.
 - Mobile direct edit is still a local-only mock flow, so removal timing for the legacy endpoint stays deferred until mobile/client scope opens.
+- `GET /api/employer/issues/review-records/{workProofId}` is now available as a read-only detail endpoint for scoped `NEEDS_REVIEW` records.
+- This detail surface is intentionally read-only in Slice 5. Resolve/approve command rules for review-required records remain deferred.
 - Employer approve/reject changes `CorrectionRequest`, `WorkProof`, `WorkProofAuditLog`, and `CorrectionDecisionAudit` in one transaction.
 - MVP invalidation policy is fixed as `next query re-reads source-of-truth`.
   - no explicit cache eviction

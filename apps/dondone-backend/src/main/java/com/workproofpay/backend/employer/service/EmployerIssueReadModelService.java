@@ -10,10 +10,13 @@ import com.workproofpay.backend.employer.api.dto.response.EmployerIssueItemType;
 import com.workproofpay.backend.employer.api.dto.response.EmployerIssuesResponse;
 import com.workproofpay.backend.employer.api.dto.response.EmployerIssueStatus;
 import com.workproofpay.backend.employer.api.dto.response.EmployerIssueSummaryResponse;
+import com.workproofpay.backend.employer.api.dto.response.EmployerReviewRequiredRecordDetailResponse;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofFinancialStatus;
+import com.workproofpay.backend.workproof.api.dto.response.WorkProofRecordStatus;
+import com.workproofpay.backend.workproof.api.dto.response.WorkProofReflectionStatus;
 import com.workproofpay.backend.workproof.repo.WorkProofRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -79,6 +82,58 @@ public class EmployerIssueReadModelService {
                 pagination.size(),
                 filteredIssues.size(),
                 pagination.totalPages()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public EmployerReviewRequiredRecordDetailResponse getReviewRecord(Long accountId, Long workProofId) {
+        EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(accountId);
+        WorkProof workProof = workProofRepository.findByIdAndWorkplaceIdAndFinancialStatus(
+                        workProofId,
+                        scope.defaultWorkplaceId(),
+                        WorkProofFinancialStatus.NEEDS_REVIEW
+                )
+                .orElseThrow(() -> new ApiException(ErrorCode.WORKPROOF_NOT_FOUND));
+        User worker = userRepository.findById(workProof.getUser().getId())
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        return new EmployerReviewRequiredRecordDetailResponse(
+                workProof.getId(),
+                worker.getId(),
+                worker.getName(),
+                worker.getEmail(),
+                workProof.getWorkDate(),
+                workProof.getClockOutAt() == null ? WorkProofRecordStatus.CHECKED_IN : WorkProofRecordStatus.CHECKED_OUT,
+                workProof.isNeedsReview() ? WorkProofReflectionStatus.NEEDS_REVIEW : WorkProofReflectionStatus.REFLECTED,
+                resolveReviewReasonCode(workProof),
+                resolveReviewReasonLabel(workProof),
+                workProof.workedMinutes(),
+                workProof.isClockOutOutsideAllowedRadius(),
+                workProof.isEdited(),
+                workProof.getEditReason(),
+                workProof.getMemo(),
+                workProof.getAttachmentCount(),
+                new EmployerReviewRequiredRecordDetailResponse.WorkplaceSnapshot(
+                        workProof.getWorkplace() == null ? null : workProof.getWorkplace().getId(),
+                        workProof.resolveWorkplaceName(),
+                        workProof.resolveWorkplaceAddress(),
+                        workProof.resolveWorkplaceMapLabel(),
+                        workProof.resolveWorkplaceLatitude(),
+                        workProof.resolveWorkplaceLongitude()
+                ),
+                new EmployerReviewRequiredRecordDetailResponse.EvidenceCaptureResponse(
+                        workProof.getDeviceClockInAt(),
+                        workProof.getServerClockInAt(),
+                        workProof.getClockInLatitude(),
+                        workProof.getClockInLongitude(),
+                        workProof.getClockInLocationLabel()
+                ),
+                workProof.getClockOutAt() == null ? null : new EmployerReviewRequiredRecordDetailResponse.EvidenceCaptureResponse(
+                        workProof.getDeviceClockOutAt(),
+                        workProof.getServerClockOutAt(),
+                        workProof.getClockOutLatitude(),
+                        workProof.getClockOutLongitude(),
+                        workProof.getClockOutLocationLabel()
+                )
         );
     }
 

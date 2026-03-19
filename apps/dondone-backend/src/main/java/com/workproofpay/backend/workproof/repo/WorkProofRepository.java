@@ -22,6 +22,8 @@ public interface WorkProofRepository extends JpaRepository<WorkProof, Long> {
 
     List<WorkProof> findByWorkplaceIdAndFinancialStatusOrderByWorkDateDescClockOutAtDescIdDesc(Long workplaceId, WorkProofFinancialStatus financialStatus);
 
+    Optional<WorkProof> findByIdAndWorkplaceIdAndFinancialStatus(Long id, Long workplaceId, WorkProofFinancialStatus financialStatus);
+
     Optional<WorkProof> findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(Long userId, Long workplaceId);
 
     Optional<WorkProof> findByIdAndUserId(Long id, Long userId);

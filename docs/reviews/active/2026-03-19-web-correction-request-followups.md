@@ -35,15 +35,16 @@
 - 닫히는 조건
   - attachment metadata의 web 표시 위치와 download contract가 고정된다.
 
-## 2. review-required record detail/command surface
+## 2. review-required record resolve command surface
 - 라벨: `deferred`
 - 현재 상태
   - employer issue queue foundation은 `GET /api/employer/issues`까지 열려 있다.
-  - `NEEDS_REVIEW` record는 목록 row만 있고 별도 detail/resolve surface는 없다.
+  - `GET /api/employer/issues/review-records/{workProofId}`로 scoped read-only detail surface는 열려 있다.
+  - 별도 resolve command surface는 아직 없다.
 - 지금 확정하지 않은 이유
-  - correction request approval flow foundation을 먼저 닫았고, review-needed record의 별도 command/state transition은 아직 제품 정책이 더 필요하다.
+  - correction request approval flow foundation과 review detail read-model까지 닫았고, review-needed record의 별도 command/state transition은 아직 제품 정책이 더 필요하다.
 - 닫히는 조건
-  - `NEEDS_REVIEW` record용 employer detail/resolve contract 또는 accepted risk가 고정된다.
+  - `NEEDS_REVIEW` record용 employer resolve contract 또는 accepted risk가 고정된다.
 
 ## 3. worker direct edit flow migration
 - 라벨: `deferred`
@@ -111,6 +112,7 @@ Slice 5 correction request flow backend로 이어가자.
 - Slice 4 worker directory/dashboard read-model 완료
 - Slice 5 correction request flow foundation 진행 중
 - `GET /api/employer/issues` foundation 완료
+- `GET /api/employer/issues/review-records/{workProofId}` read-only detail 완료
 - `GET /api/employer/correction-requests` foundation 완료
 - `GET /api/employer/correction-requests/{requestId}` foundation 완료
 - `POST /api/employer/correction-requests/{requestId}/approve` foundation 완료
@@ -124,18 +126,18 @@ Slice 5 correction request flow backend로 이어가자.
 이번 대화 범위:
 - Slice 5 correction request flow backend/docs 후속 정리
 - attachment/detail surface 후속 정리
-- review-required record detail/command 후속 정리
+- review-required record resolve command 후속 정리
 - 가능하면 worker direct edit flow migration 후속 범위 정리
 
 후속 작업 순서:
 - 1. attachment/detail surface 후속 정리
-- 2. review-required record detail/command 후속 정리
+- 2. review-required record resolve command 후속 정리
 - 3. worker direct edit flow migration 후속 범위 정리
 - 4. web issues API wiring 후속 범위 정리
 
 임시/후속 항목:
 - `temporary / shared_policy_pending`: correction detail은 현재 `attachmentCount`와 attachment metadata(`type`, `fileName`)까지만 노출
-- `deferred`: `NEEDS_REVIEW` record detail/command surface는 아직 미구현
+- `deferred`: `NEEDS_REVIEW` record resolve command surface는 아직 미구현
 - `deferred`: worker correction request create backend는 구현됐지만 worker client migration은 아직 미구현이며 mobile 범위는 현재 제외
 - `deferred`: web issues 화면은 아직 mock 기반이며 backend issue queue wiring은 후속
 

@@ -2,6 +2,7 @@ package com.workproofpay.backend.employer.api;
 
 import com.workproofpay.backend.employer.api.dto.request.EmployerIssuesQuery;
 import com.workproofpay.backend.employer.api.dto.response.EmployerIssuesResponse;
+import com.workproofpay.backend.employer.api.dto.response.EmployerReviewRequiredRecordDetailResponse;
 import com.workproofpay.backend.employer.service.EmployerIssueReadModelService;
 import com.workproofpay.backend.shared.api.ApiResponse;
 import com.workproofpay.backend.shared.config.OpenApiConfig;
@@ -18,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,5 +50,25 @@ public class EmployerIssueReadModelController {
             @Valid @ModelAttribute EmployerIssuesQuery query
     ) {
         return ApiResponse.success(employerIssueReadModelService.getIssues(user.userId(), query));
+    }
+
+    @GetMapping("/review-records/{workProofId}")
+    @Operation(
+            summary = "Get review-required work proof detail",
+            description = "Returns scoped detail for an employer issue queue review-required work proof.",
+            security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Review-required work proof detail returned"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Employer role required or out of scope", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Review-required work proof not found", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Employer scope is not ready", content = @Content)
+    })
+    public ResponseEntity<ApiResponse<EmployerReviewRequiredRecordDetailResponse>> getReviewRecord(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long workProofId
+    ) {
+        return ApiResponse.success(employerIssueReadModelService.getReviewRecord(user.userId(), workProofId));
     }
 }

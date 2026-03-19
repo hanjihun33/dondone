@@ -133,6 +133,34 @@ class EmployerIssueReadModelIntegrationTest {
     }
 
     @Test
+    void getReviewRecordReturnsScopedDetail() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/employer/issues/review-records/{workProofId}", fixture.reviewWorkProof().getId())
+                        .header("Authorization", bearer(fixture.employerUser())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.workProofId").value(fixture.reviewWorkProof().getId()))
+                .andExpect(jsonPath("$.data.workerName").value("Review Worker"))
+                .andExpect(jsonPath("$.data.recordStatus").value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.reviewReasonCode").value("CLOCK_OUT_OUTSIDE_ALLOWED_RADIUS"))
+                .andExpect(jsonPath("$.data.clockOutOutsideAllowedRadius").value(true))
+                .andExpect(jsonPath("$.data.workplace.name").value("Seoul Hub"))
+                .andExpect(jsonPath("$.data.checkOut.locationLabel").value("Office"));
+    }
+
+    @Test
+    void nonReviewRecordCannotBeOpenedAsReviewDetail() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/employer/issues/review-records/{workProofId}", fixture.correctionWorkProof().getId())
+                        .header("Authorization", bearer(fixture.employerUser())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WORKPROOF_NOT_FOUND"));
+    }
+
+    @Test
     void workerTokenCannotAccessEmployerIssues() throws Exception {
         Fixture fixture = createFixture();
 
@@ -247,6 +275,7 @@ class EmployerIssueReadModelIntegrationTest {
         return new Fixture(
                 employerUser,
                 correctionWorker,
+                correctionWorkProof,
                 reviewWorkProof,
                 pendingRequest
         );
@@ -301,6 +330,7 @@ class EmployerIssueReadModelIntegrationTest {
     private record Fixture(
             User employerUser,
             User correctionWorker,
+            WorkProof correctionWorkProof,
             WorkProof reviewWorkProof,
             CorrectionRequest pendingRequest
     ) {
