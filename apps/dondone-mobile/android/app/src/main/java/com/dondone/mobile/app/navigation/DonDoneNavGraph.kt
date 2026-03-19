@@ -167,9 +167,13 @@ fun DonDoneNavGraph(
         }
         composable(Route.MENU) {
             MenuScreen(
-                uiModel = uiState.toMenuUiModel(authUiState.session),
+                uiModel = uiState.toMenuUiModel(authUiState.session, workproofPdfCreateUiState),
+                workproofPdfFileUiState = workproofPdfFileUiState,
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
+                onOpenWorkproofPdf = viewModel::openWorkproofPdf,
+                onShareWorkproofPdf = viewModel::shareWorkproofPdf,
+                onClearPdfFileState = viewModel::clearWorkproofPdfFileState,
                 onLogout = viewModel::logout,
                 onShowToast = onShowToast
             )

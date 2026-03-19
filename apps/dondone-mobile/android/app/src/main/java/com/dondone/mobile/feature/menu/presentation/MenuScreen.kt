@@ -44,6 +44,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +75,8 @@ import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileAction
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileUiState
 
 private data class MenuServiceAction(
     val label: String,
@@ -107,8 +110,12 @@ private val MenuReceiptHashBorder = Color(0xFFE2E8F0)
 @Composable
 fun MenuScreen(
     uiModel: MenuUiModel,
+    workproofPdfFileUiState: WorkproofPdfFileUiState,
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit,
+    onOpenWorkproofPdf: (Long) -> Unit,
+    onShareWorkproofPdf: (Long) -> Unit,
+    onClearPdfFileState: () -> Unit,
     onLogout: () -> Unit,
     onShowToast: (String, BadgeTone) -> Unit
 ) {
@@ -121,6 +128,23 @@ fun MenuScreen(
     val proofDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Proof }
     val claimDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Claim }
     val selectedReceipt = if (activeSheet == MenuOverlaySheet.Receipt) uiModel.receipt else null
+
+    LaunchedEffect(workproofPdfFileUiState.fileUri, workproofPdfFileUiState.pendingAction) {
+        val fileUri = workproofPdfFileUiState.fileUri ?: return@LaunchedEffect
+        val action = workproofPdfFileUiState.pendingAction ?: return@LaunchedEffect
+        val uri = Uri.parse(fileUri)
+        when (action) {
+            WorkproofPdfFileAction.OPEN -> openMenuWorkproofPdfFile(context, uri)
+            WorkproofPdfFileAction.SHARE -> shareMenuWorkproofPdfFile(context, uri, workproofPdfFileUiState.fileName)
+        }
+        onClearPdfFileState()
+    }
+
+    LaunchedEffect(workproofPdfFileUiState.errorMessage) {
+        val message = workproofPdfFileUiState.errorMessage ?: return@LaunchedEffect
+        onShowToast(message, BadgeTone.Warning)
+        onClearPdfFileState()
+    }
 
     val serviceActions = buildList {
         add(MenuServiceAction("급여 점검", Icons.Default.Description, onOpenWage))
@@ -211,12 +235,22 @@ fun MenuScreen(
             MenuDocumentSheet(
                 document = selectedDocument,
                 onOpenProofDocument = {
-                    onShowToast("문서 열기와 실제 PDF 연결은 다음 단계에서 이어집니다.", BadgeTone.Warning)
-                    selectedDocumentId = null
+                    val documentId = selectedDocument.documentId
+                    if (documentId == null) {
+                        onShowToast("아직 준비된 문서가 없어요.", BadgeTone.Warning)
+                    } else {
+                        selectedDocumentId = null
+                        onOpenWorkproofPdf(documentId)
+                    }
                 },
                 onShareProofDocument = {
-                    onShowToast("문서 공유는 실제 파일 다운로드 연결 뒤에 지원됩니다.", BadgeTone.Warning)
-                    selectedDocumentId = null
+                    val documentId = selectedDocument.documentId
+                    if (documentId == null) {
+                        onShowToast("아직 공유할 문서가 없어요.", BadgeTone.Warning)
+                    } else {
+                        selectedDocumentId = null
+                        onShareWorkproofPdf(documentId)
+                    }
                 },
                 onOpenClaimFlow = {
                     selectedDocumentId = null
@@ -258,6 +292,44 @@ private fun openMenuReceiptExplorer(
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+    }.isSuccess
+}
+
+private fun openMenuWorkproofPdfFile(
+    context: Context,
+    uri: Uri
+): Boolean {
+    return runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }.isSuccess
+}
+
+private fun shareMenuWorkproofPdfFile(
+    context: Context,
+    uri: Uri,
+    fileName: String?
+): Boolean {
+    return runCatching {
+        context.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TITLE, fileName ?: "근무 기록 문서")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },
+                "근무 기록 문서 공유"
+            ).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         )
     }.isSuccess

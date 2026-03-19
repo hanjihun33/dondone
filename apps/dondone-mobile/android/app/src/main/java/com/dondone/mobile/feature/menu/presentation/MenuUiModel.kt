@@ -7,6 +7,7 @@ import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.DocumentItem
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
 
 enum class MenuDocumentAccent {
     Proof,
@@ -43,6 +44,7 @@ private const val DOCUMENT_ID_RECEIPT = "RECEIPT"
 
 data class MenuDocumentUiModel(
     val id: String,
+    val documentId: Long?,
     val title: String,
     val summaryText: String,
     val updatedAtText: String,
@@ -81,7 +83,21 @@ data class MenuSessionUiModel(
 )
 
 fun DemoState.toMenuUiModel(session: AuthSession?): MenuUiModel {
+    return toMenuUiModel(session, WorkproofPdfCreateUiState())
+}
+
+fun DemoState.toMenuUiModel(
+    session: AuthSession?,
+    workproofPdfCreateUiState: WorkproofPdfCreateUiState
+): MenuUiModel {
     val receiptDocument = documents.firstOrNull(DocumentItem::isReceiptDocument)
+    val baseDocuments = documents.map(DocumentItem::toMenuDocumentUiModel)
+    val liveProofDocument = workproofPdfCreateUiState.toLiveProofDocument()
+    val mergedDocuments = if (liveProofDocument != null) {
+        listOf(liveProofDocument) + baseDocuments.filterNot { it.accent == MenuDocumentAccent.Proof }
+    } else {
+        baseDocuments
+    }
 
     return MenuUiModel(
         session = session?.let {
@@ -90,7 +106,7 @@ fun DemoState.toMenuUiModel(session: AuthSession?): MenuUiModel {
                 email = it.email
             )
         },
-        documents = documents.map(DocumentItem::toMenuDocumentUiModel),
+        documents = mergedDocuments,
         receipt = receiptDocument?.let(::toMenuReceiptUiModel)
     )
 }
@@ -101,12 +117,50 @@ private fun DocumentItem.toMenuDocumentUiModel(): MenuDocumentUiModel {
 
     return MenuDocumentUiModel(
         id = id,
+        documentId = null,
         title = title,
         summaryText = accent.summaryText(),
         updatedAtText = updatedAt.toMenuUpdatedAtText(),
         statusText = accent.statusText(isReady = isReady),
         statusTone = if (isReady) BadgeTone.Success else BadgeTone.Warning,
         accent = accent
+    )
+}
+
+private fun WorkproofPdfCreateUiState.toLiveProofDocument(): MenuDocumentUiModel? {
+    val currentStatus = status ?: return null
+    val statusTone = when (currentStatus) {
+        "READY" -> BadgeTone.Success
+        "FAILED" -> BadgeTone.Warning
+        else -> BadgeTone.Info
+    }
+    val statusText = when (currentStatus) {
+        "QUEUED" -> DOCUMENT_STATUS_PENDING
+        "RUNNING" -> DOCUMENT_STATUS_GENERATING
+        "READY" -> DOCUMENT_STATUS_READY
+        "FAILED" -> "생성 실패"
+        else -> DOCUMENT_STATUS_PENDING
+    }
+    val summaryText = when (currentStatus) {
+        "READY" -> "방금 생성한 근무 기록 PDF를 메뉴에서 다시 열거나 공유할 수 있어요."
+        "FAILED" -> "근무 기록 문서 생성이 실패했어요. 기간을 다시 선택해 재시도해 주세요."
+        else -> "선택한 기간의 출퇴근 기록과 변경 이력을 정리한 PDF 문서를 준비하고 있어요."
+    }
+    val updatedAtText = when (currentStatus) {
+        "READY" -> "업데이트 방금 생성"
+        "FAILED" -> "업데이트 생성 실패"
+        else -> "업데이트 생성 요청 접수됨"
+    }
+
+    return MenuDocumentUiModel(
+        id = "LIVE-WORKPROOF-PDF",
+        documentId = documentId,
+        title = "근무 기록 문서",
+        summaryText = summaryText,
+        updatedAtText = updatedAtText,
+        statusText = statusText,
+        statusTone = statusTone,
+        accent = MenuDocumentAccent.Proof
     )
 }
 
