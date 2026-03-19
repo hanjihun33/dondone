@@ -20,6 +20,7 @@ class DemoSessionViewModelFactory(
             val client = OkHttpClient()
             @Suppress("UNCHECKED_CAST")
             return DemoSessionViewModel(
+                appContext = appContext,
                 authRepository = BackendAuthRepository(
                     sessionStore = AuthSessionStore(appContext),
                     client = client

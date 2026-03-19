@@ -22,6 +22,11 @@ interface WorkproofDocumentRepository {
         accessToken: String,
         requestId: String
     ): WorkproofDocumentRequestStatusPayload
+
+    suspend fun download(
+        accessToken: String,
+        documentId: Long
+    ): WorkproofDocumentFilePayload
 }
 
 data class WorkproofDocumentPreviewPayload(
@@ -53,6 +58,12 @@ data class WorkproofDocumentRequestStatusPayload(
     val status: String,
     val pollUrl: String,
     val documentUrl: String?
+)
+
+data class WorkproofDocumentFilePayload(
+    val bytes: ByteArray,
+    val fileName: String,
+    val contentType: String
 )
 
 class WorkproofDocumentUnauthorizedException(

@@ -2,6 +2,7 @@ package com.dondone.mobile.feature.workproof.presentation
 
 import android.app.DatePickerDialog
 import android.content.Context
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -134,6 +135,7 @@ fun WorkproofScreen(
     uiModel: WorkproofUiModel,
     pdfPreviewUiState: WorkproofPdfPreviewUiState,
     pdfCreateUiState: WorkproofPdfCreateUiState,
+    pdfFileUiState: WorkproofPdfFileUiState,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
     onSaveEdit: (String, String, String, Boolean) -> Unit,
@@ -141,6 +143,9 @@ fun WorkproofScreen(
     onClearPdfPreview: () -> Unit,
     onCreateWorkproofPdf: (LocalDate, LocalDate) -> Unit,
     onClearPdfCreateState: () -> Unit,
+    onOpenWorkproofPdf: (Long) -> Unit,
+    onShareWorkproofPdf: (Long) -> Unit,
+    onClearPdfFileState: () -> Unit,
     resetVersion: Int,
     onDetailVisibilityChange: (Boolean) -> Unit
 ) {
@@ -239,6 +244,23 @@ fun WorkproofScreen(
         showPdfGenerationResultSheet = true
     }
 
+    LaunchedEffect(pdfFileUiState.fileUri, pdfFileUiState.pendingAction) {
+        val fileUri = pdfFileUiState.fileUri ?: return@LaunchedEffect
+        val action = pdfFileUiState.pendingAction ?: return@LaunchedEffect
+        val uri = Uri.parse(fileUri)
+        when (action) {
+            WorkproofPdfFileAction.OPEN -> openWorkproofPdfFile(context, uri)
+            WorkproofPdfFileAction.SHARE -> shareWorkproofPdfFile(context, uri, pdfFileUiState.fileName)
+        }
+        onClearPdfFileState()
+    }
+
+    LaunchedEffect(pdfFileUiState.errorMessage) {
+        val message = pdfFileUiState.errorMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        onClearPdfFileState()
+    }
+
     LaunchedEffect(resetVersion) {
         monthOffset = 0
         resetEditDraft()
@@ -250,6 +272,7 @@ fun WorkproofScreen(
         pdfEndDateEpochDay = baseMonth.atEndOfMonth().toEpochDay()
         onClearPdfPreview()
         onClearPdfCreateState()
+        onClearPdfFileState()
     }
 
     DisposableEffect(Unit) {
@@ -373,6 +396,7 @@ fun WorkproofScreen(
             onDismissRequest = {
                 showPdfGenerationResultSheet = false
                 onClearPdfCreateState()
+                onClearPdfFileState()
             },
             containerColor = DawnSurface
         ) {
@@ -380,12 +404,19 @@ fun WorkproofScreen(
                 periodText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
                 createUiState = pdfCreateUiState,
                 fileName = buildWorkproofPdfFileName(pdfStartDate, pdfEndDate),
-                onOpen = { showWorkproofPdfOpenToast(context) },
-                onShare = { showWorkproofPdfShareToast(context) },
+                onOpen = {
+                    val documentId = pdfCreateUiState.documentId ?: return@WorkproofPdfGenerationResultSheet
+                    onOpenWorkproofPdf(documentId)
+                },
+                onShare = {
+                    val documentId = pdfCreateUiState.documentId ?: return@WorkproofPdfGenerationResultSheet
+                    onShareWorkproofPdf(documentId)
+                },
                 onOpenDocuments = { showWorkproofPdfDocumentBoxToast(context) },
                 onDismiss = {
                     showPdfGenerationResultSheet = false
                     onClearPdfCreateState()
+                    onClearPdfFileState()
                 }
             )
         }
@@ -2181,22 +2212,6 @@ private fun showWorkproofPdfDateRangeSavedToast(
     ).show()
 }
 
-private fun showWorkproofPdfOpenToast(context: Context) {
-    Toast.makeText(
-        context,
-        "PDF 열기 연결은 실제 파일 API 연동 단계에서 이어집니다.",
-        Toast.LENGTH_SHORT
-    ).show()
-}
-
-private fun showWorkproofPdfShareToast(context: Context) {
-    Toast.makeText(
-        context,
-        "공유 기능은 실제 파일 다운로드 연결 뒤에 이어집니다.",
-        Toast.LENGTH_SHORT
-    ).show()
-}
-
 private fun showWorkproofPdfDocumentBoxToast(context: Context) {
     Toast.makeText(
         context,
@@ -2228,6 +2243,48 @@ private fun formatWorkproofPdfDateRange(startDate: LocalDate, endDate: LocalDate
 
 private fun buildWorkproofPdfFileName(startDate: LocalDate, endDate: LocalDate): String =
     "workproof-${startDate.toString().replace("-", "")}-${endDate.toString().replace("-", "")}.pdf"
+
+private fun openWorkproofPdfFile(
+    context: Context,
+    uri: Uri
+) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }.onFailure {
+        Toast.makeText(context, "PDF를 열 수 없어요.", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun shareWorkproofPdfFile(
+    context: Context,
+    uri: Uri,
+    fileName: String?
+) {
+    runCatching {
+        context.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TITLE, fileName ?: "근무 기록 문서")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },
+                "근무 기록 문서 공유"
+            ).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }.onFailure {
+        Toast.makeText(context, "PDF를 공유할 수 없어요.", Toast.LENGTH_SHORT).show()
+    }
+}
 
 private enum class WorkproofPdfDatePreset {
     THIS_MONTH,

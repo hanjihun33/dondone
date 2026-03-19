@@ -1,5 +1,7 @@
 package com.dondone.mobile.app.session
 
+import android.content.Context
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
@@ -29,8 +31,11 @@ import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileAction
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileUiState
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiModel
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiState
+import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Job
@@ -48,6 +53,7 @@ private const val WORKPROOF_PDF_POLL_INTERVAL_MS = 1000L
 private const val WORKPROOF_PDF_POLL_MAX_ATTEMPTS = 10
 
 class DemoSessionViewModel(
+    private val appContext: Context,
     private val authRepository: AuthRepository,
     private val advanceRepository: AdvanceRepository = BackendAdvanceRepository(),
     private val workproofRepository: WorkproofRepository = BackendWorkproofRepository(),
@@ -71,6 +77,8 @@ class DemoSessionViewModel(
     val workproofPdfPreviewUiState: StateFlow<WorkproofPdfPreviewUiState> = _workproofPdfPreviewUiState.asStateFlow()
     private val _workproofPdfCreateUiState = MutableStateFlow(WorkproofPdfCreateUiState())
     val workproofPdfCreateUiState: StateFlow<WorkproofPdfCreateUiState> = _workproofPdfCreateUiState.asStateFlow()
+    private val _workproofPdfFileUiState = MutableStateFlow(WorkproofPdfFileUiState())
+    val workproofPdfFileUiState: StateFlow<WorkproofPdfFileUiState> = _workproofPdfFileUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
@@ -255,6 +263,7 @@ class DemoSessionViewModel(
         _workproofActionUiState.value = WorkproofActionUiState()
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
         _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
+        _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
         refreshAdvanceRemoteState()
         refreshWorkproofRemoteState()
     }
@@ -368,6 +377,18 @@ class DemoSessionViewModel(
     fun clearWorkproofPdfCreateState() {
         cancelWorkproofPdfPolling()
         _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
+    }
+
+    fun openWorkproofPdf(documentId: Long) {
+        downloadWorkproofPdf(documentId, WorkproofPdfFileAction.OPEN)
+    }
+
+    fun shareWorkproofPdf(documentId: Long) {
+        downloadWorkproofPdf(documentId, WorkproofPdfFileAction.SHARE)
+    }
+
+    fun clearWorkproofPdfFileState() {
+        _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
     }
 
     fun login(email: String, password: String) {
@@ -685,6 +706,7 @@ class DemoSessionViewModel(
         _workproofActionUiState.value = WorkproofActionUiState()
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
         _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
+        _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
     }
 
     private fun scheduleTransferCompletion() {
@@ -755,6 +777,55 @@ class DemoSessionViewModel(
     private fun cancelWorkproofPdfPolling() {
         workproofPdfPollingJob?.cancel()
         workproofPdfPollingJob = null
+    }
+
+    private fun downloadWorkproofPdf(
+        documentId: Long,
+        action: WorkproofPdfFileAction
+    ) {
+        val session = _authUiState.value.session ?: run {
+            _workproofPdfFileUiState.value = WorkproofPdfFileUiState(
+                errorMessage = "로그인 후 문서를 내려받을 수 있어요."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _workproofPdfFileUiState.value = WorkproofPdfFileUiState(
+                isDownloading = true,
+                pendingAction = action
+            )
+            try {
+                val payload = workproofDocumentRepository.download(session.accessToken, documentId)
+                val file = writeWorkproofPdfFile(payload.fileName, payload.bytes)
+                val uri = FileProvider.getUriForFile(
+                    appContext,
+                    "${appContext.packageName}.fileprovider",
+                    file
+                )
+                _workproofPdfFileUiState.value = WorkproofPdfFileUiState(
+                    pendingAction = action,
+                    fileUri = uri.toString(),
+                    fileName = payload.fileName
+                )
+            } catch (error: WorkproofDocumentUnauthorizedException) {
+                expireSession(error.message)
+                _workproofPdfFileUiState.value = WorkproofPdfFileUiState(
+                    errorMessage = error.message ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            } catch (error: Exception) {
+                _workproofPdfFileUiState.value = WorkproofPdfFileUiState(
+                    errorMessage = error.message ?: "근무 기록 문서를 내려받지 못했어요."
+                )
+            }
+        }
+    }
+
+    private fun writeWorkproofPdfFile(fileName: String, bytes: ByteArray): File {
+        val documentsDir = File(appContext.cacheDir, "documents").apply { mkdirs() }
+        return File(documentsDir, fileName).apply {
+            writeBytes(bytes)
+        }
     }
 
     private fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): DemoState {

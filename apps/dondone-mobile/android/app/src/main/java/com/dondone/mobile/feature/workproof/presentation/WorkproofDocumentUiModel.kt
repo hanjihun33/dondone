@@ -23,6 +23,19 @@ data class WorkproofPdfCreateUiState(
         get() = status == "FAILED"
 }
 
+data class WorkproofPdfFileUiState(
+    val isDownloading: Boolean = false,
+    val pendingAction: WorkproofPdfFileAction? = null,
+    val fileUri: String? = null,
+    val fileName: String? = null,
+    val errorMessage: String? = null
+)
+
+enum class WorkproofPdfFileAction {
+    OPEN,
+    SHARE
+}
+
 data class WorkproofPdfPreviewUiModel(
     val workplaceName: String,
     val periodText: String,

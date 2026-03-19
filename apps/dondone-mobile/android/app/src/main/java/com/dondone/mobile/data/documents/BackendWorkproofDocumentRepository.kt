@@ -5,6 +5,7 @@ import com.dondone.mobile.data.remote.BackendApiSupport
 import com.dondone.mobile.data.remote.parseBackendErrorMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -156,5 +157,54 @@ class BackendWorkproofDocumentRepository(
                 documentUrl = if (data.isNull("documentUrl")) null else data.getString("documentUrl")
             )
         }
+    }
+
+    override suspend fun download(
+        accessToken: String,
+        documentId: Long
+    ): WorkproofDocumentFilePayload = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) {
+            throw WorkproofDocumentUnauthorizedException()
+        }
+
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/documents/$documentId/download")
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val responseBody = response.body?.string().orEmpty()
+                if (response.code == 401 || response.code == 403) {
+                    throw WorkproofDocumentUnauthorizedException()
+                }
+                throw BackendApiException(
+                    parseBackendErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "근무 기록 문서를 다운로드하지 못했어요."
+                    )
+                )
+            }
+
+            return@withContext WorkproofDocumentFilePayload(
+                bytes = response.body?.bytes() ?: ByteArray(0),
+                fileName = extractFileName(response.headers, documentId),
+                contentType = response.header("Content-Type").orEmpty().ifBlank { "application/pdf" }
+            )
+        }
+    }
+}
+
+private fun extractFileName(headers: Headers, documentId: Long): String {
+    val disposition = headers["Content-Disposition"].orEmpty()
+    val fileName = disposition
+        .substringAfter("filename=", "")
+        .trim()
+        .trim('"')
+    return if (fileName.isBlank()) {
+        "workproof-$documentId.pdf"
+    } else {
+        fileName
     }
 }
