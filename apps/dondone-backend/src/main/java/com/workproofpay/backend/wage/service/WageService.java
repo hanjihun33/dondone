@@ -21,8 +21,6 @@ import com.workproofpay.backend.wage.repo.WageDepositRepository;
 import com.workproofpay.backend.wage.repo.WageVerificationRepository;
 import com.workproofpay.backend.workproof.api.dto.response.CurrentContractResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
-import com.workproofpay.backend.workproof.api.dto.response.WorkProofRecordListItemResponse;
-import com.workproofpay.backend.workproof.api.dto.response.WorkProofRecordListResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofReflectionStatus;
 import com.workproofpay.backend.workproof.service.WorkProofLane1Service;
 import com.workproofpay.backend.workproof.service.WorkProofMonthlyMetrics;
@@ -259,13 +257,12 @@ public class WageService {
      * lane 1에서는 WorkProof summary, current contract, records를 조합해 Wage 소유의 입력 묶음을 만든다.
      */
     private WageLane1Context loadLane1Context(Long userId, String month, Long workplaceId) {
-        WorkProofMonthlySummaryContractResponse summary = workProofLane1Service.getMonthlySummary(userId, month, workplaceId);
-        CurrentContractResponse contract = workProofLane1Service.getCurrentContract(userId, workplaceId);
-        WorkProofRecordListResponse records = workProofLane1Service.getRecords(userId, month, workplaceId);
+        WorkProofLane1Service.WageLane1Snapshot lane1Snapshot =
+                workProofLane1Service.getWageLane1Snapshot(userId, month, workplaceId);
 
         List<Long> includedRecordIds = new ArrayList<>();
         int excludedPendingRecordCount = 0;
-        for (WorkProofRecordListItemResponse record : records.records()) {
+        for (WorkProofLane1Service.WageLane1RecordSnapshot record : lane1Snapshot.records()) {
             if (isIncludedForWage(record)) {
                 includedRecordIds.add(record.recordId());
                 continue;
@@ -273,10 +270,15 @@ public class WageService {
             excludedPendingRecordCount++;
         }
 
-        return new WageLane1Context(contract, summary, includedRecordIds, excludedPendingRecordCount);
+        return new WageLane1Context(
+                lane1Snapshot.contract(),
+                lane1Snapshot.summary(),
+                includedRecordIds,
+                excludedPendingRecordCount
+        );
     }
 
-    private boolean isIncludedForWage(WorkProofRecordListItemResponse record) {
+    private boolean isIncludedForWage(WorkProofLane1Service.WageLane1RecordSnapshot record) {
         return record.reflectionStatus() == WorkProofReflectionStatus.REFLECTED;
     }
 
