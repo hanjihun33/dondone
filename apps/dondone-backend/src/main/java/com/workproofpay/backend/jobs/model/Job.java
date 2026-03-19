@@ -22,7 +22,8 @@ import java.time.LocalDateTime;
         name = "jobs",
         indexes = {
                 @Index(name = "idx_jobs_status_run_at", columnList = "status, run_at, id"),
-                @Index(name = "idx_jobs_reference_type", columnList = "reference_id, job_type")
+                @Index(name = "idx_jobs_reference_type", columnList = "reference_id, job_type"),
+                @Index(name = "uk_jobs_active_key", columnList = "active_key", unique = true)
         }
 )
 @Getter
@@ -39,6 +40,9 @@ public class Job {
 
     @Column(name = "reference_id", nullable = false, length = 64)
     private String referenceId;
+
+    @Column(name = "active_key", length = 128)
+    private String activeKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -62,6 +66,7 @@ public class Job {
     private Job(JobType jobType, String referenceId, LocalDateTime runAt) {
         this.jobType = jobType;
         this.referenceId = referenceId;
+        this.activeKey = buildActiveKey(jobType, referenceId);
         this.status = JobStatus.QUEUED;
         this.attemptCount = 0;
         this.runAt = runAt;
@@ -78,6 +83,7 @@ public class Job {
 
     public void markDone() {
         this.status = JobStatus.DONE;
+        this.activeKey = null;
         this.lastError = null;
     }
 
@@ -89,7 +95,12 @@ public class Job {
 
     public void markFailed(String lastError) {
         this.status = JobStatus.FAILED;
+        this.activeKey = null;
         this.lastError = sanitizeError(lastError);
+    }
+
+    public static String buildActiveKey(JobType jobType, String referenceId) {
+        return jobType.name() + ":" + referenceId;
     }
 
     @PrePersist

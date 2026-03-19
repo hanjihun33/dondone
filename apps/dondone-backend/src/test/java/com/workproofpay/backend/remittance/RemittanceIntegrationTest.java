@@ -431,6 +431,108 @@ class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void searchesRecipientsByPhoneNumberAndMarksAlreadyRegistered() throws Exception {
+        User owner = userRepository.save(User.register("search-owner@test.com", "hashed", "Owner", "01022223333"));
+        User target = userRepository.save(User.register("search-target@test.com", "hashed", "Target", "01099998888"));
+        String ownerToken = tokenFor(owner);
+
+        walletService.createWalletIfAbsent(target.getId());
+        String targetWalletAddress = userWalletRepository.findById(target.getId())
+                .orElseThrow()
+                .getWalletAddress();
+        recipientService.createRecipient(
+                owner.getId(),
+                new UpsertRecipientRequest("Target", RecipientRelation.FRIEND, targetWalletAddress, null, true)
+        );
+
+        mockMvc.perform(post("/api/remittance/recipients/search")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phoneNumber": "010-9999-8888"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.candidates.length()").value(1))
+                .andExpect(jsonPath("$.data.candidates[0].displayName").value("Target"))
+                .andExpect(jsonPath("$.data.candidates[0].maskedPhoneNumber").value("010-****-8888"))
+                .andExpect(jsonPath("$.data.candidates[0].walletAddressMasked").value("0x" + targetWalletAddress.substring(2, 6) + "..." + targetWalletAddress.substring(targetWalletAddress.length() - 4)))
+                .andExpect(jsonPath("$.data.candidates[0].alreadyRegistered").value(true));
+    }
+
+    @Test
+    void excludesSelfAndUsersWithoutWalletFromPhoneSearch() throws Exception {
+        User owner = userRepository.save(User.register("self-owner@test.com", "hashed", "Owner", "01077776666"));
+        userRepository.save(User.register("no-wallet@test.com", "hashed", "No Wallet", "01044445555"));
+        String ownerToken = tokenFor(owner);
+
+        mockMvc.perform(post("/api/remittance/recipients/search")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phoneNumber": "010-7777-6666"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.candidates.length()").value(0));
+
+        mockMvc.perform(post("/api/remittance/recipients/search")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phoneNumber": "010-4444-5555"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.candidates.length()").value(0));
+    }
+
+    @Test
+    void createsRecipientFromTargetUserIdWithoutReceivingRawWalletAddressFromSearch() throws Exception {
+        User owner = userRepository.save(User.register("target-owner@test.com", "hashed", "Owner", "01012121212"));
+        User target = userRepository.save(User.register("target-user@test.com", "hashed", "Target", "01034343434"));
+        String ownerToken = tokenFor(owner);
+
+        walletService.createWalletIfAbsent(target.getId());
+        String targetWalletAddress = userWalletRepository.findByUserId(target.getId())
+                .orElseThrow()
+                .getWalletAddress();
+
+        mockMvc.perform(post("/api/remittance/recipients")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "alias": "Target",
+                                  "relation": "FRIEND",
+                                  "targetUserId": %d,
+                                  "allowed": true
+                                }
+                                """.formatted(target.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.walletAddress").value(targetWalletAddress));
+    }
+
+    @Test
+    void returnsBadRequestForInvalidPhoneSearchPayload() throws Exception {
+        User owner = userRepository.save(User.register("invalid-search@test.com", "hashed", "Owner", "01077776666"));
+        String ownerToken = tokenFor(owner);
+
+        mockMvc.perform(post("/api/remittance/recipients/search")
+                        .header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "phoneNumber": "01012"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void blocksSelfTransferAndInsufficientBalanceAndKeepsBalanceOnFailedReceipt() throws Exception {
         User user = userRepository.save(User.register("edge@test.com", "hashed", "Edge"));
         String token = tokenFor(user);
@@ -621,11 +723,11 @@ class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
 
         String firstRecipientId = recipientService.createRecipient(
                 user.getId(),
-                new UpsertRecipientRequest("A", RecipientRelation.FAMILY, "0x9999999999999999999999999999999999999999", true)
+                new UpsertRecipientRequest("A", RecipientRelation.FAMILY, "0x9999999999999999999999999999999999999999", null, true)
         ).recipientId();
         String secondRecipientId = recipientService.createRecipient(
                 user.getId(),
-                new UpsertRecipientRequest("B", RecipientRelation.FAMILY, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true)
+                new UpsertRecipientRequest("B", RecipientRelation.FAMILY, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", null, true)
         ).recipientId();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);

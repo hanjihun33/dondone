@@ -4,6 +4,7 @@ import com.workproofpay.backend.jobs.model.Job;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,14 @@ public class JobService {
 
     @Transactional
     public void enqueue(JobType jobType, String referenceId, LocalDateTime runAt) {
-        jobRepository.save(Job.queue(jobType, referenceId, runAt));
+        String activeKey = Job.buildActiveKey(jobType, referenceId);
+        try {
+            jobRepository.saveAndFlush(Job.queue(jobType, referenceId, runAt));
+        } catch (DataIntegrityViolationException e) {
+            if (jobRepository.existsByActiveKey(activeKey)) {
+                return;
+            }
+            throw e;
+        }
     }
 }

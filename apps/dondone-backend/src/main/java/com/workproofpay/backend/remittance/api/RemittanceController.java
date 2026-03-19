@@ -1,11 +1,13 @@
 package com.workproofpay.backend.remittance.api;
 
 import com.workproofpay.backend.remittance.api.dto.request.CreateTransferRequest;
+import com.workproofpay.backend.remittance.api.dto.request.RecipientSearchRequest;
 import com.workproofpay.backend.remittance.api.dto.request.TransferPrecheckRequest;
 import com.workproofpay.backend.remittance.api.dto.request.UpsertRecipientRequest;
 import com.workproofpay.backend.remittance.api.dto.response.CreateTransferResponse;
 import com.workproofpay.backend.remittance.api.dto.response.RecipientItemResponse;
 import com.workproofpay.backend.remittance.api.dto.response.RecipientListResponse;
+import com.workproofpay.backend.remittance.api.dto.response.RecipientSearchListResponse;
 import com.workproofpay.backend.remittance.api.dto.response.TransferDetailResponse;
 import com.workproofpay.backend.remittance.api.dto.response.TransferListResponse;
 import com.workproofpay.backend.remittance.api.dto.response.TransferPrecheckResponse;
@@ -123,6 +125,31 @@ public class RemittanceController {
         return ApiResponse.success(recipientService.getRecipients(user.userId()));
     }
 
+    @PostMapping("/recipients/search")
+    @Operation(
+            summary = "전화번호 기반 수신자 검색",
+            description = """
+                    등록 가능한 DonDone 회원 지갑을 전화번호로 검색합니다.
+
+                    검색 규칙:
+                    - 자기 자신은 결과에서 제외합니다.
+                    - remittance 지갑이 없는 회원은 결과에서 제외합니다.
+                    - 이미 내 허용목록에 등록된 지갑은 `alreadyRegistered=true`로 반환합니다.
+                    """,
+            security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "검색 결과를 반환했습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "전화번호 형식이 잘못됐습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content)
+    })
+    public ResponseEntity<ApiResponse<RecipientSearchListResponse>> searchRecipients(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @Valid @RequestBody RecipientSearchRequest request
+    ) {
+        return ApiResponse.success(recipientService.searchRecipientsByPhoneNumber(user.userId(), request));
+    }
+
     @PostMapping("/recipients")
     @Operation(
             summary = "수신자 등록",
@@ -155,6 +182,7 @@ public class RemittanceController {
                                               "alias": "엄마",
                                               "relation": "FAMILY",
                                               "walletAddress": "0x1111111111111111111111111111111111111111",
+                                              "targetUserId": null,
                                               "allowed": true
                                             }
                                             """
