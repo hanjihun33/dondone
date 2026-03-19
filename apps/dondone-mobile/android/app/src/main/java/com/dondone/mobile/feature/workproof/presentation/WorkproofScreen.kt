@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SyncAlt
@@ -56,6 +57,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -78,6 +80,7 @@ import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DonDoneErrorPanel
+import com.dondone.mobile.core.designsystem.DonDoneLoadingPanel
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.pressableScale
@@ -99,6 +102,8 @@ import com.kakao.vectormap.shape.PolygonStylesSet
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val WorkproofCanvas = Color.White
 private val WorkproofDivider = Color(0xFFE8EBF0)
@@ -148,10 +153,14 @@ fun WorkproofScreen(
     var selectedAttachmentName by remember(resetVersion) { mutableStateOf<String?>(null) }
     var showDetails by remember(resetVersion) { mutableStateOf(false) }
     var showPdfDateRangeSheet by remember(resetVersion) { mutableStateOf(false) }
+    var showPdfGenerationResultSheet by remember(resetVersion) { mutableStateOf(false) }
     var pdfDatePreset by remember(resetVersion) { mutableStateOf(WorkproofPdfDatePreset.THIS_MONTH) }
     var pdfStartDateEpochDay by remember(resetVersion) { mutableLongStateOf(baseMonth.atDay(1).toEpochDay()) }
     var pdfEndDateEpochDay by remember(resetVersion) { mutableLongStateOf(baseMonth.atEndOfMonth().toEpochDay()) }
+    var isGeneratingPdf by remember(resetVersion) { mutableStateOf(false) }
+    var generatedPdfFileName by remember(resetVersion) { mutableStateOf<String?>(null) }
     var reasonMenuExpanded by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -191,6 +200,21 @@ fun WorkproofScreen(
     val isPdfDateRangeValid = remember(pdfStartDateEpochDay, pdfEndDateEpochDay) {
         pdfStartDateEpochDay <= pdfEndDateEpochDay
     }
+    val pdfPreview = remember(
+        pdfStartDateEpochDay,
+        pdfEndDateEpochDay,
+        uiModel.summary.verifiedDays,
+        uiModel.summary.auditCount,
+        uiModel.recentRecords
+    ) {
+        WorkproofPdfPreviewUiModel(
+            periodText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
+            verifiedDaysText = "${uiModel.summary.verifiedDays}일",
+            auditCountText = "${uiModel.summary.auditCount}건",
+            attachmentCountText = "${uiModel.recentRecords.sumOf(WorkproofRecordUiModel::attachmentCount)}건",
+            sectionSummaryText = "출퇴근 기록, 변경 기록, 기간 요약"
+        )
+    }
     fun clearEditDraft() {
         editReasonKey = ""
         editMemo = ""
@@ -215,9 +239,12 @@ fun WorkproofScreen(
         resetEditDraft()
         showDetails = false
         showPdfDateRangeSheet = false
+        showPdfGenerationResultSheet = false
         pdfDatePreset = WorkproofPdfDatePreset.THIS_MONTH
         pdfStartDateEpochDay = baseMonth.atDay(1).toEpochDay()
         pdfEndDateEpochDay = baseMonth.atEndOfMonth().toEpochDay()
+        isGeneratingPdf = false
+        generatedPdfFileName = null
     }
 
     DisposableEffect(Unit) {
@@ -278,6 +305,8 @@ fun WorkproofScreen(
                 startDate = pdfStartDate,
                 endDate = pdfEndDate,
                 isDateRangeValid = isPdfDateRangeValid,
+                preview = pdfPreview,
+                isGenerating = isGeneratingPdf,
                 onSelectPreset = { preset ->
                     pdfDatePreset = preset
                     when (preset) {
@@ -315,11 +344,34 @@ fun WorkproofScreen(
                         }
                     )
                 },
-                onApply = {
-                    showPdfDateRangeSheet = false
-                    showWorkproofPdfDateRangeSavedToast(context, pdfStartDate, pdfEndDate)
+                onGenerate = {
+                    if (!isPdfDateRangeValid || isGeneratingPdf) return@WorkproofPdfDateRangeSheet
+                    isGeneratingPdf = true
+                    coroutineScope.launch {
+                        delay(900)
+                        generatedPdfFileName = buildWorkproofPdfFileName(pdfStartDate, pdfEndDate)
+                        isGeneratingPdf = false
+                        showPdfDateRangeSheet = false
+                        showPdfGenerationResultSheet = true
+                    }
                 },
                 onDismiss = { showPdfDateRangeSheet = false }
+            )
+        }
+    }
+
+    if (showPdfGenerationResultSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showPdfGenerationResultSheet = false },
+            containerColor = DawnSurface
+        ) {
+            WorkproofPdfGenerationResultSheet(
+                periodText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
+                fileName = generatedPdfFileName ?: buildWorkproofPdfFileName(pdfStartDate, pdfEndDate),
+                onOpen = { showWorkproofPdfOpenToast(context) },
+                onShare = { showWorkproofPdfShareToast(context) },
+                onOpenDocuments = { showWorkproofPdfDocumentBoxToast(context) },
+                onDismiss = { showPdfGenerationResultSheet = false }
             )
         }
     }
@@ -875,10 +927,12 @@ private fun WorkproofPdfDateRangeSheet(
     startDate: LocalDate,
     endDate: LocalDate,
     isDateRangeValid: Boolean,
+    preview: WorkproofPdfPreviewUiModel,
+    isGenerating: Boolean,
     onSelectPreset: (WorkproofPdfDatePreset) -> Unit,
     onOpenStartDatePicker: () -> Unit,
     onOpenEndDatePicker: () -> Unit,
-    onApply: () -> Unit,
+    onGenerate: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Column(
@@ -938,18 +992,77 @@ private fun WorkproofPdfDateRangeSheet(
             )
         }
 
+        WorkproofPdfPreviewCard(preview = preview)
+
+        if (isGenerating) {
+            DonDoneLoadingPanel(
+                title = "PDF 생성 중",
+                message = "선택한 기간의 근무 기록을 문서로 정리하고 있어요.",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         SecondaryActionButton(
-            text = "선택 완료",
-            onClick = onApply,
-            enabled = isDateRangeValid,
+            text = if (isGenerating) "PDF 생성 중..." else "PDF 생성",
+            onClick = onGenerate,
+            enabled = isDateRangeValid && !isGenerating,
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = "미리보기와 실제 PDF 생성 연결은 다음 단계에서 이어집니다.",
+            text = "현재 화면 기준 요약을 먼저 보여주고, 실제 API 연동은 다음 단계에서 이어집니다.",
             style = MaterialTheme.typography.bodySmall,
             color = DawnTextSubtle
         )
         Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun WorkproofPdfPreviewCard(
+    preview: WorkproofPdfPreviewUiModel
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(DawnSurfaceAlt)
+            .border(1.dp, DawnBorder, RoundedCornerShape(24.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "문서 미리보기",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+            color = DawnText
+        )
+        WorkproofKeyValueRow(
+            label = "선택 기간",
+            value = preview.periodText
+        )
+        WorkproofKeyValueRow(
+            label = "확인된 근무일",
+            value = preview.verifiedDaysText
+        )
+        WorkproofKeyValueRow(
+            label = "변경 기록",
+            value = preview.auditCountText
+        )
+        WorkproofKeyValueRow(
+            label = "첨부된 근거",
+            value = preview.attachmentCountText
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "문서 포함 항목",
+                style = MaterialTheme.typography.labelLarge,
+                color = DawnTextSubtle
+            )
+            Text(
+                text = preview.sectionSummaryText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = DawnText
+            )
+        }
     }
 }
 
@@ -1006,6 +1119,92 @@ private fun WorkproofPdfDateField(
                 color = DawnText
             )
         }
+    }
+}
+
+@Composable
+private fun WorkproofPdfGenerationResultSheet(
+    periodText: String,
+    fileName: String,
+    onOpen: () -> Unit,
+    onShare: () -> Unit,
+    onOpenDocuments: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(WorkproofPdfPresetSelectedBackground),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = WorkproofRowAccentTint,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "PDF 생성 완료",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                    color = DawnText
+                )
+                Text(
+                    text = "선택한 기간의 근무 기록 문서가 준비됐어요.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnTextSubtle
+                )
+            }
+        }
+
+        WorkproofPdfPreviewCard(
+            preview = WorkproofPdfPreviewUiModel(
+                periodText = periodText,
+                verifiedDaysText = "준비됨",
+                auditCountText = "준비됨",
+                attachmentCountText = "준비됨",
+                sectionSummaryText = fileName
+            )
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            PrimaryActionButton(
+                text = "열기",
+                onClick = onOpen,
+                modifier = Modifier.weight(1f)
+            )
+            SecondaryActionButton(
+                text = "공유",
+                onClick = onShare,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        SecondaryActionButton(
+            text = "문서함에서 보기",
+            onClick = onOpenDocuments,
+            modifier = Modifier.fillMaxWidth()
+        )
+        SecondaryActionButton(
+            text = "닫기",
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -1884,6 +2083,30 @@ private fun showWorkproofPdfDateRangeSavedToast(
     ).show()
 }
 
+private fun showWorkproofPdfOpenToast(context: Context) {
+    Toast.makeText(
+        context,
+        "PDF 열기 연결은 실제 파일 API 연동 단계에서 이어집니다.",
+        Toast.LENGTH_SHORT
+    ).show()
+}
+
+private fun showWorkproofPdfShareToast(context: Context) {
+    Toast.makeText(
+        context,
+        "공유 기능은 실제 파일 다운로드 연결 뒤에 이어집니다.",
+        Toast.LENGTH_SHORT
+    ).show()
+}
+
+private fun showWorkproofPdfDocumentBoxToast(context: Context) {
+    Toast.makeText(
+        context,
+        "문서함 연결은 다음 단계에서 메뉴 탭과 연결됩니다.",
+        Toast.LENGTH_SHORT
+    ).show()
+}
+
 private fun showWorkproofDatePicker(
     context: Context,
     initialDate: LocalDate,
@@ -1905,11 +2128,22 @@ private fun formatWorkproofPdfDate(date: LocalDate): String = date.format(Workpr
 private fun formatWorkproofPdfDateRange(startDate: LocalDate, endDate: LocalDate): String =
     "${formatWorkproofPdfDate(startDate)} - ${formatWorkproofPdfDate(endDate)}"
 
+private fun buildWorkproofPdfFileName(startDate: LocalDate, endDate: LocalDate): String =
+    "workproof-${startDate.toString().replace("-", "")}-${endDate.toString().replace("-", "")}.pdf"
+
 private enum class WorkproofPdfDatePreset {
     THIS_MONTH,
     LAST_MONTH,
     CUSTOM
 }
+
+private data class WorkproofPdfPreviewUiModel(
+    val periodText: String,
+    val verifiedDaysText: String,
+    val auditCountText: String,
+    val attachmentCountText: String,
+    val sectionSummaryText: String
+)
 
 private data class WorkproofEditReasonOption(
     val key: String,
