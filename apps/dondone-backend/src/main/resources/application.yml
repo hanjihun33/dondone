@@ -28,6 +28,39 @@ jwt:
   secret: ${JWT_SECRET}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:86400000}
 
+remittance:
+  policy:
+    asset-symbol: ${REMITTANCE_ASSET_SYMBOL:dUSDC}
+    asset-decimals: ${REMITTANCE_ASSET_DECIMALS:6}
+    high-amount-threshold-atomic: ${REMITTANCE_HIGH_AMOUNT_THRESHOLD_ATOMIC:100000000}
+    recent-recipient-window-seconds: ${REMITTANCE_RECENT_RECIPIENT_WINDOW_SECONDS:86400}
+    max-auto-retry-count: ${REMITTANCE_MAX_AUTO_RETRY_COUNT:2}
+    default-list-limit: ${REMITTANCE_DEFAULT_LIST_LIMIT:20}
+  worker:
+    poll-interval-ms: ${REMITTANCE_WORKER_POLL_INTERVAL_MS:2000}
+    receipt-poll-delay-seconds: ${REMITTANCE_RECEIPT_POLL_DELAY_SECONDS:2}
+    receipt-timeout-seconds: ${REMITTANCE_RECEIPT_TIMEOUT_SECONDS:300}
+  chain:
+    mode: ${REMITTANCE_CHAIN_MODE:demo}
+    rpc-url: ${REMITTANCE_CHAIN_RPC_URL:}
+    chain-id: ${REMITTANCE_CHAIN_ID:11155111}
+    token-address: ${REMITTANCE_TOKEN_ADDRESS:}
+    token-gas-limit: ${REMITTANCE_TOKEN_GAS_LIMIT:120000}
+    native-transfer-gas-limit: ${REMITTANCE_NATIVE_TRANSFER_GAS_LIMIT:21000}
+  wallet:
+    encryption-key: ${REMITTANCE_WALLET_ENCRYPTION_KEY:}
+    funding-receipt-timeout-seconds: ${REMITTANCE_WALLET_FUNDING_RECEIPT_TIMEOUT_SECONDS:60}
+    funding-pending-stale-seconds: ${REMITTANCE_WALLET_FUNDING_PENDING_STALE_SECONDS:300}
+  treasury:
+    private-key: ${REMITTANCE_TREASURY_PRIVATE_KEY:}
+    initial-token-amount-atomic: ${REMITTANCE_INITIAL_TOKEN_AMOUNT_ATOMIC:500000000}
+    initial-native-amount-wei: ${REMITTANCE_INITIAL_NATIVE_AMOUNT_WEI:10000000000000000}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+    com.workproofpay.backend: INFO

@@ -25,6 +25,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
     implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
+    implementation("org.web3j:core:4.10.3")
     implementation("com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10")
 
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
