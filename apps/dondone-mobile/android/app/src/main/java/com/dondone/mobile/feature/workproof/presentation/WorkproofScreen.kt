@@ -1,5 +1,6 @@
 package com.dondone.mobile.feature.workproof.presentation
 
+import android.app.DatePickerDialog
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import android.net.Uri
@@ -52,6 +53,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -94,7 +96,9 @@ import com.kakao.vectormap.shape.DotPoints
 import com.kakao.vectormap.shape.PolygonOptions
 import com.kakao.vectormap.shape.PolygonStyles
 import com.kakao.vectormap.shape.PolygonStylesSet
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 
 private val WorkproofCanvas = Color.White
 private val WorkproofDivider = Color(0xFFE8EBF0)
@@ -117,7 +121,10 @@ private val WorkproofModifiedBorder = Color(0xFFD98FD0)
 private val WorkproofModifiedText = Color(0xFFAA3E96)
 private val WorkproofMapWorkplacePin = DawnText
 private val WorkproofMapCurrentPin = DawnPrimaryDeep
+private val WorkproofPdfPresetSelectedBackground = Color(0xFFF1ECFF)
+private val WorkproofPdfPresetSelectedBorder = Color(0xFFB89BFF)
 private val WorkproofWeekdays = listOf("일", "월", "화", "수", "목", "금", "토")
+private val WorkproofPdfDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,6 +147,10 @@ fun WorkproofScreen(
     var editMemo by remember(resetVersion) { mutableStateOf("") }
     var selectedAttachmentName by remember(resetVersion) { mutableStateOf<String?>(null) }
     var showDetails by remember(resetVersion) { mutableStateOf(false) }
+    var showPdfDateRangeSheet by remember(resetVersion) { mutableStateOf(false) }
+    var pdfDatePreset by remember(resetVersion) { mutableStateOf(WorkproofPdfDatePreset.THIS_MONTH) }
+    var pdfStartDateEpochDay by remember(resetVersion) { mutableLongStateOf(baseMonth.atDay(1).toEpochDay()) }
+    var pdfEndDateEpochDay by remember(resetVersion) { mutableLongStateOf(baseMonth.atEndOfMonth().toEpochDay()) }
     var reasonMenuExpanded by remember { mutableStateOf(false) }
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -175,6 +186,11 @@ fun WorkproofScreen(
     val editingRecord = remember(displayedRecentRecords, editingRecordId) {
         displayedRecentRecords.firstOrNull { it.id == editingRecordId }
     }
+    val pdfStartDate = remember(pdfStartDateEpochDay) { LocalDate.ofEpochDay(pdfStartDateEpochDay) }
+    val pdfEndDate = remember(pdfEndDateEpochDay) { LocalDate.ofEpochDay(pdfEndDateEpochDay) }
+    val isPdfDateRangeValid = remember(pdfStartDateEpochDay, pdfEndDateEpochDay) {
+        pdfStartDateEpochDay <= pdfEndDateEpochDay
+    }
     fun clearEditDraft() {
         editReasonKey = ""
         editMemo = ""
@@ -198,6 +214,10 @@ fun WorkproofScreen(
         monthOffset = 0
         resetEditDraft()
         showDetails = false
+        showPdfDateRangeSheet = false
+        pdfDatePreset = WorkproofPdfDatePreset.THIS_MONTH
+        pdfStartDateEpochDay = baseMonth.atDay(1).toEpochDay()
+        pdfEndDateEpochDay = baseMonth.atEndOfMonth().toEpochDay()
     }
 
     DisposableEffect(Unit) {
@@ -248,6 +268,62 @@ fun WorkproofScreen(
         }
     }
 
+    if (showPdfDateRangeSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showPdfDateRangeSheet = false },
+            containerColor = DawnSurface
+        ) {
+            WorkproofPdfDateRangeSheet(
+                selectedPreset = pdfDatePreset,
+                startDate = pdfStartDate,
+                endDate = pdfEndDate,
+                isDateRangeValid = isPdfDateRangeValid,
+                onSelectPreset = { preset ->
+                    pdfDatePreset = preset
+                    when (preset) {
+                        WorkproofPdfDatePreset.THIS_MONTH -> {
+                            pdfStartDateEpochDay = baseMonth.atDay(1).toEpochDay()
+                            pdfEndDateEpochDay = baseMonth.atEndOfMonth().toEpochDay()
+                        }
+
+                        WorkproofPdfDatePreset.LAST_MONTH -> {
+                            val lastMonth = baseMonth.minusMonths(1)
+                            pdfStartDateEpochDay = lastMonth.atDay(1).toEpochDay()
+                            pdfEndDateEpochDay = lastMonth.atEndOfMonth().toEpochDay()
+                        }
+
+                        WorkproofPdfDatePreset.CUSTOM -> Unit
+                    }
+                },
+                onOpenStartDatePicker = {
+                    showWorkproofDatePicker(
+                        context = context,
+                        initialDate = pdfStartDate,
+                        onDateSelected = { selectedDate ->
+                            pdfDatePreset = WorkproofPdfDatePreset.CUSTOM
+                            pdfStartDateEpochDay = selectedDate.toEpochDay()
+                        }
+                    )
+                },
+                onOpenEndDatePicker = {
+                    showWorkproofDatePicker(
+                        context = context,
+                        initialDate = pdfEndDate,
+                        onDateSelected = { selectedDate ->
+                            pdfDatePreset = WorkproofPdfDatePreset.CUSTOM
+                            pdfEndDateEpochDay = selectedDate.toEpochDay()
+                        }
+                    )
+                },
+                onApply = {
+                    showPdfDateRangeSheet = false
+                    showWorkproofPdfDateRangeSavedToast(context, pdfStartDate, pdfEndDate)
+                },
+                onDismiss = { showPdfDateRangeSheet = false }
+            )
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -265,7 +341,8 @@ fun WorkproofScreen(
                 onNextMonth = { monthOffset += 1 },
                 onBack = { showDetails = false },
                 onEditRecord = ::openEditSheet,
-                onOpenPdfCreation = { showWorkproofPdfEntryToast(context) }
+                selectedPdfDateRangeText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
+                onOpenPdfCreation = { showPdfDateRangeSheet = true }
             )
         } else {
             Column(
@@ -683,6 +760,7 @@ private fun WorkproofDetailPage(
     onNextMonth: () -> Unit,
     onBack: () -> Unit,
     onEditRecord: (WorkproofRecordUiModel) -> Unit,
+    selectedPdfDateRangeText: String,
     onOpenPdfCreation: () -> Unit
 ) {
     Column(
@@ -717,6 +795,7 @@ private fun WorkproofDetailPage(
         )
         WorkproofSectionDivider()
         WorkproofPdfEntryCard(
+            selectedDateRangeText = selectedPdfDateRangeText,
             onOpenPdfCreation = onOpenPdfCreation
         )
         WorkproofSectionDivider()
@@ -734,6 +813,7 @@ private fun WorkproofDetailPage(
 
 @Composable
 private fun WorkproofPdfEntryCard(
+    selectedDateRangeText: String,
     onOpenPdfCreation: () -> Unit
 ) {
     WorkproofSurfaceCard {
@@ -773,6 +853,11 @@ private fun WorkproofPdfEntryCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
+                Text(
+                    text = "선택 기간 $selectedDateRangeText",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = WorkproofRowAccentTint
+                )
             }
         }
 
@@ -781,6 +866,146 @@ private fun WorkproofPdfEntryCard(
             onClick = onOpenPdfCreation,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+@Composable
+private fun WorkproofPdfDateRangeSheet(
+    selectedPreset: WorkproofPdfDatePreset,
+    startDate: LocalDate,
+    endDate: LocalDate,
+    isDateRangeValid: Boolean,
+    onSelectPreset: (WorkproofPdfDatePreset) -> Unit,
+    onOpenStartDatePicker: () -> Unit,
+    onOpenEndDatePicker: () -> Unit,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "근무 기록 PDF 생성",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+            color = DawnText
+        )
+        Text(
+            text = "문서로 정리할 기간을 먼저 선택해 주세요.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = DawnTextSubtle
+        )
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            WorkproofPdfPresetChip(
+                label = "이번 달",
+                selected = selectedPreset == WorkproofPdfDatePreset.THIS_MONTH,
+                onClick = { onSelectPreset(WorkproofPdfDatePreset.THIS_MONTH) }
+            )
+            WorkproofPdfPresetChip(
+                label = "지난 달",
+                selected = selectedPreset == WorkproofPdfDatePreset.LAST_MONTH,
+                onClick = { onSelectPreset(WorkproofPdfDatePreset.LAST_MONTH) }
+            )
+            WorkproofPdfPresetChip(
+                label = "직접 선택",
+                selected = selectedPreset == WorkproofPdfDatePreset.CUSTOM,
+                onClick = { onSelectPreset(WorkproofPdfDatePreset.CUSTOM) }
+            )
+        }
+
+        WorkproofPdfDateField(
+            label = "시작일",
+            value = formatWorkproofPdfDate(startDate),
+            onClick = onOpenStartDatePicker
+        )
+        WorkproofPdfDateField(
+            label = "종료일",
+            value = formatWorkproofPdfDate(endDate),
+            onClick = onOpenEndDatePicker
+        )
+
+        if (!isDateRangeValid) {
+            Text(
+                text = "종료일은 시작일보다 빠를 수 없어요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        SecondaryActionButton(
+            text = "선택 완료",
+            onClick = onApply,
+            enabled = isDateRangeValid,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = "미리보기와 실제 PDF 생성 연결은 다음 단계에서 이어집니다.",
+            style = MaterialTheme.typography.bodySmall,
+            color = DawnTextSubtle
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun WorkproofPdfPresetChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) WorkproofPdfPresetSelectedBackground else WorkproofCanvas)
+            .border(
+                width = 1.dp,
+                color = if (selected) WorkproofPdfPresetSelectedBorder else DawnBorder,
+                shape = RoundedCornerShape(999.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = if (selected) WorkproofRowAccentTint else DawnTextSubtle
+        )
+    }
+}
+
+@Composable
+private fun WorkproofPdfDateField(
+    label: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = DawnTextSubtle
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(WorkproofCanvas)
+                .border(1.dp, DawnBorder, RoundedCornerShape(18.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                color = DawnText
+            )
+        }
     }
 }
 
@@ -1647,12 +1872,43 @@ private fun showWorkproofRadiusToast(context: Context) {
     ).show()
 }
 
-private fun showWorkproofPdfEntryToast(context: Context) {
+private fun showWorkproofPdfDateRangeSavedToast(
+    context: Context,
+    startDate: LocalDate,
+    endDate: LocalDate
+) {
     Toast.makeText(
         context,
-        "기간 선택과 PDF 생성 화면은 다음 단계에서 연결됩니다.",
+        "선택 기간 ${formatWorkproofPdfDateRange(startDate, endDate)}",
         Toast.LENGTH_SHORT
     ).show()
+}
+
+private fun showWorkproofDatePicker(
+    context: Context,
+    initialDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            onDateSelected(LocalDate.of(year, month + 1, dayOfMonth))
+        },
+        initialDate.year,
+        initialDate.monthValue - 1,
+        initialDate.dayOfMonth
+    ).show()
+}
+
+private fun formatWorkproofPdfDate(date: LocalDate): String = date.format(WorkproofPdfDateFormatter)
+
+private fun formatWorkproofPdfDateRange(startDate: LocalDate, endDate: LocalDate): String =
+    "${formatWorkproofPdfDate(startDate)} - ${formatWorkproofPdfDate(endDate)}"
+
+private enum class WorkproofPdfDatePreset {
+    THIS_MONTH,
+    LAST_MONTH,
+    CUSTOM
 }
 
 private data class WorkproofEditReasonOption(
