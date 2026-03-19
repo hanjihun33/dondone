@@ -120,7 +120,7 @@ class DocumentsServiceTest {
         WorkProofPdfSnapshot snapshot = sampleSnapshot();
         RenderedPdf renderedPdf = new RenderedPdf(new byte[]{1, 2, 3}, "proof-pack.pdf", "application/pdf", "abc123");
 
-        when(documentGenerationRequestRepository.findByIdAndUserIdAndDocumentType(documentId, userId, DocumentType.PROOF_PACK))
+        when(documentGenerationRequestRepository.findByIdAndUserId(documentId, userId))
                 .thenReturn(Optional.of(request));
         when(documentGenerationRequestRepository.saveAndFlush(any(DocumentGenerationRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -143,7 +143,7 @@ class DocumentsServiceTest {
         DocumentGenerationRequest request = DocumentGenerationRequest.queueProofPack(user, 301L, "2026-03", 7L, "proof-pack-fail-key");
         WorkProofPdfSnapshot snapshot = sampleSnapshot();
 
-        when(documentGenerationRequestRepository.findByIdAndUserIdAndDocumentType(documentId, userId, DocumentType.PROOF_PACK))
+        when(documentGenerationRequestRepository.findByIdAndUserId(documentId, userId))
                 .thenReturn(Optional.of(request));
         when(documentGenerationRequestRepository.saveAndFlush(any(DocumentGenerationRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -156,6 +156,34 @@ class DocumentsServiceTest {
 
         assertEquals("render failed", thrown.getMessage());
         assertEquals(DocumentGenerationStatus.FAILED, request.getStatus());
+    }
+
+    @Test
+    void generatesWorkproofStatementPdfAndUsesPeriodFileName() {
+        long userId = 1L;
+        long documentId = 13L;
+        User user = User.register("statement@test.com", "hashed", "Statement User");
+        DocumentGenerationRequest request = DocumentGenerationRequest.queueWorkproofStatement(
+                user,
+                7L,
+                java.time.LocalDate.of(2026, 1, 1),
+                java.time.LocalDate.of(2026, 2, 23),
+                "workproof-statement-key"
+        );
+        WorkProofPdfSnapshot snapshot = sampleSnapshot();
+        RenderedPdf renderedPdf = new RenderedPdf(new byte[]{1, 2, 3}, "temp.pdf", "application/pdf", "abc123");
+
+        when(documentGenerationRequestRepository.findByIdAndUserId(documentId, userId))
+                .thenReturn(Optional.of(request));
+        when(documentGenerationRequestRepository.saveAndFlush(any(DocumentGenerationRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(workProofPdfSnapshotAssembler.assemble(any())).thenReturn(snapshot);
+        when(pdfRenderer.render("pdf/workproof-statement", snapshot)).thenReturn(renderedPdf);
+
+        RenderedPdf result = documentsService.generateDocumentPdf(userId, documentId);
+
+        assertEquals("workproof-2026-01-01-2026-02-23.pdf", result.fileName());
+        assertEquals(DocumentGenerationStatus.READY, request.getStatus());
     }
 
     private WageVerification mockVerification(long verificationId) {

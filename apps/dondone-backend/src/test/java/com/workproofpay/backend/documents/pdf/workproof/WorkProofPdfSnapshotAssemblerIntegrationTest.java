@@ -182,4 +182,75 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
                 .anyMatch(item -> item.financialStatus().equals("NEEDS_REVIEW"))
                 .anyMatch(WorkProofPdfSnapshot.WorkProofRecordItem::edited);
     }
+
+    @Test
+    void assemblesWorkproofStatementSnapshotFromPeriodRequest() {
+        User user = userRepository.saveAndFlush(User.register("pdf-statement@test.com", "hashed", "Statement User"));
+        Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
+                user,
+                "Statement Cafe",
+                "Seoul Somewhere 2",
+                "Side door",
+                37.5,
+                127.0,
+                150
+        ));
+        WorkContract contract = workContractRepository.saveAndFlush(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(11_000),
+                480,
+                10_560,
+                BigDecimal.valueOf(11_000),
+                LocalDate.of(2026, 1, 1)
+        ));
+
+        WorkProof record = WorkProof.checkIn(
+                user,
+                workplace,
+                contract,
+                LocalDateTime.of(2026, 2, 1, 9, 0),
+                LocalDateTime.of(2026, 2, 1, 9, 1),
+                37.5,
+                127.0,
+                "Side door"
+        );
+        record.completeCheckOut(
+                LocalDateTime.of(2026, 2, 1, 18, 0),
+                LocalDateTime.of(2026, 2, 1, 18, 1),
+                37.5,
+                127.0,
+                "Side door",
+                false
+        );
+        workProofRepository.saveAndFlush(record);
+
+        DocumentGenerationRequest request = documentGenerationRequestRepository.saveAndFlush(
+                DocumentGenerationRequest.queueWorkproofStatement(
+                        user,
+                        workplace.getId(),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 2, 23),
+                        "workproof-statement-key"
+                )
+        );
+
+        WorkProofPdfSnapshot snapshot = assembler.assemble(new WorkProofPdfAssembleCommand(
+                user.getId(),
+                request.getId(),
+                request.getRequestId(),
+                workplace.getId(),
+                request.getStartDate(),
+                request.getEndDate(),
+                ZoneId.of("Asia/Seoul"),
+                Locale.KOREA
+        ));
+
+        assertThat(snapshot.meta().documentType()).isEqualTo("WORKPROOF_STATEMENT");
+        assertThat(snapshot.meta().documentNumber()).startsWith("WS-");
+        assertThat(snapshot.period().startDate()).isEqualTo("2026-01-01");
+        assertThat(snapshot.period().endDate()).isEqualTo("2026-02-23");
+        assertThat(snapshot.period().yearMonth()).isEqualTo("2026-01-01 ~ 2026-02-23");
+        assertThat(snapshot.records()).hasSize(1);
+    }
 }
