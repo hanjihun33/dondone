@@ -6,6 +6,13 @@ data class WorkproofPdfPreviewUiState(
     val errorMessage: String? = null
 )
 
+data class WorkproofPdfCreateUiState(
+    val isSubmitting: Boolean = false,
+    val requestId: String? = null,
+    val pollUrl: String? = null,
+    val errorMessage: String? = null
+)
+
 data class WorkproofPdfPreviewUiModel(
     val workplaceName: String,
     val periodText: String,

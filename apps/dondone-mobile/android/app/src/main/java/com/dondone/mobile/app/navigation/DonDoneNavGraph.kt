@@ -43,6 +43,7 @@ fun DonDoneNavGraph(
     val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
     val workproofActionUiState by viewModel.workproofActionUiState.collectAsStateWithLifecycle()
     val workproofPdfPreviewUiState by viewModel.workproofPdfPreviewUiState.collectAsStateWithLifecycle()
+    val workproofPdfCreateUiState by viewModel.workproofPdfCreateUiState.collectAsStateWithLifecycle()
     val selectedAdvanceAmount by viewModel.selectedAdvanceAmount.collectAsStateWithLifecycle()
     val advanceRequestUiState by viewModel.advanceRequestUiState.collectAsStateWithLifecycle()
     val advanceRequestDetailUiState by viewModel.advanceRequestDetailUiState.collectAsStateWithLifecycle()
@@ -88,11 +89,14 @@ fun DonDoneNavGraph(
             WorkproofScreen(
                 uiModel = uiState.toWorkproofUiModel(actionUiState = workproofActionUiState),
                 pdfPreviewUiState = workproofPdfPreviewUiState,
+                pdfCreateUiState = workproofPdfCreateUiState,
                 onClockIn = viewModel::clockIn,
                 onClockOut = viewModel::clockOut,
                 onSaveEdit = viewModel::saveWorkproofEdit,
                 onRefreshPdfPreview = viewModel::previewWorkproofPdf,
                 onClearPdfPreview = viewModel::clearWorkproofPdfPreview,
+                onCreateWorkproofPdf = viewModel::createWorkproofPdf,
+                onClearPdfCreateState = viewModel::clearWorkproofPdfCreateState,
                 resetVersion = workproofResetVersion,
                 onDetailVisibilityChange = onWorkproofDetailVisibilityChange
             )

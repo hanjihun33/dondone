@@ -57,7 +57,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -102,8 +101,6 @@ import com.kakao.vectormap.shape.PolygonStylesSet
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private val WorkproofCanvas = Color.White
 private val WorkproofDivider = Color(0xFFE8EBF0)
@@ -136,11 +133,14 @@ private val WorkproofPdfDateFormatter: DateTimeFormatter = DateTimeFormatter.ofP
 fun WorkproofScreen(
     uiModel: WorkproofUiModel,
     pdfPreviewUiState: WorkproofPdfPreviewUiState,
+    pdfCreateUiState: WorkproofPdfCreateUiState,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
     onSaveEdit: (String, String, String, Boolean) -> Unit,
     onRefreshPdfPreview: (LocalDate, LocalDate) -> Unit,
     onClearPdfPreview: () -> Unit,
+    onCreateWorkproofPdf: (LocalDate, LocalDate) -> Unit,
+    onClearPdfCreateState: () -> Unit,
     resetVersion: Int,
     onDetailVisibilityChange: (Boolean) -> Unit
 ) {
@@ -160,10 +160,7 @@ fun WorkproofScreen(
     var pdfDatePreset by remember(resetVersion) { mutableStateOf(WorkproofPdfDatePreset.THIS_MONTH) }
     var pdfStartDateEpochDay by remember(resetVersion) { mutableLongStateOf(baseMonth.atDay(1).toEpochDay()) }
     var pdfEndDateEpochDay by remember(resetVersion) { mutableLongStateOf(baseMonth.atEndOfMonth().toEpochDay()) }
-    var isGeneratingPdf by remember(resetVersion) { mutableStateOf(false) }
-    var generatedPdfFileName by remember(resetVersion) { mutableStateOf<String?>(null) }
     var reasonMenuExpanded by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -234,6 +231,14 @@ fun WorkproofScreen(
         }
     }
 
+    LaunchedEffect(pdfCreateUiState.requestId) {
+        if (pdfCreateUiState.requestId == null) {
+            return@LaunchedEffect
+        }
+        showPdfDateRangeSheet = false
+        showPdfGenerationResultSheet = true
+    }
+
     LaunchedEffect(resetVersion) {
         monthOffset = 0
         resetEditDraft()
@@ -243,9 +248,8 @@ fun WorkproofScreen(
         pdfDatePreset = WorkproofPdfDatePreset.THIS_MONTH
         pdfStartDateEpochDay = baseMonth.atDay(1).toEpochDay()
         pdfEndDateEpochDay = baseMonth.atEndOfMonth().toEpochDay()
-        isGeneratingPdf = false
-        generatedPdfFileName = null
         onClearPdfPreview()
+        onClearPdfCreateState()
     }
 
     DisposableEffect(Unit) {
@@ -301,6 +305,7 @@ fun WorkproofScreen(
             onDismissRequest = {
                 showPdfDateRangeSheet = false
                 onClearPdfPreview()
+                onClearPdfCreateState()
             },
             containerColor = DawnSurface
         ) {
@@ -310,7 +315,7 @@ fun WorkproofScreen(
                 endDate = pdfEndDate,
                 isDateRangeValid = isPdfDateRangeValid,
                 previewUiState = pdfPreviewUiState,
-                isGenerating = isGeneratingPdf,
+                createUiState = pdfCreateUiState,
                 onSelectPreset = { preset ->
                     pdfDatePreset = preset
                     when (preset) {
@@ -349,21 +354,15 @@ fun WorkproofScreen(
                     )
                 },
                 onGenerate = {
-                    if (!isPdfDateRangeValid || isGeneratingPdf || pdfPreviewUiState.preview == null) {
+                    if (!isPdfDateRangeValid || pdfCreateUiState.isSubmitting || pdfPreviewUiState.preview == null) {
                         return@WorkproofPdfDateRangeSheet
                     }
-                    isGeneratingPdf = true
-                    coroutineScope.launch {
-                        delay(900)
-                        generatedPdfFileName = buildWorkproofPdfFileName(pdfStartDate, pdfEndDate)
-                        isGeneratingPdf = false
-                        showPdfDateRangeSheet = false
-                        showPdfGenerationResultSheet = true
-                    }
+                    onCreateWorkproofPdf(pdfStartDate, pdfEndDate)
                 },
                 onDismiss = {
                     showPdfDateRangeSheet = false
                     onClearPdfPreview()
+                    onClearPdfCreateState()
                 }
             )
         }
@@ -371,16 +370,23 @@ fun WorkproofScreen(
 
     if (showPdfGenerationResultSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showPdfGenerationResultSheet = false },
+            onDismissRequest = {
+                showPdfGenerationResultSheet = false
+                onClearPdfCreateState()
+            },
             containerColor = DawnSurface
         ) {
             WorkproofPdfGenerationResultSheet(
                 periodText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
-                fileName = generatedPdfFileName ?: buildWorkproofPdfFileName(pdfStartDate, pdfEndDate),
+                requestId = pdfCreateUiState.requestId.orEmpty(),
+                fileName = buildWorkproofPdfFileName(pdfStartDate, pdfEndDate),
                 onOpen = { showWorkproofPdfOpenToast(context) },
                 onShare = { showWorkproofPdfShareToast(context) },
                 onOpenDocuments = { showWorkproofPdfDocumentBoxToast(context) },
-                onDismiss = { showPdfGenerationResultSheet = false }
+                onDismiss = {
+                    showPdfGenerationResultSheet = false
+                    onClearPdfCreateState()
+                }
             )
         }
     }
@@ -937,7 +943,7 @@ private fun WorkproofPdfDateRangeSheet(
     endDate: LocalDate,
     isDateRangeValid: Boolean,
     previewUiState: WorkproofPdfPreviewUiState,
-    isGenerating: Boolean,
+    createUiState: WorkproofPdfCreateUiState,
     onSelectPreset: (WorkproofPdfDatePreset) -> Unit,
     onOpenStartDatePicker: () -> Unit,
     onOpenEndDatePicker: () -> Unit,
@@ -1025,18 +1031,28 @@ private fun WorkproofPdfDateRangeSheet(
             }
         }
 
-        if (isGenerating) {
+        if (createUiState.errorMessage != null) {
+            DonDoneErrorPanel(
+                title = "문서 생성 요청을 접수하지 못했어요",
+                message = createUiState.errorMessage,
+                actionLabel = "다시 시도",
+                onAction = onGenerate,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (createUiState.isSubmitting) {
             DonDoneLoadingPanel(
-                title = "PDF 생성 중",
-                message = "선택한 기간의 근무 기록을 문서로 정리하고 있어요.",
+                title = "PDF 생성 요청 접수 중",
+                message = "선택한 기간의 근무 기록 문서 생성을 요청하고 있어요.",
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
         SecondaryActionButton(
-            text = if (isGenerating) "PDF 생성 중..." else "PDF 생성",
+            text = if (createUiState.isSubmitting) "PDF 생성 요청 중..." else "PDF 생성",
             onClick = onGenerate,
-            enabled = isDateRangeValid && !isGenerating && previewUiState.preview != null,
+            enabled = isDateRangeValid && !createUiState.isSubmitting && previewUiState.preview != null,
             modifier = Modifier.fillMaxWidth()
         )
         Text(
@@ -1164,6 +1180,7 @@ private fun WorkproofPdfDateField(
 @Composable
 private fun WorkproofPdfGenerationResultSheet(
     periodText: String,
+    requestId: String,
     fileName: String,
     onOpen: () -> Unit,
     onShare: () -> Unit,
@@ -1196,12 +1213,12 @@ private fun WorkproofPdfGenerationResultSheet(
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "PDF 생성 완료",
+                    text = "PDF 생성 요청 완료",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
                     color = DawnText
                 )
                 Text(
-                    text = "선택한 기간의 근무 기록 문서가 준비됐어요.",
+                    text = "선택한 기간의 근무 기록 문서 생성 요청이 접수됐어요.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
@@ -1210,13 +1227,13 @@ private fun WorkproofPdfGenerationResultSheet(
 
         WorkproofPdfPreviewCard(
             preview = WorkproofPdfPreviewUiModel(
-                workplaceName = "생성 완료",
+                workplaceName = "요청 접수됨",
                 periodText = periodText,
-                totalRecordCountText = "준비됨",
-                editedCountText = "준비됨",
-                attachmentCountText = "준비됨",
+                totalRecordCountText = "대기 중",
+                editedCountText = "대기 중",
+                attachmentCountText = "대기 중",
                 totalWorkedHoursText = fileName,
-                sectionSummaryText = fileName
+                sectionSummaryText = "요청 ID: $requestId"
             )
         )
 

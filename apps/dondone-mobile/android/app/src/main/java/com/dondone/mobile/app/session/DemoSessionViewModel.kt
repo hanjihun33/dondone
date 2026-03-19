@@ -28,6 +28,7 @@ import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiModel
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiState
 import java.time.LocalDate
@@ -65,6 +66,8 @@ class DemoSessionViewModel(
     val workproofActionUiState: StateFlow<WorkproofActionUiState> = _workproofActionUiState.asStateFlow()
     private val _workproofPdfPreviewUiState = MutableStateFlow(WorkproofPdfPreviewUiState())
     val workproofPdfPreviewUiState: StateFlow<WorkproofPdfPreviewUiState> = _workproofPdfPreviewUiState.asStateFlow()
+    private val _workproofPdfCreateUiState = MutableStateFlow(WorkproofPdfCreateUiState())
+    val workproofPdfCreateUiState: StateFlow<WorkproofPdfCreateUiState> = _workproofPdfCreateUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
@@ -247,6 +250,7 @@ class DemoSessionViewModel(
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
+        _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
         refreshAdvanceRemoteState()
         refreshWorkproofRemoteState()
     }
@@ -304,6 +308,56 @@ class DemoSessionViewModel(
 
     fun clearWorkproofPdfPreview() {
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
+    }
+
+    fun createWorkproofPdf(startDate: LocalDate, endDate: LocalDate) {
+        val session = _authUiState.value.session ?: run {
+            _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                errorMessage = "로그인 후 문서를 생성할 수 있어요."
+            )
+            return
+        }
+        val workplaceId = _uiState.value.workproof.workplaceId ?: run {
+            _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                errorMessage = "연결된 근무지 정보를 다시 불러와 주세요."
+            )
+            return
+        }
+        if (startDate.isAfter(endDate)) {
+            _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                errorMessage = "종료일은 시작일보다 빠를 수 없어요."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(isSubmitting = true)
+            try {
+                val payload = workproofDocumentRepository.create(
+                    accessToken = session.accessToken,
+                    workplaceId = workplaceId,
+                    startDate = startDate,
+                    endDate = endDate
+                )
+                _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                    requestId = payload.requestId,
+                    pollUrl = payload.pollUrl
+                )
+            } catch (error: WorkproofDocumentUnauthorizedException) {
+                expireSession(error.message)
+                _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                    errorMessage = error.message ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            } catch (error: Exception) {
+                _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState(
+                    errorMessage = error.message ?: "문서 생성 요청을 접수하지 못했어요."
+                )
+            }
+        }
+    }
+
+    fun clearWorkproofPdfCreateState() {
+        _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
     }
 
     fun login(email: String, password: String) {
@@ -618,6 +672,7 @@ class DemoSessionViewModel(
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
+        _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
     }
 
     private fun scheduleTransferCompletion() {

@@ -10,6 +10,13 @@ interface WorkproofDocumentRepository {
         startDate: LocalDate,
         endDate: LocalDate
     ): WorkproofDocumentPreviewPayload
+
+    suspend fun create(
+        accessToken: String,
+        workplaceId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): WorkproofDocumentCreatePayload
 }
 
 data class WorkproofDocumentPreviewPayload(
@@ -25,6 +32,13 @@ data class WorkproofDocumentPreviewPayload(
     val attachmentCount: Int,
     val totalWorkedMinutes: Long,
     val totalWorkedHoursText: String
+)
+
+data class WorkproofDocumentCreatePayload(
+    val requestId: String,
+    val documentType: String,
+    val status: String,
+    val pollUrl: String
 )
 
 class WorkproofDocumentUnauthorizedException(

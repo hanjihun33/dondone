@@ -5,10 +5,16 @@ import com.dondone.mobile.data.remote.BackendApiSupport
 import com.dondone.mobile.data.remote.parseBackendErrorMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.time.LocalDate
+import java.util.UUID
+
+private const val WORKPROOF_DOCUMENT_TYPE = "WORKPROOF_STATEMENT"
+private val WORKPROOF_DOCUMENT_JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 class BackendWorkproofDocumentRepository(
     private val client: OkHttpClient = OkHttpClient()
@@ -61,6 +67,53 @@ class BackendWorkproofDocumentRepository(
                 attachmentCount = data.getInt("attachmentCount"),
                 totalWorkedMinutes = data.getLong("totalWorkedMinutes"),
                 totalWorkedHoursText = data.getString("totalWorkedHoursText")
+            )
+        }
+    }
+
+    override suspend fun create(
+        accessToken: String,
+        workplaceId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): WorkproofDocumentCreatePayload = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) {
+            throw WorkproofDocumentUnauthorizedException()
+        }
+
+        val body = JSONObject()
+            .put("documentType", WORKPROOF_DOCUMENT_TYPE)
+            .put("workplaceId", workplaceId)
+            .put("startDate", startDate.toString())
+            .put("endDate", endDate.toString())
+            .toString()
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/workproof/documents")
+            .header("Authorization", "Bearer $accessToken")
+            .header("Idempotency-Key", "android-workproof-${UUID.randomUUID()}")
+            .post(body.toRequestBody(WORKPROOF_DOCUMENT_JSON_MEDIA_TYPE))
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                if (response.code == 401 || response.code == 403) {
+                    throw WorkproofDocumentUnauthorizedException()
+                }
+                throw BackendApiException(
+                    parseBackendErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "근무 기록 문서 생성 요청에 실패했어요."
+                    )
+                )
+            }
+
+            val data = JSONObject(responseBody.ifBlank { "{}" }).getJSONObject("data")
+            return@withContext WorkproofDocumentCreatePayload(
+                requestId = data.getString("requestId"),
+                documentType = data.getString("documentType"),
+                status = data.getString("status"),
+                pollUrl = data.getString("pollUrl")
             )
         }
     }
