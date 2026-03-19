@@ -1,9 +1,12 @@
 import { ReactNode, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { clearStoredUserRole, getStoredUserRole } from "../shared/auth/session";
 import {
+  AdminShieldIcon,
   ClipboardCheckIcon,
   DashboardIcon,
   SettingsIcon,
+  UserAvatarIcon,
   UsersIcon
 } from "../shared/ui/icons";
 
@@ -13,19 +16,35 @@ type NavItem = {
   to: string;
 };
 
-const navItems: NavItem[] = [
+const managerNavItems: NavItem[] = [
   { icon: <DashboardIcon />, label: "대시보드", to: "/dashboard" },
   { icon: <UsersIcon />, label: "근로자 목록", to: "/workers" },
   { icon: <ClipboardCheckIcon />, label: "요청 관리", to: "/issues" },
   { icon: <SettingsIcon />, label: "설정", to: "/settings" }
 ];
 
+const adminNavItems: NavItem[] = [
+  { icon: <AdminShieldIcon />, label: "관리자", to: "/admin" }
+];
+
 export function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const userRole = getStoredUserRole() ?? "manager";
+  const navItems = userRole === "admin" ? adminNavItems : managerNavItems;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  const handleLogoutClick = () => {
+    clearStoredUserRole();
+    setIsHelpOpen(false);
+    setIsSettingsOpen(false);
+    setIsProfileOpen(false);
+    navigate("/", { replace: true });
+  };
 
   return (
     <div className={`page-shell${isSidebarCollapsed ? " sidebar-collapsed" : ""}`}>
@@ -105,6 +124,7 @@ export function AppShell() {
             onClick={() => {
               setIsHelpOpen((prev) => !prev);
               setIsSettingsOpen(false);
+              setIsProfileOpen(false);
             }}
           >
             ?
@@ -116,9 +136,26 @@ export function AppShell() {
             onClick={() => {
               setIsSettingsOpen((prev) => !prev);
               setIsHelpOpen(false);
+              setIsProfileOpen(false);
             }}
           >
             ⚙
+          </button>
+          <button
+            className="header-profile-btn"
+            type="button"
+            aria-label="내 프로필"
+            aria-expanded={isProfileOpen}
+            onClick={() => {
+              setIsProfileOpen((prev) => !prev);
+              setIsHelpOpen(false);
+              setIsSettingsOpen(false);
+            }}
+          >
+            <span className="header-profile-avatar" aria-hidden="true">
+              <UserAvatarIcon />
+            </span>
+            <span className="header-profile-name">내 프로필</span>
           </button>
         </div>
       </header>
@@ -127,12 +164,13 @@ export function AppShell() {
         <Outlet context={{ refreshTick }} />
       </main>
 
-      {isHelpOpen || isSettingsOpen ? (
+      {isHelpOpen || isSettingsOpen || isProfileOpen ? (
         <div
           className="header-popover-backdrop"
           onClick={() => {
             setIsHelpOpen(false);
             setIsSettingsOpen(false);
+            setIsProfileOpen(false);
           }}
         >
           <aside
@@ -170,6 +208,32 @@ export function AppShell() {
                   <span>기본 사업장</span>
                   <strong>서울본사</strong>
                 </div>
+              </>
+            ) : null}
+
+            {isProfileOpen ? (
+              <>
+                <div className="popover-kicker">내 프로필</div>
+                <h3 className="popover-title">계정 정보</h3>
+                <div className="popover-setting-card">
+                  <span>이름</span>
+                  <strong>김운영</strong>
+                </div>
+                <div className="popover-setting-card">
+                  <span>이메일</span>
+                  <strong>admin@dondone.local</strong>
+                </div>
+                <div className="popover-setting-card">
+                  <span>권한</span>
+                  <strong>{userRole === "admin" ? "관리자" : "운영 담당자"}</strong>
+                </div>
+                <button
+                  type="button"
+                  className="popover-logout-btn"
+                  onClick={handleLogoutClick}
+                >
+                  로그아웃
+                </button>
               </>
             ) : null}
           </aside>
