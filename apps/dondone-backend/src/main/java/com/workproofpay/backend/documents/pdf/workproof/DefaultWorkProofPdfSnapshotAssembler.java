@@ -102,6 +102,8 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
 
         List<String> notices = buildNotices(records, contract.isEmpty(), locale);
 
+        WorkProof latestRecord = records.get(0);
+
         return new WorkProofPdfSnapshot(
                 buildMeta(request, yearMonth, zoneId, locale),
                 new WorkProofPdfSnapshot.WorkerInfo(
@@ -111,9 +113,9 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 ),
                 new WorkProofPdfSnapshot.WorkplaceInfo(
                         workplace.getId(),
-                        nullToDash(workplace.getName()),
-                        nullToDash(workplace.getAddress()),
-                        blankToDash(workplace.getMapLabel())
+                        nullToDash(latestRecord.resolveWorkplaceName()),
+                        nullToDash(latestRecord.resolveWorkplaceAddress()),
+                        blankToDash(latestRecord.resolveWorkplaceMapLabel())
                 ),
                 buildContractInfo(contract.orElse(null), locale),
                 new WorkProofPdfSnapshot.PeriodInfo(

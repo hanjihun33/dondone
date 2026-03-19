@@ -182,4 +182,76 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
                 .anyMatch(item -> item.financialStatus().equals("NEEDS_REVIEW"))
                 .anyMatch(WorkProofPdfSnapshot.WorkProofRecordItem::edited);
     }
+
+    @Test
+    void keepsHistoricalWorkplaceInfoAfterWorkplaceSettingsChange() {
+        User user = userRepository.saveAndFlush(User.register("pdf-snapshot@test.com", "hashed", "Snapshot User"));
+        Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
+                user,
+                "Proof Pack Cafe",
+                "Seoul Somewhere 1",
+                "Front door",
+                37.5,
+                127.0,
+                150
+        ));
+        WorkContract contract = workContractRepository.saveAndFlush(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(12_000),
+                480,
+                10_560,
+                BigDecimal.valueOf(12_000),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof record = WorkProof.checkIn(
+                user,
+                workplace,
+                contract,
+                LocalDateTime.of(2026, 3, 12, 9, 0),
+                LocalDateTime.of(2026, 3, 12, 9, 1),
+                37.5,
+                127.0,
+                "Front door"
+        );
+        record.completeCheckOut(
+                LocalDateTime.of(2026, 3, 12, 18, 0),
+                LocalDateTime.of(2026, 3, 12, 18, 1),
+                37.5,
+                127.0,
+                "Front door",
+                false
+        );
+        workProofRepository.saveAndFlush(record);
+
+        workplace.updateEmployerSettings(
+                "Seoul Updated 99",
+                "Back door",
+                37.6,
+                127.1,
+                500,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                user.getId()
+        );
+        workplaceRepository.saveAndFlush(workplace);
+
+        DocumentGenerationRequest request = documentGenerationRequestRepository.saveAndFlush(
+                DocumentGenerationRequest.queueProofPack(user, 500L, "2026-03", workplace.getId(), "proof-pack-snapshot-key")
+        );
+
+        WorkProofPdfSnapshot snapshot = assembler.assemble(new WorkProofPdfAssembleCommand(
+                user.getId(),
+                request.getId(),
+                request.getRequestId(),
+                workplace.getId(),
+                null,
+                null,
+                ZoneId.of("Asia/Seoul"),
+                Locale.KOREA
+        ));
+
+        assertThat(snapshot.workplace().address()).isEqualTo("Seoul Somewhere 1");
+        assertThat(snapshot.workplace().mapLabel()).isEqualTo("Front door");
+    }
 }

@@ -470,6 +470,60 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void keepsHistoricalWorkplaceSnapshotAfterWorkplaceSettingsChange() throws Exception {
+        User user = userRepository.save(User.register("snapshot@test.com", "hashed", "Snapshot"));
+        String token = tokenFor(user);
+        Long workplaceId = createWorkplaceAndContract(token);
+
+        String checkInBody = mockMvc.perform(post("/api/workproof/records/check-in")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckInWorkProofRequest(
+                                workplaceId,
+                                LocalDateTime.of(2026, 3, 18, 9, 0),
+                                37.5,
+                                127.0,
+                                "Front door"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long recordId = readId(checkInBody, "recordId");
+
+        mockMvc.perform(post("/api/workproof/records/check-out")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CheckOutWorkProofRequest(
+                                LocalDateTime.of(2026, 3, 18, 18, 0),
+                                37.5001,
+                                127.0001,
+                                "Front door"
+                        ))))
+                .andExpect(status().isOk());
+
+        var workplace = workplaceRepository.findById(workplaceId).orElseThrow();
+        workplace.updateEmployerSettings(
+                "Seoul Updated 99",
+                "Back door",
+                37.6,
+                127.1,
+                500,
+                LocalDateTime.of(2026, 3, 18, 19, 0),
+                user.getId()
+        );
+        workplaceRepository.saveAndFlush(workplace);
+
+        mockMvc.perform(get("/api/workproof/records/{recordId}", recordId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.workplace.address").value("Seoul Somewhere 2"))
+                .andExpect(jsonPath("$.data.workplace.latitude").value(37.5))
+                .andExpect(jsonPath("$.data.workplace.longitude").value(127.0));
+    }
+
+    @Test
     void hidesForeignWorkplaceAndRecordOwnership() throws Exception {
         // 타인 소유 근무지와 근무 기록은 404로 은닉되는지 확인한다.
         User owner = userRepository.save(User.register("owner-l1@test.com", "hashed", "Owner"));
