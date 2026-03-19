@@ -139,6 +139,52 @@ class EmployerWorkerReadModelIntegrationTest {
     }
 
     @Test
+    void getWorkerDetailReturnsScopedLatestRecordAndRecentDays() throws Exception {
+        Fixture fixture = createFixture();
+        LocalDate today = LocalDate.now();
+
+        mockMvc.perform(get("/api/employer/workers/{workerId}", fixture.reviewWorker().getId())
+                        .header("Authorization", bearer(fixture.employerUser())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.workerId").value(fixture.reviewWorker().getId()))
+                .andExpect(jsonPath("$.data.name").value("Review Worker"))
+                .andExpect(jsonPath("$.data.email").value("review-worker@acme.test"))
+                .andExpect(jsonPath("$.data.membershipEffectiveFrom").value(today.minusDays(1).toString()))
+                .andExpect(jsonPath("$.data.recordStatus").value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.attendanceStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.latestWorkDate").value(today.toString()))
+                .andExpect(jsonPath("$.data.latestRecord.workDate").value(today.toString()))
+                .andExpect(jsonPath("$.data.latestRecord.recordStatus").value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.latestRecord.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.latestRecord.attendanceStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.latestRecord.workedMinutes").value(550))
+                .andExpect(jsonPath("$.data.latestRecord.needsReview").value(true))
+                .andExpect(jsonPath("$.data.latestRecord.clockOutOutsideAllowedRadius").value(true))
+                .andExpect(jsonPath("$.data.latestRecord.edited").value(false))
+                .andExpect(jsonPath("$.data.latestRecord.workplaceName").value("Seoul Hub"))
+                .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("서울특별시 강남구 테헤란로 212"))
+                .andExpect(jsonPath("$.data.latestRecord.workplaceMapLabel").doesNotExist())
+                .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("정문"))
+                .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("후문"))
+                .andExpect(jsonPath("$.data.recentDays.length()").value(7))
+                .andExpect(jsonPath("$.data.recentDays[6].date").value(today.toString()))
+                .andExpect(jsonPath("$.data.recentDays[6].attendanceStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.recentDays[6].workedMinutes").value(550));
+    }
+
+    @Test
+    void getWorkerDetailRejectsWorkerOutsideEmployerScope() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/employer/workers/{workerId}", fixture.otherScopeWorker().getId())
+                        .header("Authorization", bearer(fixture.employerUser())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
     void getAttendanceBoardReturnsWeeklyScopedSnapshots() throws Exception {
         Fixture fixture = createFixture();
 
@@ -230,7 +276,7 @@ class EmployerWorkerReadModelIntegrationTest {
         User reviewWorker = createScopedWorker("review-worker@acme.test", "Review Worker", company.getId(), workplace.getId());
         User noRecordWorker = createScopedWorker("no-record-worker@acme.test", "No Record Worker", company.getId(), workplace.getId());
         createScopedWorker("future-worker@acme.test", "Future Worker", company.getId(), workplace.getId(), LocalDate.now().plusDays(1));
-        createScopedWorker("other-scope-worker@acme.test", "Other Scope Worker", otherCompany.getId(), otherWorkplace.getId());
+        User otherScopeWorker = createScopedWorker("other-scope-worker@acme.test", "Other Scope Worker", otherCompany.getId(), otherWorkplace.getId());
 
         workProofRepository.save(completedRecord(
                 workingWorker,
@@ -297,7 +343,7 @@ class EmployerWorkerReadModelIntegrationTest {
         ));
 
         int todayIndex = (int) java.time.temporal.ChronoUnit.DAYS.between(weekStart, today);
-        return new Fixture(employerUser, workingWorker, completedWorker, reviewWorker, noRecordWorker, weekStart, todayIndex);
+        return new Fixture(employerUser, workingWorker, completedWorker, reviewWorker, noRecordWorker, otherScopeWorker, weekStart, todayIndex);
     }
 
     private WorkProof completedRecord(User worker,
@@ -362,6 +408,7 @@ class EmployerWorkerReadModelIntegrationTest {
             User completedWorker,
             User reviewWorker,
             User noRecordWorker,
+            User otherScopeWorker,
             LocalDate weekStart,
             int todayIndex
     ) {

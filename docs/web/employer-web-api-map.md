@@ -85,6 +85,8 @@
   - 대신 raw source 일관성을 위해 `recordStatus`(`CHECKED_IN/CHECKED_OUT`)와 `reflectionStatus`(`PENDING/REFLECTED/NEEDS_REVIEW`)를 함께 노출하고, `attendanceStatus`는 그 조합에서 파생한다.
   - `employeeCode`, `team`, `role`, `phone`, `avatarUrl`는 canonical profile source가 없으면 `null`을 허용한다.
   - query는 `name/email` 기준 case-insensitive 검색으로 시작하고, status filter/pagination은 foundation 단계에서 service 조합으로 지원한다.
+  - `GET /api/employer/workers/{workerId}`는 detail foundation으로 `summary 필드 + membershipEffectiveFrom/effectiveTo + latestRecord + recentDays(최근 7일)`를 반환한다.
+  - `latestRecord`는 현재 source-of-truth가 있는 범위만 포함한다: `workDate`, `clockInAt`, `clockOutAt`, `recordStatus`, `reflectionStatus`, `attendanceStatus`, `workedMinutes`, `needsReview`, `clockOutOutsideAllowedRadius`, `edited`, workplace snapshot, location labels.
 - scope 규칙
   - `workerId` detail 조회 전 서버는 해당 worker의 활성 membership이 employer scope 안인지 재검증한다.
   - 단순 role 통과만으로 detail 조회를 허용하지 않는다.

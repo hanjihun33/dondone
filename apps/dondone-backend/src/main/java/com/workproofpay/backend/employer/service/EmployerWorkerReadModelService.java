@@ -9,6 +9,9 @@ import com.workproofpay.backend.employer.api.dto.response.EmployerAttendanceBoar
 import com.workproofpay.backend.employer.api.dto.response.EmployerAttendanceBoardRowResponse;
 import com.workproofpay.backend.employer.api.dto.response.EmployerDashboardSummaryResponse;
 import com.workproofpay.backend.employer.api.dto.response.EmployerWorkerAttendanceStatus;
+import com.workproofpay.backend.employer.api.dto.response.EmployerWorkerDetailResponse;
+import com.workproofpay.backend.employer.api.dto.response.EmployerWorkerLatestRecordResponse;
+import com.workproofpay.backend.employer.api.dto.response.EmployerWorkerRecentDayResponse;
 import com.workproofpay.backend.employer.api.dto.response.EmployerWorkerSummaryResponse;
 import com.workproofpay.backend.employer.api.dto.response.EmployerWorkersResponse;
 import com.workproofpay.backend.employer.model.EmploymentMembership;
@@ -45,6 +48,7 @@ public class EmployerWorkerReadModelService {
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
     private static final int BOARD_DAYS = 7;
+    private static final int RECENT_DAY_COUNT = 7;
 
     private final EmployerAccessScopeService employerAccessScopeService;
     private final EmploymentMembershipRepository employmentMembershipRepository;
@@ -98,6 +102,63 @@ public class EmployerWorkerReadModelService {
                 needsReviewCount,
                 noRecordCount,
                 today
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public EmployerWorkerDetailResponse getWorkerDetail(Long accountId, Long workerId) {
+        EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(accountId);
+        LocalDate today = LocalDate.now();
+        User worker = userRepository.findById(workerId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        EmploymentMembership membership = getRequiredAccessibleMembership(scope, workerId, today);
+
+        WorkProof latestWorkProof = workProofRepository.findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(
+                workerId,
+                scope.defaultWorkplaceId()
+        ).orElse(null);
+        DaySnapshot latestDaySnapshot = buildDaySnapshot(latestWorkProof, latestWorkProof == null ? null : latestWorkProof.getWorkDate());
+
+        LocalDate recentStartDate = today.minusDays(RECENT_DAY_COUNT - 1L);
+        Map<LocalDate, DaySnapshot> recentSnapshotsByDate = latestDaySnapshotsByDate(
+                workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
+                        workerId,
+                        scope.defaultWorkplaceId(),
+                        recentStartDate,
+                        today
+                )
+        );
+
+        List<EmployerWorkerRecentDayResponse> recentDays = new ArrayList<>(RECENT_DAY_COUNT);
+        for (int index = 0; index < RECENT_DAY_COUNT; index++) {
+            LocalDate date = recentStartDate.plusDays(index);
+            DaySnapshot daySnapshot = recentSnapshotsByDate.getOrDefault(date, emptyDaySnapshot(date));
+            recentDays.add(new EmployerWorkerRecentDayResponse(
+                    daySnapshot.date(),
+                    daySnapshot.recordStatus(),
+                    daySnapshot.reflectionStatus(),
+                    daySnapshot.attendanceStatus(),
+                    daySnapshot.workedMinutes()
+            ));
+        }
+
+        return new EmployerWorkerDetailResponse(
+                worker.getId(),
+                null,
+                worker.getName(),
+                null,
+                null,
+                worker.getEmail(),
+                null,
+                null,
+                membership.getEffectiveFrom(),
+                membership.getEffectiveTo(),
+                latestDaySnapshot.recordStatus(),
+                latestDaySnapshot.reflectionStatus(),
+                latestDaySnapshot.attendanceStatus(),
+                latestDaySnapshot.date(),
+                toLatestRecordResponse(latestWorkProof, latestDaySnapshot),
+                List.copyOf(recentDays)
         );
     }
 
@@ -222,6 +283,18 @@ public class EmployerWorkerReadModelService {
         return latestByWorkerId;
     }
 
+    private EmploymentMembership getRequiredAccessibleMembership(EmployerAccessScope scope, Long workerId, LocalDate targetDate) {
+        return employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                        workerId,
+                        scope.companyId(),
+                        scope.defaultWorkplaceId(),
+                        EmploymentMembershipStatus.ACTIVE,
+                        targetDate
+                ).stream()
+                .findFirst()
+                .orElseThrow(() -> new ApiException(ErrorCode.FORBIDDEN));
+    }
+
     private Map<Long, Map<LocalDate, DaySnapshot>> daySnapshotsByWorkerId(List<Long> workerIds,
                                                                           Long workplaceId,
                                                                           WeekRange weekRange) {
@@ -251,6 +324,14 @@ public class EmployerWorkerReadModelService {
             snapshotsByWorkerId.put(workerId, Map.copyOf(days));
         }
         return snapshotsByWorkerId;
+    }
+
+    private Map<LocalDate, DaySnapshot> latestDaySnapshotsByDate(List<WorkProof> workProofs) {
+        Map<LocalDate, DaySnapshot> snapshotsByDate = new LinkedHashMap<>();
+        for (WorkProof workProof : workProofs) {
+            snapshotsByDate.putIfAbsent(workProof.getWorkDate(), buildDaySnapshot(workProof, workProof.getWorkDate()));
+        }
+        return snapshotsByDate;
     }
 
     private ScopedWorkerSnapshot toScopedWorkerSnapshot(User user,
@@ -353,6 +434,30 @@ public class EmployerWorkerReadModelService {
                                 day.workedMinutes()
                         ))
                         .toList()
+        );
+    }
+
+    private EmployerWorkerLatestRecordResponse toLatestRecordResponse(WorkProof latestWorkProof, DaySnapshot latestDaySnapshot) {
+        if (latestWorkProof == null) {
+            return null;
+        }
+
+        return new EmployerWorkerLatestRecordResponse(
+                latestWorkProof.getWorkDate(),
+                latestWorkProof.getClockInAt(),
+                latestWorkProof.getClockOutAt(),
+                latestDaySnapshot.recordStatus(),
+                latestDaySnapshot.reflectionStatus(),
+                latestDaySnapshot.attendanceStatus(),
+                latestDaySnapshot.workedMinutes(),
+                latestWorkProof.isNeedsReview(),
+                latestWorkProof.isClockOutOutsideAllowedRadius(),
+                latestWorkProof.isEdited(),
+                latestWorkProof.resolveWorkplaceName(),
+                latestWorkProof.resolveWorkplaceAddress(),
+                latestWorkProof.resolveWorkplaceMapLabel(),
+                latestWorkProof.getClockInLocationLabel(),
+                latestWorkProof.getClockOutLocationLabel()
         );
     }
 

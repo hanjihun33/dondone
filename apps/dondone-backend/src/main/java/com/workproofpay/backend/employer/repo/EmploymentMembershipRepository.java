@@ -47,4 +47,23 @@ public interface EmploymentMembershipRepository extends JpaRepository<Employment
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    @Query("""
+            select membership
+            from EmploymentMembership membership
+            where membership.workerAccountId = :workerAccountId
+              and membership.companyId = :companyId
+              and membership.workplaceId = :workplaceId
+              and membership.status = :status
+              and membership.effectiveFrom <= :targetDate
+              and (membership.effectiveTo is null or membership.effectiveTo >= :targetDate)
+            order by membership.createdAt desc, membership.id desc
+            """)
+    List<EmploymentMembership> findActiveWorkerMembershipByScope(
+            @Param("workerAccountId") Long workerAccountId,
+            @Param("companyId") Long companyId,
+            @Param("workplaceId") Long workplaceId,
+            @Param("status") EmploymentMembershipStatus status,
+            @Param("targetDate") LocalDate targetDate
+    );
 }

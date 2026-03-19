@@ -4,6 +4,7 @@ import com.workproofpay.backend.employer.api.dto.request.EmployerAttendanceBoard
 import com.workproofpay.backend.employer.api.dto.response.EmployerAttendanceBoardResponse;
 import com.workproofpay.backend.employer.api.dto.request.EmployerWorkersQuery;
 import com.workproofpay.backend.employer.api.dto.response.EmployerDashboardSummaryResponse;
+import com.workproofpay.backend.employer.api.dto.response.EmployerWorkerDetailResponse;
 import com.workproofpay.backend.employer.api.dto.response.EmployerWorkersResponse;
 import com.workproofpay.backend.employer.service.EmployerWorkerReadModelService;
 import com.workproofpay.backend.shared.api.ApiResponse;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,6 +53,26 @@ public class EmployerWorkerReadModelController {
             @Valid @ModelAttribute EmployerWorkersQuery query
     ) {
         return ApiResponse.success(employerWorkerReadModelService.getWorkers(user.userId(), query));
+    }
+
+    @GetMapping("/workers/{workerId}")
+    @Operation(
+            summary = "Get employer worker detail",
+            description = "Returns the scoped worker detail for the authenticated employer default workplace.",
+            security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Worker detail returned"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Missing or invalid token", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Worker is outside the employer scope", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Worker not found", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Employer scope is not ready", content = @Content)
+    })
+    public ResponseEntity<ApiResponse<EmployerWorkerDetailResponse>> getWorkerDetail(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long workerId
+    ) {
+        return ApiResponse.success(employerWorkerReadModelService.getWorkerDetail(user.userId(), workerId));
     }
 
     @GetMapping("/dashboard/summary")

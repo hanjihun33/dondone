@@ -18,6 +18,7 @@
 - 현재 세션의 실제 작업 범위는 최신 `docs/execplans/active/` 문서에서 본다.
 - 구현 중 발견한 리스크와 검증 결과는 `docs/reviews/active/`에 남긴다.
 - 대화 중 후속 작업으로 미룬 항목은 `docs/reviews/active/` follow-up note와 다음 대화 시작 문구 둘 다에 남긴다.
+- 임시 처리한 항목은 단순 후속 작업이 아니라 `temporary` 또는 `shared_policy_pending` 성격까지 같이 남긴다.
 
 ## 문서 목록
 | 문서 | 역할 | 먼저 볼 시점 |
@@ -73,6 +74,10 @@
 - 실제 작업 순서와 담당 범위는 `docs/execplans/active/`에서 관리한다.
 - 구현 중 발견한 리스크와 검증 결과는 `docs/reviews/active/`에 남긴다.
 - 구현 중 의도적으로 미룬 항목은 active follow-up note에 즉시 추가하고, 다음 대화 시작 문구에도 같은 순서로 남긴다.
+- 임시 처리 항목은 follow-up note에 아래 세 줄을 같이 남긴다.
+  - 현재 임시 처리
+  - 지금 확정하지 않은 이유
+  - 닫히는 조건
 - 웹 구현 중 기존 앱 API 변경이 필요해지면 바로 범위를 다시 검토한다.
 
 ## 갱신 규칙

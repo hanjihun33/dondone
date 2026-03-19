@@ -23,11 +23,12 @@
   - `apps/dondone-backend/src/test/java/com/workproofpay/backend/employer/EmployerWorkplaceSettingsIntegrationTest.java`
 
 # Goal
-Slice 4 foundation으로 employer web read-model 첫 구간을 열고, `GET /api/employer/workers`와 가능하면 `GET /api/employer/dashboard/summary`를 현재 백엔드가 실제로 증명 가능한 조직/출퇴근 데이터 기준으로 안전하게 제공한다.
+Slice 4 read-model을 현재 백엔드가 실제로 증명 가능한 조직/출퇴근 데이터 기준으로 안전하게 열고, `GET /api/employer/workers`, `GET /api/employer/workers/{workerId}`, `GET /api/employer/dashboard/summary`, `GET /api/employer/dashboard/attendance-board`를 같은 scope/status 축으로 제공한다.
 
 # In Scope
 - employer worker directory read-model endpoint 추가
   - `GET /api/employer/workers`
+  - `GET /api/employer/workers/{workerId}`
 - employer dashboard foundation endpoint 추가
   - `GET /api/employer/dashboard/summary`
   - `GET /api/employer/dashboard/attendance-board`
@@ -42,7 +43,6 @@ Slice 4 foundation으로 employer web read-model 첫 구간을 열고, `GET /api
 - correction request flow 본구현
 - mobile 변경
 - multi-workplace switcher 구현
-- worker detail endpoint (`GET /api/employer/workers/{workerId}`) 본구현
 - worker profile 전용 엔티티 추가
 - 휴가/결근 canonical source 신설
 
@@ -80,6 +80,12 @@ Slice 4 foundation으로 employer web read-model 첫 구간을 열고, `GET /api
   - `size`
   - `totalElements`
   - `totalPages`
+- 신규 worker detail response
+  - summary foundation 필드
+  - `membershipEffectiveFrom`
+  - `membershipEffectiveTo`
+  - `latestRecord`
+  - `recentDays`
 - worker row foundation 필드
   - `workerId`
   - `name`
@@ -88,6 +94,18 @@ Slice 4 foundation으로 employer web read-model 첫 구간을 열고, `GET /api
   - `reflectionStatus`
   - `attendanceStatus`
   - `employeeCode`, `team`, `role`, `phone`, `avatarUrl`는 현재 source가 없으면 `null`
+- worker detail latest record foundation 필드
+  - `workDate`
+  - `clockInAt`
+  - `clockOutAt`
+  - `recordStatus`
+  - `reflectionStatus`
+  - `attendanceStatus`
+  - `workedMinutes`
+  - `needsReview`
+  - `clockOutOutsideAllowedRadius`
+  - `edited`
+  - workplace snapshot과 location labels
 - attendance board response
   - `weekStart`
   - `weekEnd`
@@ -117,9 +135,11 @@ Slice 4 foundation으로 employer web read-model 첫 구간을 열고, `GET /api
 - `workerId` 같은 bare ID detail endpoint는 이번 slice 범위 밖이라 열지 않는다.
 - workproof status는 scope workplace에 매달린 오늘 기록만 읽고, 다른 workplace 기록은 read-model에 섞지 않는다.
 - attendance board는 주간 범위를 읽더라도 해당 workplace에 걸린 record만 조합한다.
+- detail endpoint도 bare `workerId`를 그대로 신뢰하지 않고 `EmploymentMembership` 기준 active scoped target 재검증을 거친다.
 
 # Maintainability Notes
 - worker list/dashboard summary는 같은 scoped worker snapshot 조합 로직을 공유해 중복 status 계산을 피한다.
+- worker detail은 동일 status 조합을 재사용하고, `latestRecord + recentDays(최근 7일)`만 추가로 펼친다.
 - worker profile 전용 엔티티가 아직 없으므로 없는 필드를 임의로 합성하지 않는다.
 - foundation 단계에서는 dedicated read table 없이 service 조합으로 시작하되, 상태 필터와 pagination이 커지면 Querydsl/read-model 분리 후보로 남긴다.
 - 휴가/결근 같은 미정 상태를 무리하게 흉내 내지 말고, 현재 `WorkProof`가 증명하는 `working/completed/needs_review/no_record`만 노출한다.
@@ -171,7 +191,6 @@ Single lane
 - `attendance-board`는 week-based read-model을 별도 query로 뺄지, foundation snapshot 조합을 확장할지
 
 # Remaining Follow-ups
-- `GET /api/employer/workers/{workerId}` 계약과 target membership 재검증을 다음 순서로 남긴다.
 - worker profile canonical source 부재로 `employeeCode/team/role/phone/avatarUrl`는 계속 nullable foundation으로 남긴다.
 - `late/leave/absent` mockup 상태는 canonical source가 생길 때까지 열지 않는다.
 - 후속 작업 순서는 `docs/reviews/active/2026-03-19-web-worker-read-model-followups.md`에서 계속 관리한다.
