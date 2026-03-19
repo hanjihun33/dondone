@@ -18,6 +18,7 @@ public record EmployerCorrectionRequestDetailResponse(
         LocalDateTime requestedClockInAt,
         LocalDateTime requestedClockOutAt,
         String reason,
+        String requestMemo,
         int attachmentCount,
         LocalDateTime requestedAt,
         CorrectionRequestStatus status,

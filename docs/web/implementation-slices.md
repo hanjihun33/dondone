@@ -46,7 +46,7 @@
 | 6 | Hardening | `not_started` | 미시작 | 테스트, 리뷰, 리스크 정리와 prior slice follow-up 회수 | 관련 review note |
 
 ## 지금 기준 다음에 해야 할 일
-1. worker-side correction request create API/contract를 `requested times + reason + attachment metadata` 기준으로 정리한다.
+1. worker direct edit flow를 correction request submit 흐름으로 옮길 범위를 정리한다.
 2. correction detail attachment는 증빙자료 의미를 유지한 채 web 상세 표면을 언제 열지 결정한다.
 3. employer issue queue에 correction request와 review 대상 record를 어떻게 함께 담을지 정리한다.
 4. 승인 후 화면 갱신은 재조회로 유지하고, cache/event invalidation은 hardening에서 재평가한다.

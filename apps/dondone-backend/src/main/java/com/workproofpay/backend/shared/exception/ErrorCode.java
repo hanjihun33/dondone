@@ -51,11 +51,10 @@ public enum ErrorCode {
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "Wallet not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
-<<<<<<< HEAD
     PHONE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "Phone number already exists"),
-=======
+    CORRECTION_REQUEST_PENDING_EXISTS(HttpStatus.CONFLICT, "A pending correction request already exists for this workproof"),
     CORRECTION_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "Correction request is already processed"),
->>>>>>> 46188b4 (feat: employer correction request foundation 추가)
+    CORRECTION_REQUEST_SCOPE_NOT_READY(HttpStatus.CONFLICT, "Correction request is not available for the current workproof scope"),
     ACTIVE_CONTRACT_REQUIRED(HttpStatus.CONFLICT, "Active contract is required"),
     ACTIVE_CONTRACT_EXISTS(HttpStatus.CONFLICT, "Active contract already exists"),
     ACTIVE_WORKPROOF_EXISTS(HttpStatus.CONFLICT, "Active workproof already exists"),
@@ -76,6 +75,7 @@ public enum ErrorCode {
     WALLET_FUNDING_FAILED(HttpStatus.CONFLICT, "Wallet funding failed"),
     RECOVERY_ACTION_NOT_ALLOWED(HttpStatus.CONFLICT, "Recovery action is not allowed for the current state"),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
+    CORRECTION_REQUEST_NO_CHANGES(HttpStatus.BAD_REQUEST, "Requested correction times must differ from the original workproof"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
 

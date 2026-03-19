@@ -3,16 +3,26 @@ package com.workproofpay.backend.workproof;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.correction.model.CorrectionRequest;
+import com.workproofpay.backend.correction.model.CorrectionRequestStatus;
+import com.workproofpay.backend.correction.repo.CorrectionRequestRepository;
+import com.workproofpay.backend.employer.model.Company;
+import com.workproofpay.backend.employer.model.EmploymentMembership;
+import com.workproofpay.backend.employer.repo.CompanyRepository;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
 import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
 import com.workproofpay.backend.wage.repo.WageDepositRepository;
 import com.workproofpay.backend.workproof.api.dto.request.CreateWorkProofRequest;
+import com.workproofpay.backend.workproof.api.dto.request.CreateWorkProofCorrectionRequest;
 import com.workproofpay.backend.workproof.api.dto.request.UpdateWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.WorkProofAttachmentMetadataRequest;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofAuditLog;
+import com.workproofpay.backend.workproof.model.Workplace;
 import com.workproofpay.backend.workproof.repo.WorkProofAuditLogRepository;
 import com.workproofpay.backend.workproof.repo.WorkProofRepository;
+import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +57,19 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
     private UserRepository userRepository;
 
     @Autowired
+    private CompanyRepository companyRepository;
+
+    @Autowired
+    private WorkplaceRepository workplaceRepository;
+
+    @Autowired
+    private EmploymentMembershipRepository employmentMembershipRepository;
+
+    @Autowired
     private WorkProofRepository workProofRepository;
+
+    @Autowired
+    private CorrectionRequestRepository correctionRequestRepository;
 
     @Autowired
     private WageDepositRepository wageDepositRepository;
@@ -60,9 +82,13 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
 
     @BeforeEach
     void setUp() {
+        correctionRequestRepository.deleteAll();
         workProofAuditLogRepository.deleteAll();
         wageDepositRepository.deleteAll();
         workProofRepository.deleteAll();
+        employmentMembershipRepository.deleteAll();
+        workplaceRepository.deleteAll();
+        companyRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -263,6 +289,233 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
         WorkProof savedWorkProof = workProofRepository.findById(workProofId).orElseThrow();
         Assertions.assertEquals(2, savedWorkProof.getAttachmentCount());
         Assertions.assertTrue(savedWorkProof.getAttachmentMetadataJson().contains("\"type\":\"PHOTO\""));
+    }
+
+    @Test
+    void createCorrectionRequestForEmployerScopedWorkProof() throws Exception {
+        User worker = userRepository.save(User.register("correction-worker@test.com", "hashed", "Correction Worker"));
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                worker,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul Address 212",
+                null,
+                37.501274,
+                127.039585,
+                300
+        ));
+        employmentMembershipRepository.save(EmploymentMembership.create(
+                worker.getId(),
+                company.getId(),
+                workplace.getId(),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof workProof = WorkProof.checkIn(
+                worker,
+                workplace,
+                null,
+                LocalDateTime.of(2026, 3, 8, 9, 0),
+                LocalDateTime.of(2026, 3, 8, 9, 1),
+                37.501274,
+                127.039585,
+                "Front door"
+        );
+        workProof.completeCheckOut(
+                LocalDateTime.of(2026, 3, 8, 18, 0),
+                LocalDateTime.of(2026, 3, 8, 18, 1),
+                37.501274,
+                127.039585,
+                "Front door",
+                false
+        );
+        workProof = workProofRepository.save(workProof);
+        String token = tokenFor(worker);
+
+        CreateWorkProofCorrectionRequest request = new CreateWorkProofCorrectionRequest(
+                LocalDateTime.of(2026, 3, 8, 9, 20),
+                LocalDateTime.of(2026, 3, 8, 18, 10),
+                "Late subway arrival",
+                "Train delay screenshot attached",
+                null,
+                List.of(
+                        new WorkProofAttachmentMetadataRequest(
+                                WorkProofAttachmentMetadataRequest.AttachmentType.PHOTO,
+                                "subway.png",
+                                "storage://corrections/subway.png"
+                        )
+                )
+        );
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", workProof.getId())
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("CREATED"))
+                .andExpect(jsonPath("$.data.workProofId").value(workProof.getId()))
+                .andExpect(jsonPath("$.data.reason").value("Late subway arrival"))
+                .andExpect(jsonPath("$.data.memo").value("Train delay screenshot attached"))
+                .andExpect(jsonPath("$.data.attachmentCount").value(1))
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+
+        CorrectionRequest savedRequest = correctionRequestRepository.findAll().get(0);
+        Assertions.assertEquals(worker.getId(), savedRequest.getRequestedByAccountId());
+        Assertions.assertEquals(company.getId(), savedRequest.getCompanyId());
+        Assertions.assertEquals(workplace.getId(), savedRequest.getWorkplaceId());
+        Assertions.assertEquals("Train delay screenshot attached", savedRequest.getRequestMemo());
+        Assertions.assertTrue(savedRequest.getAttachmentMetadataJson().contains("\"fileRef\":\"storage://corrections/subway.png\""));
+    }
+
+    @Test
+    void rejectsCorrectionRequestWithoutEmployerScopedWorkProofOrWhenPendingAlreadyExists() throws Exception {
+        User worker = userRepository.save(User.register("pending-correction@test.com", "hashed", "Pending Worker"));
+        String token = tokenFor(worker);
+
+        CreateWorkProofRequest personalRequest = new CreateWorkProofRequest(
+                LocalDate.of(2026, 3, 12),
+                LocalDateTime.of(2026, 3, 12, 9, 0),
+                LocalDateTime.of(2026, 3, 12, 18, 0),
+                LocalDateTime.of(2026, 3, 12, 8, 59),
+                LocalDateTime.of(2026, 3, 12, 18, 1),
+                37.0,
+                127.0,
+                37.0,
+                127.0,
+                "personal record",
+                null,
+                0
+        );
+
+        String createdPersonal = mockMvc.perform(post("/api/workproof")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(personalRequest)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long personalWorkProofId = objectMapper.readTree(createdPersonal).path("data").path("id").asLong();
+
+        CreateWorkProofCorrectionRequest correctionRequest = new CreateWorkProofCorrectionRequest(
+                LocalDateTime.of(2026, 3, 12, 9, 10),
+                LocalDateTime.of(2026, 3, 12, 18, 10),
+                "Need correction",
+                null,
+                0,
+                null
+        );
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", personalWorkProofId)
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(correctionRequest)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CORRECTION_REQUEST_SCOPE_NOT_READY"));
+
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-WORKER"));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                worker,
+                company.getId(),
+                "Employer Hub",
+                "Employer Address 1",
+                null,
+                37.5,
+                127.0,
+                300
+        ));
+        employmentMembershipRepository.save(EmploymentMembership.create(
+                worker.getId(),
+                company.getId(),
+                workplace.getId(),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof scopedWorkProof = WorkProof.checkIn(
+                worker,
+                workplace,
+                null,
+                LocalDateTime.of(2026, 3, 13, 9, 0),
+                LocalDateTime.of(2026, 3, 13, 9, 1),
+                37.5,
+                127.0,
+                "Front door"
+        );
+        scopedWorkProof.completeCheckOut(
+                LocalDateTime.of(2026, 3, 13, 18, 0),
+                LocalDateTime.of(2026, 3, 13, 18, 1),
+                37.5,
+                127.0,
+                "Front door",
+                false
+        );
+        scopedWorkProof = workProofRepository.save(scopedWorkProof);
+
+        correctionRequestRepository.save(CorrectionRequest.create(
+                scopedWorkProof,
+                worker.getId(),
+                worker.getId(),
+                company.getId(),
+                workplace.getId(),
+                scopedWorkProof.getWorkDate(),
+                scopedWorkProof.getClockInAt(),
+                scopedWorkProof.getClockOutAt(),
+                LocalDateTime.of(2026, 3, 13, 9, 10),
+                LocalDateTime.of(2026, 3, 13, 18, 10),
+                "Existing pending correction",
+                null,
+                0,
+                null
+        ));
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", scopedWorkProof.getId())
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
+                                LocalDateTime.of(2026, 3, 13, 9, 30),
+                                LocalDateTime.of(2026, 3, 13, 18, 30),
+                                "Second correction attempt",
+                                null,
+                                0,
+                                null
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CORRECTION_REQUEST_PENDING_EXISTS"));
+
+        WorkProof unchangedWorkProof = WorkProof.checkIn(
+                worker,
+                workplace,
+                null,
+                LocalDateTime.of(2026, 3, 14, 9, 0),
+                LocalDateTime.of(2026, 3, 14, 9, 1),
+                37.5,
+                127.0,
+                "Front door"
+        );
+        unchangedWorkProof.completeCheckOut(
+                LocalDateTime.of(2026, 3, 14, 18, 0),
+                LocalDateTime.of(2026, 3, 14, 18, 1),
+                37.5,
+                127.0,
+                "Front door",
+                false
+        );
+        unchangedWorkProof = workProofRepository.save(unchangedWorkProof);
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", unchangedWorkProof.getId())
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
+                                unchangedWorkProof.getClockInAt(),
+                                unchangedWorkProof.getClockOutAt(),
+                                "No actual change",
+                                null,
+                                0,
+                                null
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CORRECTION_REQUEST_NO_CHANGES"));
     }
 
     @Test

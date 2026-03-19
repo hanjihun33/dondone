@@ -141,6 +141,7 @@ class EmployerCorrectionRequestIntegrationTest {
                 .andExpect(jsonPath("$.data.workerName").value("Rejectable Worker"))
                 .andExpect(jsonPath("$.data.workerEmail").value("rejectable-worker@acme.test"))
                 .andExpect(jsonPath("$.data.reason").value("Manual correction request"))
+                .andExpect(jsonPath("$.data.requestMemo").value("Detailed worker note"))
                 .andExpect(jsonPath("$.data.attachmentCount").value(2))
                 .andExpect(jsonPath("$.data.status").value("PENDING"));
     }
@@ -353,6 +354,7 @@ class EmployerCorrectionRequestIntegrationTest {
                 LocalDateTime.of(2026, 3, 17, 9, 20),
                 LocalDateTime.of(2026, 3, 17, 18, 10),
                 "Fix late subway arrival",
+                "Subway delay memo",
                 1,
                 "[{\"fileName\":\"evidence.png\"}]"
         ));
@@ -368,6 +370,7 @@ class EmployerCorrectionRequestIntegrationTest {
                 LocalDateTime.of(2026, 3, 16, 9, 0),
                 LocalDateTime.of(2026, 3, 16, 18, 0),
                 "Manual correction request",
+                "Detailed worker note",
                 2,
                 "[{\"fileName\":\"note.txt\"},{\"fileName\":\"photo.jpg\"}]"
         ));
@@ -383,6 +386,7 @@ class EmployerCorrectionRequestIntegrationTest {
                 LocalDateTime.of(2026, 3, 15, 9, 0),
                 LocalDateTime.of(2026, 3, 15, 18, 0),
                 "Already handled",
+                null,
                 0,
                 null
         );
@@ -401,6 +405,7 @@ class EmployerCorrectionRequestIntegrationTest {
                 LocalDateTime.of(2026, 3, 15, 9, 10),
                 LocalDateTime.of(2026, 3, 15, 18, 10),
                 "Out of scope request",
+                null,
                 0,
                 null
         ));

@@ -16,16 +16,16 @@
 - reject는 `WorkProof`를 수정하지 않고 request status와 `CorrectionDecisionAudit`만 기록하도록 고정했다.
 
 # Deferred Work Order
-## 1. worker-side correction request create implementation
+## 1. worker direct edit flow migration
 - 라벨: `now`
 - 현재 상태
-  - shared policy는 고정했다: worker는 WorkProof를 직접 확정 수정하지 않고 correction request를 제출하고, employer가 승인/반려한다.
-  - employer-side queue/decision endpoint만 먼저 열려 있고 worker-side create API는 아직 없다.
+  - shared policy는 고정했고 backend worker create endpoint도 열었다: `POST /api/workproof/{workProofId}/correction-requests`
+  - worker app은 아직 기존 direct edit flow를 쓰고 있다.
 - 지금 해야 할 일
-  - worker-side request create payload를 `requested times + reason + attachment metadata` 기준으로 구체화한다.
-  - 기존 worker 직접 수정 flow를 correction request submit flow로 바꾸는 API/backend 범위를 정리한다.
+  - worker client가 `PATCH /api/workproof/{id}` 직접 반영 대신 correction request submit flow를 쓰도록 전환 범위를 정리한다.
+  - direct edit endpoint를 언제 축소하거나 역할을 바꿀지 정리한다.
 - 닫히는 조건
-  - worker-side correction request create contract와 backend endpoint가 구현된다.
+  - worker client와 backend contract가 correction request submit 흐름으로 맞춰진다.
 
 ## 2. attachment detail surface
 - 라벨: `temporary`, `shared_policy_pending`
@@ -102,13 +102,13 @@ Slice 5 correction request flow backend로 이어가자.
 - 가능하면 correction queue와 outside-radius review 경계 재검토
 
 후속 작업 순서:
-- 1. worker-side correction request create 구현 범위 정리
+- 1. worker direct edit flow migration 정리
 - 2. attachment detail surface 정리
 - 3. correction queue vs outside-radius review boundary 정리
 - 4. dashboard/wage/docs invalidation strategy hardening 정리
 
 임시 처리된 공통 정책 항목:
-- `now`: worker-side correction request create는 정책 고정 후 미구현 상태
+- `now`: worker correction request create backend는 구현됐지만 worker client migration은 아직 미구현
 - `temporary / shared_policy_pending`: correction detail은 현재 `attachmentCount`만 노출
 - `rescope`: correction queue는 장기적으로 correction request와 review 대상 record를 둘 다 담는 방향이지만 현재는 correction request만 구현
 

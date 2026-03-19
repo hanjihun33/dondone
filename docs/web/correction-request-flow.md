@@ -104,10 +104,12 @@
 ## Slice 5 foundation 메모
 - 현재 backend foundation은 employer-side queue만 먼저 연다.
 - 구현 endpoint
+  - `POST /api/workproof/{workProofId}/correction-requests`
   - `GET /api/employer/correction-requests`
   - `GET /api/employer/correction-requests/{requestId}`
   - `POST /api/employer/correction-requests/{requestId}/approve`
   - `POST /api/employer/correction-requests/{requestId}/reject`
+- worker create endpoint는 변경 시간, 사유, memo, 증빙 attachment metadata를 받아 pending correction request를 생성한다.
 - scope는 worker의 현재 membership을 다시 계산하는 대신 request snapshot의 `companyId/workplaceId`와 현재 employer scope 일치 여부로 먼저 고정한다.
 - approve는 `CorrectionRequest` 상태 변경, `WorkProof` 시간 반영, `WorkProofAuditLog`, `CorrectionDecisionAudit`를 한 transaction으로 묶는다.
 - reject는 `WorkProof`를 변경하지 않고 request 상태와 decision audit만 남긴다.

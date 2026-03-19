@@ -233,6 +233,7 @@ public class EmployerCorrectionRequestService {
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
                 correctionRequest.getReason(),
+                correctionRequest.getRequestMemo(),
                 correctionRequest.getAttachmentCount(),
                 correctionRequest.getCreatedAt(),
                 correctionRequest.getStatus(),

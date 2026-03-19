@@ -39,8 +39,8 @@ Slice 5에서 employer web correction queue foundation을 열고, `GET /api/empl
 - Slice 5 계약 문서 갱신
 
 # Out of Scope
-- worker-side correction request 생성 endpoint
-- 기존 `/api/workproof/*`, `/api/auth/*`, `/api/wage/*` API 변경
+- 기존 worker direct edit client를 correction request submit flow로 바꾸는 mobile 변경
+- 기존 `/api/auth/*`, `/api/wage/*` API 변경
 - mobile 변경
 - 반경 밖 `check-out` review와 correction request 도메인 통합
 - 비동기 재계산 파이프라인

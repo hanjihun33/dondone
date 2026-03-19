@@ -54,6 +54,9 @@ public class CorrectionRequest extends BaseTimeEntity {
     @Column(nullable = false, length = 500)
     private String reason;
 
+    @Column(name = "request_memo", length = 500)
+    private String requestMemo;
+
     @Column(name = "attachment_count", nullable = false)
     private int attachmentCount;
 
@@ -88,6 +91,7 @@ public class CorrectionRequest extends BaseTimeEntity {
                               LocalDateTime requestedClockInAt,
                               LocalDateTime requestedClockOutAt,
                               String reason,
+                              String requestMemo,
                               int attachmentCount,
                               String attachmentMetadataJson,
                               CorrectionRequestStatus status) {
@@ -102,6 +106,7 @@ public class CorrectionRequest extends BaseTimeEntity {
         this.requestedClockInAt = requestedClockInAt;
         this.requestedClockOutAt = requestedClockOutAt;
         this.reason = reason;
+        this.requestMemo = requestMemo;
         this.attachmentCount = attachmentCount;
         this.attachmentMetadataJson = attachmentMetadataJson;
         this.status = status;
@@ -118,6 +123,7 @@ public class CorrectionRequest extends BaseTimeEntity {
                                            LocalDateTime requestedClockInAt,
                                            LocalDateTime requestedClockOutAt,
                                            String reason,
+                                           String requestMemo,
                                            int attachmentCount,
                                            String attachmentMetadataJson) {
         return new CorrectionRequest(
@@ -132,6 +138,7 @@ public class CorrectionRequest extends BaseTimeEntity {
                 requestedClockInAt,
                 requestedClockOutAt,
                 reason,
+                requestMemo,
                 attachmentCount,
                 attachmentMetadataJson,
                 CorrectionRequestStatus.PENDING
