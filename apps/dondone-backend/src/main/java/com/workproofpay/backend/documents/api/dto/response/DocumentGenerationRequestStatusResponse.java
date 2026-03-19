@@ -22,7 +22,9 @@ public record DocumentGenerationRequestStatusResponse(
                 request.getDocumentType(),
                 request.getStatus(),
                 "/api/documents/requests/" + request.getRequestId(),
-                "/api/documents/" + request.getId()
+                request.getStatus() == DocumentGenerationStatus.READY
+                        ? "/api/documents/" + request.getId() + "/download"
+                        : null
         );
     }
 }

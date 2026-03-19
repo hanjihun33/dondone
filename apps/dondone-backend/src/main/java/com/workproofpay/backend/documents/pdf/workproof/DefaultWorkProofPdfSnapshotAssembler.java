@@ -60,9 +60,19 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
         ZoneId zoneId = resolveZoneId(command.zoneId());
 
         DocumentGenerationRequest request = loadDocumentRequest(command);
-        YearMonth yearMonth = YearMonth.parse(request.getMonth());
-        LocalDate startDate = command.startDate() != null ? command.startDate() : yearMonth.atDay(1);
-        LocalDate endDate = command.endDate() != null ? command.endDate() : yearMonth.atEndOfMonth();
+        LocalDate requestStartDate = request.getStartDate();
+        LocalDate requestEndDate = request.getEndDate();
+        YearMonth yearMonth = request.getMonth() == null ? null : YearMonth.parse(request.getMonth());
+        LocalDate startDate = command.startDate() != null
+                ? command.startDate()
+                : requestStartDate != null
+                ? requestStartDate
+                : yearMonth.atDay(1);
+        LocalDate endDate = command.endDate() != null
+                ? command.endDate()
+                : requestEndDate != null
+                ? requestEndDate
+                : yearMonth.atEndOfMonth();
         Long workplaceId = command.workplaceId() != null ? command.workplaceId() : request.getWorkplaceId();
 
         Workplace workplace = workplaceRepository.findByIdAndUserId(workplaceId, command.userId())
@@ -119,7 +129,7 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 new WorkProofPdfSnapshot.PeriodInfo(
                         formatDate(startDate),
                         formatDate(endDate),
-                        request.getMonth()
+                        request.getMonth() == null ? formatYearMonth(startDate, endDate) : request.getMonth()
                 ),
                 new WorkProofPdfSnapshot.SummaryInfo(
                         totalRecordCount,
@@ -141,14 +151,25 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
             return documentGenerationRequestRepository.findByIdAndUserIdAndDocumentType(
                             command.documentRequestId(),
                             command.userId(),
-                            DocumentType.PROOF_PACK
+                            resolveSupportedDocumentType(command.documentRequestId())
                     )
                     .orElseThrow(() -> new ApiException(ErrorCode.DOCUMENT_NOT_FOUND));
         }
 
         return documentGenerationRequestRepository.findByRequestIdAndUserId(command.requestId(), command.userId())
-                .filter(request -> request.getDocumentType() == DocumentType.PROOF_PACK)
+                .filter(request -> isSupportedDocumentType(request.getDocumentType()))
                 .orElseThrow(() -> new ApiException(ErrorCode.DOCUMENT_NOT_FOUND));
+    }
+
+    private DocumentType resolveSupportedDocumentType(Long documentRequestId) {
+        return documentGenerationRequestRepository.findById(documentRequestId)
+                .map(DocumentGenerationRequest::getDocumentType)
+                .filter(this::isSupportedDocumentType)
+                .orElseThrow(() -> new ApiException(ErrorCode.DOCUMENT_NOT_FOUND));
+    }
+
+    private boolean isSupportedDocumentType(DocumentType documentType) {
+        return documentType == DocumentType.PROOF_PACK || documentType == DocumentType.WORKPROOF_STATEMENT;
     }
 
     private Optional<WorkContract> resolveContract(Long userId, Long workplaceId, List<WorkProof> records) {
@@ -169,7 +190,13 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                                                         YearMonth yearMonth,
                                                         ZoneId zoneId,
                                                         Locale locale) {
-        String documentNumber = "PP-%s-%06d".formatted(yearMonth.toString().replace("-", ""), request.getId());
+        String periodToken = yearMonth != null
+                ? yearMonth.toString().replace("-", "")
+                : request.getStartDate() != null
+                ? request.getStartDate().toString().replace("-", "")
+                : "RANGE";
+        String documentPrefix = request.getDocumentType() == DocumentType.WORKPROOF_STATEMENT ? "WS" : "PP";
+        String documentNumber = "%s-%s-%06d".formatted(documentPrefix, periodToken, request.getId());
         return new WorkProofPdfSnapshot.DocumentMeta(
                 request.getDocumentType().name(),
                 documentNumber,
@@ -329,6 +356,16 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
 
     private String formatDate(LocalDate date) {
         return date == null ? "-" : DATE_FORMATTER.format(date);
+    }
+
+    private String formatYearMonth(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            return "-";
+        }
+        if (startDate.getYear() == endDate.getYear() && startDate.getMonth() == endDate.getMonth()) {
+            return "%04d-%02d".formatted(startDate.getYear(), startDate.getMonthValue());
+        }
+        return "%s ~ %s".formatted(formatDate(startDate), formatDate(endDate));
     }
 
     private String formatDateTime(LocalDateTime dateTime) {
