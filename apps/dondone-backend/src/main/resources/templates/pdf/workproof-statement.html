@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>WorkProof Statement</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 18mm 14mm 18mm 14mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", Arial, sans-serif;
+            color: #111827;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .page {
+            width: 100%;
+        }
+
+        .header {
+            border-bottom: 2px solid #111827;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }
+
+        .brand {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .header-grid {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .header-grid td {
+            border: none;
+            padding: 0;
+            vertical-align: bottom;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .meta {
+            text-align: right;
+            font-size: 10px;
+            color: #4b5563;
+        }
+
+        .section {
+            margin-bottom: 14px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .info-grid {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            margin: 0 -8px;
+        }
+
+        .info-card {
+            width: 50%;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 10px 12px;
+            vertical-align: top;
+        }
+
+        .label {
+            font-size: 10px;
+            color: #6b7280;
+            margin-bottom: 2px;
+        }
+
+        .value {
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .summary-grid {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            margin: 0 -8px;
+        }
+
+        .summary-grid td {
+            width: 33.333%;
+        }
+
+        .summary-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+            background: #f9fafb;
+            height: 100%;
+        }
+
+        .summary-number {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .data-table th {
+            background: #f3f4f6;
+            color: #374151;
+            font-size: 10px;
+            font-weight: 700;
+            text-align: left;
+            padding: 8px 6px;
+            border: 1px solid #d1d5db;
+        }
+
+        .data-table td {
+            font-size: 10px;
+            padding: 7px 6px;
+            border: 1px solid #e5e7eb;
+            vertical-align: top;
+            word-break: break-word;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-neutral {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .notices {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: #fafafa;
+            padding: 10px 12px;
+        }
+
+        .notices ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .notices li {
+            margin: 0 0 4px 0;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+
+        .footer {
+            margin-top: 18px;
+            padding-top: 8px;
+            border-top: 1px solid #d1d5db;
+            font-size: 9px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="brand">DonDone</div>
+        <table class="header-grid">
+            <tr>
+                <td>
+                    <div class="title">WorkProof Statement</div>
+                    <div th:text="'Period: ' + ${snapshot.period.startDate} + ' - ' + ${snapshot.period.endDate}">
+                        Period: 2026-03-01 - 2026-03-31
+                    </div>
+                </td>
+                <td class="meta">
+                    <div th:text="'No. ' + ${snapshot.meta.documentNumber}">No. PP-202603-000001</div>
+                    <div th:text="'Generated: ' + ${snapshot.meta.generatedAt}">Generated: 2026-03-19 14:20:00</div>
+                    <div th:text="'Template: ' + ${snapshot.meta.templateVersion}">Template: workproof-statement-v1</div>
+                </td>
+            </tr>
+        </table>
+    </header>
+
+    <section class="section">
+        <div class="section-title">Worker and Workplace</div>
+        <table class="info-grid">
+            <tr>
+                <td class="info-card">
+                    <div class="label">Worker Name</div>
+                    <div class="value" th:text="${snapshot.worker.name}">Test User</div>
+                    <div class="label">Email</div>
+                    <div th:text="${snapshot.worker.email}">test@example.com</div>
+                    <div class="label">User ID</div>
+                    <div th:text="${snapshot.worker.userId}">1</div>
+                </td>
+                <td class="info-card">
+                    <div class="label">Workplace</div>
+                    <div class="value" th:text="${snapshot.workplace.name}">DunDone Factory</div>
+                    <div class="label">Address</div>
+                    <div th:text="${snapshot.workplace.address}">Seoul ...</div>
+                    <div class="label">Label</div>
+                    <div th:text="${snapshot.workplace.mapLabel}">Main Gate</div>
+                </td>
+            </tr>
+        </table>
+    </section>
+
+    <section class="section">
+        <div class="section-title">Contract Summary</div>
+        <table class="info-grid">
+            <tr>
+                <td class="info-card">
+                    <div class="label">Pay Unit</div>
+                    <div class="value" th:text="${snapshot.contract.payUnit}">Hourly</div>
+                </td>
+                <td class="info-card">
+                    <div class="label">Base Pay</div>
+                    <div class="value" th:text="${snapshot.contract.basePayAmount}">10,030 KRW</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-card">
+                    <div class="label">Hourly Wage</div>
+                    <div class="value" th:text="${snapshot.contract.normalizedHourlyWage}">10,030 KRW</div>
+                </td>
+                <td class="info-card">
+                    <div class="label">Work Minutes</div>
+                    <div th:text="'Daily: ' + ${snapshot.contract.dailyWorkMinutes}">Daily: 480</div>
+                    <div th:text="'Monthly: ' + ${snapshot.contract.monthlyWorkMinutes}">Monthly: 10560</div>
+                    <div th:text="'Effective: ' + ${snapshot.contract.effectiveFrom} + ' - ' + ${snapshot.contract.effectiveTo}">
+                        Effective: 2026-03-01 - Current
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </section>
+
+    <section class="section">
+        <div class="section-title">Period Summary</div>
+        <table class="summary-grid">
+            <tr>
+                <td><div class="summary-card"><div class="label">Total Records</div><div class="summary-number" th:text="${snapshot.summary.totalRecordCount}">22</div></div></td>
+                <td><div class="summary-card"><div class="label">Reflected</div><div class="summary-number" th:text="${snapshot.summary.reflectedCount}">20</div></div></td>
+                <td><div class="summary-card"><div class="label">Needs Review</div><div class="summary-number" th:text="${snapshot.summary.needsReviewCount}">2</div></div></td>
+            </tr>
+            <tr>
+                <td><div class="summary-card"><div class="label">Edited</div><div class="summary-number" th:text="${snapshot.summary.editedCount}">3</div></div></td>
+                <td><div class="summary-card"><div class="label">Attachments</div><div class="summary-number" th:text="${snapshot.summary.totalAttachmentCount}">4</div></div></td>
+                <td><div class="summary-card"><div class="label">Worked Time</div><div class="summary-number" th:text="${snapshot.summary.totalWorkedHoursLabel}">176h 00m</div></div></td>
+            </tr>
+        </table>
+    </section>
+
+    <section class="section">
+        <div class="section-title">WorkProof Records</div>
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th style="width: 10%;">Date</th>
+                <th style="width: 9%;">In</th>
+                <th style="width: 9%;">Out</th>
+                <th style="width: 11%;">Worked</th>
+                <th style="width: 13%;">Status</th>
+                <th style="width: 8%;">Edited</th>
+                <th style="width: 8%;">Files</th>
+                <th style="width: 15%;">Location</th>
+                <th style="width: 17%;">Memo</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="record : ${snapshot.records}">
+                <td th:text="${record.workDate}">2026-03-01</td>
+                <td th:text="${record.clockInAt}">09:00</td>
+                <td th:text="${record.clockOutAt}">18:00</td>
+                <td th:text="${record.workedHoursLabel}">9h 00m</td>
+                <td>
+                    <span class="status-badge"
+                          th:classappend="' status-' + ${record.financialStatusTone}"
+                          th:text="${record.financialStatusLabel}">
+                        Reflected
+                    </span>
+                    <div th:if="${record.outsideAllowedRadius}" th:text="${record.outsideAllowedRadiusLabel}">Outside Radius</div>
+                </td>
+                <td th:text="${record.edited ? 'Y' : 'N'}">N</td>
+                <td th:text="${record.attachmentCount}">0</td>
+                <td>
+                    <div th:text="${record.clockInLocationLabel}">Main Gate</div>
+                    <div th:text="${record.clockOutLocationLabel}">Main Gate</div>
+                </td>
+                <td>
+                    <div th:text="${record.editReason}">-</div>
+                    <div th:text="${record.memo}">-</div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="section page-break" th:if="${!#lists.isEmpty(snapshot.audits)}">
+        <div class="section-title">Edit History</div>
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th style="width: 13%;">Edited At</th>
+                <th style="width: 8%;">Record ID</th>
+                <th style="width: 10%;">Before In</th>
+                <th style="width: 10%;">Before Out</th>
+                <th style="width: 10%;">After In</th>
+                <th style="width: 10%;">After Out</th>
+                <th style="width: 19%;">Reason</th>
+                <th style="width: 20%;">Memo</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="audit : ${snapshot.audits}">
+                <td th:text="${audit.editedAt}">2026-03-19 14:00:00</td>
+                <td th:text="${audit.recordId}">101</td>
+                <td th:text="${audit.beforeClockInAt}">09:00</td>
+                <td th:text="${audit.beforeClockOutAt}">18:00</td>
+                <td th:text="${audit.afterClockInAt}">09:10</td>
+                <td th:text="${audit.afterClockOutAt}">18:10</td>
+                <td>
+                    <div th:text="${audit.beforeEditReason}">-</div>
+                    <div th:text="${audit.afterEditReason}">Correction</div>
+                </td>
+                <td>
+                    <div th:text="${audit.beforeMemo}">-</div>
+                    <div th:text="${audit.afterMemo}">Updated memo</div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="section" th:if="${!#lists.isEmpty(snapshot.notices)}">
+        <div class="section-title">Notices</div>
+        <div class="notices">
+            <ul>
+                <li th:each="notice : ${snapshot.notices}" th:text="${notice}">Example notice</li>
+            </ul>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div>Generated by DonDone</div>
+        <div th:text="'Document Type: ' + ${snapshot.meta.documentType}">Document Type: PROOF_PACK</div>
+    </footer>
+</div>
+</body>
+</html>
