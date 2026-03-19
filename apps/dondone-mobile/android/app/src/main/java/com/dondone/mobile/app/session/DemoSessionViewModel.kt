@@ -20,6 +20,11 @@ import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.remittance.RemittanceRepository
 import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
 import com.dondone.mobile.data.remittance.RemittanceUnauthorizedException
+import com.dondone.mobile.data.wage.BackendWageRepository
+import com.dondone.mobile.data.wage.WageRemotePayload
+import com.dondone.mobile.data.wage.WageRemoteState
+import com.dondone.mobile.data.wage.WageRepository
+import com.dondone.mobile.data.wage.WageUnauthorizedException
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
@@ -41,6 +46,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.YearMonth
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 private const val REMITTANCE_STATUS_POLL_DELAY_MS = 1500L
@@ -48,13 +55,19 @@ private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 12
 private const val REMITTANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 송금 실연동 데이터를 불러옵니다."
 private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 실연동 데이터를 불러옵니다."
 private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
+private const val WAGE_REMOTE_LOGIN_MESSAGE = "로그인 후 급여 실연동 데이터를 불러옵니다."
 private const val ATOMIC_UNITS_PER_USDC = 1_000_000L
+private const val DOCUMENT_STATUS_READY = "READY"
+private const val DOCUMENT_STATUS_NOT_CREATED = "NOT_CREATED"
+private const val DOCUMENT_ID_PROOF = "PROOF"
+private const val DOCUMENT_ID_CLAIM = "CLAIM"
 
 class DemoSessionViewModel(
     private val authRepository: AuthRepository,
     private val advanceRepository: AdvanceRepository = BackendAdvanceRepository(),
     private val workproofRepository: WorkproofRepository = BackendWorkproofRepository(),
-    private val remittanceRepository: RemittanceRepository = BackendRemittanceRepository()
+    private val remittanceRepository: RemittanceRepository = BackendRemittanceRepository(),
+    private val wageRepository: WageRepository = BackendWageRepository()
 ) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
@@ -72,19 +85,27 @@ class DemoSessionViewModel(
     val advanceRemoteState: StateFlow<AdvanceRemoteState> = _advanceRemoteState.asStateFlow()
     private val _workproofRemoteState =
         MutableStateFlow(WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE))
+    private val _wageRemoteState =
+        MutableStateFlow(WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE))
     private val _remittanceRemoteState =
         MutableStateFlow(RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE))
+    val wageRemoteState: StateFlow<WageRemoteState> = _wageRemoteState.asStateFlow()
     val remittanceRemoteState: StateFlow<RemittanceRemoteState> = _remittanceRemoteState.asStateFlow()
     private val _workproofActionUiState = MutableStateFlow(WorkproofActionUiState())
     val workproofActionUiState: StateFlow<WorkproofActionUiState> = _workproofActionUiState.asStateFlow()
+    private val _wageActionUiState = MutableStateFlow(WageActionUiState())
+    val wageActionUiState: StateFlow<WageActionUiState> = _wageActionUiState.asStateFlow()
     private val _remittanceActionUiState = MutableStateFlow(RemittanceActionUiState())
     val remittanceActionUiState: StateFlow<RemittanceActionUiState> = _remittanceActionUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
+    private val _menuLaunchRequest = MutableStateFlow<MenuLaunchRequest?>(null)
+    val menuLaunchRequest: StateFlow<MenuLaunchRequest?> = _menuLaunchRequest.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
     val advanceRequestUiState: StateFlow<AdvanceRequestUiState> = _advanceRequestUiState.asStateFlow()
     private val _advanceRequestDetailUiState = MutableStateFlow(AdvanceRequestDetailUiState())
     val advanceRequestDetailUiState: StateFlow<AdvanceRequestDetailUiState> = _advanceRequestDetailUiState.asStateFlow()
+    private var nextMenuLaunchRequestId = 1L
 
     init {
         restoreAuthSession()
@@ -92,6 +113,9 @@ class DemoSessionViewModel(
 
     fun shiftAsOfDay(delta: Int) {
         _uiState.update { state -> DemoSessionReducer.shiftAsOfDay(state, delta) }
+        if (_authUiState.value.isAuthenticated) {
+            refreshWageRemoteState()
+        }
     }
 
     fun selectAccount(accountId: String) {
@@ -506,6 +530,104 @@ class DemoSessionViewModel(
         _uiState.update { state -> DemoSessionReducer.setActualDeposit(state, amount) }
     }
 
+    fun submitWageDeposit(amount: Int) {
+        val session = _authUiState.value.session ?: run {
+            _wageActionUiState.value = WageActionUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+        if (amount <= 0) {
+            _wageActionUiState.value = WageActionUiState(
+                message = "입금 금액을 입력해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _wageActionUiState.value = WageActionUiState(isSubmittingDeposit = true)
+            try {
+                wageRepository.createDeposit(
+                    accessToken = session.accessToken,
+                    month = currentWageMonth(),
+                    depositDate = currentWageAsOfDate(),
+                    actualDepositAmount = amount.toLong(),
+                    deductionsKnown = _uiState.value.wage.deductionsKnown,
+                    note = null
+                )
+                loadWageRemoteState(session)
+                _wageActionUiState.value = WageActionUiState(message = "실제 입금액을 기록했어요.")
+            } catch (error: WageUnauthorizedException) {
+                expireSession(error.message)
+                _wageActionUiState.value = WageActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _wageActionUiState.value = WageActionUiState(
+                    message = error.message ?: "실제 입금액을 저장하지 못했어요.",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    fun createWageVerification() {
+        val session = _authUiState.value.session ?: run {
+            _wageActionUiState.value = WageActionUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val payload = _wageRemoteState.value.payload
+        val workplaceId = payload?.workplaceId ?: _uiState.value.workproof.workplaceId ?: run {
+            _wageActionUiState.value = WageActionUiState(
+                message = "근무지 정보를 다시 불러와 주세요.",
+                isError = true
+            )
+            return
+        }
+        val actualDepositAmount =
+            payload?.summary?.actualDepositAmount ?: _uiState.value.wage.actualDeposit.toLong()
+        if (actualDepositAmount <= 0L) {
+            _wageActionUiState.value = WageActionUiState(
+                message = "실제 입금액을 먼저 입력해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _wageActionUiState.value = WageActionUiState(isSubmittingVerification = true)
+            try {
+                val created = wageRepository.createVerification(
+                    accessToken = session.accessToken,
+                    month = currentWageMonth(),
+                    workplaceId = workplaceId,
+                    actualDepositAmount = actualDepositAmount,
+                    deductionsKnown = payload?.summary?.deductionsKnown ?: _uiState.value.wage.deductionsKnown,
+                    memo = null
+                )
+                loadWageRemoteState(session, created.verificationId)
+                _wageActionUiState.value = WageActionUiState(message = "급여 확인 결과를 생성했어요.")
+            } catch (error: WageUnauthorizedException) {
+                expireSession(error.message)
+                _wageActionUiState.value = WageActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _wageActionUiState.value = WageActionUiState(
+                    message = error.message ?: "급여 확인 결과를 생성하지 못했어요.",
+                    isError = true
+                )
+            }
+        }
+    }
+
     fun saveWorkproofEdit(recordId: String, reason: String, memo: String, addAttachment: Boolean) {
         _uiState.update { state ->
             DemoSessionReducer.saveWorkproofEdit(
@@ -525,9 +647,12 @@ class DemoSessionViewModel(
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
+        _wageActionUiState.value = WageActionUiState()
         _remittanceActionUiState.value = RemittanceActionUiState()
+        _menuLaunchRequest.value = null
         refreshAdvanceRemoteState()
         refreshWorkproofRemoteState()
+        refreshWageRemoteState()
         refreshRemittanceRemoteState()
     }
 
@@ -535,6 +660,32 @@ class DemoSessionViewModel(
         if (!_workproofActionUiState.value.isSubmitting && _workproofActionUiState.value.message != null) {
             _workproofActionUiState.value = WorkproofActionUiState()
         }
+    }
+
+    fun clearWageActionMessage() {
+        if (!_wageActionUiState.value.isSubmitting && _wageActionUiState.value.message != null) {
+            _wageActionUiState.value = WageActionUiState()
+        }
+    }
+
+    fun openMenuForWageDocuments() {
+        val relatedActions = _wageRemoteState.value.payload?.latestVerification?.relatedActions
+        val target = when {
+            relatedActions?.claimKitDocumentId != null -> MenuLaunchTarget.CLAIM_DOCUMENT
+            relatedActions?.proofPackDocumentId != null -> MenuLaunchTarget.PROOF_DOCUMENT
+            relatedActions != null -> MenuLaunchTarget.CLAIM_SHEET
+            else -> null
+        }
+        _menuLaunchRequest.value = target?.let {
+            MenuLaunchRequest(
+                target = it,
+                requestId = nextMenuLaunchRequestId++
+            )
+        }
+    }
+
+    fun consumeMenuLaunchRequest() {
+        _menuLaunchRequest.value = null
     }
 
     fun clearRemittanceActionMessage() {
@@ -564,6 +715,7 @@ class DemoSessionViewModel(
                 )
                 _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
                 _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
+                _wageRemoteState.value = WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE)
                 _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
             }
         }
@@ -602,6 +754,7 @@ class DemoSessionViewModel(
                 )
                 _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
                 _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
+                _wageRemoteState.value = WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE)
                 _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
             }
         }
@@ -807,6 +960,18 @@ class DemoSessionViewModel(
         }
     }
 
+    fun refreshWageRemoteState() {
+        val session = _authUiState.value.session
+        if (session == null) {
+            _wageRemoteState.value = WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE)
+            return
+        }
+
+        viewModelScope.launch {
+            loadWageRemoteState(session)
+        }
+    }
+
     fun refreshRemittanceRemoteState() {
         val session = _authUiState.value.session
         if (session == null) {
@@ -826,6 +991,7 @@ class DemoSessionViewModel(
                 _authUiState.value = AuthUiState.unauthenticated()
                 _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
                 _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
+                _wageRemoteState.value = WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE)
                 _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
             } else {
                 onAuthenticated(session)
@@ -840,6 +1006,10 @@ class DemoSessionViewModel(
             return
         }
         loadWorkproofRemoteState(session)
+        if (!_authUiState.value.isAuthenticated) {
+            return
+        }
+        loadWageRemoteState(session)
         if (!_authUiState.value.isAuthenticated) {
             return
         }
@@ -867,6 +1037,17 @@ class DemoSessionViewModel(
         applyWorkproofRemoteState(remoteState)
     }
 
+    private suspend fun loadWageRemoteState(session: AuthSession, verificationId: Long? = null) {
+        _wageRemoteState.value = WageRemoteState.loading()
+        val remoteState = wageRepository.load(
+            accessToken = session.accessToken,
+            month = currentWageMonth(),
+            asOf = currentWageAsOfDate(),
+            paydayDay = _uiState.value.wage.paydayDay
+        )
+        applyWageRemoteState(remoteState, verificationId)
+    }
+
     private suspend fun loadRemittanceRemoteState(session: AuthSession) {
         _remittanceRemoteState.value = RemittanceRemoteState.loading()
         val remoteState = remittanceRepository.load(session.accessToken)
@@ -886,6 +1067,54 @@ class DemoSessionViewModel(
         _workproofRemoteState.value = remoteState
         val payload = remoteState.payload ?: return
         _uiState.update { current -> current.syncRemoteWorkproof(payload) }
+    }
+
+    private suspend fun applyWageRemoteState(
+        remoteState: WageRemoteState,
+        verificationId: Long? = null
+    ) {
+        if (!remoteState.isAuthenticated) {
+            clearAuthenticatedState(
+                AuthUiState.unauthenticated(
+                    remoteState.errorMessage ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            )
+            return
+        }
+
+        val session = _authUiState.value.session
+        val latestVerification = if (
+            verificationId != null &&
+            remoteState.payload != null &&
+            session != null
+        ) {
+            try {
+                wageRepository.getVerificationDetail(session.accessToken, verificationId)
+            } catch (error: WageUnauthorizedException) {
+                clearAuthenticatedState(
+                    AuthUiState.unauthenticated(
+                        error.message ?: "세션이 만료되어 다시 로그인해 주세요."
+                    )
+                )
+                return
+            } catch (_: Exception) {
+                remoteState.payload.latestVerification
+            }
+        } else {
+            remoteState.payload?.latestVerification
+        }
+
+        val nextState = if (remoteState.payload != null && latestVerification != null) {
+            remoteState.copy(
+                payload = remoteState.payload.copy(latestVerification = latestVerification)
+            )
+        } else {
+            remoteState
+        }
+
+        _wageRemoteState.value = nextState
+        val payload = nextState.payload ?: return
+        _uiState.update { current -> current.syncRemoteWage(payload) }
     }
 
     private suspend fun applyRemittanceRemoteState(remoteState: RemittanceRemoteState) {
@@ -960,6 +1189,9 @@ class DemoSessionViewModel(
         _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(
             unauthenticatedState.errorMessage ?: WORKPROOF_REMOTE_LOGIN_MESSAGE
         )
+        _wageRemoteState.value = WageRemoteState.unauthenticated(
+            unauthenticatedState.errorMessage ?: WAGE_REMOTE_LOGIN_MESSAGE
+        )
         _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(
             unauthenticatedState.errorMessage ?: REMITTANCE_REMOTE_LOGIN_MESSAGE
         )
@@ -967,9 +1199,11 @@ class DemoSessionViewModel(
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
+        _wageActionUiState.value = WageActionUiState()
         _remittanceActionUiState.value = RemittanceActionUiState()
         _profileUpdateUiState.value = ProfileUpdateUiState()
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
+        _menuLaunchRequest.value = null
         cancelRemittanceStatusPolling()
     }
 
@@ -1183,6 +1417,34 @@ class DemoSessionViewModel(
         )
     }
 
+    private fun DemoState.syncRemoteWage(payload: WageRemotePayload): DemoState {
+        val actualDepositAmount = payload.summary.actualDepositAmount?.toInt()
+        return copy(
+            wage = wage.copy(
+                workDays = payload.summary.workDays,
+                totalHours = (payload.summary.totalWorkedMinutes / 60L).toInt(),
+                overtimeHours = (payload.summary.overtimeMinutes / 60L).toInt(),
+                nightHours = (payload.summary.nightMinutes / 60L).toInt(),
+                hourly = payload.monthlySummary.normalizedHourlyWage.toInt(),
+                deductionsKnown = payload.summary.deductionsKnown,
+                actualDepositRecordedDay = payload.summary.actualDepositRecordedDate?.dayOfMonth
+                    ?: payload.summary.actualDepositRecordedDay,
+                actualDeposit = actualDepositAmount ?: wage.actualDeposit,
+                paydayDay = payload.summary.paydayDay
+            ),
+            workproof = workproof.copy(
+                workplaceId = payload.workplaceId,
+                workplaceName = payload.workplaceName
+            ),
+            documents = documents.syncWageDocuments(
+                year = demo.year,
+                month = demo.month,
+                day = demo.asOfDay,
+                latestVerification = payload.latestVerification
+            )
+        )
+    }
+
     private fun DemoState.syncRemoteRemittance(payload: RemittanceRemotePayload): DemoState {
         val inFlightTransfer = payload.activeTransfer?.takeUnless { it.isTerminalStatus() }
         val nextRecipients = payload.recipients.map { recipient ->
@@ -1217,6 +1479,44 @@ class DemoSessionViewModel(
                 status = detail.toUiTransferStatus()
             )
         )
+    }
+
+    private fun currentWageMonth(): YearMonth =
+        YearMonth.of(_uiState.value.demo.year, _uiState.value.demo.month)
+
+    private fun currentWageAsOfDate(): LocalDate =
+        LocalDate.of(
+            _uiState.value.demo.year,
+            _uiState.value.demo.month,
+            _uiState.value.demo.asOfDay
+        )
+}
+
+private fun List<com.dondone.mobile.domain.model.DocumentItem>.syncWageDocuments(
+    year: Int,
+    month: Int,
+    day: Int,
+    latestVerification: com.dondone.mobile.data.wage.WageVerificationDetailPayload?
+): List<com.dondone.mobile.domain.model.DocumentItem> {
+    if (latestVerification == null) return this
+
+    val relatedActions = latestVerification.relatedActions
+    val fallbackUpdatedAt = "$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} 18:00"
+
+    return map { document ->
+        when {
+            document.id.contains(DOCUMENT_ID_PROOF) -> document.copy(
+                status = if (relatedActions.proofPackDocumentId != null) DOCUMENT_STATUS_READY else DOCUMENT_STATUS_NOT_CREATED,
+                updatedAt = if (relatedActions.proofPackDocumentId != null) document.updatedAt ?: fallbackUpdatedAt else null
+            )
+
+            document.id.contains(DOCUMENT_ID_CLAIM) -> document.copy(
+                status = if (relatedActions.claimKitDocumentId != null) DOCUMENT_STATUS_READY else DOCUMENT_STATUS_NOT_CREATED,
+                updatedAt = if (relatedActions.claimKitDocumentId != null) document.updatedAt ?: fallbackUpdatedAt else null
+            )
+
+            else -> document
+        }
     }
 }
 

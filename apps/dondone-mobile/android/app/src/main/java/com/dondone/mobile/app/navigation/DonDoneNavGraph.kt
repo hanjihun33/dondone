@@ -41,7 +41,9 @@ fun DonDoneNavGraph(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
+    val wageRemoteState by viewModel.wageRemoteState.collectAsStateWithLifecycle()
     val remittanceRemoteState by viewModel.remittanceRemoteState.collectAsStateWithLifecycle()
+    val wageActionUiState by viewModel.wageActionUiState.collectAsStateWithLifecycle()
     val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
     val workproofActionUiState by viewModel.workproofActionUiState.collectAsStateWithLifecycle()
     val selectedAdvanceAmount by viewModel.selectedAdvanceAmount.collectAsStateWithLifecycle()
@@ -49,6 +51,7 @@ fun DonDoneNavGraph(
     val advanceRequestDetailUiState by viewModel.advanceRequestDetailUiState.collectAsStateWithLifecycle()
     val profileUpdateUiState by viewModel.profileUpdateUiState.collectAsStateWithLifecycle()
     val recipientPhoneSearchUiState by viewModel.recipientPhoneSearchUiState.collectAsStateWithLifecycle()
+    val menuLaunchRequest by viewModel.menuLaunchRequest.collectAsStateWithLifecycle()
 
     LaunchedEffect(workproofActionUiState.message, workproofActionUiState.isError) {
         val message = workproofActionUiState.message ?: return@LaunchedEffect
@@ -68,6 +71,15 @@ fun DonDoneNavGraph(
         viewModel.clearRemittanceActionMessage()
     }
 
+    LaunchedEffect(wageActionUiState.message, wageActionUiState.isError) {
+        val message = wageActionUiState.message ?: return@LaunchedEffect
+        onShowToast(
+            message,
+            if (wageActionUiState.isError) BadgeTone.Warning else BadgeTone.Success
+        )
+        viewModel.clearWageActionMessage()
+    }
+
     NavHost(
         modifier = modifier,
         navController = navController,
@@ -84,6 +96,7 @@ fun DonDoneNavGraph(
             HomeScreen(
                 uiModel = uiState.toHomeUiModel(
                     workproofActionUiState = workproofActionUiState,
+                    wageRemoteState = wageRemoteState,
                     remittanceRemoteState = remittanceRemoteState,
                     isAuthenticated = authUiState.isAuthenticated
                 ),
@@ -114,6 +127,7 @@ fun DonDoneNavGraph(
             FinanceHomeScreen(
                 uiModel = uiState.toFinanceHomeUiModel(
                     remoteState = advanceRemoteState,
+                    wageRemoteState = wageRemoteState,
                     selectedAdvanceAmount = selectedAdvanceAmount,
                     advanceRequestUiState = advanceRequestUiState,
                     advanceRequestDetailUiState = advanceRequestDetailUiState
@@ -127,14 +141,25 @@ fun DonDoneNavGraph(
         }
         composable(Route.WAGE) {
             WageScreen(
-                uiModel = uiState.toWageUiModel(),
-                onApplyActualDeposit = viewModel::setActualDeposit,
+                uiModel = uiState.toWageUiModel(
+                    remoteState = wageRemoteState,
+                    actionUiState = wageActionUiState
+                ),
+                onApplyActualDeposit = viewModel::submitWageDeposit,
+                onCreateVerification = viewModel::createWageVerification,
+                onRefresh = viewModel::refreshWageRemoteState,
                 onOpenTransfer = {
                     viewModel.openTransferFlow()
                     navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target -> navController.navigate(target) }
                 },
                 onOpenWorkproof = { navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target -> navController.navigate(target) } },
-                onOpenMenu = { navigateWithinApp(Route.MENU, onNavigateToRootTab) { target -> navController.navigate(target) } }
+                onOpenMenu = {
+                    viewModel.openMenuForWageDocuments()
+                    navController.navigate(Route.MENU) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
             )
         }
         composable(Route.TRANSFER) {
@@ -190,9 +215,11 @@ fun DonDoneNavGraph(
                     session = authUiState.session,
                     remittanceRemoteState = remittanceRemoteState
                 ),
+                launchRequest = menuLaunchRequest,
                 profileUpdateUiState = profileUpdateUiState,
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
+                onConsumeLaunchRequest = viewModel::consumeMenuLaunchRequest,
                 onUpdateProfile = viewModel::updateProfile,
                 onClearProfileUpdateMessage = viewModel::clearProfileUpdateMessage,
                 onLogout = viewModel::logout,
