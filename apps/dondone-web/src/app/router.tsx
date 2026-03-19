@@ -11,6 +11,10 @@ import { getStoredUserRole } from "../shared/auth/session";
 
 function AdminOnlyRoute({ element }: { element: JSX.Element }) {
   const role = getStoredUserRole();
+  if (role === null) {
+    return <Navigate to="/" replace />;
+  }
+
   if (role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
@@ -20,6 +24,10 @@ function AdminOnlyRoute({ element }: { element: JSX.Element }) {
 
 function ManagerOnlyRoute({ element }: { element: JSX.Element }) {
   const role = getStoredUserRole();
+  if (role === null) {
+    return <Navigate to="/" replace />;
+  }
+
   if (role === "admin") {
     return <Navigate to="/admin" replace />;
   }

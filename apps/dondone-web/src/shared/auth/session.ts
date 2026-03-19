@@ -1,6 +1,7 @@
 export type UserRole = "admin" | "manager";
 
 const ROLE_STORAGE_KEY = "dondone_user_role";
+const ROLE_CHANGED_EVENT = "dondone:user-role-changed";
 
 export function getStoredUserRole(): UserRole | null {
   if (typeof window === "undefined") {
@@ -21,6 +22,7 @@ export function setStoredUserRole(role: UserRole) {
   }
 
   window.localStorage.setItem(ROLE_STORAGE_KEY, role);
+  window.dispatchEvent(new Event(ROLE_CHANGED_EVENT));
 }
 
 export function clearStoredUserRole() {
@@ -29,6 +31,7 @@ export function clearStoredUserRole() {
   }
 
   window.localStorage.removeItem(ROLE_STORAGE_KEY);
+  window.dispatchEvent(new Event(ROLE_CHANGED_EVENT));
 }
 
 export function resolveUserRoleByEmail(email: string): UserRole {
@@ -36,3 +39,22 @@ export function resolveUserRoleByEmail(email: string): UserRole {
   return normalizedEmail === "admin@dondone.local" ? "admin" : "manager";
 }
 
+export function subscribeUserRoleChange(listener: () => void): () => void {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === ROLE_STORAGE_KEY || event.key === null) {
+      listener();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(ROLE_CHANGED_EVENT, listener);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(ROLE_CHANGED_EVENT, listener);
+  };
+}

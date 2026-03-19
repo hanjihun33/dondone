@@ -2262,6 +2262,20 @@ textarea {
   padding: 18px;
 }
 
+.admin-toast {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  justify-self: end;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #cfe2ff;
+  background: #edf4ff;
+  color: #3154a8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .admin-header {
   display: flex;
   align-items: flex-start;

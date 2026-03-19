@@ -1,6 +1,10 @@
-import { ReactNode, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { clearStoredUserRole, getStoredUserRole } from "../shared/auth/session";
+import { ReactNode, useEffect, useState } from "react";
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  clearStoredUserRole,
+  getStoredUserRole,
+  subscribeUserRoleChange
+} from "../shared/auth/session";
 import {
   AdminShieldIcon,
   ClipboardCheckIcon,
@@ -30,13 +34,23 @@ const adminNavItems: NavItem[] = [
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const userRole = getStoredUserRole() ?? "manager";
+  const [userRole, setUserRole] = useState(() => getStoredUserRole());
   const navItems = userRole === "admin" ? adminNavItems : managerNavItems;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    return subscribeUserRoleChange(() => {
+      setUserRole(getStoredUserRole());
+    });
+  }, []);
+
+  if (userRole === null) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleLogoutClick = () => {
     clearStoredUserRole();

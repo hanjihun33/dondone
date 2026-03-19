@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type AdminAccount = {
   id: number;
@@ -150,6 +150,7 @@ const initialAdvanceRequests: AdvanceRequest[] = [
 export function AdminPage() {
   const [requestFilter, setRequestFilter] = useState<RequestFilter>("전체");
   const [advanceRequests, setAdvanceRequests] = useState<AdvanceRequest[]>(initialAdvanceRequests);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const requestCountByStatus = useMemo(() => {
     const counts: Record<RequestFilter, number> = {
@@ -185,8 +186,42 @@ export function AdminPage() {
     );
   };
 
+  const handleRequestAction = (request: AdvanceRequest, nextStatus: AdvanceRequestStatus) => {
+    const actionLabel = nextStatus === "승인" ? "승인" : "반려";
+    const confirmed = window.confirm(
+      `${request.workerName}님의 미리받기 요청을 ${actionLabel}하시겠습니까?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    updateRequestStatus(request.id, nextStatus);
+    setFeedbackMessage(
+      `${request.workerName}님의 요청을 ${nextStatus === "승인" ? "승인" : "반려"} 처리했습니다.`
+    );
+  };
+
+  useEffect(() => {
+    if (!feedbackMessage) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setFeedbackMessage(null);
+    }, 2400);
+
+    return () => window.clearTimeout(timer);
+  }, [feedbackMessage]);
+
   return (
     <div className="console-page admin-page">
+      {feedbackMessage ? (
+        <div className="admin-toast" role="status" aria-live="polite">
+          {feedbackMessage}
+        </div>
+      ) : null}
+
       <header className="admin-header">
         <div>
           <h2 className="admin-title">관리자 페이지</h2>
@@ -271,14 +306,14 @@ export function AdminPage() {
                         <button
                           type="button"
                           className="admin-action-button approve"
-                          onClick={() => updateRequestStatus(request.id, "승인")}
+                          onClick={() => handleRequestAction(request, "승인")}
                         >
                           승인
                         </button>
                         <button
                           type="button"
                           className="admin-action-button reject"
-                          onClick={() => updateRequestStatus(request.id, "반려")}
+                          onClick={() => handleRequestAction(request, "반려")}
                         >
                           반려
                         </button>
