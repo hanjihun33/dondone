@@ -23,6 +23,8 @@
 - invalidation policy 고정 완료
   - 별도 cache/event invalidation 없음
   - approve/reject 후 다음 조회에서 source-of-truth 재조회로 최신 반영
+- Slice 5 backend/API 범위는 사실상 마감 가능 상태
+  - 남은 항목은 deferred policy, mobile migration, web wiring 중심
 
 # Deferred Work Order
 ## 1. attachment detail surface

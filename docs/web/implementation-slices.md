@@ -5,6 +5,7 @@
 - `GET /api/employer/issues/review-records/{workProofId}` read-only detail foundation is done.
 - `PATCH /api/workproof/{id}` legacy lifecycle is fixed as `deprecated legacy`.
 - Slice 5 MVP invalidation policy is fixed as `re-read source-of-truth on next query`, without separate cache/event invalidation.
+- Slice 5 backend/API scope is effectively done. Remaining items are deferred policy, mobile migration, or web wiring tasks.
 - Current Slice 5 next work order:
   1. attachment/detail download/display contract
   2. `NEEDS_REVIEW` record resolve command surface
