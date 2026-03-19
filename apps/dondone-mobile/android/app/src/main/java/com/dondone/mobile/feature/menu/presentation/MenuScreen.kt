@@ -63,6 +63,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.dondone.mobile.app.session.MenuLaunchRequest
+import com.dondone.mobile.app.session.MenuLaunchTarget
 import com.dondone.mobile.app.session.ProfileUpdateUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DawnBorder
@@ -117,12 +119,14 @@ private val MenuReceiptHashBorder = Color(0xFFE2E8F0)
 fun MenuScreen(
     uiModel: MenuUiModel,
     workproofPdfFileUiState: WorkproofPdfFileUiState,
+    launchRequest: MenuLaunchRequest?,
     profileUpdateUiState: ProfileUpdateUiState,
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit,
     onOpenWorkproofPdf: (Long) -> Unit,
     onShareWorkproofPdf: (Long) -> Unit,
     onClearPdfFileState: () -> Unit,
+    onConsumeLaunchRequest: () -> Unit,
     onUpdateProfile: (String, String) -> Unit,
     onClearProfileUpdateMessage: () -> Unit,
     onLogout: () -> Unit,
@@ -154,6 +158,24 @@ fun MenuScreen(
         val message = workproofPdfFileUiState.errorMessage ?: return@LaunchedEffect
         onShowToast(message, BadgeTone.Warning)
         onClearPdfFileState()
+    }
+
+    LaunchedEffect(launchRequest?.requestId, proofDocument?.id, claimDocument?.id) {
+        val request = launchRequest ?: return@LaunchedEffect
+        when (request.target) {
+            MenuLaunchTarget.PROOF_DOCUMENT -> {
+                val document = proofDocument ?: return@LaunchedEffect
+                selectedDocumentId = document.id
+            }
+            MenuLaunchTarget.CLAIM_DOCUMENT -> {
+                val document = claimDocument ?: return@LaunchedEffect
+                selectedDocumentId = document.id
+            }
+            MenuLaunchTarget.CLAIM_SHEET -> {
+                activeSheet = MenuOverlaySheet.Claim
+            }
+        }
+        onConsumeLaunchRequest()
     }
 
     LaunchedEffect(

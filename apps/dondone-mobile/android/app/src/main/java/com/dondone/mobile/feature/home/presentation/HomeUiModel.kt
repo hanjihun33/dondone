@@ -5,6 +5,7 @@ import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
+import com.dondone.mobile.data.wage.WageRemoteState
 import com.dondone.mobile.domain.calculator.WageEstimator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferStatus
@@ -58,6 +59,7 @@ data class HomeUiModel(
 
 fun DemoState.toHomeUiModel(
     workproofActionUiState: WorkproofActionUiState? = null,
+    wageRemoteState: WageRemoteState? = null,
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
     isAuthenticated: Boolean = false
 ): HomeUiModel {
@@ -80,8 +82,9 @@ fun DemoState.toHomeUiModel(
         else -> BadgeTone.Info
     }
 
-    val isDepositRecorded = wage.actualDepositRecordedDay != null
-    val hasDifference = wageEstimate.difference != 0
+    val remoteSummary = wageRemoteState?.payload?.summary
+    val isDepositRecorded = remoteSummary?.actualDepositAmount != null || wage.actualDepositRecordedDay != null
+    val hasDifference = remoteSummary?.differenceAmount?.let { it != 0L } ?: (wageEstimate.difference != 0)
     val isPaydayUpcoming = demo.asOfDay < wage.paydayDay
     val isTransferConfirmed = remittance.status == TransferStatus.CONFIRMED
 

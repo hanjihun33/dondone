@@ -8,6 +8,7 @@ import com.dondone.mobile.data.auth.AuthSessionStore
 import com.dondone.mobile.data.auth.BackendAuthRepository
 import com.dondone.mobile.data.documents.BackendWorkproofDocumentRepository
 import com.dondone.mobile.data.remittance.BackendRemittanceRepository
+import com.dondone.mobile.data.wage.BackendWageRepository
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
 import okhttp3.OkHttpClient
 
@@ -29,7 +30,8 @@ class DemoSessionViewModelFactory(
                 advanceRepository = BackendAdvanceRepository(client = client),
                 workproofRepository = BackendWorkproofRepository(client = client),
                 workproofDocumentRepository = BackendWorkproofDocumentRepository(client = client),
-                remittanceRepository = BackendRemittanceRepository(client = client)
+                remittanceRepository = BackendRemittanceRepository(client = client),
+                wageRepository = BackendWageRepository(client = client)
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

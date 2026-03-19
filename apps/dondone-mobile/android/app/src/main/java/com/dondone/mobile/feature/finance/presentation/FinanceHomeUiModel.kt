@@ -6,6 +6,7 @@ import com.dondone.mobile.app.session.AdvanceRequestUiState
 import com.dondone.mobile.app.session.AdvanceRequestDetailUiState
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
 import com.dondone.mobile.data.advance.AdvanceRemoteState
+import com.dondone.mobile.data.wage.WageRemoteState
 import com.dondone.mobile.domain.calculator.AdvanceCalculator
 import com.dondone.mobile.domain.calculator.VaultCalculator
 import com.dondone.mobile.domain.calculator.WageEstimator
@@ -165,6 +166,7 @@ data class FinanceHomeUiModel(
 
 fun DemoState.toFinanceHomeUiModel(
     remoteState: AdvanceRemoteState? = null,
+    wageRemoteState: WageRemoteState? = null,
     selectedAdvanceAmount: Int? = null,
     advanceRequestUiState: AdvanceRequestUiState = AdvanceRequestUiState(),
     advanceRequestDetailUiState: AdvanceRequestDetailUiState = AdvanceRequestDetailUiState()
@@ -176,10 +178,15 @@ fun DemoState.toFinanceHomeUiModel(
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val vaultSnapshot = VaultCalculator.calculate(this)
     val wageEstimate = WageEstimator.calculate(this)
-    val livingCost = (wage.actualDeposit * 0.655).toInt()
+    val remoteWageSummary = wageRemoteState?.payload?.summary
+    val remoteWageEstimate = wageRemoteState?.payload?.estimate
+    val effectiveActualDeposit = remoteWageSummary?.actualDepositAmount?.toInt() ?: wage.actualDeposit
+    val effectiveEstimatedTotal = remoteWageEstimate?.estimatedTotal?.toInt() ?: wageEstimate.total
+    val effectiveDifference = remoteWageSummary?.differenceAmount?.toInt() ?: wageEstimate.difference
+    val livingCost = (effectiveActualDeposit * 0.655).toInt()
     val familySend = 260_000
-    val saveAmount = (wage.actualDeposit - livingCost - familySend).coerceAtLeast(0)
-    val isRecorded = wage.actualDepositRecordedDay != null
+    val saveAmount = (effectiveActualDeposit - livingCost - familySend).coerceAtLeast(0)
+    val isRecorded = remoteWageSummary?.actualDepositAmount != null || wage.actualDepositRecordedDay != null
     val formattedMonth = demo.month.toString().padStart(2, '0')
     val repaymentDueText = "${demo.year}-$formattedMonth-${demo.monthLength.toString().padStart(2, '0')}"
     val lastReflectedDay = visibleRecords.maxOfOrNull { it.day } ?: demo.asOfDay
@@ -407,24 +414,24 @@ fun DemoState.toFinanceHomeUiModel(
         wage = FinanceWageUiModel(
             statusText = if (!isRecorded) {
                 "입금 전"
-            } else if (wageEstimate.difference == 0) {
+            } else if (effectiveDifference == 0) {
                 "차이 없음"
             } else {
                 "확인 필요한 차이"
             },
             statusTone = if (!isRecorded) {
                 BadgeTone.Info
-            } else if (wageEstimate.difference == 0) {
+            } else if (effectiveDifference == 0) {
                 BadgeTone.Success
             } else {
                 BadgeTone.Warning
             },
             differenceText = if (isRecorded) {
-                formatKrw(abs(wageEstimate.difference))
+                formatKrw(abs(effectiveDifference))
             } else {
                 "확인 전"
             },
-            estimatedText = formatKrw(wageEstimate.total),
+            estimatedText = formatKrw(effectiveEstimatedTotal),
             actualText = if (isRecorded) formatKrw(wage.actualDeposit) else "미입력",
             hintText = if (isRecorded) {
                 "실입금이 반영돼 있어요. 차이와 근거를 바로 확인할 수 있습니다."
