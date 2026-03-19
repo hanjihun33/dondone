@@ -1,5 +1,7 @@
 package com.workproofpay.backend.employer.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.correction.model.CorrectionDecisionAudit;
@@ -15,6 +17,7 @@ import com.workproofpay.backend.employer.api.dto.response.EmployerCorrectionRequ
 import com.workproofpay.backend.employer.api.dto.response.EmployerCorrectionRequestsResponse;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
+import com.workproofpay.backend.workproof.api.dto.request.WorkProofAttachmentMetadataRequest;
 import com.workproofpay.backend.workproof.api.dto.request.UpdateWorkProofRequest;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofAuditLog;
@@ -46,6 +49,7 @@ public class EmployerCorrectionRequestService {
     private final UserRepository userRepository;
     private final WorkProofRequestValidator workProofRequestValidator;
     private final WorkProofAuditLogRepository workProofAuditLogRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public EmployerCorrectionRequestsResponse getCorrectionRequests(Long accountId, EmployerCorrectionRequestsQuery query) {
@@ -235,6 +239,7 @@ public class EmployerCorrectionRequestService {
                 correctionRequest.getReason(),
                 correctionRequest.getRequestMemo(),
                 correctionRequest.getAttachmentCount(),
+                resolveAttachments(correctionRequest),
                 correctionRequest.getCreatedAt(),
                 correctionRequest.getStatus(),
                 correctionRequest.getDecisionByAccountId(),
@@ -243,6 +248,28 @@ public class EmployerCorrectionRequestService {
                 correctionRequest.getDecisionMemo(),
                 correctionRequest.getRejectReasonCode()
         );
+    }
+
+    private List<EmployerCorrectionRequestDetailResponse.AttachmentResponse> resolveAttachments(CorrectionRequest correctionRequest) {
+        String attachmentMetadataJson = correctionRequest.getAttachmentMetadataJson();
+        if (attachmentMetadataJson == null || attachmentMetadataJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<WorkProofAttachmentMetadataRequest> attachments = objectMapper.readValue(
+                    attachmentMetadataJson,
+                    new TypeReference<>() {
+                    }
+            );
+            return attachments.stream()
+                    .map(attachment -> new EmployerCorrectionRequestDetailResponse.AttachmentResponse(
+                            attachment.type() == null ? null : attachment.type().name(),
+                            attachment.fileName()
+                    ))
+                    .toList();
+        } catch (Exception exception) {
+            throw new ApiException(ErrorCode.INTERNAL_ERROR);
+        }
     }
 
     private Map<Long, User> usersById(List<CorrectionRequest> requests) {

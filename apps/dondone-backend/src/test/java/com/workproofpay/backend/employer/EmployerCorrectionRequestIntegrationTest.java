@@ -143,6 +143,10 @@ class EmployerCorrectionRequestIntegrationTest {
                 .andExpect(jsonPath("$.data.reason").value("Manual correction request"))
                 .andExpect(jsonPath("$.data.requestMemo").value("Detailed worker note"))
                 .andExpect(jsonPath("$.data.attachmentCount").value(2))
+                .andExpect(jsonPath("$.data.attachments[0].type").value("MEMO"))
+                .andExpect(jsonPath("$.data.attachments[0].fileName").value("note.txt"))
+                .andExpect(jsonPath("$.data.attachments[1].type").value("PHOTO"))
+                .andExpect(jsonPath("$.data.attachments[1].fileName").value("photo.jpg"))
                 .andExpect(jsonPath("$.data.status").value("PENDING"));
     }
 
@@ -356,7 +360,7 @@ class EmployerCorrectionRequestIntegrationTest {
                 "Fix late subway arrival",
                 "Subway delay memo",
                 1,
-                "[{\"fileName\":\"evidence.png\"}]"
+                "[{\"type\":\"PHOTO\",\"fileName\":\"evidence.png\",\"fileRef\":\"storage://attachments/evidence.png\"}]"
         ));
         CorrectionRequest rejectableRequest = correctionRequestRepository.save(CorrectionRequest.create(
                 rejectableWorkProof,
@@ -372,7 +376,8 @@ class EmployerCorrectionRequestIntegrationTest {
                 "Manual correction request",
                 "Detailed worker note",
                 2,
-                "[{\"fileName\":\"note.txt\"},{\"fileName\":\"photo.jpg\"}]"
+                "[{\"type\":\"MEMO\",\"fileName\":\"note.txt\",\"fileRef\":\"storage://attachments/note.txt\"}," +
+                        "{\"type\":\"PHOTO\",\"fileName\":\"photo.jpg\",\"fileRef\":\"storage://attachments/photo.jpg\"}]"
         ));
         CorrectionRequest processedRequest = CorrectionRequest.create(
                 processedWorkProof,

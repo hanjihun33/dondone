@@ -1,53 +1,65 @@
 # Scope
-- Slice 5 `Correction request flow` foundation 구현 중 의도적으로 미룬 후속 작업
-- 기준 구현:
+- Slice 5 `Correction request flow` foundation 이후 미룬 후속 작업 정리
+- 기준 구현
   - `GET /api/employer/correction-requests`
   - `GET /api/employer/correction-requests/{requestId}`
   - `POST /api/employer/correction-requests/{requestId}/approve`
   - `POST /api/employer/correction-requests/{requestId}/reject`
+  - `POST /api/workproof/{workProofId}/correction-requests`
   - `CorrectionRequest`
   - `CorrectionDecisionAudit`
   - `WorkProofAuditLog` 연동
 
 # Closed In Slice 5 Foundation
-- employer correction queue는 `/api/employer/*` 전용 surface로 열고 기존 worker API contract는 바꾸지 않았다.
-- request scope는 MVP에서 `CorrectionRequest` snapshot의 `companyId/workplaceId`와 현재 employer scope 일치 여부로 먼저 고정했다.
+- employer correction queue는 `/api/employer/*` 전용 surface로 먼저 열고 기존 worker API contract는 바꾸지 않았다.
+- worker는 직접 확정 수정하지 않고 correction request를 보내며, employer가 승인/반려하는 정책을 고정했다.
 - approve는 request status, `WorkProof.updateTimes(...)`, `WorkProofAuditLog`, `CorrectionDecisionAudit`를 한 transaction으로 묶었다.
-- reject는 `WorkProof`를 수정하지 않고 request status와 `CorrectionDecisionAudit`만 기록하도록 고정했다.
+- reject는 `WorkProof`를 수정하지 않고 request status와 `CorrectionDecisionAudit`만 남긴다.
+- attachment는 정정 요청 증빙자료라는 의미만 먼저 고정했고, web 표시 방식은 후속으로 남겼다.
 
 # Deferred Work Order
-## 1. worker direct edit flow migration
-- 라벨: `now`
+## 1. attachment detail surface
+- 라벨: `temporary`, `shared_policy_pending`
+- 현재 임시 처리
+  - correction detail 응답은 `attachmentCount`와 attachment metadata(`type`, `fileName`)까지만 노출한다.
+  - request와 `WorkProof`에는 attachment metadata json을 내부 보존용으로만 저장한다.
+- 지금 확정하지 않은 이유
+  - 첨부의 의미는 정정 요청 증빙자료로 고정했고 detail API의 안전한 metadata shape도 열었지만, employer web에서 목록/상세 어디에 어떻게 보여줄지와 다운로드 계약은 아직 UI/스토리지 계약으로 닫히지 않았다.
+- 닫히는 조건
+  - attachment metadata의 web 표시 위치와 download contract가 고정된다.
+
+## 2. correction queue vs outside-radius review boundary
+- 라벨: `rescope`
+- 현재 상태
+  - 장기 방향은 고정됐다. employer issue queue는 worker correction request와 review가 필요한 record를 함께 다루는 방향으로 본다.
+  - 다만 현재 foundation 구현은 correction request queue만 먼저 연 상태다.
+- 지금 정리할 일
+  - review 대상 record를 correction queue와 같은 surface로 노출할지, 별도 탭/필드로 구분할지 정리한다.
+- 닫히는 조건
+  - employer issue queue contract에 review 대상 record 포함 방식이 고정된다.
+
+## 3. legacy direct edit endpoint lifecycle
+- 라벨: `deferred`
+- 현재 상태
+  - backend에는 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`가 남아 있다.
+  - correction request create endpoint `POST /api/workproof/{workProofId}/correction-requests`는 이미 추가됐다.
+- 지금 확정하지 않은 이유
+  - 현재 대화 범위는 backend correction flow foundation과 web API 정리까지이고, 기존 worker/mobile flow를 걷어내는 변경은 제외 범위다.
+- 닫히는 조건
+  - `PATCH /api/workproof/{id}`를 legacy 유지, deprecated, 제거 중 무엇으로 둘지 정책과 문서가 고정된다.
+
+## 4. worker direct edit flow migration
+- 라벨: `deferred`
 - 현재 상태
   - shared policy는 고정했고 backend worker create endpoint도 열었다: `POST /api/workproof/{workProofId}/correction-requests`
-  - worker app은 아직 기존 direct edit flow를 쓰고 있다.
-- 지금 해야 할 일
-  - worker client가 `PATCH /api/workproof/{id}` 직접 반영 대신 correction request submit flow를 쓰도록 전환 범위를 정리한다.
-  - direct edit endpoint를 언제 축소하거나 역할을 바꿀지 정리한다.
+  - worker app은 아직 기존 direct edit flow를 쓰고 있고, 현재 수정 저장은 backend `PATCH /api/workproof/{id}` 호출이 아니라 local-only mock 갱신이다.
+- 지금 정리할 일
+  - mobile/client 범위가 열릴 때 worker 수정 저장을 correction request submit flow로 전환한다.
+  - local-only worker edit draft를 어떤 API/상태로 대체할지 정리한다.
 - 닫히는 조건
   - worker client와 backend contract가 correction request submit 흐름으로 맞춰진다.
 
-## 2. attachment detail surface
-- 라벨: `temporary`, `shared_policy_pending`
-- 현재 임시 처리
-  - correction detail 응답은 `attachmentCount`만 노출한다.
-  - request와 `WorkProof`에는 attachment metadata json을 내부 보존용으로만 저장한다.
-- 지금 확정하지 않은 이유
-  - 첨부의 의미는 정정 요청 증빙자료로 고정했지만, employer web에서 목록/상세 어디에 어떻게 보여줄지는 아직 UI 계약으로 닫히지 않았다.
-- 닫히는 조건
-  - attachment metadata의 canonical response shape와 web 상세 표면을 고정한다.
-
-## 3. correction queue vs outside-radius review boundary
-- 라벨: `rescope`
-- 현재 상태
-  - 정책 방향은 고정했다: employer issue queue는 worker correction request와 review가 필요한 record를 둘 다 담는 방향으로 본다.
-  - 다만 현재 foundation 구현은 correction request queue만 먼저 연 상태다.
-- 지금 해야 할 일
-  - review 대상 record를 correction queue와 같은 surface로 노출할지, 별도 탭/타입 필드로 구분할지 정리한다.
-- 닫히는 조건
-  - employer issue queue contract에 review 대상 record가 포함되는 방식이 고정된다.
-
-## 4. dashboard/wage/docs invalidation strategy
+## 5. dashboard/wage/docs invalidation strategy
 - 라벨: `hardening`
 - 현재 고정
   - 승인 후 사용자 화면은 즉시 최신처럼 보여야 하고, foundation 구현은 관련 화면 재조회 방식으로 먼저 간다.
@@ -59,13 +71,13 @@
 # Reading Order
 1. `docs/web/implementation-slices.md`
 2. `docs/execplans/active/2026-03-19-web-correction-request-flow.md`
-3. 이 문서
-4. 이후 새 active execplan 또는 review note
+3. `docs/web/correction-request-flow.md`
+4. 이후 이 active review note
 
 # Decision Rule For Next Session
 - 다음 대화에서 Slice 5를 이어가면 먼저 이 문서의 `Deferred Work Order`를 확인한다.
-- 각 항목은 `now`, `hardening`, `rescope` 중 하나로 다시 분류한다.
-- `temporary`, `shared_policy_pending` 항목은 다음 대화 시작 문구에도 같은 표현으로 남긴다.
+- 각 항목은 `deferred`, `temporary`, `shared_policy_pending`, `rescope`, `hardening` 중 하나로 다시 분류한다.
+- `temporary`, `shared_policy_pending`, `deferred` 항목은 다음 대화 시작 문구에도 같은 표현으로 남긴다.
 
 # Next Conversation Prompt
 ```text
@@ -92,24 +104,27 @@ Slice 5 correction request flow backend로 이어가자.
 - `GET /api/employer/correction-requests/{requestId}` foundation 완료
 - `POST /api/employer/correction-requests/{requestId}/approve` foundation 완료
 - `POST /api/employer/correction-requests/{requestId}/reject` foundation 완료
+- `POST /api/workproof/{workProofId}/correction-requests` foundation 완료
 - `CorrectionRequest`, `CorrectionDecisionAudit`, `WorkProofAuditLog` 연동 완료
-- backend employer correction targeted tests 통과 완료
+- backend employer/workproof targeted tests 통과 완료
 
 이번 대화 범위:
-- Slice 5 correction request flow backend 이어서 진행
-- worker-side correction request create 후속 범위 정리
-- attachment/detail surface와 invalidation 규칙 정리
-- 가능하면 correction queue와 outside-radius review 경계 재검토
+- Slice 5 correction request flow backend/docs 이어서 진행
+- attachment/detail surface 계약 정리
+- correction queue vs outside-radius review boundary 계약 정리
+- legacy worker direct edit endpoint 정책 정리
+- 가능하면 invalidation hardening 기준까지 정리
 
 후속 작업 순서:
-- 1. worker direct edit flow migration 정리
-- 2. attachment detail surface 정리
-- 3. correction queue vs outside-radius review boundary 정리
+- 1. attachment detail surface 정리
+- 2. correction queue vs outside-radius review boundary 정리
+- 3. legacy direct edit endpoint lifecycle 정리
 - 4. dashboard/wage/docs invalidation strategy hardening 정리
+- 5. worker direct edit flow migration 후속 범위 정리
 
-임시 처리된 공통 정책 항목:
-- `now`: worker correction request create backend는 구현됐지만 worker client migration은 아직 미구현
-- `temporary / shared_policy_pending`: correction detail은 현재 `attachmentCount`만 노출
+임시/후속 항목:
+- `deferred`: worker correction request create backend는 구현됐지만 worker client migration은 아직 미구현이며 mobile 범위는 현재 제외
+- `temporary / shared_policy_pending`: correction detail은 현재 `attachmentCount`와 attachment metadata(`type`, `fileName`)까지만 노출
 - `rescope`: correction queue는 장기적으로 correction request와 review 대상 record를 둘 다 담는 방향이지만 현재는 correction request만 구현
 
 제외 범위:

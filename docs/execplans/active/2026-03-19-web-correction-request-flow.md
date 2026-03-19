@@ -97,6 +97,7 @@ Slice 5에서 employer web correction queue foundation을 열고, `GET /api/empl
 - 신규 correction request detail response
   - summary foundation 필드
   - `attachmentCount`
+  - `attachments[]`
   - `decisionByAccountId`
   - `decisionByName`
   - `decisionAt`
@@ -167,12 +168,14 @@ Single lane
 3. `test: cover employer correction request approval flow`
 
 # Open Questions
-- worker-side request 생성 endpoint를 언제 어떤 표면으로 열지
-- attachment metadata를 request detail에 어느 수준까지 노출할지
+- worker-side request 생성 endpoint는 열었고, mobile/client migration을 어느 시점에 어떤 범위로 붙일지
+- attachment metadata는 request detail에 `type`, `fileName`까지만 노출하고 storage/download contract를 언제 열지
+- 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`를 legacy 유지/deprecated/제거 중 무엇으로 둘지
 - 승인 후 wage summary와 dashboard invalidation을 명시적 캐시 무효화 없이 조회 시 재계산만으로 충분히 볼지
 
 # Assumptions
 - Slice 5 1차 목표는 employer-side correction queue foundation을 여는 것이지 worker 생성 흐름까지 닫는 것이 아니다.
+- worker correction request create backend는 additive surface로만 열고, mobile/client migration은 현재 slice 범위 밖에 둔다.
 - correction request는 시간 수정 요청만 대상으로 시작하고 반경 밖 `check-out` review는 별도 축으로 유지한다.
 - request snapshot의 `companyId/workplaceId`는 employer scope 검증에 사용할 수 있는 조직 연결 근거로 본다.
 - approve 시 `editReason`에는 correction request의 요청 사유를 연결하고, `memo`는 기존 WorkProof 값을 유지한다.

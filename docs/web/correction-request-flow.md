@@ -110,12 +110,15 @@
   - `POST /api/employer/correction-requests/{requestId}/approve`
   - `POST /api/employer/correction-requests/{requestId}/reject`
 - worker create endpoint는 변경 시간, 사유, memo, 증빙 attachment metadata를 받아 pending correction request를 생성한다.
+- 현재 worker app 수정 저장은 backend `PATCH /api/workproof/{id}`를 호출하지 않고 local-only mock flow를 유지한다. mobile/client migration은 후속 범위다.
 - scope는 worker의 현재 membership을 다시 계산하는 대신 request snapshot의 `companyId/workplaceId`와 현재 employer scope 일치 여부로 먼저 고정한다.
 - approve는 `CorrectionRequest` 상태 변경, `WorkProof` 시간 반영, `WorkProofAuditLog`, `CorrectionDecisionAudit`를 한 transaction으로 묶는다.
 - reject는 `WorkProof`를 변경하지 않고 request 상태와 decision audit만 남긴다.
-- detail 표면은 우선 `attachmentCount`까지만 노출하고, attachment metadata array 노출 여부는 후속 계약으로 남긴다.
+- detail 표면은 `attachmentCount`와 함께 안전한 attachment metadata(`type`, `fileName`)까지 노출한다.
+- 저장소 경로, 다운로드 URL, raw `fileRef` 노출 여부는 후속 계약으로 남긴다.
 - employer issue queue는 장기적으로 worker correction request와 review가 필요한 record를 함께 다루는 방향으로 본다.
 - 승인 후 화면은 즉시 최신처럼 보여야 하며, foundation 단계 구현은 관련 화면 재조회 방식으로 먼저 고정한다.
+- 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`는 현재 legacy surface로 남아 있고, 유지/deprecated/제거 정책은 follow-up으로 남긴다.
 
 ## 운영상 보수적 가정
 - 부분 승인 기능은 넣지 않는다.

@@ -4,6 +4,7 @@ import com.workproofpay.backend.correction.model.CorrectionRequestStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record EmployerCorrectionRequestDetailResponse(
         Long requestId,
@@ -20,6 +21,7 @@ public record EmployerCorrectionRequestDetailResponse(
         String reason,
         String requestMemo,
         int attachmentCount,
+        List<AttachmentResponse> attachments,
         LocalDateTime requestedAt,
         CorrectionRequestStatus status,
         Long decisionByAccountId,
@@ -28,4 +30,9 @@ public record EmployerCorrectionRequestDetailResponse(
         String decisionMemo,
         String rejectReasonCode
 ) {
+    public record AttachmentResponse(
+            String type,
+            String fileName
+    ) {
+    }
 }
