@@ -5,6 +5,11 @@ import com.workproofpay.backend.documents.api.dto.response.DocumentDetailRespons
 import com.workproofpay.backend.documents.api.dto.request.CreateProofPackRequest;
 import com.workproofpay.backend.documents.api.dto.response.DocumentGenerationAcceptedResponse;
 import com.workproofpay.backend.documents.api.dto.response.DocumentGenerationRequestStatusResponse;
+import com.workproofpay.backend.documents.pdf.PdfRenderer;
+import com.workproofpay.backend.documents.pdf.RenderedPdf;
+import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfAssembleCommand;
+import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshot;
+import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshotAssembler;
 import com.workproofpay.backend.documents.model.DocumentGenerationRequest;
 import com.workproofpay.backend.documents.model.DocumentType;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
@@ -19,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.NumberFormat;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 
@@ -30,9 +36,14 @@ import java.util.Locale;
 public class DocumentsService {
 
     private static final String DUPLICATE_REQUEST_CONSTRAINT = "uk_document_generation_requests_user_type_key";
+    private static final ZoneId DEFAULT_PDF_ZONE_ID = ZoneId.of("Asia/Seoul");
+    private static final Locale DEFAULT_PDF_LOCALE = Locale.KOREA;
+    private static final String WORKPROOF_TEMPLATE_NAME = "pdf/workproof-statement";
 
     private final DocumentGenerationRequestRepository documentGenerationRequestRepository;
     private final WageVerificationQueryService wageVerificationQueryService;
+    private final WorkProofPdfSnapshotAssembler workProofPdfSnapshotAssembler;
+    private final PdfRenderer pdfRenderer;
 
     /**
      * Proof Pack 요청은 verification snapshot과 idempotency key를 먼저 고정해
@@ -124,6 +135,41 @@ public class DocumentsService {
                 buildSummary(request, verification),
                 buildRelatedLinks(verification)
         );
+    }
+
+    public RenderedPdf generateProofPackPdf(Long userId, Long documentId) {
+        DocumentGenerationRequest request = documentGenerationRequestRepository.findByIdAndUserIdAndDocumentType(
+                        documentId,
+                        userId,
+                        DocumentType.PROOF_PACK
+                )
+                .orElseThrow(() -> new ApiException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        request.markRunning();
+        documentGenerationRequestRepository.saveAndFlush(request);
+
+        try {
+            WorkProofPdfSnapshot snapshot = workProofPdfSnapshotAssembler.assemble(new WorkProofPdfAssembleCommand(
+                    userId,
+                    request.getId(),
+                    request.getRequestId(),
+                    request.getWorkplaceId(),
+                    null,
+                    null,
+                    DEFAULT_PDF_ZONE_ID,
+                    DEFAULT_PDF_LOCALE
+            ));
+            RenderedPdf renderedPdf = pdfRenderer.render(WORKPROOF_TEMPLATE_NAME, snapshot);
+
+            request.markReady();
+            documentGenerationRequestRepository.saveAndFlush(request);
+
+            return renderedPdf;
+        } catch (RuntimeException e) {
+            request.markFailed();
+            documentGenerationRequestRepository.saveAndFlush(request);
+            throw e;
+        }
     }
 
     private boolean isDuplicateRequestViolation(DataIntegrityViolationException e) {

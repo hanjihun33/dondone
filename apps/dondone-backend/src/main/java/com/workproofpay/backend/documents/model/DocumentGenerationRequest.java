@@ -119,6 +119,18 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
         );
     }
 
+    public void markRunning() {
+        this.status = DocumentGenerationStatus.RUNNING;
+    }
+
+    public void markReady() {
+        this.status = DocumentGenerationStatus.READY;
+    }
+
+    public void markFailed() {
+        this.status = DocumentGenerationStatus.FAILED;
+    }
+
     @PrePersist
     public void onCreate() {
         if (this.requestId == null) {
