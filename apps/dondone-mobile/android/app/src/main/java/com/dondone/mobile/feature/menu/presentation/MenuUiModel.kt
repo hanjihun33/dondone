@@ -264,7 +264,7 @@ private fun DemoState.buildReceiptShareText(
         )
         append('\n')
         append(RECEIPT_SHARE_RECIPIENT_PREFIX)
-        append(remittance.displayedRecipientName())
+        append(remittance.displayedRecipientNameOrFallback())
         append('\n')
         append(RECEIPT_SHARE_HASH_PREFIX)
         append(remittance.txHash)
@@ -309,3 +309,9 @@ private fun shortenReceiptHash(txHash: String): String {
 
 private fun buildReceiptExplorerUrl(txHash: String): String =
     "https://sepolia.etherscan.io/tx/$txHash"
+
+private fun com.dondone.mobile.domain.model.RemittanceData.displayedRecipientNameOrFallback(): String {
+    return recipientDisplayNameOverride?.takeIf { it.isNotBlank() }
+        ?: selectedRecipientOrNull()?.name
+        ?: "-"
+}

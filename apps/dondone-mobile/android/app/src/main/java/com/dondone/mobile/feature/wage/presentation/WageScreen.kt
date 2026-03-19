@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,6 +81,8 @@ private val WageDivider = Color(0xFFE8EBF0)
 fun WageScreen(
     uiModel: WageUiModel,
     onApplyActualDeposit: (Int) -> Unit,
+    onCreateVerification: () -> Unit,
+    onRefresh: () -> Unit,
     onOpenTransfer: () -> Unit,
     onOpenWorkproof: () -> Unit,
     onOpenMenu: () -> Unit
@@ -97,36 +100,38 @@ fun WageScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        WageHeader(uiModel = uiModel, onOpenCopilot = { chip -> selectedCopilotChipLabel = chip.label })
-        WageSectionDivider()
-        WageNoticeCard(uiModel = uiModel)
-        WageSectionDivider()
-        WageCheckCard(
-            uiModel = uiModel,
-            onApplyActualDeposit = onApplyActualDeposit
-        )
-        WageSectionDivider()
-        WageDifferenceCard(
-            difference = uiModel.difference,
-            showSecondaryActions = showSecondaryActions,
-            onToggleSecondaryActions = { showSecondaryActions = !showSecondaryActions },
-            onPrimaryAction = resolveAction(
-                target = uiModel.difference.primaryActionTarget,
-                onOpenTransfer = onOpenTransfer,
-                onOpenWorkproof = onOpenWorkproof,
-                onOpenMenu = onOpenMenu
-            ),
-            onSecondaryAction = { target ->
-                resolveAction(
-                    target = target,
-                    onOpenTransfer = onOpenTransfer,
-                    onOpenWorkproof = onOpenWorkproof,
-                    onOpenMenu = onOpenMenu
-                ).invoke()
-            }
-        )
+        if (uiModel.surfaceState != WageSurfaceState.CONTENT) {
+            WageSurfaceStateCard(
+                uiModel = uiModel,
+                onRefresh = onRefresh
+            )
+        } else {
+            WageHeader(uiModel = uiModel, onOpenCopilot = { chip -> selectedCopilotChipLabel = chip.label })
+            WageSectionDivider()
+            WageNoticeCard(uiModel = uiModel)
+            WageSectionDivider()
+            WageCheckCard(
+                uiModel = uiModel,
+                onApplyActualDeposit = onApplyActualDeposit
+            )
+            WageSectionDivider()
+            WageDifferenceCard(
+                difference = uiModel.difference,
+                showSecondaryActions = showSecondaryActions,
+                onToggleSecondaryActions = { showSecondaryActions = !showSecondaryActions },
+                onPrimaryAction = onCreateVerification,
+                onSecondaryAction = { target ->
+                    resolveAction(
+                        target = target,
+                        onOpenTransfer = onOpenTransfer,
+                        onOpenWorkproof = onOpenWorkproof,
+                        onOpenMenu = onOpenMenu
+                    ).invoke()
+                }
+            )
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 
     if (selectedCopilotChip != null) {
@@ -146,6 +151,28 @@ fun WageScreen(
 }
 
 @Composable
+private fun WageSurfaceStateCard(
+    uiModel: WageUiModel,
+    onRefresh: () -> Unit
+) {
+    WageSurfaceCard {
+        WageSectionHeader(title = "급여 점검")
+        Text(
+            text = uiModel.surfaceMessage ?: "급여 데이터를 확인할 수 없습니다.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = DawnTextSubtle
+        )
+        if (uiModel.surfaceActionText != null && uiModel.surfaceState != WageSurfaceState.LOADING) {
+            WagePrimaryButton(
+                text = uiModel.surfaceActionText,
+                onClick = onRefresh,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
 private fun WageHeader(
     uiModel: WageUiModel,
     onOpenCopilot: (WageCopilotChipUiModel) -> Unit
@@ -153,10 +180,11 @@ private fun WageHeader(
     WageSectionSurface {
         WageSectionHeader(title = "급여 점검")
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             uiModel.chips.forEach { chip ->
                 WageChip(
@@ -192,7 +220,9 @@ private fun WageCheckCard(
         mutableStateOf(uiModel.deposit.actualDepositText.filter(Char::isDigit))
     }
     val actualDepositValue = actualDepositInput.toIntOrNull()
-    val canApplyDeposit = actualDepositValue != null && actualDepositValue > 0
+    val hasActualDepositInput = actualDepositInput.isNotBlank()
+    val canAdjustDeposit = hasActualDepositInput && !uiModel.deposit.isSubmitting
+    val canApplyDeposit = actualDepositValue != null && actualDepositValue > 0 && !uiModel.deposit.isSubmitting
 
     WageSurfaceCard {
         WageSectionHeader(title = uiModel.titleText)
@@ -238,7 +268,8 @@ private fun WageCheckCard(
                 if (uiModel.deposit.actionButtonText != null) {
                     WageCompactButton(
                         text = "입력",
-                        onClick = { focusRequester.requestFocus() }
+                        onClick = { focusRequester.requestFocus() },
+                        enabled = !uiModel.deposit.isSubmitting
                     )
                 } else {
                     StatusBadge(
@@ -272,6 +303,7 @@ private fun WageCheckCard(
                     onValueChange = { value ->
                         actualDepositInput = value.filter(Char::isDigit)
                     },
+                    enabled = !uiModel.deposit.isSubmitting,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     placeholder = {
                         Text(
@@ -315,15 +347,24 @@ private fun WageCheckCard(
                 WageSecondaryButton(
                     text = "-5만",
                     onClick = {
-                        onApplyActualDeposit((actualDepositValue ?: 0).minus(50_000).coerceAtLeast(0))
+                        actualDepositInput = actualDepositValue
+                            ?.minus(50_000)
+                            ?.coerceAtLeast(0)
+                            ?.toString()
+                            ?: actualDepositInput
                     },
+                    enabled = canAdjustDeposit,
                     modifier = Modifier.weight(1f)
                 )
                 WageSecondaryButton(
                     text = "+5만",
                     onClick = {
-                        onApplyActualDeposit((actualDepositValue ?: 0) + 50_000)
+                        actualDepositInput = actualDepositValue
+                            ?.plus(50_000)
+                            ?.toString()
+                            ?: actualDepositInput
                     },
+                    enabled = canAdjustDeposit,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -359,7 +400,7 @@ private fun WageCheckCard(
                     color = DawnText
                 )
                 Text(
-                    text = "근거 자료(WorkProof) 기반",
+                    text = "근거 자료 기반",
                     style = MaterialTheme.typography.labelLarge,
                     color = DawnTextSubtle
                 )
@@ -392,7 +433,7 @@ private fun WageCheckCard(
                     color = DawnText
                 )
                 Text(
-                    text = "근거 자료(WorkProof) 기반",
+                    text = "근거 자료 기반",
                     style = MaterialTheme.typography.labelLarge,
                     color = DawnTextSubtle
                 )
@@ -445,6 +486,10 @@ private fun WageDifferenceCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
+                StatusBadge(
+                    text = difference.statusText,
+                    tone = difference.statusTone
+                )
             }
             Box(
                 modifier = Modifier
@@ -468,7 +513,7 @@ private fun WageDifferenceCard(
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
-                text = "함께 확인된 근거",
+                text = "확인한 근거",
                 style = MaterialTheme.typography.labelLarge,
                 color = DawnText
             )
@@ -493,7 +538,7 @@ private fun WageDifferenceCard(
         } else {
             WageInfoPanel {
                 Text(
-                    text = "추천 경로(선택)",
+                    text = "다음으로 이어갈 수 있어요",
                     style = MaterialTheme.typography.labelLarge,
                     color = DawnText
                 )
@@ -533,6 +578,7 @@ private fun WageDifferenceCard(
                 WagePrimaryButton(
                     text = difference.primaryActionButtonText,
                     onClick = onPrimaryAction,
+                    enabled = difference.primaryActionEnabled,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
@@ -564,12 +610,6 @@ private fun WageDifferenceCard(
             }
         }
 
-        Text(
-            text = difference.disclaimerText,
-            modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.labelMedium,
-            color = DawnTextSubtle
-        )
     }
 }
 
@@ -949,6 +989,7 @@ private fun WageStepItem(
 private fun WagePrimaryButton(
     text: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -958,7 +999,11 @@ private fun WagePrimaryButton(
     ) {
         Button(
             onClick = onClick,
-            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            enabled = enabled,
+            modifier = modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
             interactionSource = interactionSource,
             shape = RoundedCornerShape(18.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
@@ -979,6 +1024,7 @@ private fun WagePrimaryButton(
 private fun WageSecondaryButton(
     text: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -988,7 +1034,11 @@ private fun WageSecondaryButton(
     ) {
         OutlinedButton(
             onClick = onClick,
-            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            enabled = enabled,
+            modifier = modifier.pressableScale(
+                interactionSource = interactionSource,
+                enabled = enabled
+            ),
             interactionSource = interactionSource,
             shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.dp, DawnBorder),
