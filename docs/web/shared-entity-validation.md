@@ -58,6 +58,7 @@
 - `EmployerProfile`, `WorkerProfile`, `Company`, `EmploymentMembership`, `CorrectionRequest`, `CorrectionDecisionAudit`를 추가하면 신규 테이블 마이그레이션이 필요할 가능성이 높다.
 - 기존 `Workplace.user`, `WorkProof.user`는 당장 제거하지 않고 공존시키는 방향이 안전하다.
 - employer scope binding 검증을 위해 `Workplace.companyId` 같은 보조 연결 컬럼을 additive하게 두는 접근은 허용하되, 기존 worker API 필수값처럼 즉시 승격하지 않는다.
+- Slice 3 settings foundation처럼 `Workplace.settingsEffectiveFrom`, `Workplace.settingsUpdatedByAccountId` 같은 additive metadata를 두고, `detailAddress`는 기존 `Workplace.mapLabel` 저장소를 재사용하는 접근은 허용한다.
 - 즉, MVP 단계에서는 파괴적 스키마 변경보다 `추가 테이블 + 보조 연결` 접근을 우선 검토한다.
 - 기존 seed account와 테스트 픽스처는 worker 기준으로 유지하고, employer용 seed는 별도 추가하는 편이 안전하다.
 - 단, employer web authorization source of truth는 `EmployerProfile + EmploymentMembership`으로 고정하고, 레거시 `Workplace.user`, `WorkProof.user`는 권한 판정 기준으로 사용하지 않는다.
@@ -111,6 +112,7 @@
 - 데이터 마이그레이션 또는 seed 보강 필요 여부 정리
 - 기존 integration test가 깨질 가능성이 있는지 먼저 확인
 - company-workplace binding mismatch, email case-only duplicate, invitation token 저장 방식 회귀가 테스트로 닫혔는지 확인
+- workplace settings라면 `defaultWorkplaceId` 해석, legacy `Workplace.user` 비의존성, `EmploymentMembership` 기준 영향 범위가 테스트로 닫혔는지 확인
 
 ### Gate 4. 리뷰 전
 - 권한 누락, 범위 누락, 상태 전이 누락 항목을 재점검

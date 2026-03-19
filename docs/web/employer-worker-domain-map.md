@@ -124,6 +124,11 @@
   - `latitude`
   - `longitude`
   - `allowedRadiusMeters`
+  - `settingsEffectiveFrom`
+  - `settingsUpdatedByAccountId`
+- 구현 메모
+  - Slice 3 foundation에서는 `detailAddress`를 기존 `Workplace.mapLabel` 저장소로 매핑한다.
+  - `effectiveFrom`는 settings command의 server-time 효력 시점으로 취급한다.
 
 ### EmploymentMembership
 - 목적: worker를 company/workplace에 연결하는 canonical source

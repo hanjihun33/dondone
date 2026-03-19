@@ -14,6 +14,7 @@
 ## 현재 기준 참조 문서
 - 현재 active execplan:
   - `docs/execplans/active/2026-03-19-web-auth-profile-foundation.md`
+  - `docs/execplans/active/2026-03-19-web-workplace-settings-foundation.md`
 - 현재 web 기준 문서 인덱스:
   - `docs/web/README.md`
 
@@ -21,23 +22,29 @@
 - 현재 단계는 Slice 2 `Auth and profile foundation` backend 구현과 회귀 보강이 끝난 상태다.
 - 기존 앱 API 변경 없이 employer 전용 auth/profile 경계를 분리한 채 `EMPLOYER` role, `EmployerProfile`, `EmployerInvitationToken`, `EmploymentMembership` 기반 authz foundation을 반영했다.
 - 리뷰 반영으로 invitation token hash 저장, 이메일 canonicalization 공통화, `Workplace.companyId` 기반 company-workplace binding 검증까지 완료했다.
-- 다음 단계는 Slice 3 `Workplace settings` 계약과 authorization 재사용 범위를 고정하는 작업이다.
+- Slice 3 `Workplace settings` backend foundation은 완료 상태로 정리했다.
+- `GET/PUT /api/employer/workplace-settings`, `EmployerAccessScope` 기반 default workplace 해석, `EmploymentMembership` 기반 영향 범위 집계, settings metadata additive 필드, `WorkProof` workplace snapshot 고정까지 반영했다.
+- 설정 변경 효력은 저장 시점 이후 미래 `check-in/check-out`부터 적용하고, 기존 완료 `WorkProof`는 자동 재판정하지 않으며, 상세/PDF도 record 시점 snapshot을 우선 사용하도록 고정했다.
 
 ## 진행 상태판
 | 순서 | Slice | 상태 | 마지막 결과 | 다음 작업 | 선행 문서 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 문서/경계 고정 | `done` | 검증 페르소나 리뷰를 통해 scope/auth/invitation/migration 경계 누락을 보완했고 기준 문서와 active execplan 정렬 방향을 확보함 | Slice 2 착수 전 employer auth/profile 최소 계약을 구현 단위로 내린다 | `employer-web-direction.md`, `employer-worker-domain-map.md` |
 | 2 | Auth and profile foundation | `done` | `POST /api/employer-auth/invitations/accept`, `POST /api/employer-auth/login`, `GET /api/employer/profile`, `EMPLOYER` role, `EmployerProfile`, `EmployerInvitationToken`, `EmploymentMembership` authz foundation을 구현했고 리뷰 이슈와 backend 테스트를 정리함 | Slice 3 `Workplace settings` 계약과 설정 변경 효력 규칙을 고정한다 | `auth-and-role-policy.md`, `shared-entity-validation.md` |
-| 3 | Workplace settings | `not_started` | 미시작 | `Workplace` 설정 저장 모델과 효력 시점 규칙 확정 | `workplace-settings-contract.md`, `shared-entity-validation.md` |
+| 3 | Workplace settings | `done` | `GET/PUT /api/employer/workplace-settings`, employer 전용 DTO/service/controller, `Workplace` settings metadata additive 필드, settings authz/validation 테스트, `WorkProof` workplace snapshot 고정, 관련 문서 정리를 완료함 | Slice 4 read-model scope와 worker list/dashboard 입력 소스를 고정한다 | `workplace-settings-contract.md`, `shared-entity-validation.md` |
 | 4 | Worker directory and dashboard read-model | `not_started` | 미시작 | worker list/dashboard용 read-model 입력 소스 확정 | `employer-web-api-map.md`, `employer-worker-domain-map.md` |
 | 5 | Correction request flow | `not_started` | 미시작 | 정정 요청 엔티티와 승인 반영 규칙 확정 | `correction-request-flow.md`, `shared-entity-validation.md` |
-| 6 | Hardening | `not_started` | 미시작 | 테스트, 리뷰, 리스크 정리 | 관련 review note |
+| 6 | Hardening | `not_started` | 미시작 | 테스트, 리뷰, 리스크 정리와 prior slice follow-up 회수 | 관련 review note |
 
 ## 지금 기준 다음에 해야 할 일
-1. Slice 3용 active execplan을 만들고 `Workplace settings` 범위를 auth/profile foundation 위에 올린다.
-2. `EmployerAccessScope`와 `EmploymentMembership`을 재사용하는 사업장 설정 read/write 계약을 고정한다.
-3. 설정 변경이 WorkProof 판정과 과거 기록에 미치는 효력 시점 규칙을 문서로 정리한다.
-4. 기존 앱 API contract와 worker legacy ownership이 여전히 범위 밖인지 구현 중 계속 검증한다.
+1. Slice 4 execplan을 만들고 worker list/dashboard read-model scope를 `EmployerAccessScope + EmploymentMembership` 기준으로 고정한다.
+2. `GET /api/employer/workers`, `GET /api/employer/dashboard/summary`, `GET /api/employer/dashboard/attendance-board` 순으로 read-model을 연다.
+3. 기존 앱 API contract와 worker legacy ownership이 여전히 범위 밖인지 구현 중 계속 검증한다.
+
+## Hardening 재확인 backlog
+- `docs/reviews/active/2026-03-19-web-workplace-settings-followups.md`
+- 이 문서는 Slice 3를 닫으면서 의도적으로 미룬 항목을 모아둔 backlog다.
+- Slice 6 `Hardening`에 들어가기 전에 반드시 다시 읽고, 남은 항목을 `fixed / accepted risk / rescope`로 분류한다.
 
 ## 재스코프 트리거
 - 웹 요구사항을 맞추려면 기존 앱 API contract 변경이 필수로 보일 때
@@ -51,6 +58,7 @@
 3. 해당 slice의 `선행 문서`를 읽는다.
 4. `현재 active execplan`을 열어 현재 세션 작업 범위를 확인한다.
 5. 막힌 항목이 있으면 `docs/reviews/active/`의 최신 review note를 같이 본다.
+6. Slice 6 `Hardening`을 시작할 때는 `docs/reviews/active/2026-03-19-web-workplace-settings-followups.md`를 먼저 읽는다.
 
 ## Slice 정의
 
