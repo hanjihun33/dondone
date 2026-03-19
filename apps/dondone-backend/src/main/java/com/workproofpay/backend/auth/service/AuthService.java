@@ -2,6 +2,7 @@ package com.workproofpay.backend.auth.service;
 
 import com.workproofpay.backend.auth.api.dto.request.LoginRequest;
 import com.workproofpay.backend.auth.api.dto.request.SignupRequest;
+import com.workproofpay.backend.auth.api.dto.request.UpdateProfileRequest;
 import com.workproofpay.backend.auth.api.dto.response.LoginResponse;
 import com.workproofpay.backend.auth.api.dto.response.MeResponse;
 import com.workproofpay.backend.auth.model.User;
@@ -9,6 +10,7 @@ import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
+import com.workproofpay.backend.shared.util.PhoneNumberUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,11 +29,14 @@ public class AuthService {
         if (userRepository.existsByEmail(request.email())) {
             throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
+        String normalizedPhoneNumber = PhoneNumberUtils.normalizeOrThrow(request.phoneNumber());
+        ensurePhoneNumberAvailable(normalizedPhoneNumber, null);
 
         User user = User.register(
                 request.email(),
                 passwordEncoder.encode(request.password()),
-                request.name()
+                request.name().trim(),
+                normalizedPhoneNumber
         );
         User saved = userRepository.save(user);
 
@@ -62,5 +67,24 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 
         return MeResponse.from(user);
+    }
+
+    @Transactional
+    public MeResponse updateMe(Long userId, UpdateProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        String normalizedPhoneNumber = PhoneNumberUtils.normalizeOrThrow(request.phoneNumber());
+        ensurePhoneNumberAvailable(normalizedPhoneNumber, userId);
+        user.updateProfile(request.name().trim(), normalizedPhoneNumber);
+        return MeResponse.from(user);
+    }
+
+    private void ensurePhoneNumberAvailable(String phoneNumber, Long userId) {
+        boolean exists = userId == null
+                ? userRepository.existsByPhoneNumber(phoneNumber)
+                : userRepository.existsByPhoneNumberAndIdNot(phoneNumber, userId);
+        if (exists) {
+            throw new ApiException(ErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
+        }
     }
 }

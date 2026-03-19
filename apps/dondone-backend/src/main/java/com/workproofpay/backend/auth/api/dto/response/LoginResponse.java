@@ -15,7 +15,9 @@ public record LoginResponse(
         @Schema(description = "Authenticated user email", example = "test@gmail.com")
         String email,
         @Schema(description = "Authenticated user display name", example = "Test User")
-        String name
+        String name,
+        @Schema(description = "Authenticated user phone number", example = "01012345678")
+        String phoneNumber
 ) {
     public static LoginResponse of(String accessToken, long expiresIn, User user) {
         return new LoginResponse(
@@ -24,7 +26,8 @@ public record LoginResponse(
                 expiresIn,
                 user.getId(),
                 user.getEmail(),
-                user.getName()
+                user.getName(),
+                user.getPhoneNumber()
         );
     }
 }
