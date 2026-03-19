@@ -5,3 +5,15 @@ spring:
 
 jwt:
   secret: test-dondone-secret-key-change-this-at-least-32chars
+
+remittance:
+  worker:
+    poll-interval-ms: 600000
+    receipt-poll-delay-seconds: 0
+    receipt-timeout-seconds: 2
+  chain:
+    mode: demo
+  wallet:
+    encryption-key: c29tZXRlc3QtMzItYnl0ZS1lbmNyeXB0aW9uLWtleS0xMjM0NTY=
+    funding-receipt-timeout-seconds: 1
+    funding-pending-stale-seconds: 1

@@ -26,6 +26,13 @@ public class OpenApiConfig {
                                 2. Copy `data.accessToken` from the response.
                                 3. Click `Authorize` and paste `Bearer {token}` or the raw token value.
                                 4. Call protected endpoints such as `GET /api/auth/me`.
+
+                                Remittance quick test flow:
+                                1. Call `POST /api/remittance/wallets/me`.
+                                2. Register a recipient with `POST /api/remittance/recipients`.
+                                3. Run `POST /api/remittance/transfers/precheck`.
+                                4. Create a transfer with `POST /api/remittance/transfers` and `Idempotency-Key`.
+                                5. Poll `GET /api/remittance/transfers/{transferId}` until `CONFIRMED`.
                                 """)
                         .version("v0.1.0")
                         .contact(new Contact().name("DonDone Backend")))

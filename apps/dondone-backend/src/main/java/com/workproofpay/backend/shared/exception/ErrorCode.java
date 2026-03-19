@@ -22,8 +22,10 @@ public enum ErrorCode {
     UNSUPPORTED_FILE_TYPE(HttpStatus.BAD_REQUEST, "Unsupported file type"),
     REQUEST_AMOUNT_EXCEEDS_LIMIT(HttpStatus.BAD_REQUEST, "Requested amount exceeds the available advance limit"),
     IDEMPOTENCY_KEY_REQUIRED(HttpStatus.BAD_REQUEST, "Idempotency-Key header is required"),
+    INVALID_WALLET_ADDRESS(HttpStatus.BAD_REQUEST, "walletAddress must be a valid EVM address"),
 
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication is required"),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "You do not have permission to access this resource"),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Token is invalid or expired"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid credentials"),
 
@@ -38,6 +40,9 @@ public enum ErrorCode {
     CLAIM_KIT_NOT_FOUND(HttpStatus.NOT_FOUND, "Claim kit not found"),
     CLAIM_PREPARATION_NOT_FOUND(HttpStatus.NOT_FOUND, "Claim preparation not found"),
     ADVANCE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Advance request not found"),
+    RECIPIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Recipient not found"),
+    TRANSFER_NOT_FOUND(HttpStatus.NOT_FOUND, "Transfer not found"),
+    WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "Wallet not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     ACTIVE_CONTRACT_REQUIRED(HttpStatus.CONFLICT, "Active contract is required"),
@@ -50,6 +55,15 @@ public enum ErrorCode {
     ADVANCE_DUPLICATE_REQUEST(HttpStatus.CONFLICT, "Advance request already exists for the idempotency key"),
     ADVANCE_NOT_ELIGIBLE(HttpStatus.CONFLICT, "Advance is not eligible"),
     IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD(HttpStatus.CONFLICT, "Idempotency key was reused with a different payload"),
+    RECIPIENT_WALLET_ALREADY_EXISTS(HttpStatus.CONFLICT, "Recipient wallet is already registered"),
+    RECIPIENT_NOT_ALLOWED(HttpStatus.CONFLICT, "Recipient is not allowed"),
+    RECENT_RECIPIENT_CONFIRMATION_REQUIRED(HttpStatus.CONFLICT, "Recently updated recipient requires explicit confirmation"),
+    HIGH_AMOUNT_CONFIRMATION_REQUIRED(HttpStatus.CONFLICT, "High amount transfer requires explicit confirmation"),
+    SELF_TRANSFER_NOT_ALLOWED(HttpStatus.CONFLICT, "Sending to your own wallet is not allowed"),
+    INSUFFICIENT_WALLET_BALANCE(HttpStatus.CONFLICT, "Wallet balance is insufficient for this transfer"),
+    TRANSFER_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "Another transfer is already in progress"),
+    WALLET_FUNDING_FAILED(HttpStatus.CONFLICT, "Wallet funding failed"),
+    RECOVERY_ACTION_NOT_ALLOWED(HttpStatus.CONFLICT, "Recovery action is not allowed for the current state"),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
