@@ -4,32 +4,74 @@ import { EmployerDashboardPage } from "../pages/dashboard/EmployerDashboardPage"
 import { WorkerSummaryPage } from "../pages/workers/WorkerSummaryPage";
 import { IssuesQueuePage } from "../pages/issues/IssuesQueuePage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
+import { LoggedOutPage } from "../pages/auth/LoggedOutPage";
+import { SignUpPage } from "../pages/auth/SignUpPage";
+import { AdminPage } from "../pages/admin/AdminPage";
+import { getStoredUserRole } from "../shared/auth/session";
+
+function AdminOnlyRoute({ element }: { element: JSX.Element }) {
+  const role = getStoredUserRole();
+  if (role === null) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (role !== "admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return element;
+}
+
+function ManagerOnlyRoute({ element }: { element: JSX.Element }) {
+  const role = getStoredUserRole();
+  if (role === null) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (role === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return element;
+}
 
 export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <LoggedOutPage />
+  },
+  {
+    path: "/signup",
+    element: <SignUpPage />
+  },
   {
     path: "/",
     element: <AppShell />,
     children: [
       {
-        index: true,
-        element: <Navigate to="/dashboard" replace />
-      },
-      {
         path: "dashboard",
-        element: <EmployerDashboardPage />
+        element: <ManagerOnlyRoute element={<EmployerDashboardPage />} />
       },
       {
         path: "workers",
-        element: <WorkerSummaryPage />
+        element: <ManagerOnlyRoute element={<WorkerSummaryPage />} />
       },
       {
         path: "settings",
-        element: <SettingsPage />
+        element: <ManagerOnlyRoute element={<SettingsPage />} />
       },
       {
         path: "issues",
-        element: <IssuesQueuePage />
+        element: <ManagerOnlyRoute element={<IssuesQueuePage />} />
+      },
+      {
+        path: "admin",
+        element: <AdminOnlyRoute element={<AdminPage />} />
       }
     ]
+  },
+  {
+    path: "/logged-out",
+    element: <Navigate to="/" replace />
   }
 ]);
