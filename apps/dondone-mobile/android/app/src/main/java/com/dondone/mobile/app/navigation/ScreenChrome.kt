@@ -25,14 +25,15 @@ fun resolveScreenChrome(
             },
             showRootTabs = true,
             showSettingsAction = route == Route.HOME,
-            showDate = route != Route.HOME && route != Route.MENU
+            showDate = route != Route.HOME && route != Route.MENU &&
+                !(route == Route.WORKPROOF && isWorkproofDetailVisible)
         )
     } else {
         ScreenChrome(
             headerTitle = resolveChildHeaderTitle(route, transferStep, transferStatus),
             showRootTabs = false,
             showSettingsAction = false,
-            showDate = route != Route.TRANSFER
+            showDate = route != Route.TRANSFER && route != Route.ACCOUNT
         )
     }
 }
@@ -53,7 +54,11 @@ private fun resolveTransferHeaderTitle(
     transferStep: TransferFlowStep,
     transferStatus: TransferStatus
 ): String? {
-    if (transferStatus == TransferStatus.SUBMITTED || transferStatus == TransferStatus.CONFIRMED) {
+    if (
+        transferStatus == TransferStatus.SUBMITTED ||
+        transferStatus == TransferStatus.CONFIRMED ||
+        transferStatus == TransferStatus.FAILED
+    ) {
         return null
     }
 

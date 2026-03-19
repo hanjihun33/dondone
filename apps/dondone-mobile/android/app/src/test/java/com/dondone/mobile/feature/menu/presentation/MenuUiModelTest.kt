@@ -1,6 +1,7 @@
 package com.dondone.mobile.feature.menu.presentation
 
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferStatus
 import org.junit.Assert.assertEquals
@@ -12,7 +13,10 @@ import org.junit.Test
 class MenuUiModelTest {
     @Test
     fun `menu documents exclude receipt and keep service receipt entry separate`() {
-        val uiModel = DemoSeedFactory.create().toMenuUiModel()
+        val uiModel = DemoSeedFactory.create().toMenuUiModel(
+            session = null,
+            remittanceRemoteState = defaultRemoteState()
+        )
 
         assertEquals(2, uiModel.documents.size)
         assertTrue(uiModel.documents.none { it.title == "송금 영수증" })
@@ -24,7 +28,10 @@ class MenuUiModelTest {
         val seed = DemoSeedFactory.create()
         val uiModel = seed
             .copy(remittance = seed.remittance.copy(status = TransferStatus.SUBMITTED))
-            .toMenuUiModel()
+            .toMenuUiModel(
+                session = null,
+                remittanceRemoteState = defaultRemoteState()
+            )
 
         val receipt = requireNotNull(uiModel.receipt)
 
@@ -42,7 +49,10 @@ class MenuUiModelTest {
 
     @Test
     fun `idle state still exposes latest confirmed receipt session`() {
-        val uiModel = DemoSeedFactory.create().toMenuUiModel()
+        val uiModel = DemoSeedFactory.create().toMenuUiModel(
+            session = null,
+            remittanceRemoteState = defaultRemoteState()
+        )
         val receipt = requireNotNull(uiModel.receipt)
 
         assertEquals(MenuReceiptStatus.Confirmed, receipt.status)
@@ -61,10 +71,16 @@ class MenuUiModelTest {
                     destinationMode = TransferDestinationMode.WALLET
                 )
             )
-            .toMenuUiModel()
+            .toMenuUiModel(
+                session = null,
+                remittanceRemoteState = defaultRemoteState()
+            )
 
         val receipt = requireNotNull(uiModel.receipt)
 
         assertTrue(receipt.shareText.contains("금액: ${'$'}360 USDC"))
     }
 }
+
+private fun defaultRemoteState(): RemittanceRemoteState =
+    RemittanceRemoteState.unauthenticated("login required")

@@ -1,6 +1,7 @@
 package com.dondone.mobile.app.session
 
 import com.dondone.mobile.domain.model.DemoState
+import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.TodayWork
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
@@ -45,7 +46,10 @@ object DemoSessionReducer {
             remittance = state.remittance.copy(
                 flowStep = TransferFlowStep.RECIPIENT,
                 destinationMode = TransferDestinationMode.ACCOUNT,
+                selectedRecipientId = state.remittance.recipients.firstOrNull()?.id ?: state.remittance.selectedRecipientId,
                 recipientDisplayNameOverride = null,
+                draftAmountUsd = 0,
+                txHash = "",
                 status = TransferStatus.IDLE,
                 stepReturnTarget = null
             )
@@ -123,6 +127,76 @@ object DemoSessionReducer {
                 recipientDisplayNameOverride = null,
                 flowStep = nextStep,
                 stepReturnTarget = null
+            )
+        )
+    }
+
+    fun addRecipient(
+        state: DemoState,
+        alias: String,
+        relation: String,
+        walletAddress: String
+    ): DemoState {
+        if (state.remittance.recipients.any { it.address == walletAddress }) {
+            return state
+        }
+
+        val nextId = buildLocalRecipientId(state)
+        val nextRecipient = Recipient(
+            id = nextId,
+            name = alias,
+            relationship = relation,
+            address = walletAddress
+        )
+
+        return state.copy(
+            remittance = state.remittance.copy(
+                recipients = listOf(nextRecipient) + state.remittance.recipients,
+                selectedRecipientId = nextId,
+                recipientDisplayNameOverride = null,
+                flowStep = if (state.remittance.flowStep == TransferFlowStep.RECIPIENT) {
+                    state.remittance.stepReturnTarget ?: TransferFlowStep.AMOUNT
+                } else {
+                    state.remittance.flowStep
+                },
+                stepReturnTarget = null,
+                status = TransferStatus.IDLE
+            )
+        )
+    }
+
+    fun updateRecipient(
+        state: DemoState,
+        recipientId: String,
+        alias: String,
+        relation: String,
+        walletAddress: String
+    ): DemoState {
+        if (state.remittance.recipients.any { it.id != recipientId && it.address == walletAddress }) {
+            return state
+        }
+
+        val updated = state.remittance.recipients.map { recipient ->
+            if (recipient.id == recipientId) {
+                recipient.copy(
+                    name = alias,
+                    relationship = relation,
+                    address = walletAddress
+                )
+            } else {
+                recipient
+            }
+        }
+
+        return state.copy(
+            remittance = state.remittance.copy(
+                recipients = updated,
+                recipientDisplayNameOverride = if (state.remittance.selectedRecipientId == recipientId) {
+                    null
+                } else {
+                    state.remittance.recipientDisplayNameOverride
+                },
+                status = TransferStatus.IDLE
             )
         )
     }
@@ -258,7 +332,10 @@ object DemoSessionReducer {
                 status = TransferStatus.IDLE,
                 flowStep = TransferFlowStep.RECIPIENT,
                 destinationMode = TransferDestinationMode.ACCOUNT,
+                selectedRecipientId = state.remittance.recipients.firstOrNull()?.id ?: state.remittance.selectedRecipientId,
                 recipientDisplayNameOverride = null,
+                draftAmountUsd = 0,
+                txHash = "",
                 stepReturnTarget = null
             )
         )
@@ -329,6 +406,15 @@ object DemoSessionReducer {
             modified = false,
             attachments = 0
         )
+    }
+
+    private fun buildLocalRecipientId(state: DemoState): String {
+        val nextNumericId = state.remittance.recipients
+            .mapNotNull { recipient -> recipient.id.removePrefix("R-LOCAL-").toIntOrNull() }
+            .maxOrNull()
+            ?.plus(1)
+            ?: 1
+        return "R-LOCAL-${nextNumericId.toString().padStart(3, '0')}"
     }
 
     private fun WorkRecord.toTodayWork(): TodayWork {

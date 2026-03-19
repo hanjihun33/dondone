@@ -1,10 +1,13 @@
 package com.dondone.mobile.feature.workproof.presentation
 
-import android.location.Location
 import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.WorkRecord
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 private const val UnrecordedTime = "-"
 
 enum class WorkproofCalendarTone {
@@ -169,13 +172,29 @@ private fun isWithinWorkplaceRadius(
     endLongitude: Double,
     radiusMeters: Int
 ): Boolean {
-    val result = FloatArray(1)
-    Location.distanceBetween(
+    return haversineDistanceMeters(
         startLatitude,
         startLongitude,
         endLatitude,
-        endLongitude,
-        result
-    )
-    return result.first() <= radiusMeters
+        endLongitude
+    ) <= radiusMeters
+}
+
+private fun haversineDistanceMeters(
+    startLatitude: Double,
+    startLongitude: Double,
+    endLatitude: Double,
+    endLongitude: Double
+): Double {
+    val earthRadiusMeters = 6_371_000.0
+    val latitudeDelta = Math.toRadians(endLatitude - startLatitude)
+    val longitudeDelta = Math.toRadians(endLongitude - startLongitude)
+    val startLatitudeRadians = Math.toRadians(startLatitude)
+    val endLatitudeRadians = Math.toRadians(endLatitude)
+
+    val a = sin(latitudeDelta / 2) * sin(latitudeDelta / 2) +
+        cos(startLatitudeRadians) * cos(endLatitudeRadians) *
+        sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return earthRadiusMeters * c
 }

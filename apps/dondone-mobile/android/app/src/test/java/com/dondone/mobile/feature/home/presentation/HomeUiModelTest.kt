@@ -1,7 +1,12 @@
 package com.dondone.mobile.feature.home.presentation
 
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.remittance.RemittanceRemotePayload
+import com.dondone.mobile.data.remittance.RemittanceRemoteState
+import com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload
+import com.dondone.mobile.data.remittance.RemittanceWalletPayload
 import com.dondone.mobile.domain.model.TransferStatus
+import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -17,10 +22,9 @@ class HomeUiModelTest {
 
         val uiModel = baseState.toHomeUiModel()
 
-        assertEquals("입금 대기", uiModel.money.statusText)
         assertEquals(HomeActionTarget.FINANCE, uiModel.money.nextAction.actionTarget)
         assertFalse(uiModel.money.showWorkActionCard)
-        assertFalse(uiModel.money.showPaydayCard)
+        assertEquals("금융 보기", uiModel.money.nextAction.buttonText)
     }
 
     @Test
@@ -34,10 +38,9 @@ class HomeUiModelTest {
 
         val uiModel = baseState.toHomeUiModel()
 
-        assertEquals("확인 필요한 차이", uiModel.money.statusText)
         assertEquals(HomeActionTarget.WAGE, uiModel.money.nextAction.actionTarget)
         assertTrue(uiModel.money.showWorkActionCard)
-        assertFalse(uiModel.money.showPaydayCard)
+        assertEquals("보기", uiModel.money.nextAction.buttonText)
     }
 
     @Test
@@ -56,9 +59,52 @@ class HomeUiModelTest {
 
         val uiModel = baseState.toHomeUiModel()
 
-        assertEquals("이상 없음", uiModel.money.statusText)
         assertEquals(HomeActionTarget.MENU, uiModel.money.nextAction.actionTarget)
         assertFalse(uiModel.money.showWorkActionCard)
-        assertTrue(uiModel.money.showPaydayCard)
+        assertEquals("문서", uiModel.money.nextAction.buttonText)
+    }
+
+    @Test
+    fun `unauthenticated home shows representative account info`() {
+        val state = DemoSeedFactory.create()
+
+        val uiModel = state.toHomeUiModel()
+
+        assertEquals("대표 계좌", uiModel.account.titleText)
+        assertEquals("₩1,740,000", uiModel.account.balanceText)
+    }
+
+    @Test
+    fun `authenticated home shows representative wallet info`() {
+        val state = DemoSeedFactory.create()
+        val remittanceRemoteState = RemittanceRemoteState.content(
+            RemittanceRemotePayload(
+                wallet = RemittanceWalletPayload(
+                    walletAddress = "0x1111111111111111111111111111111111111111",
+                    fundingStatus = "FUNDED",
+                    fundingFailureReason = null,
+                    fundedAt = LocalDateTime.parse("2026-03-19T09:00:00"),
+                    createdAt = LocalDateTime.parse("2026-03-19T08:59:00")
+                ),
+                balance = RemittanceWalletBalancePayload(
+                    walletAddress = "0x1111111111111111111111111111111111111111",
+                    assetSymbol = "dUSDC",
+                    assetDecimals = 6,
+                    tokenBalanceAtomic = "128500000",
+                    nativeBalanceWei = "10000000000000000"
+                ),
+                recipients = emptyList(),
+                transfers = emptyList(),
+                activeTransfer = null
+            )
+        )
+
+        val uiModel = state.toHomeUiModel(
+            remittanceRemoteState = remittanceRemoteState,
+            isAuthenticated = true
+        )
+
+        assertEquals("대표 지갑", uiModel.account.titleText)
+        assertEquals("128.5 dUSDC", uiModel.account.balanceText)
     }
 }

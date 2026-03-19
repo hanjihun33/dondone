@@ -33,9 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSecondary
@@ -130,7 +134,7 @@ private fun HomeAccountHero(
             containerColor = HomeSurface
         ) {
             Text(
-                text = "대표 계좌",
+                text = uiModel.account.titleText,
                 style = MaterialTheme.typography.labelLarge,
                 color = HomeTextMuted
             )
@@ -141,7 +145,27 @@ private fun HomeAccountHero(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = uiModel.account.balanceText,
+                    text = buildAnnotatedString {
+                        withStyle(
+                            SpanStyle(
+                                fontWeight = FontWeight.Black,
+                                fontSize = MaterialTheme.typography.displaySmall.fontSize
+                            )
+                        ) {
+                            append(uiModel.account.balanceAmountText)
+                        }
+                        uiModel.account.balanceUnitText?.let { unit ->
+                            append(" ")
+                            withStyle(
+                                SpanStyle(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 22.sp
+                                )
+                            ) {
+                                append(unit)
+                            }
+                        }
+                    },
                     style = MaterialTheme.typography.displaySmall,
                     color = HomeTextPrimary
                 )

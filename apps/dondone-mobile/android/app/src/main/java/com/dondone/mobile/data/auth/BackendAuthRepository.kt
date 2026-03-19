@@ -27,11 +27,17 @@ class BackendAuthRepository(
         session
     }
 
-    override suspend fun signup(name: String, email: String, password: String): AuthSession = withContext(Dispatchers.IO) {
+    override suspend fun signup(
+        name: String,
+        email: String,
+        password: String,
+        phoneNumber: String
+    ): AuthSession = withContext(Dispatchers.IO) {
         val payload = JSONObject()
             .put("email", email)
             .put("password", password)
             .put("name", name)
+            .put("phoneNumber", phoneNumber)
             .toString()
         val request = Request.Builder()
             .url("${BackendApiSupport.baseUrl}/api/auth/signup")
@@ -82,10 +88,50 @@ class BackendAuthRepository(
                 expiresAtEpochMillis = AuthSession.resolveExpiresAtEpochMillis(data.getLong("expiresIn")),
                 userId = data.getLong("userId"),
                 email = data.getString("email"),
-                name = data.getString("name")
+                name = data.getString("name"),
+                phoneNumber = data.optString("phoneNumber").ifBlank { null }
             )
             sessionStore.save(session)
             session
+        }
+    }
+
+    override suspend fun updateProfile(
+        session: AuthSession,
+        name: String,
+        phoneNumber: String
+    ): AuthSession = withContext(Dispatchers.IO) {
+        val payload = JSONObject()
+            .put("name", name)
+            .put("phoneNumber", phoneNumber)
+            .toString()
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/auth/me")
+            .header("Authorization", "Bearer ${session.accessToken}")
+            .put(payload.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val message = parseBackendErrorMessage(
+                    responseBody = responseBody,
+                    fallbackMessage = "내 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요."
+                )
+                if (response.code == 401 || response.code == 403) {
+                    throw AuthUnauthorizedException(message)
+                }
+                throw BackendApiException(message)
+            }
+
+            val json = JSONObject(responseBody.ifBlank { "{}" })
+            val data = json.getJSONObject("data")
+            val updatedSession = session.copy(
+                name = data.getString("name"),
+                phoneNumber = data.optString("phoneNumber").ifBlank { null }
+            )
+            sessionStore.save(updatedSession)
+            updatedSession
         }
     }
 

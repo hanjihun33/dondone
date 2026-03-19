@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -53,11 +54,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSurface
@@ -104,6 +109,16 @@ private val TransferNumberPadRows = listOf(
 )
 private const val TransferAmountMaxDigits = 9
 private const val TransferKrwPerUsdc = 1_450.0
+private val TransferRecipientRelationOptions = listOf(
+    "FAMILY" to "가족",
+    "SPOUSE" to "배우자",
+    "PARENT" to "부모",
+    "CHILD" to "자녀",
+    "SIBLING" to "형제자매",
+    "RELATIVE" to "친척",
+    "FRIEND" to "친구",
+    "OTHER" to "기타"
+)
 
 private data class TransferDestinationSummary(
     val title: String,
@@ -138,8 +153,28 @@ private data class TransferReviewCopy(
 private enum class TransferReviewOverlay {
     None,
     RecipientEditor,
-    AccountSheet
+    AccountSheet,
+    WalletSheet
 }
+
+internal enum class TransferScreenMode {
+    TRACKER,
+    REVIEW,
+    REMOTE_GATE,
+    AMOUNT,
+    PICKER
+}
+
+internal fun resolveTransferScreenMode(uiModel: TransferUiModel): TransferScreenMode {
+    return when {
+        uiModel.showTrackerScreen -> TransferScreenMode.TRACKER
+        uiModel.showReviewScreen -> TransferScreenMode.REVIEW
+        uiModel.remoteGate != null -> TransferScreenMode.REMOTE_GATE
+        uiModel.flowStep == TransferFlowStep.AMOUNT -> TransferScreenMode.AMOUNT
+        else -> TransferScreenMode.PICKER
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransferScreen(
@@ -149,6 +184,8 @@ fun TransferScreen(
     onSelectRecipient: (String) -> Unit,
     onUpdateRecipientDisplayName: (String) -> Unit,
     onUpdateAmount: (Int) -> Unit,
+    onCreateRecipient: (String, String, String) -> Unit,
+    onRefreshRemittance: () -> Unit,
     onChangeRecipient: () -> Unit,
     onChangeAccountFromAmount: () -> Unit,
     onSubmitTransfer: () -> Unit,
@@ -156,20 +193,25 @@ fun TransferScreen(
     onConfirmTransfer: () -> Unit,
     onResetTransfer: () -> Unit
 ) {
-    when {
-        uiModel.showTrackerScreen -> TransferTrackerScreen(
+    when (resolveTransferScreenMode(uiModel)) {
+        TransferScreenMode.TRACKER -> TransferTrackerScreen(
             uiModel = uiModel,
             onResetTransfer = onResetTransfer
         )
 
-        uiModel.showReviewScreen -> TransferReviewScreen(
+        TransferScreenMode.REVIEW -> TransferReviewScreen(
             uiModel = uiModel,
             onDismiss = onDismissTransferConfirmation,
             onConfirm = onConfirmTransfer,
             onUpdateRecipientDisplayName = onUpdateRecipientDisplayName
         )
 
-        uiModel.flowStep == TransferFlowStep.AMOUNT -> AmountStepCard(
+        TransferScreenMode.REMOTE_GATE -> TransferRemoteGateScreen(
+            gate = requireNotNull(uiModel.remoteGate),
+            onRefresh = onRefreshRemittance
+        )
+
+        TransferScreenMode.AMOUNT -> AmountStepCard(
             uiModel = uiModel,
             onUpdateAmount = onUpdateAmount,
             onChangeRecipient = onChangeRecipient,
@@ -177,7 +219,7 @@ fun TransferScreen(
             onPrimaryAction = onSubmitTransfer
         )
 
-        else -> Column(
+        TransferScreenMode.PICKER -> Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
@@ -193,7 +235,8 @@ fun TransferScreen(
                 RecipientStepCard(
                     uiModel = uiModel,
                     onSelectDestinationMode = onSelectDestinationMode,
-                    onSelectRecipient = onSelectRecipient
+                    onSelectRecipient = onSelectRecipient,
+                    onCreateRecipient = onCreateRecipient
                 )
             }
         }
@@ -231,10 +274,12 @@ private fun AccountStepCard(
 private fun RecipientStepCard(
     uiModel: TransferUiModel,
     onSelectDestinationMode: (TransferDestinationMode) -> Unit,
-    onSelectRecipient: (String) -> Unit
+    onSelectRecipient: (String) -> Unit,
+    onCreateRecipient: (String, String, String) -> Unit
 ) {
     val selectedTab = uiModel.destinationMode.toRecipientPickerTab()
     var query by remember { mutableStateOf("") }
+    var showCreateRecipientSheet by remember { mutableStateOf(false) }
     val filteredSections = remember(uiModel.recipientSections, query, selectedTab) {
         filterRecipientSections(
             sections = uiModel.recipientSections,
@@ -250,16 +295,40 @@ private fun RecipientStepCard(
             .padding(top = 12.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Text(
-            text = uiModel.recipientScreenTitle,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
-            color = DawnText
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = uiModel.recipientScreenTitle,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+            if (uiModel.showAddRecipientAction) {
+                OutlinedButton(
+                    onClick = { showCreateRecipientSheet = true },
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, TransferRecipientSelectedBorder),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White,
+                        contentColor = DawnPrimary
+                    )
+                ) {
+                    Text(
+                        text = "수신자 추가",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
+                    )
+                }
+            }
+        }
 
-        TransferRecipientSegmentedTabs(
-            selectedTab = selectedTab,
-            onSelectTab = { onSelectDestinationMode(it.toDestinationMode()) }
-        )
+        if (!uiModel.isRemoteMode) {
+            TransferRecipientSegmentedTabs(
+                selectedTab = selectedTab,
+                onSelectTab = { onSelectDestinationMode(it.toDestinationMode()) }
+            )
+        }
 
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
@@ -297,7 +366,17 @@ private fun RecipientStepCard(
 
         if (filteredSections.isEmpty()) {
             TransferRecipientEmptyState(
-                description = selectedTab.emptyStateDescription()
+                description = if (uiModel.showAddRecipientAction) {
+                    "허용 목록 수신자를 먼저 등록해 주세요."
+                } else {
+                    selectedTab.emptyStateDescription()
+                },
+                actionText = if (uiModel.showAddRecipientAction) "수신자 등록" else null,
+                onAction = if (uiModel.showAddRecipientAction) {
+                    { showCreateRecipientSheet = true }
+                } else {
+                    null
+                }
             )
         } else {
             filteredSections.forEach { section ->
@@ -310,6 +389,16 @@ private fun RecipientStepCard(
             }
         }
 
+    }
+
+    if (showCreateRecipientSheet) {
+        CreateRecipientBottomSheet(
+            onDismiss = { showCreateRecipientSheet = false },
+            onCreateRecipient = { alias, relation, walletAddress ->
+                onCreateRecipient(alias, relation, walletAddress)
+                showCreateRecipientSheet = false
+            }
+        )
     }
 }
 
@@ -477,7 +566,9 @@ private fun TransferRecipientRow(
 
 @Composable
 private fun TransferRecipientEmptyState(
-    description: String
+    description: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -497,6 +588,217 @@ private fun TransferRecipientEmptyState(
             style = MaterialTheme.typography.bodySmall,
             color = DawnTextSubtle
         )
+        if (actionText != null && onAction != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onAction,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, TransferRecipientSelectedBorder),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.White,
+                    contentColor = DawnPrimary
+                )
+            ) {
+                Text(
+                    text = actionText,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransferInlineNoticeCard(
+    title: String,
+    description: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(TransferMutedCardBackground, RoundedCornerShape(18.dp))
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+            color = DawnText
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = DawnTextSubtle
+        )
+    }
+}
+
+@Composable
+private fun TransferRemoteGateScreen(
+    gate: TransferRemoteGateUiModel,
+    onRefresh: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(TransferMutedCardBackground, RoundedCornerShape(24.dp))
+                .border(1.dp, TransferMutedCardBorder, RoundedCornerShape(24.dp))
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            if (gate.isLoading) {
+                CircularProgressIndicator(
+                    color = DawnPrimary,
+                    strokeWidth = 3.dp
+                )
+            }
+            Text(
+                text = gate.title,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+                color = DawnText,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = gate.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = DawnTextSubtle,
+                textAlign = TextAlign.Center
+            )
+            if (gate.actionText != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DawnPrimary, RoundedCornerShape(18.dp))
+                        .clickable(onClick = onRefresh)
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = gate.actionText,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreateRecipientBottomSheet(
+    onDismiss: () -> Unit,
+    onCreateRecipient: (String, String, String) -> Unit
+) {
+    var alias by remember { mutableStateOf("") }
+    var walletAddress by remember { mutableStateOf("") }
+    var relation by remember { mutableStateOf("FAMILY") }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        scrimColor = TransferReviewSheetScrim
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "허용 목록 수신자 추가",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+            Text(
+                text = "테스트넷 지갑 주소만 등록할 수 있어요.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = DawnTextSubtle
+            )
+            OutlinedTextField(
+                value = alias,
+                onValueChange = { alias = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("별칭") },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp)
+            )
+            OutlinedTextField(
+                value = walletAddress,
+                onValueChange = { walletAddress = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("지갑 주소") },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp)
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "관계",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                    color = DawnText
+                )
+                TransferRecipientRelationOptions.chunked(2).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        row.forEach { (code, label) ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(
+                                        if (relation == code) TransferRecipientSelectedBackground else Color.White,
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (relation == code) TransferRecipientSelectedBorder else TransferRecipientRowBorder,
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable { relation = code }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                                    color = if (relation == code) DawnPrimary else DawnTextSubtle
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DawnPrimary, RoundedCornerShape(18.dp))
+                    .clickable(
+                        enabled = alias.isNotBlank() && walletAddress.isNotBlank()
+                    ) {
+                        onCreateRecipient(alias.trim(), relation, walletAddress.trim())
+                    }
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "등록하기",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                    color = Color.White.copy(alpha = if (alias.isNotBlank() && walletAddress.isNotBlank()) 1f else 0.52f)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
     }
 }
 
@@ -594,16 +896,18 @@ private fun AmountStepCard(
                         .align(Alignment.TopCenter)
                         .background(TransferAmountActionBackground)
                         .clickable(
-                            enabled = uiModel.canSubmit,
+                            enabled = uiModel.canSubmit && !uiModel.isActionSubmitting,
                             onClick = onPrimaryAction
                         )
                         .padding(vertical = TransferAmountActionVerticalPadding),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "다음",
+                        text = if (uiModel.isActionSubmitting) "확인 중..." else "다음",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                        color = Color.White.copy(alpha = if (uiModel.canSubmit) 1f else 0.52f)
+                        color = Color.White.copy(
+                            alpha = if (uiModel.canSubmit && !uiModel.isActionSubmitting) 1f else 0.52f
+                        )
                     )
                 }
             }
@@ -745,10 +1049,10 @@ private fun TransferTrackerScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (uiModel.transferStatus == TransferStatus.CONFIRMED) {
-                        Icons.Default.Check
-                    } else {
-                        Icons.AutoMirrored.Filled.Send
+                    imageVector = when (uiModel.transferStatus) {
+                        TransferStatus.CONFIRMED -> Icons.Default.Check
+                        TransferStatus.FAILED -> Icons.Default.Close
+                        else -> Icons.AutoMirrored.Filled.Send
                     },
                     contentDescription = null,
                     tint = Color(0xFF5C6484),
@@ -776,6 +1080,13 @@ private fun TransferTrackerScreen(
                     color = DawnText,
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = uiModel.trackerDetailText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnTextSubtle,
+                    textAlign = TextAlign.Center
+                )
             }
             OutlinedButton(
                 onClick = { },
@@ -801,17 +1112,20 @@ private fun TransferTrackerScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            if (uiModel.transferStatus == TransferStatus.CONFIRMED) {
+            if (uiModel.transferStatus == TransferStatus.CONFIRMED || uiModel.transferStatus == TransferStatus.FAILED) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(DawnPrimary, RoundedCornerShape(18.dp))
+                        .background(
+                            if (uiModel.transferStatus == TransferStatus.FAILED) Color(0xFF1F2937) else DawnPrimary,
+                            RoundedCornerShape(18.dp)
+                        )
                         .clickable(onClick = onResetTransfer)
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "확인",
+                        text = if (uiModel.transferStatus == TransferStatus.FAILED) "닫기" else "확인",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = Color.White
                     )
@@ -834,8 +1148,10 @@ private fun TransferReviewScreen(
     var draftRecipientDisplayName by remember(uiModel.selectedRecipientName) {
         mutableStateOf(uiModel.selectedRecipientName)
     }
-    val accountSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val reviewCopy = resolveReviewCopy(uiModel)
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
     if (activeOverlay == TransferReviewOverlay.RecipientEditor) {
         TransferRecipientDisplayNameEditor(
@@ -906,7 +1222,11 @@ private fun TransferReviewScreen(
                     showTrailingIcon = true
                 )
                 TransferReviewInfoRow(
-                    label = "출금 계좌",
+                    label = if (uiModel.destinationMode == TransferDestinationMode.WALLET) {
+                        "출금 지갑"
+                    } else {
+                        "출금 계좌"
+                    },
                     value = uiModel.selectedAccountName,
                     onClick = { activeOverlay = TransferReviewOverlay.AccountSheet },
                     withDivider = false,
@@ -915,25 +1235,46 @@ private fun TransferReviewScreen(
                 TransferReviewInfoRow(
                     label = reviewCopy.recipientDetailLabel,
                     value = reviewCopy.recipientDetail,
-                    onClick = null,
+                    onClick = if (uiModel.destinationMode == TransferDestinationMode.WALLET) {
+                        { activeOverlay = TransferReviewOverlay.WalletSheet }
+                    } else {
+                        null
+                    },
                     withDivider = false,
-                    showTrailingIcon = false,
+                    showTrailingIcon = uiModel.destinationMode == TransferDestinationMode.WALLET,
                     valueFontFamily = reviewCopy.recipientDetailFontFamily
                 )
+                if (uiModel.reviewNotice != null) {
+                    TransferInlineNoticeCard(
+                        title = uiModel.reviewNotice.title,
+                        description = uiModel.reviewNotice.description
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(DawnPrimary, RoundedCornerShape(18.dp))
-                        .clickable(onClick = onConfirm)
+                        .clickable(
+                            enabled = !uiModel.isActionSubmitting,
+                            onClick = onConfirm
+                        )
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = reviewCopy.confirmActionText,
+                        text = if (uiModel.isActionSubmitting) {
+                            if (uiModel.destinationMode == TransferDestinationMode.WALLET) {
+                                "보내는 중..."
+                            } else {
+                                "옮기는 중..."
+                            }
+                        } else {
+                            reviewCopy.confirmActionText
+                        },
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                        color = Color.White
+                        color = Color.White.copy(alpha = if (uiModel.isActionSubmitting) 0.72f else 1f)
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -944,7 +1285,7 @@ private fun TransferReviewScreen(
     if (activeOverlay == TransferReviewOverlay.AccountSheet) {
         ModalBottomSheet(
             onDismissRequest = { activeOverlay = TransferReviewOverlay.None },
-            sheetState = accountSheetState,
+            sheetState = reviewSheetState,
             containerColor = Color.White,
             scrimColor = TransferReviewSheetScrim,
             dragHandle = {
@@ -959,6 +1300,32 @@ private fun TransferReviewScreen(
         ) {
             TransferAccountBottomSheet(
                 uiModel = uiModel,
+                onConfirm = { activeOverlay = TransferReviewOverlay.None }
+            )
+        }
+    }
+
+    if (activeOverlay == TransferReviewOverlay.WalletSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { activeOverlay = TransferReviewOverlay.None },
+            sheetState = reviewSheetState,
+            containerColor = Color.White,
+            scrimColor = TransferReviewSheetScrim,
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 10.dp, bottom = 14.dp)
+                        .width(92.dp)
+                        .height(6.dp)
+                        .background(Color(0xFFE5E7EB), RoundedCornerShape(999.dp))
+                )
+            }
+        ) {
+            TransferWalletBottomSheet(
+                recipientName = uiModel.selectedRecipientName,
+                walletAddress = uiModel.selectedRecipientWalletFullLabel,
+                clipboardManager = clipboardManager,
+                context = context,
                 onConfirm = { activeOverlay = TransferReviewOverlay.None }
             )
         }
@@ -1044,7 +1411,11 @@ private fun TransferAccountBottomSheet(
         horizontalArrangement = Arrangement.Start
     ) {
         Text(
-            text = "아래 계좌에서 출금돼요",
+            text = if (uiModel.destinationMode == TransferDestinationMode.WALLET) {
+                "아래 지갑에서 출금돼요"
+            } else {
+                "아래 계좌에서 출금돼요"
+            },
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
@@ -1086,6 +1457,100 @@ private fun TransferAccountBottomSheet(
         }
     }
     Spacer(modifier = Modifier.height(44.dp))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .background(DawnPrimary, RoundedCornerShape(22.dp))
+            .clickable(onClick = onConfirm)
+            .padding(vertical = 20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "확인",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+            color = Color.White
+        )
+    }
+    Spacer(modifier = Modifier.height(28.dp))
+}
+
+@Composable
+private fun TransferWalletBottomSheet(
+    recipientName: String,
+    walletAddress: String,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    context: android.content.Context,
+    onConfirm: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Text(
+            text = "아래 지갑으로 보내요",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+            color = DawnText
+        )
+    }
+    Spacer(modifier = Modifier.height(28.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(68.dp)
+                .background(Color(0xFFE5E7EB), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "지갑",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                color = Color(0xFF1F2937)
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = recipientName,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+            Text(
+                text = walletAddress,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                color = DawnTextSubtle
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(20.dp))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .background(Color(0xFFF3F4F6), RoundedCornerShape(18.dp))
+            .clickable {
+                clipboardManager.setText(AnnotatedString(walletAddress))
+                Toast.makeText(context, "지갑 주소를 복사했어요.", Toast.LENGTH_SHORT).show()
+            }
+            .padding(vertical = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "주소 복사",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+            color = DawnText
+        )
+    }
+    Spacer(modifier = Modifier.height(12.dp))
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1326,7 +1791,7 @@ private fun resolveAmountStepCopy(
     val assistText = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
         "잔액 · ${uiModel.selectedAccountBalanceText} 입력"
     } else {
-        "지갑 송금 · USDC 입력"
+        "잔액 · ${uiModel.selectedAccountBalanceText} 입력"
     }
     val amountDisplay = when (uiModel.destinationMode) {
         TransferDestinationMode.ACCOUNT -> amountInput.toIntOrNull()?.let(::formatKrw).orEmpty()
@@ -1368,14 +1833,24 @@ private fun convertTransferAmountInput(
 
 private fun resolveTrackerCopy(uiModel: TransferUiModel): TransferTrackerCopy {
     val destination = resolveDestinationSummary(uiModel)
-    val statusText = if (uiModel.transferStatus == TransferStatus.CONFIRMED) {
-        if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
-            "옮겼어요"
-        } else {
-            "보냈어요"
+    val statusText = when (uiModel.transferStatus) {
+        TransferStatus.REVIEWING -> {
+            if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
+                "옮기는 중이에요"
+            } else {
+                "보내는 중이에요"
+            }
         }
-    } else {
-        "확인하고 있어요"
+        TransferStatus.CONFIRMED -> {
+            if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
+                "옮겼어요"
+            } else {
+                "보냈어요"
+            }
+        }
+
+        TransferStatus.FAILED -> "실패했어요"
+        else -> "확인하고 있어요"
     }
 
     return TransferTrackerCopy(
