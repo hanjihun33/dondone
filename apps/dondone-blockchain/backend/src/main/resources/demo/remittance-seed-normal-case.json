@@ -1,7 +1,7 @@
 {
   "seedName": "normal-case-001",
   "user": {
-    "userId": "user_001",
+    "userId": 1,
     "displayName": "Demo Worker"
   },
   "wallet": {

@@ -8,14 +8,14 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "recipients")
+@Table(name = "recipients", schema = "test")
 public class RecipientEntity {
     @Id
     @Column(name = "recipient_id", nullable = false, length = 64)
     private String recipientId;
 
-    @Column(name = "user_id", nullable = false, length = 64)
-    private String userId;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(name = "alias", nullable = false, length = 128)
     private String alias;
@@ -40,11 +40,11 @@ public class RecipientEntity {
         this.recipientId = recipientId;
     }
 
-    public String getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(String userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
 

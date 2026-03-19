@@ -1,6 +1,5 @@
 package com.dondone.mobile.feature.home.presentation
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,7 +26,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -56,6 +54,9 @@ private val HomeSuccessMuted = Color(0xFFF3F5F8)
 private val HomeWarningMuted = Color(0xFFF9F4EC)
 private val HomeWarningText = Color(0xFFB67D39)
 private val HomeSuccessText = Color(0xFF7E8896)
+private val HomeDisabledPrimary = Color(0xFFD8DDE6)
+private val HomeDisabledSoft = Color(0xFFEDEFF3)
+private val HomeDisabledText = Color(0xFF9EA7B3)
 
 @Composable
 fun HomeScreen(
@@ -317,13 +318,13 @@ private fun HomeWorkSection(
             HomePrimaryButton(
                 text = "출근",
                 onClick = onClockIn,
-                enabled = uiModel.work.canClockIn,
+                enabled = uiModel.work.canClockIn && uiModel.work.isWithinWorkplaceRadius,
                 modifier = Modifier.weight(1f)
             )
             HomeSoftButton(
                 text = "퇴근",
                 onClick = onClockOut,
-                enabled = uiModel.work.canClockOut,
+                enabled = uiModel.work.canClockOut && uiModel.work.isWithinWorkplaceRadius,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -478,43 +479,9 @@ private fun HomePrimaryButton(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = HomeAccent,
-                contentColor = Color.White
-            )
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeSecondaryButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-
-    androidx.compose.runtime.CompositionLocalProvider(
-        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
-    ) {
-        OutlinedButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier.pressableScale(
-                interactionSource = interactionSource,
-                enabled = enabled
-            ),
-            interactionSource = interactionSource,
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, HomeDivider),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = HomeSurface,
-                contentColor = HomeAccent
+                contentColor = Color.White,
+                disabledContainerColor = HomeDisabledPrimary,
+                disabledContentColor = HomeDisabledText
             )
         ) {
             Text(
@@ -549,7 +516,9 @@ private fun HomeSoftButton(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = HomeSurfaceMuted,
-                contentColor = HomeTextPrimary
+                contentColor = HomeTextPrimary,
+                disabledContainerColor = HomeDisabledSoft,
+                disabledContentColor = HomeDisabledText
             )
         ) {
             Text(

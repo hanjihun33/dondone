@@ -99,7 +99,7 @@ proofId = keccak256(docType + ":" + sourceRef + ":" + payloadHash)
 
 ```bash
 curl -s 'http://localhost:8080/api/v1/remittance/transfers/tr_seed_001/integrity-hash' \
-  -H 'X-User-Id: user_001'
+  -H 'X-User-Id: 1'
 ```
 
 예상 응답 형태:
@@ -117,5 +117,5 @@ curl -s 'http://localhost:8080/api/v1/remittance/transfers/tr_seed_001/integrity
 
 ## 7. 코드 위치
 
-- `/home/ssafy/crypto-pjt/backend/src/main/java/com/workproofpay/remittance/service/TransferIntegrityService.java`
-- `/home/ssafy/crypto-pjt/src/DocumentHashRegistry.sol`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/backend/src/main/java/com/workproofpay/remittance/service/TransferIntegrityService.java`
+- `/home/ssafy/S14P21C202/apps/dondone-blockchain/src/DocumentHashRegistry.sol`

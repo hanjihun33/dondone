@@ -97,7 +97,9 @@ public class AppProperties {
         private String rpcUrl = "";
         private long chainId = 11155111;
         private String tokenAddress = "";
+        private String stablecoinSymbol = "dUSDC";
         private long gasLimit = 120000;
+        private Onboarding onboarding = new Onboarding();
 
         public String getMode() {
             return mode;
@@ -131,6 +133,14 @@ public class AppProperties {
             this.tokenAddress = tokenAddress;
         }
 
+        public String getStablecoinSymbol() {
+            return stablecoinSymbol;
+        }
+
+        public void setStablecoinSymbol(String stablecoinSymbol) {
+            this.stablecoinSymbol = stablecoinSymbol;
+        }
+
         public long getGasLimit() {
             return gasLimit;
         }
@@ -138,10 +148,58 @@ public class AppProperties {
         public void setGasLimit(long gasLimit) {
             this.gasLimit = gasLimit;
         }
+
+        public Onboarding getOnboarding() {
+            return onboarding;
+        }
+
+        public void setOnboarding(Onboarding onboarding) {
+            this.onboarding = onboarding;
+        }
+    }
+
+    public static class Onboarding {
+        private boolean enabled = true;
+        private String fundingPrivateKey = "";
+        private String ethAmountWei = "10000000000000000";
+        private long stablecoinAmountAtomic = 200_000_000L;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getFundingPrivateKey() {
+            return fundingPrivateKey;
+        }
+
+        public void setFundingPrivateKey(String fundingPrivateKey) {
+            this.fundingPrivateKey = fundingPrivateKey;
+        }
+
+        public String getEthAmountWei() {
+            return ethAmountWei;
+        }
+
+        public void setEthAmountWei(String ethAmountWei) {
+            this.ethAmountWei = ethAmountWei;
+        }
+
+        public long getStablecoinAmountAtomic() {
+            return stablecoinAmountAtomic;
+        }
+
+        public void setStablecoinAmountAtomic(long stablecoinAmountAtomic) {
+            this.stablecoinAmountAtomic = stablecoinAmountAtomic;
+        }
     }
 
     public static class Wallet {
         private String encryptionKey = "";
+        private boolean allowGeneratedKey = false;
 
         public String getEncryptionKey() {
             return encryptionKey;
@@ -149,6 +207,14 @@ public class AppProperties {
 
         public void setEncryptionKey(String encryptionKey) {
             this.encryptionKey = encryptionKey;
+        }
+
+        public boolean isAllowGeneratedKey() {
+            return allowGeneratedKey;
+        }
+
+        public void setAllowGeneratedKey(boolean allowGeneratedKey) {
+            this.allowGeneratedKey = allowGeneratedKey;
         }
     }
 }

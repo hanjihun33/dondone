@@ -3,6 +3,7 @@ package com.dondone.mobile.app.navigation
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,9 +41,19 @@ fun DonDoneNavGraph(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
+    val workproofActionUiState by viewModel.workproofActionUiState.collectAsStateWithLifecycle()
     val selectedAdvanceAmount by viewModel.selectedAdvanceAmount.collectAsStateWithLifecycle()
     val advanceRequestUiState by viewModel.advanceRequestUiState.collectAsStateWithLifecycle()
     val advanceRequestDetailUiState by viewModel.advanceRequestDetailUiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(workproofActionUiState.message, workproofActionUiState.isError) {
+        val message = workproofActionUiState.message ?: return@LaunchedEffect
+        onShowToast(
+            message,
+            if (workproofActionUiState.isError) BadgeTone.Warning else BadgeTone.Success
+        )
+        viewModel.clearWorkproofActionMessage()
+    }
 
     NavHost(
         modifier = modifier,
@@ -58,7 +69,7 @@ fun DonDoneNavGraph(
     ) {
         composable(Route.HOME) {
             HomeScreen(
-                uiModel = uiState.toHomeUiModel(advanceRemoteState),
+                uiModel = uiState.toHomeUiModel(workproofActionUiState = workproofActionUiState),
                 onOpenTransfer = {
                     viewModel.openTransferFlow()
                     navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target -> navController.navigate(target) }
@@ -74,7 +85,7 @@ fun DonDoneNavGraph(
         }
         composable(Route.WORKPROOF) {
             WorkproofScreen(
-                uiModel = uiState.toWorkproofUiModel(),
+                uiModel = uiState.toWorkproofUiModel(actionUiState = workproofActionUiState),
                 onClockIn = viewModel::clockIn,
                 onClockOut = viewModel::clockOut,
                 onSaveEdit = viewModel::saveWorkproofEdit,

@@ -1,6 +1,7 @@
 package com.workproofpay.backend.workproof.model;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -17,7 +18,7 @@ import java.time.LocalDateTime;
 /**
  * 기존 CRUD형 근무 기록과 lane 1 출퇴근 흐름을 함께 담는 근무 증거 엔티티다.
  */
-public class WorkProof {
+public class WorkProof extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -94,12 +95,6 @@ public class WorkProof {
     @Enumerated(EnumType.STRING)
     @Column(name = "financial_status", nullable = false, length = 20)
     private WorkProofFinancialStatus financialStatus;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     private WorkProof(User user,
                       Workplace workplace,
@@ -284,17 +279,5 @@ public class WorkProof {
         this.financialStatus = outsideAllowedRadius
                 ? WorkProofFinancialStatus.NEEDS_REVIEW
                 : WorkProofFinancialStatus.REFLECTED;
-    }
-
-    @PrePersist
-    public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

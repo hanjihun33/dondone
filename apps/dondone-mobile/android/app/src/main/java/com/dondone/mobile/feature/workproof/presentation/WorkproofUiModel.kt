@@ -1,10 +1,10 @@
 package com.dondone.mobile.feature.workproof.presentation
 
 import android.location.Location
+import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.WorkRecord
-
 private const val UnrecordedTime = "-"
 
 enum class WorkproofCalendarTone {
@@ -65,14 +65,16 @@ data class WorkproofUiModel(
     val calendarDayTones: Map<Int, WorkproofCalendarTone>,
     val summary: WorkproofSummaryUiModel,
     val recentRecords: List<WorkproofRecordUiModel>,
-    val auditPreview: WorkproofAuditUiModel?,
     val audits: List<WorkproofAuditUiModel>
 )
 
-fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
+fun DemoState.toWorkproofUiModel(
+    actionUiState: WorkproofActionUiState? = null
+): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val verifiedSnapshot = WorkproofCalculator.verify(this)
-    val workplaceRadiusMeters = 100
+    val workplaceRadiusMeters = workproof.allowedRadiusMeters
+    val canSubmitAction = actionUiState?.isSubmitting != true
     val isWithinWorkplaceRadius = isWithinWorkplaceRadius(
         startLatitude = workproof.currentLatitude,
         startLongitude = workproof.currentLongitude,
@@ -115,8 +117,8 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
         calendarCurrentDay = demo.asOfDay,
         calendarDayTones = dayTones,
         summary = WorkproofSummaryUiModel(
-            canClockIn = workproof.today.clockIn == null,
-            canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null,
+            canClockIn = workproof.today.clockIn == null && canSubmitAction,
+            canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null && canSubmitAction,
             verifiedDays = verifiedSnapshot.verifiedDays,
             auditCount = workproof.audit.size,
             todayInTime = workproof.today.clockIn?.let { "$todayDateText · $it" },
@@ -129,7 +131,6 @@ fun DemoState.toWorkproofUiModel(): WorkproofUiModel {
             isWithinWorkplaceRadius = isWithinWorkplaceRadius
         ),
         recentRecords = recentRecords,
-        auditPreview = auditItems.firstOrNull(),
         audits = auditItems
     )
 }

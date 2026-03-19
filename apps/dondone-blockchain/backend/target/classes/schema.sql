@@ -1,0 +1,20 @@
+CREATE SCHEMA IF NOT EXISTS test;
+
+CREATE TABLE IF NOT EXISTS test.users (
+    id BIGINT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    role VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS test.user_wallets (
+    user_id BIGINT PRIMARY KEY,
+    wallet_address VARCHAR(128) NOT NULL UNIQUE,
+    encrypted_private_key VARCHAR(512) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_wallets_user
+        FOREIGN KEY (user_id) REFERENCES test.users(id)
+);

@@ -7,8 +7,10 @@ import com.workproofpay.remittance.domain.JobType;
 import com.workproofpay.remittance.domain.RecipientEntity;
 import com.workproofpay.remittance.domain.TransferEntity;
 import com.workproofpay.remittance.domain.TransferStatus;
+import com.workproofpay.remittance.domain.AppUserEntity;
 import com.workproofpay.remittance.domain.UserWalletEntity;
 import com.workproofpay.remittance.dto.DemoSeedResponse;
+import com.workproofpay.remittance.repo.AppUserRepository;
 import com.workproofpay.remittance.repo.JobRepository;
 import com.workproofpay.remittance.repo.RecipientRepository;
 import com.workproofpay.remittance.repo.TransferRepository;
@@ -26,6 +28,7 @@ import java.util.List;
 public class DemoSeedService {
     private final ObjectMapper objectMapper;
     private final WalletCryptoService walletCryptoService;
+    private final AppUserRepository appUserRepository;
     private final UserWalletRepository userWalletRepository;
     private final RecipientRepository recipientRepository;
     private final TransferRepository transferRepository;
@@ -34,6 +37,7 @@ public class DemoSeedService {
     public DemoSeedService(
             ObjectMapper objectMapper,
             WalletCryptoService walletCryptoService,
+            AppUserRepository appUserRepository,
             UserWalletRepository userWalletRepository,
             RecipientRepository recipientRepository,
             TransferRepository transferRepository,
@@ -41,6 +45,7 @@ public class DemoSeedService {
     ) {
         this.objectMapper = objectMapper;
         this.walletCryptoService = walletCryptoService;
+        this.appUserRepository = appUserRepository;
         this.userWalletRepository = userWalletRepository;
         this.recipientRepository = recipientRepository;
         this.transferRepository = transferRepository;
@@ -55,6 +60,8 @@ public class DemoSeedService {
         transferRepository.deleteAll();
         recipientRepository.deleteAll();
         userWalletRepository.deleteAll();
+
+        ensureDemoUserExists(payload.user().userId(), payload.user().displayName());
 
         Credentials credentials = Credentials.create(payload.wallet().privateKey());
 
@@ -116,6 +123,19 @@ public class DemoSeedService {
         );
     }
 
+    private void ensureDemoUserExists(Long userId, String displayName) {
+        if (appUserRepository.existsById(userId)) {
+            return;
+        }
+        AppUserEntity user = new AppUserEntity();
+        user.setId(userId);
+        user.setEmail("demo-user-" + userId + "@example.com");
+        user.setPasswordHash("demo-password-hash");
+        user.setName(displayName == null || displayName.isBlank() ? "Demo User" : displayName);
+        user.setRole("USER");
+        appUserRepository.save(user);
+    }
+
     private DemoSeedPayload loadPayload(String resourcePath) {
         try {
             ClassPathResource resource = new ClassPathResource(resourcePath);
@@ -137,7 +157,7 @@ public class DemoSeedService {
     ) {}
 
     private record UserSeed(
-            String userId,
+            Long userId,
             String displayName
     ) {}
 

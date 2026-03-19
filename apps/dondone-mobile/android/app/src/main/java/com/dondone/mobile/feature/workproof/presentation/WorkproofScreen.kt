@@ -168,33 +168,25 @@ fun WorkproofScreen(
     val displayedRecentRecords = remember(isBaseMonth, uiModel.recentRecords) {
         if (isBaseMonth) uiModel.recentRecords else emptyList()
     }
-    val displayedAuditPreview = remember(isBaseMonth, uiModel.auditPreview) {
-        if (isBaseMonth) uiModel.auditPreview else null
-    }
-    val displayedAudits = remember(isBaseMonth, uiModel.audits) {
+    val displayedAuditItems = remember(isBaseMonth, uiModel.audits) {
         if (isBaseMonth) uiModel.audits else emptyList()
     }
     val editingRecord = remember(displayedRecentRecords, editingRecordId) {
         displayedRecentRecords.firstOrNull { it.id == editingRecordId }
     }
+    fun clearEditDraft() {
+        editReasonKey = ""
+        editMemo = ""
+        selectedAttachmentName = null
+        reasonMenuExpanded = false
+    }
     val resetEditDraft = {
         editingRecordId = null
-        editReasonKey = ""
-        editMemo = ""
-        selectedAttachmentName = null
-        reasonMenuExpanded = false
+        clearEditDraft()
     }
-    val resetTransientState = {
-        monthOffset = 0
-        resetEditDraft()
-        showDetails = false
-    }
-    val openEditSheet: (WorkproofRecordUiModel) -> Unit = { record ->
+    fun openEditSheet(record: WorkproofRecordUiModel) {
         editingRecordId = record.id
-        editReasonKey = ""
-        editMemo = ""
-        selectedAttachmentName = null
-        reasonMenuExpanded = false
+        clearEditDraft()
     }
 
     LaunchedEffect(showDetails) {
@@ -202,7 +194,9 @@ fun WorkproofScreen(
     }
 
     LaunchedEffect(resetVersion) {
-        resetTransientState()
+        monthOffset = 0
+        resetEditDraft()
+        showDetails = false
     }
 
     DisposableEffect(Unit) {
@@ -212,10 +206,7 @@ fun WorkproofScreen(
     }
 
     BackHandler(
-        enabled = shouldInterceptWorkproofBack(
-            showDetails = showDetails,
-            editingRecordId = editingRecordId
-        )
+        enabled = showDetails && editingRecordId == null
     ) {
         showDetails = false
     }
@@ -262,19 +253,18 @@ fun WorkproofScreen(
             .background(WorkproofCanvas)
     ) {
         if (showDetails) {
-                WorkproofDetailPage(
-                    displayedMonthText = formatMonthText(displayedMonth),
-                    calendarCountText = stringResource(R.string.workproof_calendar_recorded_count, recordedDayCount),
-                    calendarCells = calendarCells,
-                    weekdays = WorkproofWeekdays,
-                    records = displayedRecentRecords,
-                    preview = displayedAuditPreview,
-                    audits = displayedAudits.drop(1),
-                    onPreviousMonth = { monthOffset -= 1 },
-                    onNextMonth = { monthOffset += 1 },
-                    onBack = { showDetails = false },
-                    onEditRecord = openEditSheet
-                )
+            WorkproofDetailPage(
+                displayedMonthText = formatMonthText(displayedMonth),
+                calendarCountText = stringResource(R.string.workproof_calendar_recorded_count, recordedDayCount),
+                calendarCells = calendarCells,
+                weekdays = WorkproofWeekdays,
+                records = displayedRecentRecords,
+                auditItems = displayedAuditItems,
+                onPreviousMonth = { monthOffset -= 1 },
+                onNextMonth = { monthOffset += 1 },
+                onBack = { showDetails = false },
+                onEditRecord = ::openEditSheet
+            )
         } else {
             Column(
                 modifier = Modifier
@@ -686,8 +676,7 @@ private fun WorkproofDetailPage(
     calendarCells: List<WorkproofCalendarCellUiModel>,
     weekdays: List<String>,
     records: List<WorkproofRecordUiModel>,
-    preview: WorkproofAuditUiModel?,
-    audits: List<WorkproofAuditUiModel>,
+    auditItems: List<WorkproofAuditUiModel>,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onBack: () -> Unit,
@@ -730,8 +719,7 @@ private fun WorkproofDetailPage(
         )
         WorkproofSectionDivider()
         WorkproofAuditCard(
-            preview = preview,
-            audits = audits
+            auditItems = auditItems
         )
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -860,15 +848,12 @@ private fun WorkproofRecentLogsCard(
 
 @Composable
 private fun WorkproofAuditCard(
-    preview: WorkproofAuditUiModel?,
-    audits: List<WorkproofAuditUiModel>
+    auditItems: List<WorkproofAuditUiModel>
 ) {
     WorkproofSurfaceCard {
         WorkproofSectionHeader(title = "변경 기록")
 
-        if (preview != null) {
-            WorkproofAuditPreviewRow(uiModel = preview)
-        } else {
+        if (auditItems.isEmpty()) {
             WorkproofAuditPreviewRow(
                 uiModel = WorkproofAuditUiModel(
                     dateText = "",
@@ -877,11 +862,11 @@ private fun WorkproofAuditCard(
                     reasonText = stringResource(R.string.workproof_empty_audit_description)
                 )
             )
-        }
-
-        if (audits.isNotEmpty()) {
-            audits.forEachIndexed { index, audit ->
-                HorizontalDivider(color = WorkproofDivider)
+        } else {
+            auditItems.forEachIndexed { index, audit ->
+                if (index > 0) {
+                    HorizontalDivider(color = WorkproofDivider)
+                }
                 WorkproofAuditPreviewRow(uiModel = audit)
             }
         }
@@ -1548,11 +1533,6 @@ private fun isRecordedCalendarTone(tone: WorkproofCalendarTone?): Boolean {
         tone == WorkproofCalendarTone.COMPLETE ||
         tone == WorkproofCalendarTone.MODIFIED
 }
-
-internal fun shouldInterceptWorkproofBack(
-    showDetails: Boolean,
-    editingRecordId: String?
-): Boolean = showDetails && editingRecordId == null
 
 @Composable
 private fun timeOrPlaceholder(time: String?): String {

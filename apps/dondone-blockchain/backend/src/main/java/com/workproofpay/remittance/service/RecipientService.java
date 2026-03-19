@@ -22,14 +22,14 @@ public class RecipientService {
     }
 
     @Transactional(readOnly = true)
-    public List<RecipientItemResponse> getRecipients(String userId) {
+    public List<RecipientItemResponse> getRecipients(Long userId) {
         return recipientRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional
-    public RecipientItemResponse upsertRecipient(String userId, String recipientId, RecipientUpsertRequest request) {
+    public RecipientItemResponse upsertRecipient(Long userId, String recipientId, RecipientUpsertRequest request) {
         RecipientEntity entity = recipientRepository
                 .findByRecipientIdAndUserId(recipientId, userId)
                 .orElseGet(RecipientEntity::new);
@@ -46,7 +46,7 @@ public class RecipientService {
         return toResponse(entity);
     }
 
-    public RecipientEntity getRequiredRecipient(String userId, String recipientId) {
+    public RecipientEntity getRequiredRecipient(Long userId, String recipientId) {
         return recipientRepository.findByRecipientIdAndUserId(recipientId, userId)
                 .orElseThrow(() -> new ApiException(404, "RECIPIENT_NOT_FOUND", "Recipient not found", null));
     }

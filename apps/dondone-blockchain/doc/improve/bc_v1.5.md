@@ -2,7 +2,7 @@
 
 ## 1. 블록체인 파트 역할 정의
 
-DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 역할을 담당합니다.
+DonDone에서 블록체인은 단순 전송 기능이 아니라, **급여 지갑 경험을 뒷받침하는 인프라**로서 아래 4가지 역할을 담당합니다.
 
 1. **테스트넷 송금**
 
@@ -10,18 +10,25 @@ DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 
    * 전송 상태 추적
    * 전송 해시 기반 영수증 생성
 
-2. **SafePay 기반 송금 보호**
+2. **사용자별 급여 지갑(wallet)**
+
+   * 사용자별 내부 지갑 생성/관리
+   * 송금 시 해당 사용자 지갑으로 서명
+   * 사용자는 private key를 직접 다루지 않아도 되는 custodial wallet 구조
+
+3. **SafePay 기반 송금 보호**
 
    * 허용 목록
    * 24시간 쿨다운
    * 고액 추가 확인
    * 중복 전송 방지
 
-3. **문서 무결성 보조**
+4. **문서 무결성 보조**
 
    * Proof Pack / Claim Kit 해시 생성
    * QR 검증 연계
    * 문서가 위변조되지 않았음을 보여주는 데모 장치
+   * 근로계약서, 월별 근무기록, 핵심 증빙 문서의 무결성 해시(Integrity Hash) 설명 근거 제공
 
 ---
 
@@ -29,6 +36,7 @@ DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 
 
 ### P0 (6주 Demo MVP)
 
+* 사용자별 내부 지갑 생성/조회
 * 테스트넷 송금
 * 송금 상태 추적
 * 전송 해시(Tx Hash) 표시
@@ -45,11 +53,13 @@ DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 
 
 ### P1 (후속)
 
+* 회원가입 시스템과 지갑 자동 생성 완전 연동
 * 정기 송금/자동 송금
 * 송금 한도 고도화
 * 메인넷 연동
 * 실제 Vault/Advance 사업 구조와의 연결
 * 실사용 수준의 리스크 정책 및 온체인 운영 고도화
+* HSM/KMS/MPC 기반 키 관리
 
 ---
 
@@ -57,6 +67,7 @@ DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 
 
 ### 3.1 송금(테스트넷)
 
+0. 사용자별 wallet 생성/확인
 1. 수신자 선택(허용 목록 내)
 2. 금액 입력
 3. 사용자 확인
@@ -78,9 +89,16 @@ DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 
 ### 3.3 문서 무결성 검증
 
 1. Proof Pack / Claim Kit 생성
-2. 문서 payload 해시 생성
-3. QR payload 포함
-4. 검증 화면에서 `OK / FAIL` 표시
+2. 정규화 payload 생성
+3. 무결성 해시(Integrity Hash) 생성
+4. QR payload 포함
+5. 검증 화면에서 `OK / FAIL` 표시
+
+### 3.4 고용주 지원축과의 연결
+
+* 블록체인 파트는 근로자 전면 가치(송금/지갑)를 중심으로 동작한다.
+* 다만 문서 무결성과 검증 가능한 송금 기록은 고용주 운영 콘솔, 선지급 가능 대상 확인, Verified Worker Summary의 신뢰 보조 축으로 연결된다.
+* 원칙은 평가 점수화가 아니라 **선지급·정산 리스크 절감 지원**이다.
 
 ---
 
@@ -97,6 +115,7 @@ DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 
 ### R2. 송금 실행(P0)
 
 * 테스트넷에서 스테이블코인 또는 모의 토큰 전송
+* 사용자별 내부 wallet private key로 서명
 * 전송 전 사용자 확인 필수
 * 화면에 반드시 표시:
 
@@ -115,6 +134,14 @@ DonDone에서 블록체인은 단순 전송 기능이 아니라, 아래 3가지 
 * Tx Hash 포함
 * PDF 영수증 자동 생성
 * 송금 상세/내역 화면에서 즉시 열 수 있어야 함
+
+### R5. 사용자별 지갑(P0)
+
+* 사용자별 Ethereum wallet 자동 생성
+* wallet address는 DB 저장
+* private key는 암호화 저장
+* 사용자는 wallet/private key를 몰라도 앱에서 송금 가능
+* 송금 시 해당 사용자 wallet으로 서명
 
 ---
 
@@ -175,7 +202,7 @@ public interface TransferUseCase {
 }
 
 public interface Erc20Gateway {
-  TxHash submitTransfer(String tokenAddress, String toAddress, BigInteger amountAtomic);
+  TxHash submitTransfer(String tokenAddress, String toAddress, BigInteger amountAtomic, String senderPrivateKey);
   Optional<TxReceipt> getReceipt(TxHash txHash);
 }
 ```
@@ -185,10 +212,34 @@ public interface Erc20Gateway {
 * web3j 사용 여부는 adapter 내부에 한정
 * nonce/gas/RPC 처리도 adapter 내부 책임
 * 서비스 레이어는 송금 요청/조회만 알면 됨
+* 사용자별 private key는 암호화 저장 후, 전송 시점에만 복호화해 서명
+
+## 5.2 현재 실제 연결 구조
+
+현재 프로젝트 기준 연결 구조는 아래와 같습니다.
+
+```text
+사용자 요청
+  ->
+Spring Boot API
+  ->
+사용자 wallet 조회/자동 생성
+  ->
+암호화 private key 복호화
+  ->
+web3j
+  ->
+Sepolia RPC
+  ->
+배포된 ERC20 / 컨트랙트
+```
+
+현재 실제 전송은 **Sepolia RPC + web3j + ERC20 transfer** 기준으로 연결되어 있고,
+`SafePayRemittance`, `DocumentHashRegistry`는 온체인 자산으로 존재하되 백엔드 메인 플로우에는 단계적으로 연결하는 구조다.
 
 ---
 
-## 5.2 비동기 잡 구조
+## 5.3 비동기 잡 구조
 
 송금은 요청 즉시 끝나는 기능이 아니라, **전송 + 확정 확인**이 분리되어야 합니다.
 
@@ -212,7 +263,7 @@ public interface Erc20Gateway {
 
 ---
 
-## 5.3 상태 머신
+## 5.4 상태 머신
 
 송금 상태는 최소 아래처럼 관리합니다.
 
@@ -237,6 +288,7 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 
 ### 핵심 테이블
 
+* `user_wallets`
 * `recipients`
 * `transfers`
 * `documents`
@@ -253,6 +305,7 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 
 * transfer_id
 * user_id
+* sender_wallet_address
 * recipient_id
 * amount
 * token_symbol
@@ -265,6 +318,13 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 * created_at
 * confirmed_at
 
+### user_wallets에 필요한 핵심 필드 예시
+
+* user_id
+* wallet_address
+* encrypted_private_key
+* created_at
+
 ---
 
 ## 7. 기술 스택 — 블록체인 부분
@@ -275,6 +335,7 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 * **web3j**
 * **테스트 토큰 또는 모의 토큰**
 * **Spring 서버에서 게이트웨이 형태로 연동**
+* **사용자별 custodial wallet**
 
 ### 원칙
 
@@ -293,6 +354,7 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 ### P0 요구사항
 
 * Proof Pack 해시 생성(오프체인)
+* 무결성 해시(Integrity Hash) 규격 정의
 * QR payload 확정
 * QR Verifier 웹에서 검증 결과 표시
 
@@ -304,6 +366,8 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 
 * Proof Pack
 * Claim Kit
+* 근로계약서
+* 월별 근무기록
 * 필요 시 송금 영수증
 
 ---
@@ -317,6 +381,7 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 
 ### 데모 시드 데이터 포함 요소
 
+* 사용자 wallet 1개
 * 정상 송금 1건
 * 실패 송금 1건 이상
 * 차단 케이스 1건
@@ -334,7 +399,7 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 
 ### 최성민
 
-* 지갑 연결 + 테스트넷 전송 PoC
+* 사용자별 wallet 기반 테스트넷 전송 PoC
 * tx 생성 / 서명 / 전송
 * tx 상태 확인 방식 결정(우선 폴링)
 
@@ -455,4 +520,4 @@ REQUESTED -> QUEUED -> SUBMITTED -> CONFIRMED
 
 ## 14. 블록체인 파트 한 줄 요약
 
-> **DonDone의 블록체인 파트는 테스트넷 기반 송금, SafePay 보호정책, 문서 무결성 검증을 중심으로 구성되며, 실서비스가 아니라 데모 안정성과 신뢰 표현에 초점을 둔다.**
+> **DonDone의 블록체인 파트는 사용자별 급여 지갑, 테스트넷 기반 송금, SafePay 보호정책, 문서 무결성 검증을 중심으로 구성되며, 근로자 전면 가치와 고용주 운영 리스크 절감을 함께 뒷받침한다.**

@@ -1,12 +1,11 @@
 package com.workproofpay.backend.claim.model;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.shared.persistence.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 /**
  * Instant Claim v0는 자동 제출이 아니라 준비 결과를 저장해 다시 열어볼 수 있게 하는 엔티티다.
@@ -15,7 +14,7 @@ import java.time.LocalDateTime;
 @Table(name = "claim_preparations")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ClaimPreparation {
+public class ClaimPreparation extends BaseCreatedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,9 +44,6 @@ public class ClaimPreparation {
     @Column(name = "summary_text", nullable = false, length = 2000)
     private String summaryText;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
     private ClaimPreparation(User user,
                              Long wageVerificationId,
                              Long claimKitDocumentId,
@@ -70,10 +66,5 @@ public class ClaimPreparation {
                                          ClaimPreparationTone tone,
                                          String summaryText) {
         return new ClaimPreparation(user, wageVerificationId, claimKitDocumentId, locale, tone, summaryText);
-    }
-
-    @PrePersist
-    public void onCreate() {
-        this.createdAt = LocalDateTime.now();
     }
 }

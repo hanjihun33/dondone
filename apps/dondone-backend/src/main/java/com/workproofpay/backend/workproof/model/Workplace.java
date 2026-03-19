@@ -1,6 +1,7 @@
 package com.workproofpay.backend.workproof.model;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,14 +10,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "workplaces")
@@ -25,7 +22,7 @@ import java.time.LocalDateTime;
 /**
  * WorkProof lane 1에서 출퇴근과 계약의 기준축이 되는 사용자 소속 근무지다.
  */
-public class Workplace {
+public class Workplace extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,12 +49,6 @@ public class Workplace {
 
     @Column(name = "allowed_radius_meters")
     private Integer allowedRadiusMeters;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     private Workplace(User user,
                       String name,
@@ -88,17 +79,5 @@ public class Workplace {
     // 기존 row에는 반경 값이 없을 수 있어서 lane 1 기본 반경을 fallback으로 쓴다.
     public int resolveAllowedRadiusMeters(int defaultAllowedRadiusMeters) {
         return allowedRadiusMeters == null ? defaultAllowedRadiusMeters : allowedRadiusMeters;
-    }
-
-    @PrePersist
-    public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

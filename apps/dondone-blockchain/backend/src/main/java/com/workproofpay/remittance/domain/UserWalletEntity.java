@@ -8,11 +8,11 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "user_wallets")
+@Table(name = "user_wallets", schema = "test")
 public class UserWalletEntity {
     @Id
-    @Column(name = "user_id", nullable = false, length = 64)
-    private String userId;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(name = "wallet_address", nullable = false, length = 128, unique = true)
     private String walletAddress;
@@ -23,11 +23,11 @@ public class UserWalletEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    public String getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(String userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
 

@@ -1,16 +1,12 @@
 package com.dondone.mobile.feature.home.presentation
 
+import android.location.Location
+import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
-import com.dondone.mobile.data.advance.AdvanceRemoteMode
-import com.dondone.mobile.data.advance.AdvanceRemoteState
-import com.dondone.mobile.domain.calculator.AdvanceCalculator
 import com.dondone.mobile.domain.calculator.WageEstimator
-import com.dondone.mobile.domain.advance.AdvanceSurfaceState
-import com.dondone.mobile.domain.advance.toAdvanceContractState
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferStatus
-import kotlin.math.abs
 
 data class HomeAccountUiModel(
     val balanceText: String
@@ -22,13 +18,9 @@ data class HomeWorkUiModel(
     val statusTone: BadgeTone,
     val canClockIn: Boolean,
     val canClockOut: Boolean,
+    val isWithinWorkplaceRadius: Boolean,
     val clockInText: String,
-    val clockOutText: String,
-    val impactText: String,
-    val advanceAvailableText: String,
-    val advanceProgressText: String,
-    val advanceProgress: Float,
-    val advanceHintText: String
+    val clockOutText: String
 )
 
 enum class HomeActionTarget {
@@ -36,15 +28,6 @@ enum class HomeActionTarget {
     FINANCE,
     MENU
 }
-
-data class HomePaydayUiModel(
-    val kicker: String,
-    val title: String,
-    val description: String,
-    val metaText: String,
-    val buttonText: String,
-    val actionTarget: HomeActionTarget
-)
 
 data class HomeNextActionUiModel(
     val title: String,
@@ -54,15 +37,7 @@ data class HomeNextActionUiModel(
 )
 
 data class HomeMoneyUiModel(
-    val statusText: String,
-    val statusTone: BadgeTone,
-    val briefText: String,
-    val estimatedText: String,
-    val actualText: String,
-    val differenceText: String,
     val showWorkActionCard: Boolean,
-    val showPaydayCard: Boolean,
-    val payday: HomePaydayUiModel,
     val nextAction: HomeNextActionUiModel
 )
 
@@ -72,23 +47,11 @@ data class HomeUiModel(
     val money: HomeMoneyUiModel
 )
 
-fun DemoState.toHomeUiModel(remoteState: AdvanceRemoteState? = null): HomeUiModel {
+fun DemoState.toHomeUiModel(
+    workproofActionUiState: WorkproofActionUiState? = null
+): HomeUiModel {
     val selectedAccount = remittance.selectedAccount()
     val wageEstimate = WageEstimator.calculate(this)
-    val advance = AdvanceCalculator.calculate(this)
-    val advanceContractState = toAdvanceContractState(remoteState)
-    val usesRemoteAdvance = remoteState != null
-    val progress = if (usesRemoteAdvance) {
-        when (advanceContractState.surfaceState) {
-            AdvanceSurfaceState.SUCCESS -> 1f
-            AdvanceSurfaceState.BLOCKED -> 0.2f
-            else -> 0f
-        }
-    } else if (advance.progressTargetDays == 0) {
-        1f
-    } else {
-        advance.verifiedDays / advance.progressTargetDays.toFloat()
-    }
     val formattedMonth = demo.month.toString().padStart(2, '0')
     fun formatDay(day: Int): String = day.toString().padStart(2, '0')
     val currentDateText = "${demo.year}-$formattedMonth-${formatDay(demo.asOfDay)}"
@@ -110,46 +73,6 @@ fun DemoState.toHomeUiModel(remoteState: AdvanceRemoteState? = null): HomeUiMode
     val hasDifference = wageEstimate.difference != 0
     val isPaydayUpcoming = demo.asOfDay < wage.paydayDay
     val isTransferConfirmed = remittance.status == TransferStatus.CONFIRMED
-
-    val moneyStatusText = when {
-        !isDepositRecorded -> "입금 대기"
-        hasDifference -> "확인 필요한 차이"
-        else -> "이상 없음"
-    }
-    val moneyStatusTone = when {
-        !isDepositRecorded -> BadgeTone.Info
-        hasDifference -> BadgeTone.Warning
-        else -> BadgeTone.Success
-    }
-
-    val payday = when {
-        !isDepositRecorded -> HomePaydayUiModel(
-            kicker = "급여일 체크",
-            title = "실제 입금액을 먼저 확인해 주세요",
-            description = "실입금을 입력하면 차이 확인과 다음 행동이 바로 열려요.",
-            metaText = "예상 급여일 · ${demo.year}-$formattedMonth-${formatDay(wage.paydayDay)}",
-            buttonText = "급여 확인",
-            actionTarget = HomeActionTarget.WAGE
-        )
-
-        hasDifference -> HomePaydayUiModel(
-            kicker = "급여 확인 완료",
-            title = "차이 확인이 열렸어요",
-            description = "예상과 실제 입금 차이를 근거와 함께 바로 확인할 수 있어요.",
-            metaText = "입금 기록일 · ${demo.year}-$formattedMonth-${formatDay(requireNotNull(wage.actualDepositRecordedDay))}",
-            buttonText = "차이 확인",
-            actionTarget = HomeActionTarget.WAGE
-        )
-
-        else -> HomePaydayUiModel(
-            kicker = "급여 확인 완료",
-            title = "이번 달 실입금이 반영됐어요",
-            description = "예상과 큰 차이 없이 확인됐어요. 다음 흐름으로 이어갈 수 있어요.",
-            metaText = "입금 기록일 · ${demo.year}-$formattedMonth-${formatDay(requireNotNull(wage.actualDepositRecordedDay))}",
-            buttonText = "정산 보기",
-            actionTarget = HomeActionTarget.WAGE
-        )
-    }
 
     val nextAction = when {
         !isDepositRecorded && isPaydayUpcoming -> HomeNextActionUiModel(
@@ -196,55 +119,27 @@ fun DemoState.toHomeUiModel(remoteState: AdvanceRemoteState? = null): HomeUiMode
             dateText = currentDateText,
             statusText = workStatusText,
             statusTone = workStatusTone,
-            canClockIn = workproof.today.clockIn == null,
-            canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null,
+            canClockIn = workproof.today.clockIn == null && workproofActionUiState?.isSubmitting != true,
+            canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null && workproofActionUiState?.isSubmitting != true,
+            isWithinWorkplaceRadius = workproof.isWithinWorkplaceRadius(),
             clockInText = clockIn,
-            clockOutText = clockOut,
-            impactText = "오늘 기록이 저장되어 다음 반영 후보에 포함돼요.",
-            advanceAvailableText = formatKrw(
-                if (usesRemoteAdvance) {
-                    (advanceContractState.availableAmountOverride ?: 0L).toInt()
-                } else {
-                    advance.available
-                }
-            ),
-            advanceProgressText = if (usesRemoteAdvance) {
-                when (remoteState?.mode) {
-                    AdvanceRemoteMode.CONTENT -> "실연동 한도 기준"
-                    AdvanceRemoteMode.LOADING -> "실연동 확인 중"
-                    AdvanceRemoteMode.EMPTY -> "실연동 비어 있음"
-                    AdvanceRemoteMode.ERROR -> "실연동 재확인 필요"
-                    else -> "로그인 필요"
-                }
-            } else {
-                "${advance.verifiedDays}일 / ${advance.progressTargetDays}일"
-            },
-            advanceProgress = progress,
-            advanceHintText = if (usesRemoteAdvance) {
-                advanceContractState.stateBodyText
-            } else if (advanceContractState.surfaceState == AdvanceSurfaceState.BLOCKED) {
-                advanceContractState.stateBodyText
-            } else if (advance.nextTierInDays > 0) {
-                "다음 구간까지 ${advance.nextTierInDays}일 · 예상 증가 ${formatKrw(advance.nextTierGain)}"
-            } else {
-                "이번 달 최고 구간에 도달했어요."
-            }
+            clockOutText = clockOut
         ),
         money = HomeMoneyUiModel(
-            statusText = moneyStatusText,
-            statusTone = moneyStatusTone,
-            briefText = when {
-                !isDepositRecorded -> "실입금 전에는 차이 비교가 잠겨 있어요."
-                hasDifference -> "실입금 기준으로 차이 분석이 열렸어요."
-                else -> "이번 달 정산이 안정적으로 반영됐어요."
-            },
-            estimatedText = formatKrw(wageEstimate.total),
-            actualText = formatKrw(wage.actualDeposit),
-            differenceText = formatKrw(abs(wageEstimate.difference)),
             showWorkActionCard = isDepositRecorded && hasDifference,
-            showPaydayCard = isDepositRecorded && !hasDifference,
-            payday = payday,
             nextAction = nextAction
         )
     )
+}
+
+private fun com.dondone.mobile.domain.model.WorkproofData.isWithinWorkplaceRadius(): Boolean {
+    val result = FloatArray(1)
+    Location.distanceBetween(
+        currentLatitude,
+        currentLongitude,
+        workplaceLatitude,
+        workplaceLongitude,
+        result
+    )
+    return result.first() <= allowedRadiusMeters
 }

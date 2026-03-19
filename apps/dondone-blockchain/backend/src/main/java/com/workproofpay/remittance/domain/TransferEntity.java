@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "transfers", indexes = {
+@Table(name = "transfers", schema = "test", indexes = {
         @Index(name = "idx_transfers_user_idem", columnList = "user_id,idempotency_key", unique = true)
 })
 public class TransferEntity {
@@ -13,8 +13,8 @@ public class TransferEntity {
     @Column(name = "transfer_id", nullable = false, length = 64)
     private String transferId;
 
-    @Column(name = "user_id", nullable = false, length = 64)
-    private String userId;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(name = "recipient_id", nullable = false, length = 64)
     private String recipientId;
@@ -61,11 +61,11 @@ public class TransferEntity {
         this.transferId = transferId;
     }
 
-    public String getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(String userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
 

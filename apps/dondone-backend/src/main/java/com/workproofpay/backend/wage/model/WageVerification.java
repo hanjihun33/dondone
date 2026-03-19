@@ -1,13 +1,13 @@
 package com.workproofpay.backend.wage.model;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +19,7 @@ import java.util.List;
 @Table(name = "wage_verifications")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class WageVerification {
+public class WageVerification extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -105,12 +105,6 @@ public class WageVerification {
     @OrderColumn(name = "cause_order")
     private List<WageVerificationPossibleCauseSnapshot> possibleCauses = new ArrayList<>();
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     private WageVerification(User user, WageVerificationDraft draft) {
         this.user = user;
         this.month = draft.month();
@@ -138,17 +132,5 @@ public class WageVerification {
 
     public static WageVerification record(User user, WageVerificationDraft draft) {
         return new WageVerification(user, draft);
-    }
-
-    @PrePersist
-    public void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

@@ -66,7 +66,7 @@
 응답 예시:
 ```json
 {
-  "userId": "user_001",
+  "userId": 1,
   "walletAddress": "0xAB...12",
   "createdAt": "2026-03-11T10:00:00Z"
 }
