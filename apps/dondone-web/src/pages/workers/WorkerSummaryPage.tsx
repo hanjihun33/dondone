@@ -1,46 +1,122 @@
-import { verifiedWorkerSummaries } from "../../mocks/employerConsoleData";
-import { Badge } from "../../shared/ui/Badge";
-import { SectionCard } from "../../shared/ui/SectionCard";
+import { useEffect, useMemo, useState } from "react";
+import { SearchIcon } from "../../shared/ui/icons";
+import { WorkerSummaryList } from "./components/WorkerSummaryList";
+import {
+  type WorkerAttendanceStatus,
+  workerSummaryData
+} from "./model/workerSummaryData";
+
+const quickStatusFilters: { key: "all" | WorkerAttendanceStatus; label: string }[] = [
+  { key: "all", label: "전체" },
+  { key: "present", label: "오늘 출근" },
+  { key: "late", label: "지각" },
+  { key: "leave", label: "휴가" },
+  { key: "absent", label: "결근" }
+];
+const rowsPerPageOptions = [5, 10, 20];
 
 export function WorkerSummaryPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<"all" | WorkerAttendanceStatus>("all");
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const filteredRows = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+
+    return workerSummaryData.rows.filter((row) => {
+      const matchesKeyword =
+        keyword.length === 0 ||
+        row.name.toLowerCase().includes(keyword) ||
+        row.employeeCode.toLowerCase().includes(keyword) ||
+        row.appliedFor.toLowerCase().includes(keyword) ||
+        row.team.toLowerCase().includes(keyword) ||
+        row.email.toLowerCase().includes(keyword);
+
+      const matchesStatus =
+        selectedStatus === "all" || row.attendanceStatus === selectedStatus;
+
+      return matchesKeyword && matchesStatus;
+    });
+  }, [searchQuery, selectedStatus]);
+
+  const totalRows = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedStatus, rowsPerPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const pagedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredRows.slice(startIndex, endIndex);
+  }, [currentPage, filteredRows, rowsPerPage]);
+
+  const rangeStart = totalRows === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
+  const rangeEnd = totalRows === 0 ? 0 : Math.min(currentPage * rowsPerPage, totalRows);
+
   return (
-    <div className="board">
-      <header className="topbar">
+    <div className="console-page worker-list-page">
+      <header className="worker-list-header">
         <div>
-          <p className="headline-kicker">Verified Worker Summary</p>
-          <h2 className="headline-title">
-            점수 대신 확인 신호와 기록 일관성만 요약합니다.
-          </h2>
-          <p className="headline-sub">
-            근로자를 줄 세우지 않고, 재직 확인과 최근 기록 신뢰도만 운영 보조
-            신호로 보여줍니다.
-          </p>
-        </div>
-        <div className="topbar-actions">
-          <Badge tone="success">22명 확인 완료</Badge>
+          <h2 className="worker-list-title">{workerSummaryData.title}</h2>
+          <p className="worker-list-subtitle">{workerSummaryData.subtitle}</p>
         </div>
       </header>
 
-      <SectionCard
-        title="요약 카드"
-        description="근무 신뢰도, 정산 이슈 여부, 선지급 검토 상태를 내부 보조 카드로 표시합니다."
-      >
-        <div className="summary-list">
-          {verifiedWorkerSummaries.map((summary) => (
-            <div className="summary-card" key={summary.title}>
-              <strong>{summary.title}</strong>
-              <p>{summary.description}</p>
-              <div className="summary-meta">
-                {summary.chips.map((chip) => (
-                  <span className="summary-chip" key={chip}>
-                    {chip}
-                  </span>
-                ))}
-              </div>
+      <section className="worker-list-panel attendance-board">
+        <div className="attendance-toolbar">
+          <label className="attendance-search">
+            <span className="attendance-search-icon">
+              <SearchIcon />
+            </span>
+            <input
+              type="text"
+              placeholder="근로자/직무/연락처 검색"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.currentTarget.value)}
+            />
+          </label>
+
+          <div className="attendance-toolbar-actions">
+            <div className="worker-quick-filter">
+              {quickStatusFilters.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  className={`worker-quick-filter-button${selectedStatus === filter.key ? " active" : ""}`}
+                  onClick={() => setSelectedStatus(filter.key)}
+                >
+                  {filter.label}
+                </button>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
-      </SectionCard>
+
+        <WorkerSummaryList
+          columns={workerSummaryData.columns}
+          rows={pagedRows}
+          pagination={{
+            rowsPerPage,
+            rowsPerPageOptions,
+            currentPage,
+            totalPages,
+            totalRows,
+            rangeStart,
+            rangeEnd,
+            onRowsPerPageChange: setRowsPerPage,
+            onPageChange: setCurrentPage
+          }}
+        />
+      </section>
     </div>
   );
 }

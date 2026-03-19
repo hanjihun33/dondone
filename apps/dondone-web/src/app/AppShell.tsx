@@ -1,27 +1,23 @@
 import { ReactNode, useState } from "react";
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  AlertIcon,
+  ClipboardCheckIcon,
   DashboardIcon,
-  RefreshIcon,
-  ShieldCheckIcon,
-  UsersIcon,
-  WalletIcon,
+  SettingsIcon,
+  UsersIcon
 } from "../shared/ui/icons";
 
 type NavItem = {
   icon: ReactNode;
   label: string;
-  to?: string;
+  to: string;
 };
 
 const navItems: NavItem[] = [
-  { icon: <DashboardIcon />, label: "대시보드", to: "/" },
+  { icon: <DashboardIcon />, label: "대시보드", to: "/dashboard" },
   { icon: <UsersIcon />, label: "근로자 목록", to: "/workers" },
-  { icon: <AlertIcon />, label: "정산 이슈", to: "/issues" },
-  { icon: <WalletIcon />, label: "선지급 확인" },
-  { icon: <RefreshIcon />, label: "확인 요청 관리" },
-  { icon: <ShieldCheckIcon />, label: "설정" },
+  { icon: <ClipboardCheckIcon />, label: "요청 관리", to: "/issues" },
+  { icon: <SettingsIcon />, label: "설정", to: "/settings" }
 ];
 
 export function AppShell() {
@@ -33,7 +29,6 @@ export function AppShell() {
 
   return (
     <div className={`page-shell${isSidebarCollapsed ? " sidebar-collapsed" : ""}`}>
-      {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-brand">
           <button
@@ -54,33 +49,19 @@ export function AppShell() {
 
         <nav className="nav-group">
           {navItems.map((item, idx) => {
-            if (!item.to) {
-              return (
-                <button
-                  key={`${item.label}-${idx}`}
-                  type="button"
-                  className="nav-item"
-                  aria-label={item.label}
-                >
-                  <span className="nav-item-icon" aria-hidden="true">{item.icon}</span>
-                  <span className="nav-item-label">{item.label}</span>
-                </button>
-              );
-            }
-
             return (
               <NavLink
                 key={`${item.label}-${idx}`}
                 to={item.to}
                 className={({ isActive }) => {
-                  const active =
-                    isActive &&
-                    location.pathname === item.to;
+                  const active = isActive && location.pathname === item.to;
                   return `nav-item${active ? " active" : ""}`;
                 }}
                 title={isSidebarCollapsed ? item.label : undefined}
               >
-                <span className="nav-item-icon" aria-hidden="true">{item.icon}</span>
+                <span className="nav-item-icon" aria-hidden="true">
+                  {item.icon}
+                </span>
                 <span className="nav-item-label">{item.label}</span>
               </NavLink>
             );
@@ -98,10 +79,12 @@ export function AppShell() {
         </div>
       </aside>
 
-      {/* ── Header Bar ── */}
       <header className="header-bar">
         <div className="header-left">
-          <div className={`header-wordmark${isSidebarCollapsed ? " visible" : ""}`} aria-hidden={!isSidebarCollapsed}>
+          <div
+            className={`header-wordmark${isSidebarCollapsed ? " visible" : ""}`}
+            aria-hidden={!isSidebarCollapsed}
+          >
             <span className="brand-wordmark-don">Don</span>
             <span className="brand-wordmark-done">Done</span>
           </div>
@@ -140,12 +123,11 @@ export function AppShell() {
         </div>
       </header>
 
-      {/* ── Main Content ── */}
       <main className="content">
         <Outlet context={{ refreshTick }} />
       </main>
 
-      {(isHelpOpen || isSettingsOpen) ? (
+      {isHelpOpen || isSettingsOpen ? (
         <div
           className="header-popover-backdrop"
           onClick={() => {
@@ -164,7 +146,10 @@ export function AppShell() {
                 <ul className="popover-list">
                   <li>오늘 출퇴근 현황과 요청 관리 상태를 한 번에 확인합니다.</li>
                   <li>근무 수정, 휴가 생성, 위치 불일치 같은 이슈를 검토합니다.</li>
-                  <li>Verified Worker Summary와 회사 확인 코드는 운영 보조 신호로만 사용합니다.</li>
+                  <li>
+                    Verified Worker Summary와 회사 확인 코드는 운영 보조 신호로만
+                    사용합니다.
+                  </li>
                 </ul>
               </>
             ) : null}

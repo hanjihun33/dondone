@@ -11,10 +11,12 @@ function IconBase({ children }: { children: ReactNode }) {
 export function DashboardIcon() {
   return (
     <IconBase>
-      <rect x="3" y="3" width="8" height="8" rx="2" />
-      <rect x="13" y="3" width="8" height="5" rx="2" />
-      <rect x="13" y="10" width="8" height="11" rx="2" />
-      <rect x="3" y="13" width="8" height="8" rx="2" />
+      <path d="M4.5 15a7.5 7.5 0 1 1 15 0" />
+      <path d="M12 15 16.2 10.8" />
+      <circle cx="12" cy="15" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M6.8 15h-.3" />
+      <path d="M17.2 15h.3" />
+      <path d="M12 8.2v-.3" />
     </IconBase>
   );
 }
@@ -30,42 +32,111 @@ export function UsersIcon() {
   );
 }
 
-export function WalletIcon() {
+export function ClipboardCheckIcon() {
   return (
     <IconBase>
-      <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H19a2 2 0 0 1 2 2v2.5H6.5A2.5 2.5 0 0 0 4 13Z" />
-      <path d="M4 13v4a2 2 0 0 0 2 2h15v-8.5H6.5A2.5 2.5 0 0 0 4 13Z" />
-      <circle cx="17" cy="14.75" r="1" fill="currentColor" stroke="none" />
+      <rect x="6" y="4.5" width="12" height="16" rx="2.2" />
+      <rect x="9" y="2.5" width="6" height="3.5" rx="1.2" />
+      <path d="m9 13 2.2 2.2 3.8-4.2" />
     </IconBase>
   );
 }
 
-export function AlertIcon() {
+export function SettingsIcon() {
   return (
     <IconBase>
-      <path d="M12 3 2.8 19h18.4L12 3Z" />
-      <path d="M12 9v4.5" />
-      <circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="2.8" />
+      <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.1 1.1a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0l-1.1-1.1a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a1 1 0 0 1-1-1v-1.6a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4l1.1-1.1a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.1 1.1a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.6a1 1 0 0 1-1 1h-.2a1 1 0 0 0-.9.6Z" />
     </IconBase>
   );
 }
 
-export function RefreshIcon() {
+export function CalendarIcon() {
   return (
     <IconBase>
-      <path d="M20 6v5h-5" />
-      <path d="M4 18v-5h5" />
-      <path d="M6.7 9A7 7 0 0 1 18 11" />
-      <path d="M17.3 15A7 7 0 0 1 6 13" />
+      <rect x="3" y="4.5" width="18" height="16.5" rx="2.5" />
+      <path d="M3 9.5h18" />
+      <path d="M8 3v3" />
+      <path d="M16 3v3" />
     </IconBase>
   );
 }
 
-export function ShieldCheckIcon() {
+export function ChevronDownIcon() {
   return (
     <IconBase>
-      <path d="M12 3 6 5.5v5.3c0 4.1 2.5 7.9 6 9.2 3.5-1.3 6-5.1 6-9.2V5.5L12 3Z" />
-      <path d="m9.5 12 1.8 1.8 3.4-3.8" />
+      <path d="m6.5 9 5.5 6 5.5-6" />
+    </IconBase>
+  );
+}
+
+export function MapPinIcon() {
+  return (
+    <IconBase>
+      <path d="M12 21s6-5.8 6-10a6 6 0 1 0-12 0c0 4.2 6 10 6 10Z" />
+      <circle cx="12" cy="11" r="2.2" />
+    </IconBase>
+  );
+}
+
+export function SearchIcon() {
+  return (
+    <IconBase>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-3.7-3.7" />
+    </IconBase>
+  );
+}
+
+export function FilterIcon() {
+  return (
+    <IconBase>
+      <path d="M4 5h16l-6 7v5l-4 2v-7Z" />
+    </IconBase>
+  );
+}
+
+export function CheckCircleIcon() {
+  return (
+    <IconBase>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.5 12 2.2 2.2 4.8-5" />
+    </IconBase>
+  );
+}
+
+export function ClockIcon() {
+  return (
+    <IconBase>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5v5l3.2 1.8" />
+    </IconBase>
+  );
+}
+
+export function LeaveIcon() {
+  return (
+    <IconBase>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M8 12h8" />
+    </IconBase>
+  );
+}
+
+export function UserAvatarIcon() {
+  return (
+    <IconBase>
+      <circle cx="12" cy="9" r="3.2" />
+      <path d="M5.8 18a6.2 6.2 0 0 1 12.4 0" />
+    </IconBase>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <IconBase>
+      <path d="m7 7 10 10" />
+      <path d="m17 7-10 10" />
     </IconBase>
   );
 }
