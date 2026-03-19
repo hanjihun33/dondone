@@ -205,6 +205,30 @@ public class WorkProofLane1Service {
     }
 
     /**
+     * Wage lane 1 read 흐름에서 계약, 월간 요약, 레코드 반영 상태를 한 번에 조합해 중복 조회를 줄인다.
+     */
+    @Transactional(readOnly = true)
+    public WageLane1Snapshot getWageLane1Snapshot(Long userId, String month, Long workplaceId) {
+        YearMonth targetMonth = parseYearMonth(month);
+        Workplace workplace = getOwnedWorkplace(userId, workplaceId);
+        WorkContract contract = getActiveContract(userId, workplace.getId(), ErrorCode.ACTIVE_CONTRACT_NOT_FOUND);
+        List<WorkProof> records = workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
+                userId,
+                workplaceId,
+                targetMonth.atDay(1),
+                targetMonth.atEndOfMonth()
+        );
+
+        return new WageLane1Snapshot(
+                toCurrentContractResponse(contract),
+                buildMonthlySummary(targetMonth, workplaceId, records),
+                records.stream()
+                        .map(record -> new WageLane1RecordSnapshot(record.getId(), resolveReflectionStatus(record)))
+                        .toList()
+        );
+    }
+
+    /**
      * 상세 조회는 workplace/contract snapshot과 evidence capture를 같이 내려 후속 증빙 흐름의 기준으로 쓴다.
      */
     @Transactional(readOnly = true)
@@ -229,6 +253,12 @@ public class WorkProofLane1Service {
                 targetMonth.atEndOfMonth()
         );
 
+        return buildMonthlySummary(targetMonth, workplaceId, records);
+    }
+
+    private WorkProofMonthlySummaryContractResponse buildMonthlySummary(YearMonth targetMonth,
+                                                                       Long workplaceId,
+                                                                       List<WorkProof> records) {
         // v1 요약은 reflected record만 급여 계산 입력으로 간주하고, recorded/reflected 차이는 integrity에 남긴다.
         List<WorkProof> reflected = records.stream().filter(WorkProof::isReflected).toList();
         List<WorkProof> needsReview = records.stream().filter(record -> !record.isReflected()).toList();
@@ -508,5 +538,18 @@ public class WorkProofLane1Service {
 
     private Long resolveWorkedMinutes(WorkProof workProof) {
         return workProof.getClockOutAt() == null ? null : workProof.workedMinutes();
+    }
+
+    public record WageLane1Snapshot(
+            CurrentContractResponse contract,
+            WorkProofMonthlySummaryContractResponse summary,
+            List<WageLane1RecordSnapshot> records
+    ) {
+    }
+
+    public record WageLane1RecordSnapshot(
+            Long recordId,
+            WorkProofReflectionStatus reflectionStatus
+    ) {
     }
 }

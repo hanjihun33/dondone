@@ -1,41 +1,120 @@
-import { issueQueue } from "../../mocks/employerConsoleData";
+import { useMemo, useState } from "react";
 import { Badge } from "../../shared/ui/Badge";
+import { SearchIcon } from "../../shared/ui/icons";
 import { SectionCard } from "../../shared/ui/SectionCard";
+import { IssueQueueList } from "./components/IssueQueueList";
+import {
+  issuesQueueData,
+  type CorrectionRequestItem,
+  type CorrectionRequestStatus
+} from "./model/issuesQueueData";
+
+type RequestFilterKey = "pending" | "approved" | "rejected" | "all";
+
+const requestFilters: { key: RequestFilterKey; label: string }[] = [
+  { key: "all", label: "전체" },
+  { key: "pending", label: "대기" },
+  { key: "approved", label: "수락" },
+  { key: "rejected", label: "거절" }
+];
 
 export function IssuesQueuePage() {
+  const [requests, setRequests] = useState<CorrectionRequestItem[]>(
+    issuesQueueData.requests
+  );
+  const [selectedFilter, setSelectedFilter] =
+    useState<RequestFilterKey>("pending");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const countByStatus = useMemo(() => {
+    const pending = requests.filter((item) => item.status === "pending").length;
+    const approved = requests.filter(
+      (item) => item.status === "approved"
+    ).length;
+    const rejected = requests.filter(
+      (item) => item.status === "rejected"
+    ).length;
+
+    return {
+      pending,
+      approved,
+      rejected,
+      all: requests.length
+    };
+  }, [requests]);
+
+  const filteredRequests = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+
+    return requests.filter((request) => {
+      const matchesStatus =
+        selectedFilter === "all" || request.status === selectedFilter;
+
+      const matchesKeyword =
+        keyword.length === 0 ||
+        request.workerName.toLowerCase().includes(keyword) ||
+        request.reason.toLowerCase().includes(keyword);
+
+      return matchesStatus && matchesKeyword;
+    });
+  }, [requests, searchQuery, selectedFilter]);
+
+  const resolveRequest = (
+    requestId: string,
+    nextStatus: CorrectionRequestStatus
+  ) => {
+    setRequests((prev) =>
+      prev.map((request) =>
+        request.id === requestId ? { ...request, status: nextStatus } : request
+      )
+    );
+  };
+
   return (
-    <div className="board">
-      <header className="topbar">
+    <div className="board issues-page">
+      <header className="topbar issues-header">
         <div>
-          <p className="headline-kicker">정산 이슈 큐</p>
-          <h2 className="headline-title">
-            근로자 확인 요청 이후 필요한 설명과 정정만 확인합니다.
-          </h2>
-          <p className="headline-sub">
-            회사는 연결된 경우에만, 운영 콘솔에서 해당 월의 확인 요청 상태와
-            근거 요약을 보고 설명/정정에 참여하는 보조 축으로 동작합니다.
-          </p>
+          <h2 className="issues-title">요청 관리</h2>
+          <p className="issues-subtitle">출퇴근 정정 요청을 확인하고 처리합니다.</p>
         </div>
         <div className="topbar-actions">
-          <Badge tone="warn">열린 이슈 4건</Badge>
+          <Badge tone="warn">{`대기 ${countByStatus.pending}건`}</Badge>
         </div>
       </header>
 
-      <SectionCard
-        title="확인 필요 항목"
-        description="Proof Pack, 변경 이력, 설명 메모가 함께 검토돼야 하는 항목만 남깁니다."
-      >
-        <div className="risk-board">
-          {issueQueue.map((item) => (
-            <div className="risk-item" key={item.title}>
-              <div className="risk-topline">
-                <strong>{item.title}</strong>
-                <Badge tone={item.badgeTone}>{item.badgeText}</Badge>
-              </div>
-              <p>{item.description}</p>
-            </div>
-          ))}
+      <SectionCard>
+        <div className="issue-queue-toolbar">
+          <div className="issue-filter-tabs">
+            {requestFilters.map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                className={`issue-filter-tab${
+                  selectedFilter === filter.key ? " active" : ""
+                }`}
+                onClick={() => setSelectedFilter(filter.key)}
+              >
+                {filter.label}
+                <span>{countByStatus[filter.key]}</span>
+              </button>
+            ))}
+          </div>
+
+          <label className="issue-search-input">
+            <span className="issue-search-leading-icon" aria-hidden="true">
+              <SearchIcon />
+            </span>
+            <input
+              type="text"
+              aria-label="요청 검색"
+              placeholder="근로자명 또는 사유로 검색"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.currentTarget.value)}
+            />
+          </label>
         </div>
+
+        <IssueQueueList requests={filteredRequests} onResolve={resolveRequest} />
       </SectionCard>
     </div>
   );

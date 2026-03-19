@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 
 type SectionCardProps = {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   aside?: ReactNode;
   children: ReactNode;
 };
@@ -13,15 +13,19 @@ export function SectionCard({
   aside,
   children
 }: SectionCardProps) {
+  const hasHead = Boolean(title || description || aside);
+
   return (
     <article className="card section-card">
-      <div className="section-head">
-        <div>
-          <h3 className="section-title">{title}</h3>
-          <p className="section-sub">{description}</p>
+      {hasHead ? (
+        <div className="section-head">
+          <div>
+            {title ? <h3 className="section-title">{title}</h3> : null}
+            {description ? <p className="section-sub">{description}</p> : null}
+          </div>
+          {aside}
         </div>
-        {aside}
-      </div>
+      ) : null}
       {children}
     </article>
   );

@@ -44,6 +44,7 @@ dependencies {
     testAnnotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("com.h2database:h2")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
 }
@@ -51,16 +52,28 @@ dependencies {
 tasks.named<Test>("test") {
     useJUnitPlatform {
         excludeTags("integration")
+        excludeTags("docker-perf-external")
     }
 }
 
 tasks.register<Test>("integrationTest") {
-    description = "Runs Docker-based integration tests."
+    description = "Runs tagged integration tests, including H2-backed regression checks."
     group = "verification"
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
     shouldRunAfter(tasks.named("test"))
     useJUnitPlatform {
         includeTags("integration")
+    }
+}
+
+tasks.register<Test>("externalDockerPerfTest") {
+    description = "Runs performance tests against an externally started PostgreSQL datasource."
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    shouldRunAfter(tasks.named("integrationTest"))
+    useJUnitPlatform {
+        includeTags("docker-perf-external")
     }
 }
