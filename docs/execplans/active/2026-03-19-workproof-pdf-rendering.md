@@ -19,6 +19,20 @@
 - `WorkProof` 기반 출퇴근 기록 정리 PDF를 실제로 렌더링할 수 있는 최소 파이프라인을 설계하고 구현한다.
 - 엔티티 직접 렌더링이 아니라 `문서 전용 snapshot -> HTML template -> PDF bytes` 흐름을 기준선으로 고정한다.
 
+# Current Status
+- 완료
+  - `WorkProofPdfSnapshot`, `WorkProofPdfAssembleCommand`, `WorkProofPdfSnapshotAssembler` 계약 추가
+  - `DefaultWorkProofPdfSnapshotAssembler` 구현
+  - `Thymeleaf + OpenHTMLtoPDF` 기반 렌더러 어댑터 추가
+  - `workproof-statement.html` 템플릿 추가
+  - `DocumentsService.generateProofPackPdf` 및 `/api/documents/{documentId}/download` 연결
+  - renderer/unit/integration test 추가
+- 남은 후속 범위
+  - object storage 업로드
+  - presigned URL 또는 download token
+  - 비동기 worker 분리
+  - 거래 내역 PDF
+
 # In Scope
 - `WorkProof PDF` v1 문서 유형 정의
 - `WorkProofPdfSnapshot` 문서 전용 DTO 정의
@@ -92,6 +106,14 @@
 - PDF 렌더링 smoke test
 - 필요 시 생성된 PDF를 로컬 파일로 떨어뜨려 시각 확인
 - 템플릿 회귀 확인 시 최소 1건의 representative snapshot 기준 렌더링 검증
+
+# Verification Result
+- `./gradlew.bat compileJava --console=plain`
+- `./gradlew.bat test --tests com.workproofpay.backend.documents.DocumentsServiceTest --tests com.workproofpay.backend.documents.pdf.ThymeleafOpenHtmlPdfRendererTest --console=plain`
+- `./gradlew.bat integrationTest --tests com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshotAssemblerIntegrationTest --console=plain`
+- 비고
+  - integration test는 Docker/Testcontainers 환경이 준비되어야 실제 실행된다
+  - 현재 단계에서는 PDF 파일 저장/서명 URL 없이 on-demand download만 제공한다
 
 # Review Focus
 - 엔티티 직접 렌더링이 아니라 snapshot 기반 구조로 분리되었는가
