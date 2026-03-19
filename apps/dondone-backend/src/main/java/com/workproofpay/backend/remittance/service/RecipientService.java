@@ -1,13 +1,18 @@
 package com.workproofpay.backend.remittance.service;
 
+import com.workproofpay.backend.remittance.api.dto.request.RecipientSearchRequest;
 import com.workproofpay.backend.remittance.api.dto.request.UpsertRecipientRequest;
 import com.workproofpay.backend.remittance.api.dto.response.RecipientItemResponse;
 import com.workproofpay.backend.remittance.api.dto.response.RecipientListResponse;
+import com.workproofpay.backend.remittance.api.dto.response.RecipientSearchItemResponse;
+import com.workproofpay.backend.remittance.api.dto.response.RecipientSearchListResponse;
 import com.workproofpay.backend.remittance.config.RemittanceProperties;
 import com.workproofpay.backend.remittance.model.Recipient;
 import com.workproofpay.backend.remittance.repo.RecipientRepository;
+import com.workproofpay.backend.remittance.repo.UserWalletRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
+import com.workproofpay.backend.shared.util.PhoneNumberUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -15,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -22,6 +28,7 @@ import java.util.UUID;
 public class RecipientService {
 
     private final RecipientRepository recipientRepository;
+    private final UserWalletRepository userWalletRepository;
     private final RemittanceProperties properties;
 
     @Transactional(readOnly = true)
@@ -33,9 +40,31 @@ public class RecipientService {
         return new RecipientListResponse(recipients);
     }
 
+    @Transactional(readOnly = true)
+    public RecipientSearchListResponse searchRecipientsByPhoneNumber(Long userId, RecipientSearchRequest request) {
+        String normalizedPhoneNumber = PhoneNumberUtils.normalizeOrThrow(request.phoneNumber());
+        Set<String> existingWalletAddresses = recipientRepository.findByUserIdOrderByUpdatedAtDescRecipientIdDesc(userId)
+                .stream()
+                .map(Recipient::getWalletAddress)
+                .collect(java.util.stream.Collectors.toSet());
+        List<RecipientSearchItemResponse> candidates = userWalletRepository.findRecipientCandidatesByPhoneNumber(
+                        normalizedPhoneNumber,
+                        userId
+                ).stream()
+                .map(candidate -> new RecipientSearchItemResponse(
+                        candidate.getUserId(),
+                        candidate.getDisplayName(),
+                        PhoneNumberUtils.mask(candidate.getPhoneNumber()),
+                        maskWalletAddress(candidate.getWalletAddress()),
+                        existingWalletAddresses.contains(candidate.getWalletAddress())
+                ))
+                .toList();
+        return new RecipientSearchListResponse(candidates);
+    }
+
     @Transactional
     public RecipientItemResponse createRecipient(Long userId, UpsertRecipientRequest request) {
-        String normalizedWalletAddress = request.walletAddress().toLowerCase();
+        String normalizedWalletAddress = resolveWalletAddress(request);
         ensureWalletAddressAvailable(userId, normalizedWalletAddress, null);
         Recipient recipient = Recipient.create(
                 generateRecipientId(),
@@ -50,7 +79,7 @@ public class RecipientService {
 
     @Transactional
     public RecipientItemResponse updateRecipient(Long userId, String recipientId, UpsertRecipientRequest request) {
-        String normalizedWalletAddress = request.walletAddress().toLowerCase();
+        String normalizedWalletAddress = resolveWalletAddress(request);
         ensureWalletAddressAvailable(userId, normalizedWalletAddress, recipientId);
         Recipient recipient = getRequiredRecipient(userId, recipientId);
         recipient.update(
@@ -93,6 +122,23 @@ public class RecipientService {
         return new ApiException(ErrorCode.RECIPIENT_WALLET_ALREADY_EXISTS);
     }
 
+    private String resolveWalletAddress(UpsertRecipientRequest request) {
+        if (request.targetUserId() != null) {
+            return userWalletRepository.findByUserId(request.targetUserId())
+                    .map(wallet -> wallet.getWalletAddress().toLowerCase())
+                    .orElseThrow(() -> new ApiException(ErrorCode.RECIPIENT_NOT_FOUND));
+        }
+
+        String walletAddress = request.walletAddress();
+        if (walletAddress == null || walletAddress.isBlank()) {
+            throw new ApiException(ErrorCode.INVALID_WALLET_ADDRESS);
+        }
+        if (!walletAddress.matches("^0x[a-fA-F0-9]{40}$")) {
+            throw new ApiException(ErrorCode.INVALID_WALLET_ADDRESS);
+        }
+        return walletAddress.toLowerCase();
+    }
+
     private RecipientItemResponse toResponse(Recipient recipient) {
         return new RecipientItemResponse(
                 recipient.getRecipientId(),
@@ -108,5 +154,12 @@ public class RecipientService {
     private boolean isRecentlyUpdated(Recipient recipient) {
         return recipient.getUpdatedAt().plusSeconds(properties.getPolicy().getRecentRecipientWindowSeconds())
                 .isAfter(LocalDateTime.now());
+    }
+
+    private String maskWalletAddress(String walletAddress) {
+        if (walletAddress == null || walletAddress.length() < 12) {
+            return walletAddress;
+        }
+        return walletAddress.substring(0, 6) + "..." + walletAddress.substring(walletAddress.length() - 4);
     }
 }

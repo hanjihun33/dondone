@@ -282,7 +282,10 @@ fun WorkproofScreen(
     }
 
     BackHandler(
-        enabled = showDetails && editingRecordId == null
+        enabled = shouldInterceptWorkproofBack(
+            showDetails = showDetails,
+            editingRecordId = editingRecordId
+        )
     ) {
         showDetails = false
     }
@@ -461,6 +464,11 @@ fun WorkproofScreen(
         }
     }
 }
+
+internal fun shouldInterceptWorkproofBack(
+    showDetails: Boolean,
+    editingRecordId: String?
+): Boolean = showDetails && editingRecordId == null
 
 @Composable
 private fun WorkproofPunchCard(

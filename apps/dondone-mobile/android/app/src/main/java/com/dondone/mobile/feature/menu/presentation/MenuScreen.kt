@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -35,12 +36,14 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,8 +60,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.dondone.mobile.app.session.ProfileUpdateUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
@@ -91,6 +96,7 @@ private data class MenuDocumentColors(
 
 private enum class MenuOverlaySheet {
     Claim,
+    Profile,
     Receipt,
     Settings
 }
@@ -111,11 +117,14 @@ private val MenuReceiptHashBorder = Color(0xFFE2E8F0)
 fun MenuScreen(
     uiModel: MenuUiModel,
     workproofPdfFileUiState: WorkproofPdfFileUiState,
+    profileUpdateUiState: ProfileUpdateUiState,
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit,
     onOpenWorkproofPdf: (Long) -> Unit,
     onShareWorkproofPdf: (Long) -> Unit,
     onClearPdfFileState: () -> Unit,
+    onUpdateProfile: (String, String) -> Unit,
+    onClearProfileUpdateMessage: () -> Unit,
     onLogout: () -> Unit,
     onShowToast: (String, BadgeTone) -> Unit
 ) {
@@ -123,6 +132,7 @@ fun MenuScreen(
     var activeSheet by rememberSaveable { mutableStateOf<MenuOverlaySheet?>(null) }
     var selectedLanguage by rememberSaveable { mutableStateOf("ko") }
     var selectedDocumentId by remember { mutableStateOf<String?>(null) }
+    var awaitingProfileUpdateResult by remember { mutableStateOf(false) }
 
     val selectedDocument = uiModel.documents.firstOrNull { it.id == selectedDocumentId }
     val proofDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Proof }
@@ -146,6 +156,25 @@ fun MenuScreen(
         onClearPdfFileState()
     }
 
+    LaunchedEffect(
+        awaitingProfileUpdateResult,
+        profileUpdateUiState.isSubmitting,
+        profileUpdateUiState.message,
+        profileUpdateUiState.isError
+    ) {
+        if (!awaitingProfileUpdateResult || profileUpdateUiState.isSubmitting || profileUpdateUiState.message == null) {
+            return@LaunchedEffect
+        }
+        if (profileUpdateUiState.isError) {
+            awaitingProfileUpdateResult = false
+            return@LaunchedEffect
+        }
+        activeSheet = null
+        awaitingProfileUpdateResult = false
+        onShowToast(profileUpdateUiState.message, BadgeTone.Success)
+        onClearProfileUpdateMessage()
+    }
+
     val serviceActions = buildList {
         add(MenuServiceAction("급여 점검", Icons.Default.Description, onOpenWage))
         add(MenuServiceAction("계좌 지갑 관리", Icons.Default.AccountBalanceWallet, onOpenAccount))
@@ -163,6 +192,11 @@ fun MenuScreen(
         if (uiModel.session != null) {
             MenuSessionSection(
                 session = uiModel.session,
+                onEditProfile = {
+                    awaitingProfileUpdateResult = false
+                    onClearProfileUpdateMessage()
+                    activeSheet = MenuOverlaySheet.Profile
+                },
                 onLogout = onLogout
             )
             MenuSectionDivider()
@@ -223,6 +257,35 @@ fun MenuScreen(
                 selectedLanguage = selectedLanguage,
                 onSelectLanguage = { selectedLanguage = it },
                 onDismiss = { activeSheet = null }
+            )
+        }
+    }
+
+    if (activeSheet == MenuOverlaySheet.Profile && uiModel.session != null) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                if (!profileUpdateUiState.isSubmitting) {
+                    awaitingProfileUpdateResult = false
+                    onClearProfileUpdateMessage()
+                    activeSheet = null
+                }
+            },
+            containerColor = DawnSurface
+        ) {
+            MenuProfileSheet(
+                session = uiModel.session,
+                uiState = profileUpdateUiState,
+                onSubmit = { name, phoneNumber ->
+                    awaitingProfileUpdateResult = true
+                    onUpdateProfile(name, phoneNumber)
+                },
+                onDismiss = {
+                    if (!profileUpdateUiState.isSubmitting) {
+                        awaitingProfileUpdateResult = false
+                        onClearProfileUpdateMessage()
+                        activeSheet = null
+                    }
+                }
             )
         }
     }
@@ -357,6 +420,7 @@ private fun shareMenuReceipt(
 @Composable
 private fun MenuSessionSection(
     session: MenuSessionUiModel,
+    onEditProfile: () -> Unit,
     onLogout: () -> Unit
 ) {
     MenuSectionSurface {
@@ -372,10 +436,82 @@ private fun MenuSessionSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnTextSubtle
             )
+            session.phoneNumber?.let { phoneNumber ->
+                Text(
+                    text = phoneNumber,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnTextSubtle
+                )
+            }
         }
+        SecondaryActionButton(
+            text = "내 정보 수정",
+            onClick = onEditProfile,
+            modifier = Modifier.fillMaxWidth()
+        )
         SecondaryActionButton(
             text = "로그아웃",
             onClick = onLogout,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun MenuProfileSheet(
+    session: MenuSessionUiModel,
+    uiState: ProfileUpdateUiState,
+    onSubmit: (String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember(session.name) { mutableStateOf(session.name) }
+    var phoneNumber by remember(session.phoneNumber) { mutableStateOf(session.phoneNumber.orEmpty()) }
+    val canSubmit = !uiState.isSubmitting && name.trim().isNotBlank() && phoneNumber.filter(Char::isDigit).length in 10..11
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "내 정보 수정",
+            style = MaterialTheme.typography.titleLarge,
+            color = DawnText
+        )
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = name,
+            onValueChange = { name = it },
+            singleLine = true,
+            label = { Text("이름") },
+            shape = RoundedCornerShape(16.dp)
+        )
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = phoneNumber,
+            onValueChange = { phoneNumber = it },
+            singleLine = true,
+            label = { Text("휴대폰 번호") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            shape = RoundedCornerShape(16.dp)
+        )
+        if (uiState.message != null) {
+            Text(
+                text = uiState.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (uiState.isError) Color(0xFFC93C37) else DawnSuccess
+            )
+        }
+        PrimaryActionButton(
+            text = if (uiState.isSubmitting) "저장 중..." else "저장하기",
+            onClick = { onSubmit(name, phoneNumber) },
+            enabled = canSubmit,
+            modifier = Modifier.fillMaxWidth()
+        )
+        SecondaryActionButton(
+            text = "닫기",
+            onClick = onDismiss,
             modifier = Modifier.fillMaxWidth()
         )
     }

@@ -69,7 +69,7 @@ class ScreenChromeTest {
     }
 
     @Test
-    fun `account child route keeps title and date`() {
+    fun `account child route keeps title and hides date`() {
         val chrome = resolveScreenChrome(
             route = Route.ACCOUNT,
             transferStep = TransferFlowStep.RECIPIENT,
@@ -80,6 +80,6 @@ class ScreenChromeTest {
         assertEquals("계좌·지갑 관리", chrome.headerTitle)
         assertFalse(chrome.showRootTabs)
         assertFalse(chrome.showSettingsAction)
-        assertTrue(chrome.showDate)
+        assertFalse(chrome.showDate)
     }
 }

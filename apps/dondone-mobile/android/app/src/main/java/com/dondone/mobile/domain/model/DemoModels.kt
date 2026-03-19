@@ -71,7 +71,7 @@ data class Recipient(
 )
 
 enum class TransferStatus {
-    IDLE, REVIEWING, SUBMITTED, CONFIRMED
+    IDLE, REVIEWING, SUBMITTED, CONFIRMED, FAILED
 }
 
 enum class TransferFlowStep {

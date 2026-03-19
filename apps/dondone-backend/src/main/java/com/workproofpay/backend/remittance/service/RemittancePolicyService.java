@@ -62,8 +62,9 @@ public class RemittancePolicyService {
             return blocked(RemittancePolicyCode.TRANSFER_ALREADY_IN_PROGRESS, recipient, wallet, balanceSnapshot, recentConfirmationRequired);
         }
 
+        BigInteger requiredGasCostWei = walletService.estimateTransferGasCostWei();
         if (balanceSnapshot.tokenBalanceAtomic().compareTo(BigInteger.valueOf(amountAtomic)) < 0
-                || balanceSnapshot.nativeBalanceWei().signum() <= 0) {
+                || balanceSnapshot.nativeBalanceWei().compareTo(requiredGasCostWei) < 0) {
             return blocked(RemittancePolicyCode.INSUFFICIENT_WALLET_BALANCE, recipient, wallet, balanceSnapshot, recentConfirmationRequired);
         }
 

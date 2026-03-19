@@ -10,10 +10,18 @@ public record MeResponse(
         String email,
         @Schema(description = "Authenticated user display name", example = "Test User")
         String name,
+        @Schema(description = "Authenticated user phone number", example = "01012345678")
+        String phoneNumber,
         @Schema(description = "Authenticated user role", example = "USER")
         String role
 ) {
     public static MeResponse from(User user) {
-        return new MeResponse(user.getId(), user.getEmail(), user.getName(), user.getRole().name());
+        return new MeResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getName(),
+                user.getPhoneNumber(),
+                user.getRole().name()
+        );
     }
 }

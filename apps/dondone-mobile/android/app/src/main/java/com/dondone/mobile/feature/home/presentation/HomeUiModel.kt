@@ -1,15 +1,24 @@
 package com.dondone.mobile.feature.home.presentation
 
-import android.location.Location
 import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
+import com.dondone.mobile.data.remittance.RemittanceRemoteMode
+import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.domain.calculator.WageEstimator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferStatus
+import java.math.RoundingMode
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 data class HomeAccountUiModel(
-    val balanceText: String
+    val titleText: String,
+    val balanceText: String,
+    val balanceAmountText: String,
+    val balanceUnitText: String?
 )
 
 data class HomeWorkUiModel(
@@ -48,7 +57,9 @@ data class HomeUiModel(
 )
 
 fun DemoState.toHomeUiModel(
-    workproofActionUiState: WorkproofActionUiState? = null
+    workproofActionUiState: WorkproofActionUiState? = null,
+    remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
+    isAuthenticated: Boolean = false
 ): HomeUiModel {
     val selectedAccount = remittance.selectedAccount()
     val wageEstimate = WageEstimator.calculate(this)
@@ -112,8 +123,10 @@ fun DemoState.toHomeUiModel(
     }
 
     return HomeUiModel(
-        account = HomeAccountUiModel(
-            balanceText = formatKrw(selectedAccount.balance)
+        account = resolveHomeAccountUiModel(
+            selectedAccount = selectedAccount,
+            remittanceRemoteState = remittanceRemoteState,
+            isAuthenticated = isAuthenticated
         ),
         work = HomeWorkUiModel(
             dateText = currentDateText,
@@ -132,14 +145,77 @@ fun DemoState.toHomeUiModel(
     )
 }
 
-private fun com.dondone.mobile.domain.model.WorkproofData.isWithinWorkplaceRadius(): Boolean {
-    val result = FloatArray(1)
-    Location.distanceBetween(
-        currentLatitude,
-        currentLongitude,
-        workplaceLatitude,
-        workplaceLongitude,
-        result
+private fun resolveHomeAccountUiModel(
+    selectedAccount: com.dondone.mobile.domain.model.Account,
+    remittanceRemoteState: RemittanceRemoteState,
+    isAuthenticated: Boolean
+): HomeAccountUiModel {
+    if (isAuthenticated) {
+        val remotePayload = remittanceRemoteState.payload
+        return HomeAccountUiModel(
+            titleText = "대표 지갑",
+            balanceText = when (remittanceRemoteState.mode) {
+                RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.formatTokenBalanceForHome() ?: "잔액 확인 중"
+                RemittanceRemoteMode.LOADING -> "잔액 확인 중"
+                else -> "지갑 정보 확인 중"
+            },
+            balanceAmountText = when (remittanceRemoteState.mode) {
+                RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.formatTokenAmountForHome() ?: "잔액 확인 중"
+                RemittanceRemoteMode.LOADING -> "잔액 확인 중"
+                else -> "지갑 정보 확인 중"
+            },
+            balanceUnitText = when (remittanceRemoteState.mode) {
+                RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.assetSymbol
+                else -> null
+            }
+        )
+    }
+
+    return HomeAccountUiModel(
+        titleText = "대표 계좌",
+        balanceText = formatKrw(selectedAccount.balance),
+        balanceAmountText = formatKrw(selectedAccount.balance),
+        balanceUnitText = null
     )
-    return result.first() <= allowedRadiusMeters
+}
+
+private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenBalanceForHome(): String {
+    val amount = formatTokenAmountForHome()
+    return if (amount == "잔액 확인 중") amount else "$amount $assetSymbol"
+}
+
+private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenAmountForHome(): String {
+    val normalized = tokenBalanceAtomic.toBigDecimalOrNull()
+        ?.movePointLeft(assetDecimals)
+        ?.setScale(2, RoundingMode.DOWN)
+        ?: return "잔액 확인 중"
+    return normalized.stripTrailingZeros().toPlainString()
+}
+
+private fun com.dondone.mobile.domain.model.WorkproofData.isWithinWorkplaceRadius(): Boolean {
+    return haversineDistanceMeters(
+        startLatitude = currentLatitude,
+        startLongitude = currentLongitude,
+        endLatitude = workplaceLatitude,
+        endLongitude = workplaceLongitude
+    ) <= allowedRadiusMeters
+}
+
+private fun haversineDistanceMeters(
+    startLatitude: Double,
+    startLongitude: Double,
+    endLatitude: Double,
+    endLongitude: Double
+): Double {
+    val earthRadiusMeters = 6_371_000.0
+    val latitudeDelta = Math.toRadians(endLatitude - startLatitude)
+    val longitudeDelta = Math.toRadians(endLongitude - startLongitude)
+    val startLatitudeRadians = Math.toRadians(startLatitude)
+    val endLatitudeRadians = Math.toRadians(endLatitude)
+
+    val a = sin(latitudeDelta / 2) * sin(latitudeDelta / 2) +
+        cos(startLatitudeRadians) * cos(endLatitudeRadians) *
+        sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return earthRadiusMeters * c
 }

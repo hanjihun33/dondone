@@ -92,13 +92,14 @@ fun LoginLoadingScreen() {
 fun LoginScreen(
     uiState: AuthUiState,
     onLogin: (String, String) -> Unit,
-    onSignup: (String, String, String) -> Unit,
+    onSignup: (String, String, String, String) -> Unit,
     onFieldEdited: () -> Unit
 ) {
     var screen by rememberSaveable { mutableStateOf(AuthEntryScreen.WELCOME) }
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var phoneNumber by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
     Box(
@@ -126,9 +127,11 @@ fun LoginScreen(
                     subtitle = "",
                     primaryActionText = if (uiState.isSubmitting) "로그인 중..." else "로그인",
                     showNameField = false,
+                    showPhoneField = false,
                     name = name,
                     email = email,
                     password = password,
+                    phoneNumber = phoneNumber,
                     errorMessage = uiState.errorMessage,
                     isSubmitting = uiState.isSubmitting,
                     onBack = {
@@ -145,6 +148,10 @@ fun LoginScreen(
                     },
                     onPasswordChange = {
                         password = it
+                        onFieldEdited()
+                    },
+                    onPhoneNumberChange = {
+                        phoneNumber = it
                         onFieldEdited()
                     },
                     onPrimaryAction = {
@@ -165,9 +172,11 @@ fun LoginScreen(
                     subtitle = "",
                     primaryActionText = if (uiState.isSubmitting) "가입 중..." else "시작하기",
                     showNameField = true,
+                    showPhoneField = true,
                     name = name,
                     email = email,
                     password = password,
+                    phoneNumber = phoneNumber,
                     errorMessage = uiState.errorMessage,
                     isSubmitting = uiState.isSubmitting,
                     onBack = {
@@ -186,9 +195,13 @@ fun LoginScreen(
                         password = it
                         onFieldEdited()
                     },
+                    onPhoneNumberChange = {
+                        phoneNumber = it
+                        onFieldEdited()
+                    },
                     onPrimaryAction = {
                         focusManager.clearFocus(force = true)
-                        onSignup(name, email, password)
+                        onSignup(name, email, password, phoneNumber)
                     },
                     onSecondaryAction = {
                         onFieldEdited()
@@ -252,15 +265,18 @@ private fun AuthFormScreen(
     subtitle: String,
     primaryActionText: String,
     showNameField: Boolean,
+    showPhoneField: Boolean,
     name: String,
     email: String,
     password: String,
+    phoneNumber: String,
     errorMessage: String?,
     isSubmitting: Boolean,
     onBack: () -> Unit,
     onNameChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onPhoneNumberChange: (String) -> Unit,
     onPrimaryAction: () -> Unit,
     onSecondaryAction: () -> Unit,
     secondaryActionText: String
@@ -311,6 +327,15 @@ private fun AuthFormScreen(
                     imeAction = ImeAction.Next,
                     onValueChange = onEmailChange
                 )
+                if (showPhoneField) {
+                    TossLikeField(
+                        value = phoneNumber,
+                        label = "휴대폰 번호",
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next,
+                        onValueChange = onPhoneNumberChange
+                    )
+                }
                 TossLikeField(
                     value = password,
                     label = "비밀번호",

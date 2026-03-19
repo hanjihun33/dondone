@@ -8,7 +8,8 @@ data class AuthSession(
     val expiresAtEpochMillis: Long,
     val userId: Long,
     val email: String,
-    val name: String
+    val name: String,
+    val phoneNumber: String?
 ) {
     fun isExpired(nowEpochMillis: Long = System.currentTimeMillis()): Boolean {
         return nowEpochMillis >= expiresAtEpochMillis

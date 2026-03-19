@@ -12,6 +12,7 @@ import com.workproofpay.backend.remittance.model.Transfer;
 import com.workproofpay.backend.remittance.model.TransferFailureCode;
 import com.workproofpay.backend.remittance.model.TransferStatus;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
+import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,6 +48,9 @@ class RemittanceJobWorkerTest {
 
     @Mock
     private WalletService walletService;
+
+    @Mock
+    private WalletCryptoService walletCryptoService;
 
     @Mock
     private RemittanceBlockchainGateway blockchainGateway;
@@ -68,6 +73,7 @@ class RemittanceJobWorkerTest {
                 jobRepository,
                 transferRepository,
                 walletService,
+                walletCryptoService,
                 blockchainGateway,
                 jobService,
                 properties,
@@ -80,6 +86,13 @@ class RemittanceJobWorkerTest {
             ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(null);
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
+        lenient().when(walletCryptoService.encrypt(anyString()))
+                .thenAnswer(invocation -> "enc:" + invocation.getArgument(0, String.class));
+        lenient().when(walletCryptoService.decrypt(anyString()))
+                .thenAnswer(invocation -> {
+                    String value = invocation.getArgument(0, String.class);
+                    return value.startsWith("enc:") ? value.substring(4) : value;
+                });
     }
 
     @Test

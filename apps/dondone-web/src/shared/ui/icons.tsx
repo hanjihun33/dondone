@@ -51,6 +51,15 @@ export function SettingsIcon() {
   );
 }
 
+export function AdminShieldIcon() {
+  return (
+    <IconBase>
+      <path d="M12 3.5 5.5 6v6.5c0 3.9 2.6 7.4 6.5 8.5 3.9-1.1 6.5-4.6 6.5-8.5V6L12 3.5Z" />
+      <path d="M9.6 12.1 11.2 13.7 14.5 10.4" />
+    </IconBase>
+  );
+}
+
 export function CalendarIcon() {
   return (
     <IconBase>

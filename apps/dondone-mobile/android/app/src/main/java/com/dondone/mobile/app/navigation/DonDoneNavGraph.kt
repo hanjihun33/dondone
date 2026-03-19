@@ -41,6 +41,8 @@ fun DonDoneNavGraph(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
+    val remittanceRemoteState by viewModel.remittanceRemoteState.collectAsStateWithLifecycle()
+    val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
     val workproofActionUiState by viewModel.workproofActionUiState.collectAsStateWithLifecycle()
     val workproofPdfPreviewUiState by viewModel.workproofPdfPreviewUiState.collectAsStateWithLifecycle()
     val workproofPdfCreateUiState by viewModel.workproofPdfCreateUiState.collectAsStateWithLifecycle()
@@ -48,6 +50,8 @@ fun DonDoneNavGraph(
     val selectedAdvanceAmount by viewModel.selectedAdvanceAmount.collectAsStateWithLifecycle()
     val advanceRequestUiState by viewModel.advanceRequestUiState.collectAsStateWithLifecycle()
     val advanceRequestDetailUiState by viewModel.advanceRequestDetailUiState.collectAsStateWithLifecycle()
+    val profileUpdateUiState by viewModel.profileUpdateUiState.collectAsStateWithLifecycle()
+    val recipientPhoneSearchUiState by viewModel.recipientPhoneSearchUiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(workproofActionUiState.message, workproofActionUiState.isError) {
         val message = workproofActionUiState.message ?: return@LaunchedEffect
@@ -56,6 +60,15 @@ fun DonDoneNavGraph(
             if (workproofActionUiState.isError) BadgeTone.Warning else BadgeTone.Success
         )
         viewModel.clearWorkproofActionMessage()
+    }
+
+    LaunchedEffect(remittanceActionUiState.message, remittanceActionUiState.isError) {
+        val message = remittanceActionUiState.message ?: return@LaunchedEffect
+        onShowToast(
+            message,
+            if (remittanceActionUiState.isError) BadgeTone.Warning else BadgeTone.Success
+        )
+        viewModel.clearRemittanceActionMessage()
     }
 
     NavHost(
@@ -72,7 +85,11 @@ fun DonDoneNavGraph(
     ) {
         composable(Route.HOME) {
             HomeScreen(
-                uiModel = uiState.toHomeUiModel(workproofActionUiState = workproofActionUiState),
+                uiModel = uiState.toHomeUiModel(
+                    workproofActionUiState = workproofActionUiState,
+                    remittanceRemoteState = remittanceRemoteState,
+                    isAuthenticated = authUiState.isAuthenticated
+                ),
                 onOpenTransfer = {
                     viewModel.openTransferFlow()
                     navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target -> navController.navigate(target) }
@@ -135,12 +152,18 @@ fun DonDoneNavGraph(
         }
         composable(Route.TRANSFER) {
             TransferScreen(
-                uiModel = uiState.toTransferUiModel(),
+                uiModel = uiState.toTransferUiModel(
+                    remoteState = remittanceRemoteState,
+                    actionUiState = remittanceActionUiState,
+                    isAuthenticated = authUiState.isAuthenticated
+                ),
                 onSelectAccount = viewModel::selectAccount,
                 onSelectDestinationMode = viewModel::selectTransferDestinationMode,
                 onSelectRecipient = viewModel::selectRecipient,
                 onUpdateRecipientDisplayName = viewModel::updateRecipientDisplayName,
                 onUpdateAmount = viewModel::updateTransferAmount,
+                onCreateRecipient = viewModel::createRemittanceRecipient,
+                onRefreshRemittance = viewModel::refreshRemittanceRemoteState,
                 onChangeRecipient = viewModel::showRecipientStepFromAmount,
                 onChangeAccountFromAmount = viewModel::showAccountStepFromAmount,
                 onSubmitTransfer = viewModel::submitTransfer,
@@ -161,19 +184,35 @@ fun DonDoneNavGraph(
         }
         composable(Route.ACCOUNT) {
             AccountManageScreen(
-                uiModel = uiState.toAccountManageUiModel(),
-                onSelectAccount = viewModel::selectAccount
+                uiModel = uiState.toAccountManageUiModel(
+                    remittanceRemoteState = remittanceRemoteState,
+                    isAuthenticated = authUiState.isAuthenticated,
+                    recipientPhoneSearchUiState = recipientPhoneSearchUiState
+                ),
+                actionUiState = remittanceActionUiState,
+                onSelectAccount = viewModel::selectAccount,
+                onAddRecipient = viewModel::addRecipientFromAccountManage,
+                onUpdateRecipient = viewModel::updateRecipientFromAccountManage,
+                onSearchRecipientsByPhone = viewModel::searchRecipientsByPhone,
+                onClearPhoneSearch = viewModel::clearRecipientPhoneSearch
             )
         }
         composable(Route.MENU) {
             MenuScreen(
-                uiModel = uiState.toMenuUiModel(authUiState.session, workproofPdfCreateUiState),
+                uiModel = uiState.toMenuUiModel(
+                    session = authUiState.session,
+                    remittanceRemoteState = remittanceRemoteState,
+                    workproofPdfCreateUiState = workproofPdfCreateUiState
+                ),
                 workproofPdfFileUiState = workproofPdfFileUiState,
+                profileUpdateUiState = profileUpdateUiState,
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenWorkproofPdf = viewModel::openWorkproofPdf,
                 onShareWorkproofPdf = viewModel::shareWorkproofPdf,
                 onClearPdfFileState = viewModel::clearWorkproofPdfFileState,
+                onUpdateProfile = viewModel::updateProfile,
+                onClearProfileUpdateMessage = viewModel::clearProfileUpdateMessage,
                 onLogout = viewModel::logout,
                 onShowToast = onShowToast
             )

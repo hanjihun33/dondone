@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dondone.mobile.core.ui.phoneDigits
+import com.dondone.mobile.data.auth.AuthUnauthorizedException
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
 import com.dondone.mobile.data.advance.AdvanceRequestDetailPayload
 import com.dondone.mobile.data.advance.AdvanceRequestItemPayload
@@ -18,6 +20,12 @@ import com.dondone.mobile.data.documents.BackendWorkproofDocumentRepository
 import com.dondone.mobile.data.documents.WorkproofDocumentPreviewPayload
 import com.dondone.mobile.data.documents.WorkproofDocumentRepository
 import com.dondone.mobile.data.documents.WorkproofDocumentUnauthorizedException
+import com.dondone.mobile.data.remittance.BackendRemittanceRepository
+import com.dondone.mobile.data.remittance.RemittanceRemotePayload
+import com.dondone.mobile.data.remittance.RemittanceRemoteState
+import com.dondone.mobile.data.remittance.RemittanceRepository
+import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
+import com.dondone.mobile.data.remittance.RemittanceUnauthorizedException
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
@@ -25,8 +33,8 @@ import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.data.workproof.WorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofUnauthorizedException
 import com.dondone.mobile.domain.model.DemoState
+import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.TodayWork
-import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
@@ -38,6 +46,8 @@ import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiSt
 import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.dondone.mobile.domain.model.WorkRecord
+import com.dondone.mobile.domain.model.remittanceRelationCodeToLabel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,30 +57,43 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
+private const val REMITTANCE_STATUS_POLL_DELAY_MS = 1500L
+private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 12
+private const val REMITTANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 송금 실연동 데이터를 불러옵니다."
 private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 실연동 데이터를 불러옵니다."
 private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
 private const val WORKPROOF_PDF_POLL_INTERVAL_MS = 1000L
 private const val WORKPROOF_PDF_POLL_MAX_ATTEMPTS = 10
+private const val ATOMIC_UNITS_PER_USDC = 1_000_000L
 
 class DemoSessionViewModel(
     private val appContext: Context,
     private val authRepository: AuthRepository,
     private val advanceRepository: AdvanceRepository = BackendAdvanceRepository(),
     private val workproofRepository: WorkproofRepository = BackendWorkproofRepository(),
-    private val workproofDocumentRepository: WorkproofDocumentRepository = BackendWorkproofDocumentRepository()
+    private val workproofDocumentRepository: WorkproofDocumentRepository = BackendWorkproofDocumentRepository(),
+    private val remittanceRepository: RemittanceRepository = BackendRemittanceRepository()
 ) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
+    private var remittanceStatusPollingJob: Job? = null
     private var workproofPdfPollingJob: Job? = null
     private val _uiState = MutableStateFlow(initialState)
     val uiState: StateFlow<DemoState> = _uiState.asStateFlow()
     private val _authUiState = MutableStateFlow(AuthUiState.restoring())
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
+    private val _profileUpdateUiState = MutableStateFlow(ProfileUpdateUiState())
+    val profileUpdateUiState: StateFlow<ProfileUpdateUiState> = _profileUpdateUiState.asStateFlow()
+    private val _recipientPhoneSearchUiState = MutableStateFlow(RecipientPhoneSearchUiState())
+    val recipientPhoneSearchUiState: StateFlow<RecipientPhoneSearchUiState> = _recipientPhoneSearchUiState.asStateFlow()
     private val _advanceRemoteState =
         MutableStateFlow(AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE))
     val advanceRemoteState: StateFlow<AdvanceRemoteState> = _advanceRemoteState.asStateFlow()
     private val _workproofRemoteState =
         MutableStateFlow(WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE))
+    private val _remittanceRemoteState =
+        MutableStateFlow(RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE))
+    val remittanceRemoteState: StateFlow<RemittanceRemoteState> = _remittanceRemoteState.asStateFlow()
     private val _workproofActionUiState = MutableStateFlow(WorkproofActionUiState())
     val workproofActionUiState: StateFlow<WorkproofActionUiState> = _workproofActionUiState.asStateFlow()
     private val _workproofPdfPreviewUiState = MutableStateFlow(WorkproofPdfPreviewUiState())
@@ -79,6 +102,8 @@ class DemoSessionViewModel(
     val workproofPdfCreateUiState: StateFlow<WorkproofPdfCreateUiState> = _workproofPdfCreateUiState.asStateFlow()
     private val _workproofPdfFileUiState = MutableStateFlow(WorkproofPdfFileUiState())
     val workproofPdfFileUiState: StateFlow<WorkproofPdfFileUiState> = _workproofPdfFileUiState.asStateFlow()
+    private val _remittanceActionUiState = MutableStateFlow(RemittanceActionUiState())
+    val remittanceActionUiState: StateFlow<RemittanceActionUiState> = _remittanceActionUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
@@ -95,6 +120,9 @@ class DemoSessionViewModel(
     }
 
     fun selectAccount(accountId: String) {
+        if (accountId == "remote-wallet") {
+            return
+        }
         _uiState.update { state -> DemoSessionReducer.selectAccount(state, accountId) }
     }
 
@@ -105,6 +133,10 @@ class DemoSessionViewModel(
 
         cancelTransferCompletion()
         _uiState.update { state -> DemoSessionReducer.openTransferFlow(state) }
+        val session = _authUiState.value.session ?: return
+        viewModelScope.launch {
+            loadRemittanceRemoteState(session)
+        }
     }
 
     fun showAccountStep() {
@@ -151,6 +183,146 @@ class DemoSessionViewModel(
 
     fun updateTransferAmount(nextAmount: Int) {
         _uiState.update { state -> DemoSessionReducer.updateTransferAmount(state, nextAmount) }
+    }
+
+    fun createRemittanceRecipient(
+        alias: String,
+        relation: String,
+        walletAddress: String
+    ) {
+        val session = _authUiState.value.session ?: run {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        submitRemoteRemittanceRecipientCreation(
+            session = session,
+            alias = alias,
+            relation = relation,
+            walletAddress = walletAddress
+        )
+    }
+
+    fun addRecipientFromAccountManage(
+        alias: String,
+        relation: String,
+        walletAddress: String,
+        targetUserId: Long?
+    ) {
+        if (targetUserId == null && hasRecipientWallet(walletAddress)) {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "이미 등록된 지갑이에요.",
+                isError = true
+            )
+            return
+        }
+
+        val session = _authUiState.value.session
+        if (session == null) {
+            _uiState.update { state ->
+                DemoSessionReducer.addRecipient(
+                    state = state,
+                    alias = alias,
+                    relation = remittanceRelationCodeToLabel(relation),
+                    walletAddress = walletAddress
+                )
+            }
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "수신 지갑을 추가했어요."
+            )
+            return
+        }
+
+        submitRemoteRemittanceRecipientCreation(
+            session = session,
+            alias = alias,
+            relation = relation,
+            walletAddress = walletAddress,
+            targetUserId = targetUserId
+        )
+    }
+
+    fun updateRecipientFromAccountManage(
+        recipientId: String,
+        alias: String,
+        relation: String,
+        walletAddress: String
+    ) {
+        if (hasOtherRecipientWallet(recipientId, walletAddress)) {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "이미 등록된 지갑이에요.",
+                isError = true
+            )
+            return
+        }
+
+        val session = _authUiState.value.session
+        if (session == null) {
+            _uiState.update { state ->
+                DemoSessionReducer.updateRecipient(
+                    state = state,
+                    recipientId = recipientId,
+                    alias = alias,
+                    relation = remittanceRelationCodeToLabel(relation),
+                    walletAddress = walletAddress
+                )
+            }
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "수신 지갑을 수정했어요."
+            )
+            return
+        }
+
+        submitRemoteRemittanceRecipientUpdate(
+            session = session,
+            recipientId = recipientId,
+            alias = alias,
+            relation = relation,
+            walletAddress = walletAddress
+        )
+    }
+
+    fun searchRecipientsByPhone(phoneNumber: String) {
+        val session = _authUiState.value.session ?: run {
+            _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState(
+                errorMessage = "로그인 후 다시 시도해 주세요."
+            )
+            return
+        }
+        val normalizedPhoneNumber = phoneNumber.phoneDigits()
+        if (normalizedPhoneNumber.length !in 10..11) {
+            _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState(
+                errorMessage = "휴대폰 번호를 다시 확인해 주세요."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState(isLoading = true)
+            try {
+                val results = remittanceRepository.searchRecipientsByPhone(
+                    accessToken = session.accessToken,
+                    phoneNumber = normalizedPhoneNumber
+                )
+                _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState(results = results)
+            } catch (error: RemittanceUnauthorizedException) {
+                expireSession(error.message)
+                _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState(
+                    errorMessage = error.message ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            } catch (error: Exception) {
+                _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState(
+                    errorMessage = error.message ?: "휴대폰 번호 검색에 실패했어요."
+                )
+            }
+        }
+    }
+
+    fun clearRecipientPhoneSearch() {
+        _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
     }
 
     fun clockIn() {
@@ -213,20 +385,137 @@ class DemoSessionViewModel(
     }
 
     fun submitTransfer() {
-        _uiState.update { state -> DemoSessionReducer.submitTransfer(state) }
+        if (_remittanceActionUiState.value.isSubmitting) {
+            return
+        }
+        val session = _authUiState.value.session
+        if (session == null) {
+            _uiState.update { state -> DemoSessionReducer.submitTransfer(state) }
+            return
+        }
+
+        val remittance = _uiState.value.remittance
+        val selectedRecipient = remittance.selectedRecipientOrNull()
+        if (selectedRecipient == null) {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "송금할 수신자를 먼저 등록해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        val amountAtomic = remittance.draftAmountUsd.toLong() * ATOMIC_UNITS_PER_USDC
+        if (amountAtomic <= 0L) {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "송금 금액을 입력해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                isSubmitting = true,
+                submittingAction = RemittanceSubmittingAction.TRANSFER_PRECHECK
+            )
+            try {
+                val precheck = remittanceRepository.precheck(
+                    accessToken = session.accessToken,
+                    recipientId = selectedRecipient.id,
+                    amountAtomic = amountAtomic,
+                    highAmountConfirmed = false,
+                    recentRecipientConfirmed = false
+                )
+                if (!precheck.allowed && !precheck.isConfirmable()) {
+                    _remittanceActionUiState.value = RemittanceActionUiState(
+                        message = precheck.resolveBlockedMessage(),
+                        isError = true
+                    )
+                    return@launch
+                }
+
+                _uiState.update { state -> DemoSessionReducer.submitTransfer(state) }
+                _remittanceActionUiState.value = RemittanceActionUiState(precheck = precheck)
+            } catch (error: RemittanceUnauthorizedException) {
+                expireSession(error.message)
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message ?: "송금 가능 여부를 확인하지 못했어요.",
+                    isError = true
+                )
+            }
+        }
     }
 
     fun dismissTransferConfirmation() {
         _uiState.update { state -> DemoSessionReducer.dismissTransferConfirmation(state) }
+        _remittanceActionUiState.value = RemittanceActionUiState()
     }
 
     fun confirmTransfer() {
-        _uiState.update { state -> DemoSessionReducer.confirmTransfer(state) }
-        scheduleTransferCompletion()
+        if (_remittanceActionUiState.value.isSubmitting) {
+            return
+        }
+        val session = _authUiState.value.session
+        if (session == null) {
+            _uiState.update { state -> DemoSessionReducer.confirmTransfer(state) }
+            scheduleTransferCompletion()
+            return
+        }
+
+        val remittance = _uiState.value.remittance
+        val selectedRecipient = remittance.selectedRecipientOrNull() ?: run {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "송금할 수신자를 먼저 선택해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val amountAtomic = remittance.draftAmountUsd.toLong() * ATOMIC_UNITS_PER_USDC
+        val precheck = _remittanceActionUiState.value.precheck
+
+        viewModelScope.launch {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                isSubmitting = true,
+                submittingAction = RemittanceSubmittingAction.TRANSFER_CREATE,
+                precheck = precheck
+            )
+            try {
+                val result = remittanceRepository.createTransfer(
+                    accessToken = session.accessToken,
+                    recipientId = selectedRecipient.id,
+                    amountAtomic = amountAtomic,
+                    highAmountConfirmed = precheck.requiresHighAmountConfirmation(),
+                    recentRecipientConfirmed = precheck?.recentRecipientConfirmationRequired == true
+                )
+                _uiState.update { state -> DemoSessionReducer.confirmTransfer(state) }
+                loadRemittanceRemoteState(session)
+                _remittanceActionUiState.value = RemittanceActionUiState()
+                startRemittanceStatusPolling(session, result.transferId)
+            } catch (error: RemittanceUnauthorizedException) {
+                expireSession(error.message)
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message ?: "송금 요청을 보내지 못했어요.",
+                    isError = true,
+                    precheck = precheck
+                )
+            }
+        }
     }
 
     fun resetTransfer() {
         cancelTransferCompletion()
+        cancelRemittanceStatusPolling()
+        _remittanceActionUiState.value = RemittanceActionUiState()
         _uiState.update { state -> DemoSessionReducer.resetTransfer(state) }
     }
 
@@ -257,6 +546,7 @@ class DemoSessionViewModel(
     fun resetSeed() {
         cancelTransferCompletion()
         cancelWorkproofPdfPolling()
+        cancelRemittanceStatusPolling()
         _uiState.value = initialState
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
@@ -264,8 +554,10 @@ class DemoSessionViewModel(
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
         _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
         _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
+        _remittanceActionUiState.value = RemittanceActionUiState()
         refreshAdvanceRemoteState()
         refreshWorkproofRemoteState()
+        refreshRemittanceRemoteState()
     }
 
     fun clearWorkproofActionMessage() {
@@ -391,6 +683,14 @@ class DemoSessionViewModel(
         _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
     }
 
+    fun clearRemittanceActionMessage() {
+        if (!_remittanceActionUiState.value.isSubmitting && _remittanceActionUiState.value.message != null) {
+            _remittanceActionUiState.value = _remittanceActionUiState.value.copy(
+                message = null,
+                isError = false
+            )
+        }
+    }
     fun login(email: String, password: String) {
         val trimmedEmail = email.trim()
         if (trimmedEmail.isBlank() || password.isBlank()) {
@@ -409,26 +709,37 @@ class DemoSessionViewModel(
                 )
                 _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
                 _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
+                _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
             }
         }
     }
 
-    fun signup(name: String, email: String, password: String) {
+    fun signup(name: String, email: String, password: String, phoneNumber: String) {
         val trimmedName = name.trim()
         val trimmedEmail = email.trim()
-        if (trimmedName.isBlank() || trimmedEmail.isBlank() || password.isBlank()) {
-            _authUiState.value = AuthUiState.unauthenticated("이름, 이메일, 비밀번호를 모두 입력해 주세요.")
+        val normalizedPhoneNumber = phoneNumber.phoneDigits()
+        if (trimmedName.isBlank() || trimmedEmail.isBlank() || password.isBlank() || normalizedPhoneNumber.isBlank()) {
+            _authUiState.value = AuthUiState.unauthenticated("이름, 이메일, 비밀번호, 전화번호를 모두 입력해 주세요.")
             return
         }
         if (password.length < 8) {
             _authUiState.value = AuthUiState.unauthenticated("비밀번호는 8자 이상이어야 해요.")
             return
         }
+        if (normalizedPhoneNumber.length !in 10..11) {
+            _authUiState.value = AuthUiState.unauthenticated("전화번호를 다시 확인해 주세요.")
+            return
+        }
 
         viewModelScope.launch {
             _authUiState.value = AuthUiState.submitting()
             try {
-                val session = authRepository.signup(trimmedName, trimmedEmail, password)
+                val session = authRepository.signup(
+                    name = trimmedName,
+                    email = trimmedEmail,
+                    password = password,
+                    phoneNumber = normalizedPhoneNumber
+                )
                 onAuthenticated(session)
             } catch (error: Exception) {
                 _authUiState.value = AuthUiState.unauthenticated(
@@ -436,7 +747,64 @@ class DemoSessionViewModel(
                 )
                 _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
                 _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
+                _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
             }
+        }
+    }
+
+    fun updateProfile(name: String, phoneNumber: String) {
+        val session = _authUiState.value.session ?: run {
+            _profileUpdateUiState.value = ProfileUpdateUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val trimmedName = name.trim()
+        val normalizedPhoneNumber = phoneNumber.phoneDigits()
+        if (trimmedName.isBlank() || normalizedPhoneNumber.isBlank()) {
+            _profileUpdateUiState.value = ProfileUpdateUiState(
+                message = "이름과 전화번호를 모두 입력해 주세요.",
+                isError = true
+            )
+            return
+        }
+        if (normalizedPhoneNumber.length !in 10..11) {
+            _profileUpdateUiState.value = ProfileUpdateUiState(
+                message = "전화번호를 다시 확인해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _profileUpdateUiState.value = ProfileUpdateUiState(isSubmitting = true)
+            try {
+                val updatedSession = authRepository.updateProfile(
+                    session = session,
+                    name = trimmedName,
+                    phoneNumber = normalizedPhoneNumber
+                )
+                _authUiState.value = AuthUiState.authenticated(updatedSession)
+                _profileUpdateUiState.value = ProfileUpdateUiState(message = "내 정보를 수정했어요.")
+            } catch (error: AuthUnauthorizedException) {
+                expireSession(error.message)
+                _profileUpdateUiState.value = ProfileUpdateUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _profileUpdateUiState.value = ProfileUpdateUiState(
+                    message = error.message ?: "내 정보를 수정하지 못했어요.",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    fun clearProfileUpdateMessage() {
+        if (!_profileUpdateUiState.value.isSubmitting && _profileUpdateUiState.value.message != null) {
+            _profileUpdateUiState.value = ProfileUpdateUiState()
         }
     }
 
@@ -449,6 +817,7 @@ class DemoSessionViewModel(
     fun logout() {
         cancelTransferCompletion()
         cancelWorkproofPdfPolling()
+        cancelRemittanceStatusPolling()
         viewModelScope.launch {
             clearAuthenticatedState(AuthUiState.unauthenticated())
         }
@@ -584,6 +953,18 @@ class DemoSessionViewModel(
         }
     }
 
+    fun refreshRemittanceRemoteState() {
+        val session = _authUiState.value.session
+        if (session == null) {
+            _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
+            return
+        }
+
+        viewModelScope.launch {
+            loadRemittanceRemoteState(session)
+        }
+    }
+
     private fun restoreAuthSession() {
         viewModelScope.launch {
             val session = authRepository.restore()
@@ -591,6 +972,7 @@ class DemoSessionViewModel(
                 _authUiState.value = AuthUiState.unauthenticated()
                 _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
                 _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
+                _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
             } else {
                 onAuthenticated(session)
             }
@@ -604,6 +986,10 @@ class DemoSessionViewModel(
             return
         }
         loadWorkproofRemoteState(session)
+        if (!_authUiState.value.isAuthenticated) {
+            return
+        }
+        loadRemittanceRemoteState(session)
     }
 
     private suspend fun loadAdvanceRemoteState(session: AuthSession) {
@@ -627,6 +1013,12 @@ class DemoSessionViewModel(
         applyWorkproofRemoteState(remoteState)
     }
 
+    private suspend fun loadRemittanceRemoteState(session: AuthSession) {
+        _remittanceRemoteState.value = RemittanceRemoteState.loading()
+        val remoteState = remittanceRepository.load(session.accessToken)
+        applyRemittanceRemoteState(remoteState)
+    }
+
     private suspend fun applyWorkproofRemoteState(remoteState: WorkproofRemoteState) {
         if (!remoteState.isAuthenticated) {
             clearAuthenticatedState(
@@ -640,6 +1032,21 @@ class DemoSessionViewModel(
         _workproofRemoteState.value = remoteState
         val payload = remoteState.payload ?: return
         _uiState.update { current -> current.syncRemoteWorkproof(payload) }
+    }
+
+    private suspend fun applyRemittanceRemoteState(remoteState: RemittanceRemoteState) {
+        if (!remoteState.isAuthenticated) {
+            clearAuthenticatedState(
+                AuthUiState.unauthenticated(
+                    remoteState.errorMessage ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            )
+            return
+        }
+
+        _remittanceRemoteState.value = remoteState
+        val payload = remoteState.payload ?: return
+        _uiState.update { current -> current.syncRemoteRemittance(payload) }
     }
 
     private fun syncSelectedAdvanceAmount(remoteState: AdvanceRemoteState) {
@@ -691,6 +1098,7 @@ class DemoSessionViewModel(
 
     private suspend fun clearAuthenticatedState(unauthenticatedState: AuthUiState) {
         cancelWorkproofPdfPolling()
+        cancelRemittanceStatusPolling()
         authRepository.logout()
         _uiState.value = initialState
         _authUiState.value = unauthenticatedState
@@ -700,6 +1108,9 @@ class DemoSessionViewModel(
         _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(
             unauthenticatedState.errorMessage ?: WORKPROOF_REMOTE_LOGIN_MESSAGE
         )
+        _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(
+            unauthenticatedState.errorMessage ?: REMITTANCE_REMOTE_LOGIN_MESSAGE
+        )
         _selectedAdvanceAmount.value = null
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
@@ -707,6 +1118,100 @@ class DemoSessionViewModel(
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
         _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
         _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
+        _remittanceActionUiState.value = RemittanceActionUiState()
+        _profileUpdateUiState.value = ProfileUpdateUiState()
+        _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
+    }
+
+    private fun submitRemoteRemittanceRecipientCreation(
+        session: AuthSession,
+        alias: String,
+        relation: String,
+        walletAddress: String,
+        targetUserId: Long? = null
+    ) {
+        viewModelScope.launch {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                isSubmitting = true,
+                submittingAction = RemittanceSubmittingAction.RECIPIENT_CREATE
+            )
+            try {
+                val created = remittanceRepository.createRecipient(
+                    accessToken = session.accessToken,
+                    alias = alias,
+                    relation = relation,
+                    walletAddress = walletAddress,
+                    targetUserId = targetUserId
+                )
+                loadRemittanceRemoteState(session)
+                _uiState.update { state -> DemoSessionReducer.selectRecipient(state, created.recipientId) }
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = "수신 지갑을 추가했어요."
+                )
+            } catch (error: RemittanceUnauthorizedException) {
+                expireSession(error.message)
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message ?: "수신 지갑을 추가하지 못했어요.",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    private fun submitRemoteRemittanceRecipientUpdate(
+        session: AuthSession,
+        recipientId: String,
+        alias: String,
+        relation: String,
+        walletAddress: String
+    ) {
+        viewModelScope.launch {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                isSubmitting = true,
+                submittingAction = RemittanceSubmittingAction.RECIPIENT_UPDATE
+            )
+            try {
+                remittanceRepository.updateRecipient(
+                    accessToken = session.accessToken,
+                    recipientId = recipientId,
+                    alias = alias,
+                    relation = relation,
+                    walletAddress = walletAddress
+                )
+                loadRemittanceRemoteState(session)
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = "수신 지갑을 수정했어요."
+                )
+            } catch (error: RemittanceUnauthorizedException) {
+                expireSession(error.message)
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = error.message ?: "수신 지갑을 수정하지 못했어요.",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    private fun hasRecipientWallet(walletAddress: String): Boolean {
+        return _uiState.value.remittance.recipients.any { recipient ->
+            recipient.address.equals(walletAddress, ignoreCase = true)
+        }
+    }
+
+    private fun hasOtherRecipientWallet(recipientId: String, walletAddress: String): Boolean {
+        return _uiState.value.remittance.recipients.any { recipient ->
+            recipient.id != recipientId && recipient.address.equals(walletAddress, ignoreCase = true)
+        }
     }
 
     private fun scheduleTransferCompletion() {
@@ -828,6 +1333,66 @@ class DemoSessionViewModel(
         }
     }
 
+    private fun startRemittanceStatusPolling(session: AuthSession, transferId: String) {
+        cancelRemittanceStatusPolling()
+        remittanceStatusPollingJob = viewModelScope.launch {
+            repeat(REMITTANCE_STATUS_POLL_ATTEMPTS) {
+                delay(REMITTANCE_STATUS_POLL_DELAY_MS)
+                try {
+                    val detail = remittanceRepository.getTransferDetail(session.accessToken, transferId)
+                    mergeRemoteTransferDetail(detail)
+                    if (detail.isTerminalStatus()) {
+                        return@launch
+                    }
+                } catch (error: RemittanceUnauthorizedException) {
+                    expireSession(error.message)
+                    return@launch
+                } catch (_: Exception) {
+                    return@launch
+                }
+            }
+        }
+    }
+
+    private fun cancelRemittanceStatusPolling() {
+        remittanceStatusPollingJob?.cancel()
+        remittanceStatusPollingJob = null
+    }
+
+    private fun mergeRemoteTransferDetail(detail: RemittanceTransferDetailPayload) {
+        _remittanceRemoteState.update { current ->
+            val payload = current.payload ?: return@update current
+            val updatedTransfers = buildList {
+                add(
+                    payload.transfers.firstOrNull { it.transferId == detail.transferId }?.copy(
+                        status = detail.status,
+                        amountAtomic = detail.amountAtomic,
+                        txHash = detail.txHash,
+                        updatedAt = detail.updatedAt
+                    ) ?: com.dondone.mobile.data.remittance.RemittanceTransferSummaryPayload(
+                        transferId = detail.transferId,
+                        status = detail.status,
+                        assetSymbol = detail.assetSymbol,
+                        amountAtomic = detail.amountAtomic,
+                        recipientId = detail.recipientId,
+                        recipientAlias = detail.recipientAlias,
+                        recipientAddress = detail.recipientAddress,
+                        txHash = detail.txHash,
+                        updatedAt = detail.updatedAt
+                    )
+                )
+                addAll(payload.transfers.filterNot { it.transferId == detail.transferId })
+            }
+            current.copy(
+                payload = payload.copy(
+                    transfers = updatedTransfers,
+                    activeTransfer = detail
+                )
+            )
+        }
+        _uiState.update { current -> current.syncTransferStatus(detail) }
+    }
+
     private fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): DemoState {
         val systemToday = java.time.LocalDate.now()
         val activeRecord = payload.records.firstOrNull { record ->
@@ -884,6 +1449,67 @@ class DemoSessionViewModel(
             totalWorkedHoursText = totalWorkedHoursText,
             sectionSummaryText = "출퇴근 기록, 수정 이력, 기간 요약"
         )
+    }
+
+    private fun DemoState.syncRemoteRemittance(payload: RemittanceRemotePayload): DemoState {
+        val inFlightTransfer = payload.activeTransfer?.takeUnless { it.isTerminalStatus() }
+        val nextRecipients = payload.recipients.map { recipient ->
+            Recipient(
+                id = recipient.recipientId,
+                name = recipient.alias,
+                relationship = remittanceRelationCodeToLabel(recipient.relation),
+                address = recipient.walletAddress
+            )
+        }
+        val selectedRecipientId = when {
+            nextRecipients.isEmpty() -> remittance.selectedRecipientId
+            nextRecipients.any { it.id == remittance.selectedRecipientId } -> remittance.selectedRecipientId
+            else -> nextRecipients.first().id
+        }
+
+        return copy(
+            remittance = remittance.copy(
+                recipients = nextRecipients,
+                selectedRecipientId = selectedRecipientId,
+                destinationMode = TransferDestinationMode.WALLET,
+                txHash = inFlightTransfer?.txHash ?: remittance.txHash,
+                status = inFlightTransfer?.toUiTransferStatus() ?: remittance.status
+            )
+        )
+    }
+
+    private fun DemoState.syncTransferStatus(detail: RemittanceTransferDetailPayload): DemoState {
+        return copy(
+            remittance = remittance.copy(
+                txHash = detail.txHash ?: remittance.txHash,
+                status = detail.toUiTransferStatus()
+            )
+        )
+    }
+}
+
+private fun RemittanceTransferDetailPayload.toUiTransferStatus(): TransferStatus = when (status) {
+    "CONFIRMED" -> TransferStatus.CONFIRMED
+    "FAILED", "TIMED_OUT" -> TransferStatus.FAILED
+    else -> TransferStatus.SUBMITTED
+}
+
+private fun RemittanceTransferDetailPayload.isTerminalStatus(): Boolean =
+    status == "CONFIRMED" || status == "FAILED" || status == "TIMED_OUT"
+
+private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload?.requiresHighAmountConfirmation(): Boolean =
+    this?.policyCode == "HIGH_AMOUNT_CONFIRMATION_REQUIRED"
+
+private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload.isConfirmable(): Boolean =
+    policyCode == "RECENT_RECIPIENT_CONFIRMATION_REQUIRED" || policyCode == "HIGH_AMOUNT_CONFIRMATION_REQUIRED"
+
+private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload.resolveBlockedMessage(): String {
+    return when (policyCode) {
+        "INSUFFICIENT_WALLET_BALANCE" -> "송금 지갑 잔액이 부족해요. 잠시 후 다시 확인해 주세요."
+        "RECIPIENT_NOT_ALLOWED" -> "허용된 수신자만 송금할 수 있어요."
+        "TRANSFER_ALREADY_IN_PROGRESS" -> "진행 중인 송금이 있어 잠시 후 다시 시도해 주세요."
+        "SELF_TRANSFER_NOT_ALLOWED" -> "내 지갑으로는 송금할 수 없어요."
+        else -> "현재는 이 송금을 진행할 수 없어요."
     }
 }
 

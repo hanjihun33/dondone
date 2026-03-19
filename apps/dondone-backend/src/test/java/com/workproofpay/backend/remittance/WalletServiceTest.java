@@ -27,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -84,7 +86,7 @@ class WalletServiceTest {
         doThrow(new IllegalStateException("rpc timeout"))
                 .doNothing()
                 .when(blockchainGateway)
-                .fundWallet(any());
+                .fundWallet(anyString(), any(BigInteger.class), any(BigInteger.class));
 
         assertThatThrownBy(() -> walletService.createWalletIfAbsent(userId))
                 .isInstanceOf(ApiException.class)
@@ -123,7 +125,7 @@ class WalletServiceTest {
 
         assertThat(result.created()).isFalse();
         assertThat(result.response().fundingStatus()).isEqualTo(WalletFundingStatus.PENDING);
-        verify(blockchainGateway, never()).fundWallet(any());
+        verify(blockchainGateway, never()).fundWallet(anyString(), any(BigInteger.class), any(BigInteger.class));
     }
 
     @Test
@@ -146,7 +148,34 @@ class WalletServiceTest {
 
         assertThat(result.created()).isFalse();
         assertThat(result.response().fundingStatus()).isEqualTo(WalletFundingStatus.FUNDED);
-        verify(blockchainGateway, never()).fundWallet(any());
+        verify(blockchainGateway, never()).fundWallet(anyString(), any(BigInteger.class), any(BigInteger.class));
+    }
+
+    @Test
+    void recoversFailedWalletByFundingOnlyMissingAssets() {
+        long userId = 4L;
+        UserWallet failedWallet = UserWallet.create(
+                userId,
+                "0x4444444444444444444444444444444444444444",
+                "encrypted-private-key"
+        );
+        failedWallet.onCreate();
+        failedWallet.markFundingFailed("partial funding");
+        walletStore.put(userId, failedWallet);
+
+        when(blockchainGateway.getBalances(failedWallet.getWalletAddress()))
+                .thenReturn(new ChainBalanceSnapshot(
+                        BigInteger.ZERO,
+                        new BigInteger("10000000000000000")
+                ));
+
+        walletService.recoverWalletFunding(userId);
+
+        verify(blockchainGateway).fundWallet(
+                eq(failedWallet.getWalletAddress()),
+                eq(BigInteger.valueOf(500_000_000L)),
+                eq(BigInteger.ZERO)
+        );
     }
 
     private UserWallet persist(UserWallet wallet, boolean isCreate) {

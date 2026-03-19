@@ -141,11 +141,11 @@ public class Transfer {
                 && this.recentRecipientConfirmed == recentRecipientConfirmed;
     }
 
-    public void markSigned(String txHash, String signedTransaction) {
+    public void markSigned(String txHash, String encryptedSignedTransaction) {
         requireStatus(TransferStatus.REQUESTED);
         this.status = TransferStatus.SIGNED;
         this.txHash = txHash;
-        this.signedTransaction = signedTransaction;
+        this.signedTransaction = encryptedSignedTransaction;
         this.failureCode = null;
     }
 
