@@ -180,6 +180,7 @@ public class DocumentsService {
 
     private String buildTitle(DocumentGenerationRequest request) {
         return switch (request.getDocumentType()) {
+            case WORKPROOF_STATEMENT -> "근무 기록 문서";
             case PROOF_PACK -> request.getMonth() + " Proof Pack";
             case CLAIM_KIT -> request.getMonth() + " Claim Kit";
             case TRANSFER_RECEIPT -> "Transfer Receipt";
@@ -193,6 +194,9 @@ public class DocumentsService {
         String difference = numberFormat.format(verification.getDifferenceAmount());
 
         return switch (request.getDocumentType()) {
+            case WORKPROOF_STATEMENT ->
+                    "%s부터 %s까지의 출퇴근 기록과 변경 이력을 정리하는 근무 기록 문서 요청입니다."
+                            .formatted(request.getStartDate(), request.getEndDate());
             case PROOF_PACK ->
                     "%s 급여 확인 근거를 정리한 Proof Pack입니다. 참고용 예상 %s원, 실제 확인 %s원, 차이 %s원을 같은 verification snapshot 기준으로 설명합니다."
                             .formatted(request.getMonth(), estimated, actual, difference);

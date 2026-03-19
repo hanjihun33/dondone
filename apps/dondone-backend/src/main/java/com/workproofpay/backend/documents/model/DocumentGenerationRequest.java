@@ -7,6 +7,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -41,14 +43,20 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
     @Column(name = "document_type", nullable = false, length = 30)
     private DocumentType documentType;
 
-    @Column(name = "wage_verification_id", nullable = false)
+    @Column(name = "wage_verification_id")
     private Long wageVerificationId;
 
-    @Column(name = "year_month", nullable = false, length = 7)
+    @Column(name = "year_month", length = 7)
     private String month;
 
     @Column(name = "workplace_id", nullable = false)
     private Long workplaceId;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "output_format", nullable = false, length = 10)
@@ -64,11 +72,22 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private DocumentGenerationStatus status;
 
+    @Column(name = "file_name", length = 255)
+    private String fileName;
+
+    @Column(name = "generated_at")
+    private LocalDateTime generatedAt;
+
+    @Column(name = "failure_reason", length = 100)
+    private String failureReason;
+
     private DocumentGenerationRequest(User user,
                                       DocumentType documentType,
                                       Long wageVerificationId,
                                       String month,
                                       Long workplaceId,
+                                      LocalDate startDate,
+                                      LocalDate endDate,
                                       DocumentFileFormat outputFormat,
                                       boolean includeAttachments,
                                       String idempotencyKey) {
@@ -77,6 +96,8 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
         this.wageVerificationId = wageVerificationId;
         this.month = month;
         this.workplaceId = workplaceId;
+        this.startDate = startDate;
+        this.endDate = endDate;
         this.outputFormat = outputFormat;
         this.includeAttachments = includeAttachments;
         this.idempotencyKey = idempotencyKey;
@@ -94,6 +115,8 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
                 wageVerificationId,
                 month,
                 workplaceId,
+                null,
+                null,
                 DocumentFileFormat.PDF,
                 false,
                 idempotencyKey
@@ -113,22 +136,56 @@ public class DocumentGenerationRequest extends BaseTimeEntity {
                 wageVerificationId,
                 month,
                 workplaceId,
+                null,
+                null,
                 outputFormat,
                 includeAttachments,
                 idempotencyKey
         );
     }
 
+    public static DocumentGenerationRequest queueWorkproofStatement(User user,
+                                                                    Long workplaceId,
+                                                                    LocalDate startDate,
+                                                                    LocalDate endDate,
+                                                                    String idempotencyKey) {
+        return new DocumentGenerationRequest(
+                user,
+                DocumentType.WORKPROOF_STATEMENT,
+                null,
+                null,
+                workplaceId,
+                startDate,
+                endDate,
+                DocumentFileFormat.PDF,
+                false,
+                idempotencyKey
+        );
+    }
+
     public void markRunning() {
         this.status = DocumentGenerationStatus.RUNNING;
+        this.failureReason = null;
     }
 
     public void markReady() {
+        markReady(this.fileName, LocalDateTime.now());
+    }
+
+    public void markReady(String fileName, LocalDateTime generatedAt) {
         this.status = DocumentGenerationStatus.READY;
+        this.fileName = fileName;
+        this.generatedAt = generatedAt;
+        this.failureReason = null;
     }
 
     public void markFailed() {
+        markFailed(null);
+    }
+
+    public void markFailed(String failureReason) {
         this.status = DocumentGenerationStatus.FAILED;
+        this.failureReason = failureReason;
     }
 
     @PrePersist
