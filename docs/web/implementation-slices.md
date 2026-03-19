@@ -18,26 +18,26 @@
   - `docs/web/README.md`
 
 ## 현재 작업 컨텍스트
-- 현재 단계는 Slice 2 `Auth and profile foundation` 범위 고정 및 구현 착수 준비 단계다.
-- 아직 앱 API 변경은 범위 밖이다.
-- 이번 범위는 `invitation token contract`, `employer role/profile`, `membership authz`를 웹 전용 경계 안에서 구현 단위로 고정한다.
-- 현재 backend 근거상 `UserRole = USER/ADMIN`, `Workplace.user`, `WorkProof.user` 구조를 먼저 감안해야 한다.
+- 현재 단계는 Slice 2 `Auth and profile foundation` backend 구현과 회귀 보강이 끝난 상태다.
+- 기존 앱 API 변경 없이 employer 전용 auth/profile 경계를 분리한 채 `EMPLOYER` role, `EmployerProfile`, `EmployerInvitationToken`, `EmploymentMembership` 기반 authz foundation을 반영했다.
+- 리뷰 반영으로 invitation token hash 저장, 이메일 canonicalization 공통화, `Workplace.companyId` 기반 company-workplace binding 검증까지 완료했다.
+- 다음 단계는 Slice 3 `Workplace settings` 계약과 authorization 재사용 범위를 고정하는 작업이다.
 
 ## 진행 상태판
 | 순서 | Slice | 상태 | 마지막 결과 | 다음 작업 | 선행 문서 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 문서/경계 고정 | `done` | 검증 페르소나 리뷰를 통해 scope/auth/invitation/migration 경계 누락을 보완했고 기준 문서와 active execplan 정렬 방향을 확보함 | Slice 2 착수 전 employer auth/profile 최소 계약을 구현 단위로 내린다 | `employer-web-direction.md`, `employer-worker-domain-map.md` |
-| 2 | Auth and profile foundation | `in_progress` | invitation token contract, employer role/profile, membership authz 범위를 웹 전용 경계로 다시 잘랐음 | employer auth/profile foundation 구현과 테스트 계획으로 내린다 | `auth-and-role-policy.md`, `shared-entity-validation.md` |
+| 2 | Auth and profile foundation | `done` | `POST /api/employer-auth/invitations/accept`, `POST /api/employer-auth/login`, `GET /api/employer/profile`, `EMPLOYER` role, `EmployerProfile`, `EmployerInvitationToken`, `EmploymentMembership` authz foundation을 구현했고 리뷰 이슈와 backend 테스트를 정리함 | Slice 3 `Workplace settings` 계약과 설정 변경 효력 규칙을 고정한다 | `auth-and-role-policy.md`, `shared-entity-validation.md` |
 | 3 | Workplace settings | `not_started` | 미시작 | `Workplace` 설정 저장 모델과 효력 시점 규칙 확정 | `workplace-settings-contract.md`, `shared-entity-validation.md` |
 | 4 | Worker directory and dashboard read-model | `not_started` | 미시작 | worker list/dashboard용 read-model 입력 소스 확정 | `employer-web-api-map.md`, `employer-worker-domain-map.md` |
 | 5 | Correction request flow | `not_started` | 미시작 | 정정 요청 엔티티와 승인 반영 규칙 확정 | `correction-request-flow.md`, `shared-entity-validation.md` |
 | 6 | Hardening | `not_started` | 미시작 | 테스트, 리뷰, 리스크 정리 | 관련 review note |
 
 ## 지금 기준 다음에 해야 할 일
-1. `docs/execplans/active/2026-03-19-web-auth-profile-foundation.md` 기준으로 backend/web 모듈 범위를 고정한다.
-2. employer invitation accept/login/profile DTO와 security rule의 최소 계약을 구현한다.
-3. `EmployerProfile + EmploymentMembership` 기반 membership authz helper와 회귀 테스트를 추가한다.
-4. 기존 앱 API contract가 범위 안으로 들어오지 않는지 구현 중 계속 검증한다.
+1. Slice 3용 active execplan을 만들고 `Workplace settings` 범위를 auth/profile foundation 위에 올린다.
+2. `EmployerAccessScope`와 `EmploymentMembership`을 재사용하는 사업장 설정 read/write 계약을 고정한다.
+3. 설정 변경이 WorkProof 판정과 과거 기록에 미치는 효력 시점 규칙을 문서로 정리한다.
+4. 기존 앱 API contract와 worker legacy ownership이 여전히 범위 밖인지 구현 중 계속 검증한다.
 
 ## 재스코프 트리거
 - 웹 요구사항을 맞추려면 기존 앱 API contract 변경이 필수로 보일 때

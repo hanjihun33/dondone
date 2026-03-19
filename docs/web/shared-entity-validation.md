@@ -57,6 +57,7 @@
 ## MVP 기준 마이그레이션 메모
 - `EmployerProfile`, `WorkerProfile`, `Company`, `EmploymentMembership`, `CorrectionRequest`, `CorrectionDecisionAudit`를 추가하면 신규 테이블 마이그레이션이 필요할 가능성이 높다.
 - 기존 `Workplace.user`, `WorkProof.user`는 당장 제거하지 않고 공존시키는 방향이 안전하다.
+- employer scope binding 검증을 위해 `Workplace.companyId` 같은 보조 연결 컬럼을 additive하게 두는 접근은 허용하되, 기존 worker API 필수값처럼 즉시 승격하지 않는다.
 - 즉, MVP 단계에서는 파괴적 스키마 변경보다 `추가 테이블 + 보조 연결` 접근을 우선 검토한다.
 - 기존 seed account와 테스트 픽스처는 worker 기준으로 유지하고, employer용 seed는 별도 추가하는 편이 안전하다.
 - 단, employer web authorization source of truth는 `EmployerProfile + EmploymentMembership`으로 고정하고, 레거시 `Workplace.user`, `WorkProof.user`는 권한 판정 기준으로 사용하지 않는다.
@@ -65,6 +66,7 @@
 ### User or Account
 - 공통 auth용인지 역할 정보까지 포함하는지
 - worker/employer 겸용을 허용할지
+- 이메일 canonicalization을 모든 auth 경로에서 같은 규칙으로 적용하는지
 
 ### Employer or Worker Profile
 - 화면 표시용 필드와 권한용 필드를 분리할지
@@ -73,6 +75,8 @@
 ### Company and Workplace
 - 어떤 엔티티가 권한 기준 축인지
 - workplace settings가 어느 엔티티에 저장되는지
+- `defaultWorkplaceId`가 실제 `Workplace.companyId`와 맞물리는지
+- `Workplace.companyId`가 employer 검증용 보조 연결인지, 공용 필수 소속 키인지 단계를 구분하는지
 
 ### EmploymentMembership
 - 근로자와 회사/사업장을 연결하는 canonical source인지
@@ -106,6 +110,7 @@
 - 변경 엔티티가 WorkProof/Wage 계산에 영향 주는지 다시 확인
 - 데이터 마이그레이션 또는 seed 보강 필요 여부 정리
 - 기존 integration test가 깨질 가능성이 있는지 먼저 확인
+- company-workplace binding mismatch, email case-only duplicate, invitation token 저장 방식 회귀가 테스트로 닫혔는지 확인
 
 ### Gate 4. 리뷰 전
 - 권한 누락, 범위 누락, 상태 전이 누락 항목을 재점검
@@ -115,9 +120,11 @@
 - worker가 employer scope 데이터를 직접 참조하기 시작함
 - employer endpoint가 기존 worker DTO를 그대로 재사용하려 함
 - company/workplace scope 없이 worker 목록을 전역 조회하려 함
+- company 존재와 workplace 존재만 따로 확인하고 두 값의 실제 소속 관계를 증명하지 못함
 - correction request 승인 후 WorkProof 반영 규칙이 문서에 없음
 - 웹 요구사항을 맞추기 위해 기존 앱 API contract 변경이 필수처럼 보이기 시작함
 - 신규 엔티티를 넣으려는데 기존 `Workplace.user`, `WorkProof.user`를 동시에 제거해야만 성립하는 구조가 나옴
+- `Workplace.companyId` 같은 보조 연결을 넣은 뒤 기존 worker 생성/조회 흐름에도 곧바로 필수값처럼 강제하려 함
 
 ## 결과 기록 위치
 - 실제 검증 결과와 리스크는 `docs/reviews/active/`에 기록한다.
