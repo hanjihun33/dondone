@@ -62,6 +62,7 @@ private fun AuthenticatedDonDoneAppShell(
     viewModel: DemoSessionViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
     val toastState = rememberDonDoneToastState()
     val navController = rememberNavController()
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
@@ -85,11 +86,19 @@ private fun AuthenticatedDonDoneAppShell(
     val rootTabs = currentDestination.toRootTabUiStates(currentRoute)
 
     fun handleBack() {
-        when (val action = resolveAppBackAction(currentRoute, remittance)) {
+        when (
+            val action = resolveAppBackAction(
+                currentRoute = currentRoute,
+                remittance = remittance,
+                isRemittanceSubmitting = remittanceActionUiState.isSubmitting,
+                remittanceSubmittingAction = remittanceActionUiState.submittingAction
+            )
+        ) {
             AppBackAction.NavigateUp -> navController.navigateUp()
             AppBackAction.DismissTransferConfirmation -> {
                 viewModel.dismissTransferConfirmation()
             }
+            AppBackAction.Ignore -> Unit
 
             is AppBackAction.ShowTransferStep -> {
                 viewModel.showTransferStep(action.step)

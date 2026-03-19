@@ -22,7 +22,8 @@ public class DevUserInitializer implements CommandLineRunner {
         User user = User.register(
                 "test@gmail.com",
                 passwordEncoder.encode("qweqwe123"),
-                "Test User"
+                "Test User",
+                "01012345678"
         );
         userRepository.save(user);
     }

@@ -6,6 +6,7 @@ import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -73,11 +74,74 @@ class DemoSessionReducerTest {
     }
 
     @Test
+    fun `addRecipient prepends new local recipient and selects it`() {
+        val baseState = DemoSeedFactory.create()
+
+        val nextState = DemoSessionReducer.addRecipient(
+            state = baseState,
+            alias = "새 가족 지갑",
+            relation = "가족",
+            walletAddress = "0x7F4F0b8E8fA0d3B6bA91F5bEEfa2276c9168a20D"
+        )
+
+        assertEquals("새 가족 지갑", nextState.remittance.recipients.first().name)
+        assertEquals("가족", nextState.remittance.recipients.first().relationship)
+        assertEquals("0x7F4F0b8E8fA0d3B6bA91F5bEEfa2276c9168a20D", nextState.remittance.recipients.first().address)
+        assertEquals(nextState.remittance.recipients.first().id, nextState.remittance.selectedRecipientId)
+        assertEquals(baseState.remittance.recipients.size + 1, nextState.remittance.recipients.size)
+        assertNotEquals(baseState.remittance.selectedRecipientId, nextState.remittance.selectedRecipientId)
+    }
+
+    @Test
+    fun `addRecipient ignores duplicate wallet address`() {
+        val baseState = DemoSeedFactory.create().copy(
+            remittance = DemoSeedFactory.create().remittance.copy(
+                recipients = listOf(
+                    DemoSeedFactory.create().remittance.recipients.first().copy(
+                        address = "0x1234567890abcdef1234567890abcdef12345678"
+                    )
+                )
+            )
+        )
+
+        val nextState = DemoSessionReducer.addRecipient(
+            state = baseState,
+            alias = "중복 지갑",
+            relation = "가족",
+            walletAddress = "0x1234567890abcdef1234567890abcdef12345678"
+        )
+
+        assertEquals(baseState, nextState)
+    }
+
+    @Test
+    fun `updateRecipient replaces matching local recipient fields`() {
+        val baseState = DemoSeedFactory.create()
+
+        val nextState = DemoSessionReducer.updateRecipient(
+            state = baseState,
+            recipientId = "R-001",
+            alias = "수정된 이름",
+            relation = "친구",
+            walletAddress = "0x1111111111111111111111111111111111111111"
+        )
+
+        assertEquals("수정된 이름", nextState.remittance.recipients.first().name)
+        assertEquals("친구", nextState.remittance.recipients.first().relationship)
+        assertEquals("0x1111111111111111111111111111111111111111", nextState.remittance.recipients.first().address)
+        assertEquals(TransferStatus.IDLE, nextState.remittance.status)
+    }
+
+    @Test
     fun `openTransferFlow starts at recipient step`() {
         val baseState = DemoSeedFactory.create().copy(
             remittance = DemoSeedFactory.create().remittance.copy(
                 flowStep = TransferFlowStep.ACCOUNT,
                 destinationMode = TransferDestinationMode.WALLET,
+                selectedRecipientId = "R-002",
+                recipientDisplayNameOverride = "이전 입력값",
+                draftAmountUsd = 480,
+                txHash = "0xold",
                 status = TransferStatus.CONFIRMED,
                 stepReturnTarget = TransferFlowStep.AMOUNT
             )
@@ -87,6 +151,10 @@ class DemoSessionReducerTest {
 
         assertEquals(TransferFlowStep.RECIPIENT, nextState.remittance.flowStep)
         assertEquals(TransferDestinationMode.ACCOUNT, nextState.remittance.destinationMode)
+        assertEquals("R-001", nextState.remittance.selectedRecipientId)
+        assertNull(nextState.remittance.recipientDisplayNameOverride)
+        assertEquals(0, nextState.remittance.draftAmountUsd)
+        assertEquals("", nextState.remittance.txHash)
         assertEquals(TransferStatus.IDLE, nextState.remittance.status)
         assertNull(nextState.remittance.stepReturnTarget)
     }

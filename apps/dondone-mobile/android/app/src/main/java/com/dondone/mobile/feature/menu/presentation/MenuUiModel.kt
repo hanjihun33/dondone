@@ -1,8 +1,11 @@
 package com.dondone.mobile.feature.menu.presentation
 
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.ui.toDisplayPhoneNumber
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.data.auth.AuthSession
+import com.dondone.mobile.data.remittance.RemittanceRemoteState
+import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.DocumentItem
 import com.dondone.mobile.domain.model.TransferDestinationMode
@@ -16,7 +19,8 @@ enum class MenuDocumentAccent {
 
 enum class MenuReceiptStatus {
     Pending,
-    Confirmed
+    Confirmed,
+    Failed
 }
 
 private const val DOCUMENT_STATUS_READY = "준비됨"
@@ -77,21 +81,33 @@ data class MenuUiModel(
 
 data class MenuSessionUiModel(
     val name: String,
-    val email: String
+    val email: String,
+    val phoneNumber: String?
 )
 
-fun DemoState.toMenuUiModel(session: AuthSession?): MenuUiModel {
+fun DemoState.toMenuUiModel(
+    session: AuthSession?,
+    remittanceRemoteState: RemittanceRemoteState
+): MenuUiModel {
     val receiptDocument = documents.firstOrNull(DocumentItem::isReceiptDocument)
+    val remoteTransfer = remittanceRemoteState.payload?.activeTransfer
 
     return MenuUiModel(
         session = session?.let {
             MenuSessionUiModel(
                 name = it.name,
-                email = it.email
+                email = it.email,
+                phoneNumber = it.phoneNumber?.toDisplayPhoneNumber()
             )
         },
-        documents = documents.map(DocumentItem::toMenuDocumentUiModel),
-        receipt = receiptDocument?.let(::toMenuReceiptUiModel)
+        documents = documents
+            .filterNot(DocumentItem::isReceiptDocument)
+            .map(DocumentItem::toMenuDocumentUiModel),
+        receipt = when {
+            remoteTransfer != null -> toRemoteMenuReceiptUiModel(remoteTransfer, receiptDocument)
+            receiptDocument != null -> toMenuReceiptUiModel(receiptDocument)
+            else -> null
+        }
     )
 }
 
@@ -162,31 +178,71 @@ private fun DemoState.toMenuReceiptUiModel(receiptDocument: DocumentItem): MenuR
     )
 }
 
+private fun DemoState.toRemoteMenuReceiptUiModel(
+    transfer: RemittanceTransferDetailPayload,
+    receiptDocument: DocumentItem?
+): MenuReceiptUiModel {
+    val receiptStatus = transfer.toMenuReceiptStatus()
+    val txHash = transfer.txHash ?: "아직 전송 해시가 없어요"
+
+    return MenuReceiptUiModel(
+        title = receiptDocument?.title ?: "송금 영수증",
+        status = receiptStatus,
+        statusText = receiptStatus.statusText(),
+        statusDetailText = receiptStatus.statusDetailText(),
+        updatedAtText = (receiptDocument?.updatedAt ?: transfer.updatedAt?.toString()).toMenuUpdatedAtText(),
+        networkLabel = RECEIPT_NETWORK_LABEL,
+        txHashSectionTitle = RECEIPT_HASH_SECTION_TITLE,
+        txHashLabel = shortenReceiptHash(txHash),
+        txHashFullText = txHash,
+        helperText = RECEIPT_HELPER_TEXT,
+        pendingNoticeText = receiptStatus.pendingNoticeText(),
+        explorerButtonText = RECEIPT_EXPLORER_BUTTON_TEXT,
+        explorerUrl = if (transfer.txHash.isNullOrBlank()) "" else buildReceiptExplorerUrl(transfer.txHash),
+        shareButtonText = RECEIPT_SHARE_BUTTON_TEXT,
+        shareText = buildRemoteReceiptShareText(transfer, receiptStatus)
+    )
+}
+
 private fun com.dondone.mobile.domain.model.RemittanceData.toMenuReceiptStatus(): MenuReceiptStatus {
     return if (status == TransferStatus.SUBMITTED) {
         MenuReceiptStatus.Pending
+    } else if (status == TransferStatus.FAILED) {
+        MenuReceiptStatus.Failed
     } else {
         MenuReceiptStatus.Confirmed
     }
 }
 
+private fun RemittanceTransferDetailPayload.toMenuReceiptStatus(): MenuReceiptStatus {
+    return when (status) {
+        "CONFIRMED" -> MenuReceiptStatus.Confirmed
+        "FAILED", "TIMED_OUT" -> MenuReceiptStatus.Failed
+        else -> MenuReceiptStatus.Pending
+    }
+}
+
 private fun MenuReceiptStatus.statusText(): String {
-    return if (this == MenuReceiptStatus.Confirmed) RECEIPT_STATUS_CONFIRMED else RECEIPT_STATUS_PENDING
+    return when (this) {
+        MenuReceiptStatus.Confirmed -> RECEIPT_STATUS_CONFIRMED
+        MenuReceiptStatus.Failed -> "실패"
+        MenuReceiptStatus.Pending -> RECEIPT_STATUS_PENDING
+    }
 }
 
 private fun MenuReceiptStatus.statusDetailText(): String {
-    return if (this == MenuReceiptStatus.Confirmed) {
-        "메뉴에서 최근 송금 영수증과 전송 해시를 다시 확인할 수 있어요."
-    } else {
-        "네트워크 확인이 끝나면 영수증 상태가 최종 확정돼요."
+    return when (this) {
+        MenuReceiptStatus.Confirmed -> "메뉴에서 최근 송금 영수증과 전송 해시를 다시 확인할 수 있어요."
+        MenuReceiptStatus.Failed -> "전송이 완료되지 않아 실패 원인을 먼저 확인해야 해요."
+        MenuReceiptStatus.Pending -> "네트워크 확인이 끝나면 영수증 상태가 최종 확정돼요."
     }
 }
 
 private fun MenuReceiptStatus.pendingNoticeText(): String? {
-    return if (this == MenuReceiptStatus.Pending) {
-        "네트워크 확인이 끝나면 영수증 상태가 자동으로 완료로 바뀝니다."
-    } else {
-        null
+    return when (this) {
+        MenuReceiptStatus.Pending -> "네트워크 확인이 끝나면 영수증 상태가 자동으로 완료로 바뀝니다."
+        MenuReceiptStatus.Failed -> "실패한 전송은 영수증 대신 상태와 해시만 다시 확인할 수 있어요."
+        MenuReceiptStatus.Confirmed -> null
     }
 }
 
@@ -215,6 +271,31 @@ private fun DemoState.buildReceiptShareText(
         append('\n')
         append(RECEIPT_SHARE_EXPLORER_PREFIX)
         append(buildReceiptExplorerUrl(remittance.txHash))
+    }
+}
+
+private fun DemoState.buildRemoteReceiptShareText(
+    transfer: RemittanceTransferDetailPayload,
+    receiptStatus: MenuReceiptStatus
+): String {
+    return buildString {
+        append(RECEIPT_SHARE_TITLE)
+        append(RECEIPT_SHARE_STATUS_PREFIX)
+        append(receiptStatus.statusText())
+        append('\n')
+        append(RECEIPT_SHARE_AMOUNT_PREFIX)
+        append("${'$'}${transfer.amountAtomic / 1_000_000L} ${transfer.assetSymbol}")
+        append('\n')
+        append(RECEIPT_SHARE_RECIPIENT_PREFIX)
+        append(transfer.recipientAlias ?: transfer.recipientAddress)
+        append('\n')
+        append(RECEIPT_SHARE_HASH_PREFIX)
+        append(transfer.txHash ?: "아직 없음")
+        if (!transfer.txHash.isNullOrBlank()) {
+            append('\n')
+            append(RECEIPT_SHARE_EXPLORER_PREFIX)
+            append(buildReceiptExplorerUrl(transfer.txHash))
+        }
     }
 }
 

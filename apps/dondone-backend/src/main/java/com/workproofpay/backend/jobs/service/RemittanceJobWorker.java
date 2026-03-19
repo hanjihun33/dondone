@@ -12,6 +12,7 @@ import com.workproofpay.backend.remittance.model.Transfer;
 import com.workproofpay.backend.remittance.model.TransferFailureCode;
 import com.workproofpay.backend.remittance.model.TransferStatus;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
+import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,6 +34,7 @@ public class RemittanceJobWorker {
     private final JobRepository jobRepository;
     private final TransferRepository transferRepository;
     private final WalletService walletService;
+    private final WalletCryptoService walletCryptoService;
     private final RemittanceBlockchainGateway blockchainGateway;
     private final JobService jobService;
     private final RemittanceProperties properties;
@@ -103,14 +105,17 @@ public class RemittanceJobWorker {
                     transfer.getRecipientAddress(),
                     BigInteger.valueOf(transfer.getAmountAtomic())
             );
-            transfer.markSigned(prepared.txHash(), prepared.signedTransaction());
+            transfer.markSigned(prepared.txHash(), walletCryptoService.encrypt(prepared.signedTransaction()));
             return new PendingSubmission(transfer.getTransferId(), prepared.signedTransaction());
         }
 
         if (transfer.getStatus() == TransferStatus.SIGNED
                 && transfer.getSignedTransaction() != null
                 && transfer.getTxHash() != null) {
-            return new PendingSubmission(transfer.getTransferId(), transfer.getSignedTransaction());
+            return new PendingSubmission(
+                    transfer.getTransferId(),
+                    decryptSignedTransaction(transfer.getSignedTransaction())
+            );
         }
 
         return null;
@@ -250,6 +255,14 @@ public class RemittanceJobWorker {
     private boolean isReceiptTimedOut(Transfer transfer) {
         return Duration.between(transfer.getUpdatedAt(), LocalDateTime.now()).getSeconds()
                 >= properties.getWorker().getReceiptTimeoutSeconds();
+    }
+
+    private String decryptSignedTransaction(String encryptedOrLegacySignedTransaction) {
+        try {
+            return walletCryptoService.decrypt(encryptedOrLegacySignedTransaction);
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            return encryptedOrLegacySignedTransaction;
+        }
     }
 
     private record PendingSubmission(

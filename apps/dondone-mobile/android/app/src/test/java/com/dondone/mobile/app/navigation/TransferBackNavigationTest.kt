@@ -1,5 +1,6 @@
 package com.dondone.mobile.app.navigation
 
+import com.dondone.mobile.app.session.RemittanceSubmittingAction
 import com.dondone.mobile.domain.model.Account
 import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.RemittanceData
@@ -15,7 +16,9 @@ class TransferBackNavigationTest {
     fun `non transfer route navigates up`() {
         val action = resolveAppBackAction(
             currentRoute = Route.HOME,
-            remittance = createRemittanceData()
+            remittance = createRemittanceData(),
+            isRemittanceSubmitting = false,
+            remittanceSubmittingAction = null
         )
 
         assertSame(AppBackAction.NavigateUp, action)
@@ -25,7 +28,9 @@ class TransferBackNavigationTest {
     fun `reviewing transfer dismisses confirmation first`() {
         val action = resolveAppBackAction(
             currentRoute = Route.TRANSFER,
-            remittance = createRemittanceData(status = TransferStatus.REVIEWING)
+            remittance = createRemittanceData(status = TransferStatus.REVIEWING),
+            isRemittanceSubmitting = false,
+            remittanceSubmittingAction = null
         )
 
         assertSame(AppBackAction.DismissTransferConfirmation, action)
@@ -35,7 +40,9 @@ class TransferBackNavigationTest {
     fun `submitted transfer navigates up`() {
         val action = resolveAppBackAction(
             currentRoute = Route.TRANSFER,
-            remittance = createRemittanceData(status = TransferStatus.SUBMITTED)
+            remittance = createRemittanceData(status = TransferStatus.SUBMITTED),
+            isRemittanceSubmitting = false,
+            remittanceSubmittingAction = null
         )
 
         assertSame(AppBackAction.NavigateUp, action)
@@ -48,7 +55,9 @@ class TransferBackNavigationTest {
             remittance = createRemittanceData(
                 flowStep = TransferFlowStep.RECIPIENT,
                 stepReturnTarget = TransferFlowStep.ACCOUNT
-            )
+            ),
+            isRemittanceSubmitting = false,
+            remittanceSubmittingAction = null
         )
 
         assertEquals(
@@ -64,10 +73,42 @@ class TransferBackNavigationTest {
             remittance = createRemittanceData(
                 flowStep = TransferFlowStep.RECIPIENT,
                 stepReturnTarget = null
-            )
+            ),
+            isRemittanceSubmitting = false,
+            remittanceSubmittingAction = null
         )
 
         assertSame(AppBackAction.NavigateUp, action)
+    }
+
+    @Test
+    fun `submitting remittance ignores back navigation`() {
+        val action = resolveAppBackAction(
+            currentRoute = Route.TRANSFER,
+            remittance = createRemittanceData(status = TransferStatus.REVIEWING),
+            isRemittanceSubmitting = true,
+            remittanceSubmittingAction = RemittanceSubmittingAction.TRANSFER_CREATE
+        )
+
+        assertSame(AppBackAction.Ignore, action)
+    }
+
+    @Test
+    fun `recipient registration submit does not ignore back navigation`() {
+        val action = resolveAppBackAction(
+            currentRoute = Route.TRANSFER,
+            remittance = createRemittanceData(
+                flowStep = TransferFlowStep.RECIPIENT,
+                stepReturnTarget = TransferFlowStep.ACCOUNT
+            ),
+            isRemittanceSubmitting = true,
+            remittanceSubmittingAction = RemittanceSubmittingAction.RECIPIENT_CREATE
+        )
+
+        assertEquals(
+            AppBackAction.ShowTransferStep(TransferFlowStep.ACCOUNT),
+            action
+        )
     }
 }
 

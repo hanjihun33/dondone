@@ -16,6 +16,7 @@ import java.util.Optional;
 public interface JobRepository extends JpaRepository<Job, Long> {
     List<Job> findTop20ByStatusAndRunAtLessThanEqualOrderByIdAsc(JobStatus status, LocalDateTime runAt);
     boolean existsByReferenceIdAndJobTypeAndStatusIn(String referenceId, JobType jobType, Collection<JobStatus> statuses);
+    boolean existsByActiveKey(String activeKey);
     List<Job> findByStatusInOrderByUpdatedAtDescIdDesc(Collection<JobStatus> statuses, org.springframework.data.domain.Pageable pageable);
     long countByStatus(JobStatus status);
 

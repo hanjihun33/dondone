@@ -37,9 +37,18 @@ public class DemoRemittanceBlockchainGateway implements RemittanceBlockchainGate
     }
 
     @Override
-    public void fundWallet(String walletAddress) {
-        tokenBalances.merge(walletAddress, BigInteger.valueOf(properties.getTreasury().getInitialTokenAmountAtomic()), BigInteger::add);
-        nativeBalances.merge(walletAddress, new BigInteger(properties.getTreasury().getInitialNativeAmountWei()), BigInteger::add);
+    public void fundWallet(String walletAddress, BigInteger tokenAmountAtomic, BigInteger nativeAmountWei) {
+        if (tokenAmountAtomic.signum() > 0) {
+            tokenBalances.merge(walletAddress, tokenAmountAtomic, BigInteger::add);
+        }
+        if (nativeAmountWei.signum() > 0) {
+            nativeBalances.merge(walletAddress, nativeAmountWei, BigInteger::add);
+        }
+    }
+
+    @Override
+    public BigInteger estimateTokenTransferGasCostWei() {
+        return BigInteger.ONE;
     }
 
     @Override

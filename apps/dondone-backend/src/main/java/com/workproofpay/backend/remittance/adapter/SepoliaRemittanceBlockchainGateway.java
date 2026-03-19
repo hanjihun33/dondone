@@ -61,47 +61,56 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
     }
 
     @Override
-    public void fundWallet(String walletAddress) {
+    public void fundWallet(String walletAddress, BigInteger tokenAmountAtomic, BigInteger nativeAmountWei) {
         String treasuryKey = require(properties.getTreasury().getPrivateKey(), "REMITTANCE_TREASURY_PRIVATE_KEY");
         Credentials treasury = Credentials.create(treasuryKey);
         RawTransactionManager txManager = new RawTransactionManager(web3j(), treasury, properties.getChain().getChainId());
         BigInteger gasPrice = getGasPrice();
 
         try {
-            EthSendTransaction nativeTx = txManager.sendTransaction(
-                    gasPrice,
-                    BigInteger.valueOf(properties.getChain().getNativeTransferGasLimit()),
-                    walletAddress,
-                    "",
-                    new BigInteger(properties.getTreasury().getInitialNativeAmountWei())
-            );
-            if (nativeTx.hasError()) {
-                throw new IllegalStateException("native funding failed: " + nativeTx.getError().getMessage());
+            if (nativeAmountWei.signum() > 0) {
+                EthSendTransaction nativeTx = txManager.sendTransaction(
+                        gasPrice,
+                        BigInteger.valueOf(properties.getChain().getNativeTransferGasLimit()),
+                        walletAddress,
+                        "",
+                        nativeAmountWei
+                );
+                if (nativeTx.hasError()) {
+                    throw new IllegalStateException("native funding failed: " + nativeTx.getError().getMessage());
+                }
+                waitForSuccessfulReceipt(require(nativeTx.getTransactionHash(), "nativeFundingTxHash"));
             }
-            waitForSuccessfulReceipt(require(nativeTx.getTransactionHash(), "nativeFundingTxHash"));
 
-            Function transfer = new Function(
-                    "transfer",
-                    List.of(
-                            new Address(walletAddress),
-                            new Uint256(BigInteger.valueOf(properties.getTreasury().getInitialTokenAmountAtomic()))
-                    ),
-                    Collections.emptyList()
-            );
-            EthSendTransaction tokenTx = txManager.sendTransaction(
-                    gasPrice,
-                    BigInteger.valueOf(properties.getChain().getTokenGasLimit()),
-                    require(properties.getChain().getTokenAddress(), "REMITTANCE_TOKEN_ADDRESS"),
-                    FunctionEncoder.encode(transfer),
-                    BigInteger.ZERO
-            );
-            if (tokenTx.hasError()) {
-                throw new IllegalStateException("token funding failed: " + tokenTx.getError().getMessage());
+            if (tokenAmountAtomic.signum() > 0) {
+                Function transfer = new Function(
+                        "transfer",
+                        List.of(
+                                new Address(walletAddress),
+                                new Uint256(tokenAmountAtomic)
+                        ),
+                        Collections.emptyList()
+                );
+                EthSendTransaction tokenTx = txManager.sendTransaction(
+                        gasPrice,
+                        BigInteger.valueOf(properties.getChain().getTokenGasLimit()),
+                        require(properties.getChain().getTokenAddress(), "REMITTANCE_TOKEN_ADDRESS"),
+                        FunctionEncoder.encode(transfer),
+                        BigInteger.ZERO
+                );
+                if (tokenTx.hasError()) {
+                    throw new IllegalStateException("token funding failed: " + tokenTx.getError().getMessage());
+                }
+                waitForSuccessfulReceipt(require(tokenTx.getTransactionHash(), "tokenFundingTxHash"));
             }
-            waitForSuccessfulReceipt(require(tokenTx.getTransactionHash(), "tokenFundingTxHash"));
         } catch (IOException e) {
             throw new IllegalStateException("wallet funding failed", e);
         }
+    }
+
+    @Override
+    public BigInteger estimateTokenTransferGasCostWei() {
+        return getGasPrice().multiply(BigInteger.valueOf(properties.getChain().getTokenGasLimit()));
     }
 
     @Override

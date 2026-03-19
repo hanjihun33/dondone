@@ -191,6 +191,7 @@
 | `POST` | `/api/auth/signup` | 회원가입 | 불필요 |
 | `POST` | `/api/auth/login` | 로그인/JWT 발급 | 불필요 |
 | `GET` | `/api/auth/me` | 현재 사용자 조회 | 필요 |
+| `PUT` | `/api/auth/me` | 현재 사용자 이름/전화번호 수정 | 필요 |
 
 ### `POST /api/auth/signup`
 
@@ -202,6 +203,7 @@ Request:
 | `email` | string |
 | `password` | string, 최소 8자 |
 | `name` | string, 최대 100자 |
+| `phoneNumber` | string, 휴대폰 번호. 서버 저장 시 숫자만 정규화 |
 
 Response `201 Created`:
 | 필드 | 설명 |
@@ -209,12 +211,14 @@ Response `201 Created`:
 | `userId` | - |
 | `email` | - |
 | `name` | - |
+| `phoneNumber` | 정규화된 숫자 문자열 |
 | `role` | - |
 
 주요 에러:
 | HTTP | Code | 설명 |
 | --- | --- | --- |
 | `409` | `EMAIL_ALREADY_EXISTS` | - |
+| `409` | `PHONE_NUMBER_ALREADY_EXISTS` | - |
 | `400` | `VALIDATION_ERROR` | - |
 
 ### `POST /api/auth/login`
@@ -236,6 +240,7 @@ Response `200 OK`:
 | `userId` | - |
 | `email` | - |
 | `name` | - |
+| `phoneNumber` | 정규화된 숫자 문자열 |
 
 주요 에러:
 | HTTP | Code | 설명 |
@@ -253,7 +258,33 @@ Response `200 OK`:
 | `userId` | - |
 | `email` | - |
 | `name` | - |
+| `phoneNumber` | 정규화된 숫자 문자열 |
 | `role` | - |
+
+### `PUT /api/auth/me`
+
+배경: 회원가입 이후 번호 변경, 누락된 번호 등록, 계정 표시 정보 수정 흐름을 지원한다.
+
+Request:
+| 필드 | 설명 |
+| --- | --- |
+| `name` | string, 최대 100자 |
+| `phoneNumber` | string, 휴대폰 번호. 서버 저장 시 숫자만 정규화 |
+
+Response `200 OK`:
+| 필드 | 설명 |
+| --- | --- |
+| `userId` | - |
+| `email` | - |
+| `name` | - |
+| `phoneNumber` | 정규화된 숫자 문자열 |
+| `role` | - |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `409` | `PHONE_NUMBER_ALREADY_EXISTS` | - |
+| `400` | `VALIDATION_ERROR` | - |
 
 ## 1A. Home
 
@@ -1098,6 +1129,7 @@ Response:
 | Method | Path | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/remittance/recipients` | 허용 목록 조회 |
+| `POST` | `/api/remittance/recipients/search` | 전화번호 기반 수신자 검색 |
 | `POST` | `/api/remittance/recipients` | 허용 목록 수신자 등록 |
 | `GET` | `/api/remittance/transfers` | 송금 목록 조회 |
 | `POST` | `/api/remittance/transfers` | 송금 요청 |
@@ -1110,7 +1142,21 @@ Response:
 Response:
 | 필드 | 설명 |
 | --- | --- |
-| `recipients[]` | array<object>. 배열 항목: recipientId, name, alias, relationship, walletAddress, photoUrl, isFavorite, cooldownUntil |
+| `recipients[]` | array<object>. 배열 항목: recipientId, alias, relation, walletAddress, allowed, recentlyUpdated, updatedAt |
+
+### 7.1A `POST /api/remittance/recipients/search`
+
+배경: 지갑 주소를 직접 입력하지 않고 DonDone 회원 전화번호로 송금 수신 후보를 찾기 위한 검색 단계다.
+
+Request:
+| 필드 | 설명 |
+| --- | --- |
+| `phoneNumber` | 휴대폰 번호. 서버에서 숫자만 정규화 |
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `candidates[]` | array<object>. 배열 항목: candidateUserId, displayName, maskedPhoneNumber, walletAddressMasked, alreadyRegistered |
 
 ### 7.2 `POST /api/remittance/recipients`
 
@@ -1119,26 +1165,27 @@ Response:
 Request:
 | 필드 | 설명 |
 | --- | --- |
-| `name` | - |
 | `alias` | - |
-| `relationship` | - |
-| `walletAddress` | - |
-| `photoUrl` | 선택 |
+| `relation` | enum (`FAMILY`, `SPOUSE`, `PARENT`, `CHILD`, `SIBLING`, `FRIEND`, `OTHER`) |
+| `walletAddress` | 직접 입력 등록 시 사용 |
+| `targetUserId` | 전화번호 검색 결과 등록 시 사용 |
+| `allowed` | boolean |
 
 Response:
 | 필드 | 설명 |
 | --- | --- |
 | `recipientId` | - |
-| `name` | - |
 | `alias` | - |
-| `relationship` | - |
+| `relation` | - |
 | `walletAddress` | - |
-| `cooldownUntil` | - |
+| `allowed` | - |
+| `recentlyUpdated` | - |
+| `updatedAt` | - |
 
 주요 에러:
 | HTTP | Code | 설명 |
 | --- | --- | --- |
-| `409` | `RECIPIENT_ALREADY_EXISTS` | - |
+| `409` | `RECIPIENT_WALLET_ALREADY_EXISTS` | - |
 | `400` | `INVALID_WALLET_ADDRESS` | - |
 
 ### 7.3 `GET /api/remittance/transfers`

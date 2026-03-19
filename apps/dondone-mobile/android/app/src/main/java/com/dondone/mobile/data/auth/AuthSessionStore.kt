@@ -12,6 +12,7 @@ private const val KEY_EXPIRES_AT = "expires_at_epoch_millis"
 private const val KEY_USER_ID = "user_id"
 private const val KEY_EMAIL = "email"
 private const val KEY_NAME = "name"
+private const val KEY_PHONE_NUMBER = "phone_number"
 
 class AuthSessionStore(
     context: Context
@@ -42,7 +43,8 @@ class AuthSessionStore(
             expiresAtEpochMillis = expiresAtEpochMillis,
             userId = userId,
             email = email,
-            name = name
+            name = name,
+            phoneNumber = preferences.getString(KEY_PHONE_NUMBER, null)
         )
     }
 
@@ -54,6 +56,7 @@ class AuthSessionStore(
             .putLong(KEY_USER_ID, session.userId)
             .putString(KEY_EMAIL, session.email)
             .putString(KEY_NAME, session.name)
+            .putString(KEY_PHONE_NUMBER, session.phoneNumber)
             .apply()
     }
 

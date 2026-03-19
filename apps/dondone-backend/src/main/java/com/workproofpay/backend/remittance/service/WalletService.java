@@ -51,7 +51,16 @@ public class WalletService {
                 : new WalletRecordResult(markWalletFundingPending(existing.getUserId()), false);
 
         try {
-            blockchainGateway.fundWallet(walletResult.wallet().getWalletAddress());
+            FundingShortfall fundingShortfall = calculateFundingShortfall(walletResult.wallet().getWalletAddress());
+            if (fundingShortfall.isZero()) {
+                UserWallet fundedWallet = markWalletFunded(walletResult.wallet().getUserId());
+                return new WalletCreateResult(walletResult.created(), toResponse(fundedWallet));
+            }
+            blockchainGateway.fundWallet(
+                    walletResult.wallet().getWalletAddress(),
+                    fundingShortfall.tokenAmountAtomic(),
+                    fundingShortfall.nativeAmountWei()
+            );
             UserWallet fundedWallet = markWalletFunded(walletResult.wallet().getUserId());
             return new WalletCreateResult(walletResult.created(), toResponse(fundedWallet));
         } catch (ApiException e) {
@@ -79,7 +88,15 @@ public class WalletService {
 
         UserWallet pendingWallet = markWalletFundingPending(userId);
         try {
-            blockchainGateway.fundWallet(pendingWallet.getWalletAddress());
+            FundingShortfall fundingShortfall = calculateFundingShortfall(pendingWallet.getWalletAddress());
+            if (fundingShortfall.isZero()) {
+                return toResponse(markWalletFunded(userId));
+            }
+            blockchainGateway.fundWallet(
+                    pendingWallet.getWalletAddress(),
+                    fundingShortfall.tokenAmountAtomic(),
+                    fundingShortfall.nativeAmountWei()
+            );
             return toResponse(markWalletFunded(userId));
         } catch (ApiException e) {
             throw e;
@@ -155,6 +172,11 @@ public class WalletService {
         return blockchainGateway.getBalances(walletAddress);
     }
 
+    @Transactional(readOnly = true)
+    public BigInteger estimateTransferGasCostWei() {
+        return blockchainGateway.estimateTokenTransferGasCostWei();
+    }
+
     protected UserWallet markWalletFunded(Long userId) {
         UserWallet wallet = getRequiredWallet(userId);
         wallet.markFunded();
@@ -208,9 +230,7 @@ public class WalletService {
     }
 
     private boolean hasSeedFunding(UserWallet wallet) {
-        ChainBalanceSnapshot balanceSnapshot = blockchainGateway.getBalances(wallet.getWalletAddress());
-        return balanceSnapshot.tokenBalanceAtomic().compareTo(BigInteger.valueOf(properties.getTreasury().getInitialTokenAmountAtomic())) >= 0
-                && balanceSnapshot.nativeBalanceWei().compareTo(new BigInteger(properties.getTreasury().getInitialNativeAmountWei())) >= 0;
+        return calculateFundingShortfall(wallet.getWalletAddress()).isZero();
     }
 
     private boolean isFundingPendingStale(UserWallet wallet) {
@@ -222,5 +242,23 @@ public class WalletService {
     }
 
     public record WalletCreateResult(boolean created, WalletResponse response) {
+    }
+
+    private FundingShortfall calculateFundingShortfall(String walletAddress) {
+        ChainBalanceSnapshot balanceSnapshot = blockchainGateway.getBalances(walletAddress);
+        BigInteger requiredTokenAmountAtomic = BigInteger.valueOf(properties.getTreasury().getInitialTokenAmountAtomic());
+        BigInteger requiredNativeAmountWei = new BigInteger(properties.getTreasury().getInitialNativeAmountWei());
+        BigInteger missingTokenAmountAtomic = requiredTokenAmountAtomic.subtract(balanceSnapshot.tokenBalanceAtomic()).max(BigInteger.ZERO);
+        BigInteger missingNativeAmountWei = requiredNativeAmountWei.subtract(balanceSnapshot.nativeBalanceWei()).max(BigInteger.ZERO);
+        return new FundingShortfall(missingTokenAmountAtomic, missingNativeAmountWei);
+    }
+
+    private record FundingShortfall(
+            BigInteger tokenAmountAtomic,
+            BigInteger nativeAmountWei
+    ) {
+        private boolean isZero() {
+            return tokenAmountAtomic.signum() == 0 && nativeAmountWei.signum() == 0;
+        }
     }
 }
