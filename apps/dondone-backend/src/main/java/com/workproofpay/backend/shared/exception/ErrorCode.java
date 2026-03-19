@@ -35,6 +35,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     COMPANY_NOT_FOUND(HttpStatus.NOT_FOUND, "Company not found"),
     EMPLOYER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "Employer profile not found"),
+    CORRECTION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Correction request not found"),
     WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "WorkProof not found"),
     WORKPROOF_EDIT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Only reflected WorkProof can be edited"),
     WORKPLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "Workplace not found"),
@@ -50,7 +51,11 @@ public enum ErrorCode {
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "Wallet not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
+<<<<<<< HEAD
     PHONE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "Phone number already exists"),
+=======
+    CORRECTION_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "Correction request is already processed"),
+>>>>>>> 46188b4 (feat: employer correction request foundation 추가)
     ACTIVE_CONTRACT_REQUIRED(HttpStatus.CONFLICT, "Active contract is required"),
     ACTIVE_CONTRACT_EXISTS(HttpStatus.CONFLICT, "Active contract already exists"),
     ACTIVE_WORKPROOF_EXISTS(HttpStatus.CONFLICT, "Active workproof already exists"),

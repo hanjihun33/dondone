@@ -102,14 +102,24 @@
   - 승인 후 실제 WorkProof 반영 규칙
   - 처리자, 처리 시각, 감사로그 저장 방식
   - 이미 처리된 요청 재처리 방지 규칙
+  - worker가 직접 수정하지 않고 정정 요청 제출로 전환될 때 app/web contract를 어떻게 맞출지
 - 최소 응답 필드 예시
   - `requestId`, `workerId`, `workerName`, `workDate`, `originalCheckIn`, `requestedCheckIn`, `reason`, `requestedAt`, `status`
-  - detail: `decisionBy`, `decisionAt`, `decisionMemo`, `attachments[]`
+  - detail: `decisionBy`, `decisionAt`, `decisionMemo`, `rejectReasonCode`, `attachmentCount`
 - command request 예시 필드
   - approve: `decisionMemo`
   - reject: `decisionMemo`, `rejectReasonCode`
+- Slice 5 foundation 메모
+  - 현재 backend는 employer-side queue만 먼저 연다: `GET /api/employer/correction-requests`, `GET /api/employer/correction-requests/{requestId}`, `POST /api/employer/correction-requests/{requestId}/approve`, `POST /api/employer/correction-requests/{requestId}/reject`
+  - queue filter는 `query`(worker name/email, reason), `statuses`, `page`, `size` foundation으로 시작한다.
+  - detail은 attachment metadata 목록 대신 `attachmentCount`만 노출하고, raw metadata json은 request/WorkProof 내부 보존 용도로 유지한다.
+  - worker가 정정 요청을 제출할 때는 변경 내용, 사유, 증빙자료를 함께 보내고 employer가 승인/반려하는 승인형 흐름을 shared policy로 본다.
+  - web detail page가 생기면 attachment metadata를 바로 붙일 수 있게 backend는 request/WorkProof에 attachment metadata json을 유지한다.
+  - approve는 `CorrectionRequest.status` 변경, `WorkProof.updateTimes(...)`, `WorkProofAuditLog`, `CorrectionDecisionAudit`를 한 transaction에서 처리한다.
+  - reject는 `WorkProof`를 수정하지 않고 request status와 `CorrectionDecisionAudit`만 기록한다.
+  - employer issue queue는 correction request와 review가 필요한 record를 모두 담는 방향으로 확장 가능해야 한다.
 - scope 규칙
-  - `requestId`만으로 처리하지 않고, 대상 request의 worker membership과 employer company/workplace scope를 함께 검증한다.
+  - `requestId`만으로 처리하지 않고, 대상 request snapshot의 `companyId/workplaceId`가 현재 employer scope와 일치하는지 다시 검증한다.
   - scope 불일치 시 `403 FORBIDDEN`으로 처리한다.
 
 ### 4. Workplace Settings

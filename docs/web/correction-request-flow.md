@@ -65,6 +65,8 @@
 ## MVP 확정 규칙
 ### 원칙
 - correction request는 원본 WorkProof를 대체하는 독립 기록이 아니다.
+- worker는 WorkProof를 직접 확정 수정하지 않고, 변경 내용과 사유, 증빙자료를 담은 correction request를 제출한다.
+- employer는 correction request를 승인 또는 반려하고, 승인될 때만 원본 WorkProof가 최종 반영된다.
 - 승인 시 원본 WorkProof를 업데이트하는 command로 본다.
 - 승인 결과는 하나의 request당 한 번만 반영된다.
 
@@ -98,6 +100,20 @@
 - 이미 처리된 요청의 중복 승인/반려는 `409 CONFLICT`로 막는다.
 - 소속 범위가 맞지 않으면 `403 FORBIDDEN`으로 막는다.
 - 대상 WorkProof가 없으면 `404 NOT_FOUND`로 처리한다.
+
+## Slice 5 foundation 메모
+- 현재 backend foundation은 employer-side queue만 먼저 연다.
+- 구현 endpoint
+  - `GET /api/employer/correction-requests`
+  - `GET /api/employer/correction-requests/{requestId}`
+  - `POST /api/employer/correction-requests/{requestId}/approve`
+  - `POST /api/employer/correction-requests/{requestId}/reject`
+- scope는 worker의 현재 membership을 다시 계산하는 대신 request snapshot의 `companyId/workplaceId`와 현재 employer scope 일치 여부로 먼저 고정한다.
+- approve는 `CorrectionRequest` 상태 변경, `WorkProof` 시간 반영, `WorkProofAuditLog`, `CorrectionDecisionAudit`를 한 transaction으로 묶는다.
+- reject는 `WorkProof`를 변경하지 않고 request 상태와 decision audit만 남긴다.
+- detail 표면은 우선 `attachmentCount`까지만 노출하고, attachment metadata array 노출 여부는 후속 계약으로 남긴다.
+- employer issue queue는 장기적으로 worker correction request와 review가 필요한 record를 함께 다루는 방향으로 본다.
+- 승인 후 화면은 즉시 최신처럼 보여야 하며, foundation 단계 구현은 관련 화면 재조회 방식으로 먼저 고정한다.
 
 ## 운영상 보수적 가정
 - 부분 승인 기능은 넣지 않는다.
