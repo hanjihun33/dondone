@@ -25,6 +25,7 @@ Slice 5에서 employer web correction queue foundation을 열고, `GET /api/empl
 
 # In Scope
 - employer correction request queue read-model endpoint 추가
+  - `GET /api/employer/issues`
   - `GET /api/employer/correction-requests`
   - `GET /api/employer/correction-requests/{requestId}`
 - employer correction request command endpoint 추가
@@ -75,10 +76,27 @@ Slice 5에서 employer web correction queue foundation을 열고, `GET /api/empl
 
 # Contract Changes
 - 신규 correction queue query DTO
+  - `itemTypes`
   - `query`
   - `statuses`
   - `page`
   - `size`
+- 신규 employer issue queue response
+  - `itemType`
+  - `issueStatus`
+  - `requestId`
+  - `workProofId`
+  - `workerId`
+  - `workerName`
+  - `workerEmail`
+  - `workDate`
+  - `clockInAt`
+  - `clockOutAt`
+  - `requestedClockInAt`
+  - `requestedClockOutAt`
+  - `reason`
+  - `reviewReasonCode`
+  - `raisedAt`
 - 신규 correction request summary response
   - `requestId`
   - `workProofId`
@@ -170,6 +188,7 @@ Single lane
 # Open Questions
 - worker-side request 생성 endpoint는 열었고, mobile/client migration을 어느 시점에 어떤 범위로 붙일지
 - attachment metadata는 request detail에 `type`, `fileName`까지만 노출하고 storage/download contract를 언제 열지
+- `NEEDS_REVIEW` record에 대한 별도 detail/command surface를 열지, issue queue read-model만 유지할지
 - 기존 worker direct edit endpoint `PATCH /api/workproof/{id}`를 legacy 유지/deprecated/제거 중 무엇으로 둘지
 - 승인 후 wage summary와 dashboard invalidation을 명시적 캐시 무효화 없이 조회 시 재계산만으로 충분히 볼지
 

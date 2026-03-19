@@ -1,6 +1,7 @@
 package com.workproofpay.backend.workproof.repo;
 
 import com.workproofpay.backend.workproof.model.WorkProof;
+import com.workproofpay.backend.workproof.model.WorkProofFinancialStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
@@ -18,6 +19,8 @@ public interface WorkProofRepository extends JpaRepository<WorkProof, Long> {
     List<WorkProof> findByUserIdInAndWorkplaceIdAndWorkDateOrderByUserIdAscCreatedAtDescIdDesc(List<Long> userIds, Long workplaceId, LocalDate workDate);
 
     List<WorkProof> findByUserIdInAndWorkplaceIdAndWorkDateBetweenOrderByUserIdAscWorkDateAscCreatedAtDescIdDesc(List<Long> userIds, Long workplaceId, LocalDate startDate, LocalDate endDate);
+
+    List<WorkProof> findByWorkplaceIdAndFinancialStatusOrderByWorkDateDescClockOutAtDescIdDesc(Long workplaceId, WorkProofFinancialStatus financialStatus);
 
     Optional<WorkProof> findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(Long userId, Long workplaceId);
 

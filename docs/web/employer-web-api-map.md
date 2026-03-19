@@ -20,7 +20,7 @@
 | --- | --- | --- | --- |
 | Dashboard | `apps/dondone-web/src/pages/dashboard/EmployerDashboardPage.tsx` | 주간 근태 조회, 검색, 상태 필터 | read-model |
 | Workers | `apps/dondone-web/src/pages/workers/WorkerSummaryPage.tsx` | 근로자 목록 조회, 상태 필터, 페이지네이션 | read-model |
-| Issues | `apps/dondone-web/src/pages/issues/IssuesQueuePage.tsx` | 정정 요청 조회, 승인/반려 | read-model + command |
+| Issues | `apps/dondone-web/src/pages/issues/IssuesQueuePage.tsx` | 미처리 이슈 큐 조회, 정정 요청 승인/반려 | read-model + command |
 | Settings | `apps/dondone-web/src/pages/settings/SettingsPage.tsx` | 사업장 위치/반경 조회 및 수정 | read-model + command |
 
 ## 화면별 API
@@ -94,6 +94,7 @@
 ### 3. Correction Requests
 - 목적: 근로자 정정 요청 목록 조회 및 승인/반려 처리
 - 후보 API
+  - `GET /api/employer/issues`
   - `GET /api/employer/correction-requests`
   - `GET /api/employer/correction-requests/{requestId}`
   - `POST /api/employer/correction-requests/{requestId}/approve`
@@ -104,13 +105,15 @@
   - 이미 처리된 요청 재처리 방지 규칙
   - worker가 직접 수정하지 않고 정정 요청 제출로 전환될 때 app/web contract를 어떻게 맞출지
 - 최소 응답 필드 예시
+  - issue queue row: `itemType`, `issueStatus`, `requestId`, `workProofId`, `workerId`, `workerName`, `workDate`, `clockInAt`, `clockOutAt`, `requestedClockInAt`, `requestedClockOutAt`, `reason`, `reviewReasonCode`, `raisedAt`
   - `requestId`, `workerId`, `workerName`, `workDate`, `originalCheckIn`, `requestedCheckIn`, `reason`, `requestedAt`, `status`
   - detail: `decisionBy`, `decisionAt`, `decisionMemo`, `rejectReasonCode`, `attachmentCount`, `attachments[]`
 - command request 예시 필드
   - approve: `decisionMemo`
   - reject: `decisionMemo`, `rejectReasonCode`
 - Slice 5 foundation 메모
-  - 현재 backend는 employer-side queue만 먼저 연다: `GET /api/employer/correction-requests`, `GET /api/employer/correction-requests/{requestId}`, `POST /api/employer/correction-requests/{requestId}/approve`, `POST /api/employer/correction-requests/{requestId}/reject`
+  - `GET /api/employer/issues`는 미처리 이슈 큐 read-model로 열고, `PENDING` correction request와 `NEEDS_REVIEW` WorkProof를 `itemType`으로 함께 노출한다.
+  - 현재 backend는 employer-side issue queue read-model과 correction request history/command를 함께 연다: `GET /api/employer/issues`, `GET /api/employer/correction-requests`, `GET /api/employer/correction-requests/{requestId}`, `POST /api/employer/correction-requests/{requestId}/approve`, `POST /api/employer/correction-requests/{requestId}/reject`
   - queue filter는 `query`(worker name/email, reason), `statuses`, `page`, `size` foundation으로 시작한다.
   - detail은 `attachmentCount`와 함께 attachment metadata(`type`, `fileName`)를 노출하고, raw metadata json은 request/WorkProof 내부 보존 용도로 유지한다.
   - worker가 정정 요청을 제출할 때는 변경 내용, 사유, 증빙자료를 함께 보내고 employer가 승인/반려하는 승인형 흐름을 shared policy로 본다.
@@ -118,6 +121,7 @@
   - approve는 `CorrectionRequest.status` 변경, `WorkProof.updateTimes(...)`, `WorkProofAuditLog`, `CorrectionDecisionAudit`를 한 transaction에서 처리한다.
   - reject는 `WorkProof`를 수정하지 않고 request status와 `CorrectionDecisionAudit`만 기록한다.
   - employer issue queue는 correction request와 review가 필요한 record를 모두 담는 방향으로 확장 가능해야 한다.
+  - correction request history/command는 `/api/employer/correction-requests/*`에 남기고, employer issue queue는 `/api/employer/issues`에서 action queue read-model로 분리한다.
 - scope 규칙
   - `requestId`만으로 처리하지 않고, 대상 request snapshot의 `companyId/workplaceId`가 현재 employer scope와 일치하는지 다시 검증한다.
   - scope 불일치 시 `403 FORBIDDEN`으로 처리한다.
@@ -152,6 +156,7 @@
 
 ## API 분류
 ### Read-model
+- `GET /api/employer/issues`
 - `GET /api/employer/dashboard/summary`
 - `GET /api/employer/dashboard/attendance-board`
 - `GET /api/employer/workers`

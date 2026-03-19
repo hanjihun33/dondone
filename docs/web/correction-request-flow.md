@@ -102,13 +102,15 @@
 - 대상 WorkProof가 없으면 `404 NOT_FOUND`로 처리한다.
 
 ## Slice 5 foundation 메모
-- 현재 backend foundation은 employer-side queue만 먼저 연다.
+- 현재 backend foundation은 employer-side issue queue read-model과 correction request history/command를 먼저 연다.
 - 구현 endpoint
+  - `GET /api/employer/issues`
   - `POST /api/workproof/{workProofId}/correction-requests`
   - `GET /api/employer/correction-requests`
   - `GET /api/employer/correction-requests/{requestId}`
   - `POST /api/employer/correction-requests/{requestId}/approve`
   - `POST /api/employer/correction-requests/{requestId}/reject`
+- `GET /api/employer/issues`는 미처리 employer issue queue만 내려준다: `PENDING` correction request + `NEEDS_REVIEW` WorkProof.
 - worker create endpoint는 변경 시간, 사유, memo, 증빙 attachment metadata를 받아 pending correction request를 생성한다.
 - 현재 worker app 수정 저장은 backend `PATCH /api/workproof/{id}`를 호출하지 않고 local-only mock flow를 유지한다. mobile/client migration은 후속 범위다.
 - scope는 worker의 현재 membership을 다시 계산하는 대신 request snapshot의 `companyId/workplaceId`와 현재 employer scope 일치 여부로 먼저 고정한다.
@@ -129,6 +131,7 @@
 - 반경 밖 `check-out`으로 인해 생성되는 review 대상 기록은 employer web의 이슈 큐에서 함께 다뤄질 수 있다.
 - 다만 이것을 현재 문서 단계에서 `correction request`와 완전히 같은 도메인으로 고정하지는 않는다.
 - 시간 수정 요청은 worker가 제출하는 `correction request`로 보고, 위치 이탈 퇴근은 `review 대상 예외 기록`으로 구분하는 편이 MVP 문맥에서 더 안전하다.
+- backend foundation은 이 경계를 `GET /api/employer/issues`에서 `itemType`으로 분리해 반영한다. correction request history/command는 기존 `/api/employer/correction-requests/*`를 유지한다.
 - worker 앱에서 반경 밖 `check-out` 시 사유를 어떻게 입력받을지, worker-side check-out request 계약을 어떻게 바꿀지는 현재 웹 문서 범위를 넘는다.
 - 이 부분은 추후 app/web 공통 리팩토링 단계에서 worker API, employer queue, WorkProof evidence 정책을 함께 보며 일관되게 정리한다.
 
