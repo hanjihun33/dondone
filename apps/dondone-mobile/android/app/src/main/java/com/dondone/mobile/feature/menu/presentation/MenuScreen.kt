@@ -210,6 +210,14 @@ fun MenuScreen(
         ) {
             MenuDocumentSheet(
                 document = selectedDocument,
+                onOpenProofDocument = {
+                    onShowToast("문서 열기와 실제 PDF 연결은 다음 단계에서 이어집니다.", BadgeTone.Warning)
+                    selectedDocumentId = null
+                },
+                onShareProofDocument = {
+                    onShowToast("문서 공유는 실제 파일 다운로드 연결 뒤에 지원됩니다.", BadgeTone.Warning)
+                    selectedDocumentId = null
+                },
                 onOpenClaimFlow = {
                     selectedDocumentId = null
                     activeSheet = MenuOverlaySheet.Claim
@@ -685,6 +693,8 @@ private fun menuDocumentColors(accent: MenuDocumentAccent): MenuDocumentColors {
 @Composable
 private fun MenuDocumentSheet(
     document: MenuDocumentUiModel,
+    onOpenProofDocument: () -> Unit,
+    onShareProofDocument: () -> Unit,
     onOpenClaimFlow: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -717,7 +727,7 @@ private fun MenuDocumentSheet(
             )
             Text(
                 text = when (document.accent) {
-                    MenuDocumentAccent.Proof -> "근무 기록과 차액 검토 근거가 반영된 최신 증빙 문서예요."
+                    MenuDocumentAccent.Proof -> "근무 탭에서 선택한 기간의 출퇴근 기록과 변경 이력을 다시 열고 공유할 수 있는 문서예요."
                     MenuDocumentAccent.Claim -> "차액 검토 결과를 토대로 신고 준비 흐름으로 이어지는 묶음 문서예요."
                     MenuDocumentAccent.Receipt -> "최근 테스트넷 송금 내역과 전송 해시를 확인할 수 있는 영수증 문서예요."
                 },
@@ -726,11 +736,35 @@ private fun MenuDocumentSheet(
             )
         }
 
-        PrimaryActionButton(
-            text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
-            onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (document.accent == MenuDocumentAccent.Proof) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                MenuDocumentActionButton(
+                    text = "공유",
+                    icon = Icons.Default.Share,
+                    onClick = onShareProofDocument,
+                    enabled = document.statusTone == BadgeTone.Success,
+                    primary = false,
+                    modifier = Modifier.weight(1f)
+                )
+                MenuDocumentActionButton(
+                    text = "열기",
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    onClick = onOpenProofDocument,
+                    enabled = document.statusTone == BadgeTone.Success,
+                    primary = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            PrimaryActionButton(
+                text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
+                onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -943,7 +977,7 @@ private fun MenuClaimSheet(
             }
             proofDocument?.let { document ->
                 MenuClaimFileCard(
-                    title = "Proof Pack",
+                    title = "근무 기록 문서",
                     badgeText = document.statusText,
                     badgeTone = document.statusTone,
                     accentBackground = DawnSecondary,
@@ -992,7 +1026,7 @@ private fun MenuClaimSheet(
         }
 
         MenuSheetSection(title = "체크리스트") {
-            MenuChecklistRow(text = "Proof Pack 준비")
+            MenuChecklistRow(text = "근무 기록 문서 준비")
             MenuChecklistRow(text = "근거 자료 묶음 준비")
             MenuChecklistRow(text = "접수 경로 확인(온라인/전화/방문)", isInfo = true)
         }

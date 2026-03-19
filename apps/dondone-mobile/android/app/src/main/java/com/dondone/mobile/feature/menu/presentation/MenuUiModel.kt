@@ -21,7 +21,7 @@ enum class MenuReceiptStatus {
 
 private const val DOCUMENT_STATUS_READY = "준비됨"
 private const val DOCUMENT_STATUS_PENDING = "대기"
-private const val DOCUMENT_STATUS_REVIEW = "검토 필요"
+private const val DOCUMENT_STATUS_GENERATING = "준비 중"
 private const val RECEIPT_STATUS_PENDING = "확인 중"
 private const val RECEIPT_STATUS_CONFIRMED = "완료"
 private const val MENU_UPDATED_AT_PREFIX = "업데이트 "
@@ -122,7 +122,7 @@ private fun DocumentItem.isReceiptDocument(): Boolean = id.contains(DOCUMENT_ID_
 
 private fun MenuDocumentAccent.summaryText(): String {
     return when (this) {
-        MenuDocumentAccent.Proof -> "근무 기록과 차액 검토 근거를 묶어 둔 문서예요."
+        MenuDocumentAccent.Proof -> "선택한 기간의 출퇴근 기록과 변경 이력을 정리한 PDF 문서예요."
         MenuDocumentAccent.Claim -> "신고 준비에 필요한 핵심 자료를 한 번에 정리해요."
         MenuDocumentAccent.Receipt -> "최근 송금 영수증과 전송 해시를 다시 확인할 수 있어요."
     }
@@ -133,7 +133,7 @@ private fun MenuDocumentAccent.statusText(isReady: Boolean): String {
         isReady -> DOCUMENT_STATUS_READY
         this == MenuDocumentAccent.Receipt -> RECEIPT_STATUS_PENDING
         this == MenuDocumentAccent.Claim -> DOCUMENT_STATUS_PENDING
-        else -> DOCUMENT_STATUS_REVIEW
+        else -> DOCUMENT_STATUS_GENERATING
     }
 }
 
