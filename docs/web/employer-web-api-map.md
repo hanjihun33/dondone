@@ -54,8 +54,14 @@
   - 지각/결근/휴가 상태 산정 기준
   - 주간 보드 데이터가 `WorkProof`에서 바로 오지 않고 별도 read-model 조합이 필요한지
 - 최소 응답 필드 예시
-  - summary: `presentCount`, `lateCount`, `leaveCount`, `absentCount`, `asOf`
+  - foundation summary: `activeWorkerCount`, `workingCount`, `completedCount`, `needsReviewCount`, `noRecordCount`, `asOf`
   - board: `workerId`, `name`, `role`, `avatarUrl`, `days[]`, `page`, `hasNext`
+- Slice 4 foundation 메모
+  - 현재 backend는 휴가/결근/지각 canonical source가 없어서 `GET /api/employer/dashboard/summary`를 `today scoped WorkProof` 기준 `WORKING/COMPLETED/NEEDS_REVIEW/NO_RECORD` 집계로 먼저 연다.
+  - `leave/absent/late`는 schedule/leave/correction source가 고정될 때 별도 계약으로 다시 넓힌다.
+  - `GET /api/employer/dashboard/attendance-board`는 `weekStart`가 없으면 현재 주 일요일 기준 7일 범위를 반환한다.
+  - board day cell은 `recordStatus`(`CHECKED_IN/CHECKED_OUT`), `reflectionStatus`(`PENDING/REFLECTED/NEEDS_REVIEW`), `attendanceStatus`, `workedMinutes`를 함께 노출한다.
+  - row filter `statuses`는 그 주간 7일 중 하나라도 일치하는 worker를 포함하는 방식으로 시작한다.
 - scope 규칙
   - company는 서버가 employer profile에서 해석한다.
   - workplace는 MVP에서 서버가 `defaultWorkplaceId`를 적용한다.
@@ -73,6 +79,12 @@
 - 최소 응답 필드 예시
   - `workerId`, `employeeCode`, `name`, `team`, `role`, `email`, `phone`, `avatarUrl`, `attendanceStatus`
   - pagination: `page`, `size`, `totalElements`, `totalPages`
+- Slice 4 foundation 메모
+  - `GET /api/employer/workers`는 현재 `User + EmploymentMembership + today scoped WorkProof`만으로 조합한다.
+  - `attendanceStatus`는 `WORKING`, `COMPLETED`, `NEEDS_REVIEW`, `NO_RECORD` 네 값만 지원한다.
+  - 대신 raw source 일관성을 위해 `recordStatus`(`CHECKED_IN/CHECKED_OUT`)와 `reflectionStatus`(`PENDING/REFLECTED/NEEDS_REVIEW`)를 함께 노출하고, `attendanceStatus`는 그 조합에서 파생한다.
+  - `employeeCode`, `team`, `role`, `phone`, `avatarUrl`는 canonical profile source가 없으면 `null`을 허용한다.
+  - query는 `name/email` 기준 case-insensitive 검색으로 시작하고, status filter/pagination은 foundation 단계에서 service 조합으로 지원한다.
 - scope 규칙
   - `workerId` detail 조회 전 서버는 해당 worker의 활성 membership이 employer scope 안인지 재검증한다.
   - 단순 role 통과만으로 detail 조회를 허용하지 않는다.

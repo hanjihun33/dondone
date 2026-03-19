@@ -15,6 +15,10 @@ public interface WorkProofRepository extends JpaRepository<WorkProof, Long> {
 
     List<WorkProof> findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(Long userId, Long workplaceId, LocalDate startDate, LocalDate endDate);
 
+    List<WorkProof> findByUserIdInAndWorkplaceIdAndWorkDateOrderByUserIdAscCreatedAtDescIdDesc(List<Long> userIds, Long workplaceId, LocalDate workDate);
+
+    List<WorkProof> findByUserIdInAndWorkplaceIdAndWorkDateBetweenOrderByUserIdAscWorkDateAscCreatedAtDescIdDesc(List<Long> userIds, Long workplaceId, LocalDate startDate, LocalDate endDate);
+
     Optional<WorkProof> findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(Long userId, Long workplaceId);
 
     Optional<WorkProof> findByIdAndUserId(Long id, Long userId);

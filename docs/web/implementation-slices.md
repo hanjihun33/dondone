@@ -15,6 +15,7 @@
 - 현재 active execplan:
   - `docs/execplans/active/2026-03-19-web-auth-profile-foundation.md`
   - `docs/execplans/active/2026-03-19-web-workplace-settings-foundation.md`
+  - `docs/execplans/active/2026-03-19-web-worker-directory-dashboard-read-model.md`
 - 현재 web 기준 문서 인덱스:
   - `docs/web/README.md`
 
@@ -25,6 +26,10 @@
 - Slice 3 `Workplace settings` backend foundation은 완료 상태로 정리했다.
 - `GET/PUT /api/employer/workplace-settings`, `EmployerAccessScope` 기반 default workplace 해석, `EmploymentMembership` 기반 영향 범위 집계, settings metadata additive 필드, `WorkProof` workplace snapshot 고정까지 반영했다.
 - 설정 변경 효력은 저장 시점 이후 미래 `check-in/check-out`부터 적용하고, 기존 완료 `WorkProof`는 자동 재판정하지 않으며, 상세/PDF도 record 시점 snapshot을 우선 사용하도록 고정했다.
+- Slice 4 `Worker directory and dashboard read-model` backend foundation을 시작했다.
+- `GET /api/employer/workers`, `GET /api/employer/dashboard/summary`, `GET /api/employer/dashboard/attendance-board`, `EmploymentMembership` scope 조회, today/week `WorkProof` 기반 status 조합, search/status filter/pagination foundation 테스트를 추가했다.
+- 현재 read-model status는 `WORKING`, `COMPLETED`, `NEEDS_REVIEW`, `NO_RECORD`로만 고정했고, 휴가/결근/지각은 canonical source가 생길 때까지 후속 범위로 남긴다.
+- raw source 일관성을 위해 employer read-model에도 `recordStatus`(`CHECKED_IN/CHECKED_OUT`)와 `reflectionStatus`(`PENDING/REFLECTED/NEEDS_REVIEW`)를 함께 노출한다.
 
 ## 진행 상태판
 | 순서 | Slice | 상태 | 마지막 결과 | 다음 작업 | 선행 문서 |
@@ -32,18 +37,21 @@
 | 1 | 문서/경계 고정 | `done` | 검증 페르소나 리뷰를 통해 scope/auth/invitation/migration 경계 누락을 보완했고 기준 문서와 active execplan 정렬 방향을 확보함 | Slice 2 착수 전 employer auth/profile 최소 계약을 구현 단위로 내린다 | `employer-web-direction.md`, `employer-worker-domain-map.md` |
 | 2 | Auth and profile foundation | `done` | `POST /api/employer-auth/invitations/accept`, `POST /api/employer-auth/login`, `GET /api/employer/profile`, `EMPLOYER` role, `EmployerProfile`, `EmployerInvitationToken`, `EmploymentMembership` authz foundation을 구현했고 리뷰 이슈와 backend 테스트를 정리함 | Slice 3 `Workplace settings` 계약과 설정 변경 효력 규칙을 고정한다 | `auth-and-role-policy.md`, `shared-entity-validation.md` |
 | 3 | Workplace settings | `done` | `GET/PUT /api/employer/workplace-settings`, employer 전용 DTO/service/controller, `Workplace` settings metadata additive 필드, settings authz/validation 테스트, `WorkProof` workplace snapshot 고정, 관련 문서 정리를 완료함 | Slice 4 read-model scope와 worker list/dashboard 입력 소스를 고정한다 | `workplace-settings-contract.md`, `shared-entity-validation.md` |
-| 4 | Worker directory and dashboard read-model | `not_started` | 미시작 | worker list/dashboard용 read-model 입력 소스 확정 | `employer-web-api-map.md`, `employer-worker-domain-map.md` |
+| 4 | Worker directory and dashboard read-model | `in_progress` | `GET /api/employer/workers`, `GET /api/employer/dashboard/summary`, `GET /api/employer/dashboard/attendance-board` foundation, active membership/week overlap scope, `recordStatus/reflectionStatus + attendanceStatus` 조합, search/status filter/pagination backend 테스트를 추가함 | worker detail 계약과 profile source 빈 칸을 이어서 고정한다 | `employer-web-api-map.md`, `employer-worker-domain-map.md` |
 | 5 | Correction request flow | `not_started` | 미시작 | 정정 요청 엔티티와 승인 반영 규칙 확정 | `correction-request-flow.md`, `shared-entity-validation.md` |
 | 6 | Hardening | `not_started` | 미시작 | 테스트, 리뷰, 리스크 정리와 prior slice follow-up 회수 | 관련 review note |
 
 ## 지금 기준 다음에 해야 할 일
-1. Slice 4 execplan을 만들고 worker list/dashboard read-model scope를 `EmployerAccessScope + EmploymentMembership` 기준으로 고정한다.
-2. `GET /api/employer/workers`, `GET /api/employer/dashboard/summary`, `GET /api/employer/dashboard/attendance-board` 순으로 read-model을 연다.
-3. 기존 앱 API contract와 worker legacy ownership이 여전히 범위 밖인지 구현 중 계속 검증한다.
+1. Slice 4 foundation 위에 `GET /api/employer/workers/{workerId}` 계약을 현재 source-of-truth 기준으로 세분화한다.
+2. worker profile canonical source가 생기기 전까지 `employeeCode/team/role/phone/avatarUrl` null 허용 정책을 유지할지, 별도 profile/entity를 열지 결정한다.
+3. `late/leave/absent` 같은 mockup 상태를 열 필요가 생기면 canonical source를 먼저 고정한 뒤 summary/board 계약을 넓힌다.
+4. 기존 앱 API contract와 worker legacy ownership이 여전히 범위 밖인지 구현 중 계속 검증한다.
 
 ## Hardening 재확인 backlog
+- `docs/reviews/active/2026-03-19-web-auth-profile-followups.md`
 - `docs/reviews/active/2026-03-19-web-workplace-settings-followups.md`
-- 이 문서는 Slice 3를 닫으면서 의도적으로 미룬 항목을 모아둔 backlog다.
+- `docs/reviews/active/2026-03-19-web-worker-read-model-followups.md`
+- 이 문서들은 Slice 2~4를 닫거나 진행하면서 의도적으로 미룬 항목을 모아둔 backlog다.
 - Slice 6 `Hardening`에 들어가기 전에 반드시 다시 읽고, 남은 항목을 `fixed / accepted risk / rescope`로 분류한다.
 
 ## 재스코프 트리거
@@ -57,8 +65,9 @@
 2. 이 문서의 `진행 상태판`에서 현재 `in_progress` 또는 첫 `not_started` slice를 찾는다.
 3. 해당 slice의 `선행 문서`를 읽는다.
 4. `현재 active execplan`을 열어 현재 세션 작업 범위를 확인한다.
-5. 막힌 항목이 있으면 `docs/reviews/active/`의 최신 review note를 같이 본다.
+5. 막힌 항목이나 미룬 작업이 있으면 `docs/reviews/active/`의 최신 review note를 같이 본다.
 6. Slice 6 `Hardening`을 시작할 때는 `docs/reviews/active/2026-03-19-web-workplace-settings-followups.md`를 먼저 읽는다.
+7. Slice 4를 이어갈 때는 `docs/reviews/active/2026-03-19-web-worker-read-model-followups.md`를 먼저 읽는다.
 
 ## Slice 정의
 
