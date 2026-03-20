@@ -14,6 +14,7 @@ import com.workproofpay.backend.workproof.repo.WorkProofRepository;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Component
+@Profile("demo")
 @RequiredArgsConstructor
 public class DevUserInitializer implements CommandLineRunner {
 
