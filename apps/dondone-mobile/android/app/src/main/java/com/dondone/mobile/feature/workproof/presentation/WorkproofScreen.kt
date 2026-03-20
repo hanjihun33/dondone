@@ -442,7 +442,6 @@ fun WorkproofScreen(
                 onNextMonth = { monthOffset += 1 },
                 onBack = { showDetails = false },
                 onEditRecord = ::openEditSheet,
-                selectedPdfDateRangeText = formatWorkproofPdfDateRange(pdfStartDate, pdfEndDate),
                 onOpenPdfCreation = { showPdfDateRangeSheet = true }
             )
         } else {
@@ -850,7 +849,6 @@ private fun WorkproofDetailPage(
     onNextMonth: () -> Unit,
     onBack: () -> Unit,
     onEditRecord: (WorkproofRecordUiModel) -> Unit,
-    selectedPdfDateRangeText: String,
     onOpenPdfCreation: () -> Unit
 ) {
     Column(
@@ -885,7 +883,6 @@ private fun WorkproofDetailPage(
         )
         WorkproofSectionDivider()
         WorkproofPdfEntryCard(
-            selectedDateRangeText = selectedPdfDateRangeText,
             onOpenPdfCreation = onOpenPdfCreation
         )
         WorkproofSectionDivider()
@@ -903,16 +900,26 @@ private fun WorkproofDetailPage(
 
 @Composable
 private fun WorkproofPdfEntryCard(
-    selectedDateRangeText: String,
     onOpenPdfCreation: () -> Unit
 ) {
-    WorkproofSurfaceCard {
-        WorkproofSectionHeader(title = "근무 기록 문서")
+    val interactionSource = remember { MutableInteractionSource() }
 
+    WorkproofSurfaceCard(
+        modifier = Modifier
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.99f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onOpenPdfCreation
+            )
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
@@ -928,34 +935,19 @@ private fun WorkproofPdfEntryCard(
                     modifier = Modifier.size(20.dp)
                 )
             }
-
-            Column(
+            Text(
+                text = "근무기록 문서 생성",
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "선택한 기간의 출퇴근 기록을 PDF로 정리해요.",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
-                    color = DawnText
-                )
-                Text(
-                    text = "근무 기록 확인용 문서이자 임금체불 진정 시 첨부 문서로 활용할 수 있도록 준비 중이에요.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DawnTextSubtle
-                )
-                Text(
-                    text = "선택 기간 $selectedDateRangeText",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = WorkproofRowAccentTint
-                )
-            }
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = DawnTextSubtle,
+                modifier = Modifier.size(22.dp)
+            )
         }
-
-        PrimaryActionButton(
-            text = "근무 기록 문서 만들기",
-            onClick = onOpenPdfCreation,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
@@ -1602,10 +1594,11 @@ private fun WorkproofAuditPreviewRow(
 
 @Composable
 private fun WorkproofSurfaceCard(
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 6.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
