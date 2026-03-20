@@ -18,11 +18,19 @@ import type { IssueFilterKey, IssueQueueItem } from "./model/issuesQueueData";
 
 const requestFilters: { key: IssueFilterKey; label: string }[] = [
   { key: "all", label: "전체" },
-  { key: "pending", label: "대기" },
+  { key: "pending", label: "정정 요청" },
   { key: "needs_review", label: "검토 필요" },
-  { key: "approved", label: "수락" },
-  { key: "rejected", label: "거절" }
+  { key: "approved", label: "승인" },
+  { key: "rejected", label: "반려" }
 ];
+
+const rowsPerPageOptions = [5, 10, 20];
+const roleFallback = "직무 정보 연동 대기";
+
+const reviewReasonLabels: Record<string, string> = {
+  CLOCK_OUT_OUTSIDE_ALLOWED_RADIUS: "반경 밖 퇴근",
+  NEEDS_REVIEW: "검토 필요 기록"
+};
 
 function formatTime(value: string | null) {
   if (!value) {
@@ -40,6 +48,14 @@ function formatDateTime(value: string | null) {
   return value.replace("T", " ").slice(0, 16);
 }
 
+function getReviewReasonLabel(reviewReasonCode: string | null) {
+  if (!reviewReasonCode) {
+    return null;
+  }
+
+  return reviewReasonLabels[reviewReasonCode] ?? reviewReasonCode;
+}
+
 function mapPendingIssues(
   items: Awaited<ReturnType<typeof getEmployerIssues>>["issues"]
 ): IssueQueueItem[] {
@@ -53,7 +69,7 @@ function mapPendingIssues(
     workerId: item.workerId,
     workerName: item.workerName,
     workerEmail: item.workerEmail,
-    role: item.role ?? "직무 기준 데이터 정리 예정",
+    role: item.role ?? roleFallback,
     workDate: item.workDate,
     originalCheckIn: formatTime(item.clockInAt),
     originalCheckOut: formatTime(item.clockOutAt),
@@ -61,8 +77,8 @@ function mapPendingIssues(
     requestedCheckOut: formatTime(item.requestedClockOutAt ?? item.clockOutAt),
     reason:
       item.itemType === "CORRECTION_REQUEST"
-        ? item.reason ?? "정정 요청"
-        : item.reason ?? "검토 필요 기록",
+        ? item.reason ?? "요청 사유 없음"
+        : item.reason ?? getReviewReasonLabel(item.reviewReasonCode) ?? "검토 사유 확인 필요",
     requestedAt: formatDateTime(item.raisedAt),
     detailState: "idle",
     detail: null,
@@ -83,7 +99,7 @@ function mapClosedCorrections(
     workerId: item.workerId,
     workerName: item.workerName,
     workerEmail: item.workerEmail,
-    role: item.role ?? "직무 기준 데이터 정리 예정",
+    role: item.role ?? roleFallback,
     workDate: item.workDate,
     originalCheckIn: formatTime(item.originalClockInAt),
     originalCheckOut: formatTime(item.originalClockOutAt),
@@ -101,11 +117,38 @@ function sortByRequestedAtDesc(items: IssueQueueItem[]) {
   return [...items].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
 }
 
+function getPaginationItems(currentPage: number, totalPages: number) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const items: Array<number | "ellipsis"> = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+
+  if (start > 2) {
+    items.push("ellipsis");
+  }
+
+  for (let page = start; page <= end; page += 1) {
+    items.push(page);
+  }
+
+  if (end < totalPages - 1) {
+    items.push("ellipsis");
+  }
+
+  items.push(totalPages);
+  return items;
+}
+
 export function IssuesQueuePage() {
   const navigate = useNavigate();
   const { refreshTick } = useOutletContext<{ refreshTick: number }>();
   const [selectedFilter, setSelectedFilter] = useState<IssueFilterKey>("pending");
   const [searchQuery, setSearchQuery] = useState("");
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
   const [pendingIssues, setPendingIssues] = useState<IssueQueueItem[]>([]);
   const [closedCorrections, setClosedCorrections] = useState<IssueQueueItem[]>([]);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
@@ -178,18 +221,24 @@ export function IssuesQueuePage() {
   const filteredRequests = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
 
-    const baseList =
-      selectedFilter === "all"
-        ? allRequests
-        : selectedFilter === "pending"
-          ? pendingIssues.filter((item) => item.correctionStatus === "PENDING")
-          : selectedFilter === "needs_review"
-            ? pendingIssues.filter((item) => item.issueStatus === "NEEDS_REVIEW")
-            : closedCorrections.filter((item) =>
-                selectedFilter === "approved"
-                  ? item.correctionStatus === "APPROVED"
-                  : item.correctionStatus === "REJECTED"
-              );
+    let baseList: IssueQueueItem[];
+    switch (selectedFilter) {
+      case "all":
+        baseList = allRequests;
+        break;
+      case "pending":
+        baseList = pendingIssues.filter((item) => item.correctionStatus === "PENDING");
+        break;
+      case "needs_review":
+        baseList = pendingIssues.filter((item) => item.issueStatus === "NEEDS_REVIEW");
+        break;
+      case "approved":
+        baseList = closedCorrections.filter((item) => item.correctionStatus === "APPROVED");
+        break;
+      case "rejected":
+        baseList = closedCorrections.filter((item) => item.correctionStatus === "REJECTED");
+        break;
+    }
 
     return baseList.filter((request) => {
       if (keyword.length === 0) {
@@ -203,6 +252,25 @@ export function IssuesQueuePage() {
       );
     });
   }, [allRequests, closedCorrections, pendingIssues, searchQuery, selectedFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [rowsPerPage, searchQuery, selectedFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / rowsPerPage));
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
+
+  const pagedRequests = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredRequests.slice(startIndex, startIndex + rowsPerPage);
+  }, [currentPage, filteredRequests, rowsPerPage]);
+
+  const rangeStart = filteredRequests.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
+  const rangeEnd = filteredRequests.length === 0 ? 0 : Math.min(currentPage * rowsPerPage, filteredRequests.length);
+  const pageItems = getPaginationItems(currentPage, totalPages);
 
   const updateIssueItem = (nextItem: IssueQueueItem) => {
     const updateList = (items: IssueQueueItem[]) =>
@@ -322,7 +390,7 @@ export function IssuesQueuePage() {
         workerId: detail.workerId,
         workerName: detail.workerName,
         workerEmail: detail.workerEmail,
-        role: detail.role ?? "직무 기준 데이터 정리 예정",
+        role: detail.role ?? roleFallback,
         workDate: detail.workDate,
         originalCheckIn: formatTime(detail.originalClockInAt),
         originalCheckOut: formatTime(detail.originalClockOutAt),
@@ -349,7 +417,7 @@ export function IssuesQueuePage() {
         return;
       }
 
-      setErrorMessage(error instanceof Error ? error.message : "요청을 수락하지 못했습니다.");
+      setErrorMessage(error instanceof Error ? error.message : "정정 요청을 승인하지 못했습니다.");
     }
   };
 
@@ -361,15 +429,14 @@ export function IssuesQueuePage() {
       return;
     }
 
-    const promptResult = window.prompt("거절 사유를 입력하세요.", "");
+    const promptResult = window.prompt("반려 사유를 입력해 주세요.", "");
     if (promptResult === null) {
       return;
     }
-    const decisionMemo = promptResult;
 
     try {
       const detail = await rejectEmployerCorrectionRequest(token, requestId, {
-        decisionMemo,
+        decisionMemo: promptResult,
         rejectReasonCode: "EMPLOYER_REJECTED"
       });
       moveCorrectionToClosed({
@@ -382,7 +449,7 @@ export function IssuesQueuePage() {
         workerId: detail.workerId,
         workerName: detail.workerName,
         workerEmail: detail.workerEmail,
-        role: detail.role ?? "직무 기준 데이터 정리 예정",
+        role: detail.role ?? roleFallback,
         workDate: detail.workDate,
         originalCheckIn: formatTime(detail.originalClockInAt),
         originalCheckOut: formatTime(detail.originalClockOutAt),
@@ -409,7 +476,7 @@ export function IssuesQueuePage() {
         return;
       }
 
-      setErrorMessage(error instanceof Error ? error.message : "요청을 거절하지 못했습니다.");
+      setErrorMessage(error instanceof Error ? error.message : "정정 요청을 반려하지 못했습니다.");
     }
   };
 
@@ -418,12 +485,13 @@ export function IssuesQueuePage() {
       <header className="topbar issues-header">
         <div>
           <h2 className="issues-title">요청 관리</h2>
-          <p className="issues-subtitle">출퇴근 정정 요청을 확인하고 처리합니다.</p>
+          <p className="issues-subtitle">정정 요청과 검토 필요 기록을 함께 확인합니다.</p>
+          <p className="issues-subtitle">{`조회 범위 내 요청 ${filteredRequests.length}건`}</p>
           {loadState === "loading" ? <p className="issues-subtitle">요청 목록을 불러오는 중입니다...</p> : null}
           {errorMessage ? <p className="issues-subtitle">{errorMessage}</p> : null}
         </div>
         <div className="topbar-actions">
-          <Badge tone="warn">{`대기 ${countByStatus.pending}건`}</Badge>
+          <Badge tone="warn">{`정정 요청 ${countByStatus.pending}건`}</Badge>
         </div>
       </header>
 
@@ -450,7 +518,7 @@ export function IssuesQueuePage() {
             <input
               type="text"
               aria-label="요청 검색"
-              placeholder="근로자명 또는 사유로 검색"
+              placeholder="근로자명, 이메일, 사유 검색"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.currentTarget.value)}
             />
@@ -458,11 +526,71 @@ export function IssuesQueuePage() {
         </div>
 
         <IssueQueueList
-          requests={filteredRequests}
+          requests={pagedRequests}
           onApprove={handleApprove}
           onReject={handleReject}
           onToggleDetail={handleToggleDetail}
         />
+
+        <div className="worker-pagination">
+          <div className="worker-pagination-left">
+            <label htmlFor="issue-rows-per-page">페이지당 개수</label>
+            <select
+              id="issue-rows-per-page"
+              value={rowsPerPage}
+              onChange={(event) => setRowsPerPage(Number(event.currentTarget.value))}
+            >
+              {rowsPerPageOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <span>
+              {rangeStart}-{rangeEnd} / {filteredRequests.length}
+            </span>
+          </div>
+
+          <div className="worker-pagination-right">
+            <button
+              type="button"
+              className="worker-pagination-nav"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage <= 1}
+              aria-label="이전 페이지"
+            >
+              이전
+            </button>
+
+            {pageItems.map((item, index) =>
+              item === "ellipsis" ? (
+                <span key={`ellipsis-${index}`} className="worker-pagination-ellipsis" aria-hidden="true">
+                  ...
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  key={item}
+                  className={`worker-pagination-page${item === currentPage ? " active" : ""}`}
+                  onClick={() => setCurrentPage(item)}
+                  aria-current={item === currentPage ? "page" : undefined}
+                >
+                  {item}
+                </button>
+              )
+            )}
+
+            <button
+              type="button"
+              className="worker-pagination-nav"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage >= totalPages}
+              aria-label="다음 페이지"
+            >
+              다음
+            </button>
+          </div>
+        </div>
       </SectionCard>
     </div>
   );

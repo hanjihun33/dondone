@@ -55,11 +55,9 @@ public class WorkProofAuditLog extends BaseCreatedEntity {
     @Column(name = "after_attachment_count", nullable = false)
     private int afterAttachmentCount;
 
-    @Lob
     @Column(name = "before_attachment_metadata_json", columnDefinition = "TEXT")
     private String beforeAttachmentMetadataJson;
 
-    @Lob
     @Column(name = "after_attachment_metadata_json", columnDefinition = "TEXT")
     private String afterAttachmentMetadataJson;
 
