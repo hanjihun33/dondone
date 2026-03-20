@@ -178,7 +178,7 @@ EOF
                 runLogged('''
                     cd "$DEPLOY_DIR"
                     docker compose build api-server
-                    docker compose up -d postgres redis api-server nginx
+                    docker compose up -d postgres redis api-server
                 ''')
             }
         }
@@ -189,15 +189,67 @@ EOF
                     env.FAILED_STAGE = 'Health Check'
                 }
                 runLogged('''
-                    for i in $(seq 1 12); do
-                        if curl -fsS --max-time 5 "$HEALTHCHECK_URL"; then
-                            echo "Health check passed"
-                            exit 0
+                    cd "$DEPLOY_DIR"
+
+                    for i in $(seq 1 24); do
+                        API_CONTAINER_ID="$(docker compose ps -q api-server || true)"
+                        API_HEALTH="unknown"
+                        API_STATUS="unknown"
+
+                        if [ -n "$API_CONTAINER_ID" ]; then
+                            API_STATUS="$(docker inspect --format '{{.State.Status}}' "$API_CONTAINER_ID" || echo unknown)"
+                            API_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$API_CONTAINER_ID" || echo unknown)"
                         fi
-                        echo "Attempt $i/12 failed, retrying in 5s..."
+
+                        echo "Attempt $i/24: api-server status=$API_STATUS health=$API_HEALTH"
+
+                        if [ "$API_STATUS" = "exited" ] || [ "$API_STATUS" = "dead" ]; then
+                            docker compose ps || true
+                            docker compose logs --tail=200 api-server || true
+                            echo "api-server is not running"
+                            exit 1
+                        fi
+
+                        if [ "$API_HEALTH" = "unhealthy" ]; then
+                            docker compose ps || true
+                            docker compose logs --tail=200 api-server || true
+                            echo "api-server became unhealthy"
+                            exit 1
+                        fi
+
+                        if [ "$API_HEALTH" = "healthy" ]; then
+                            echo "api-server is healthy"
+                            break
+                        fi
+
+                        echo "Attempt $i/24 failed, retrying in 5s..."
                         sleep 5
                     done
-                    echo "Health check failed after 60s"
+
+                    API_CONTAINER_ID="$(docker compose ps -q api-server || true)"
+                    API_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$API_CONTAINER_ID" || echo unknown)"
+
+                    if [ "$API_HEALTH" != "healthy" ]; then
+                        docker compose ps || true
+                        docker compose logs --tail=200 api-server || true
+                        echo "api-server did not become healthy after 120s"
+                        exit 1
+                    fi
+
+                    docker compose up -d nginx
+
+                    for i in $(seq 1 12); do
+                        if curl -fsS --max-time 5 "$HEALTHCHECK_URL"; then
+                            echo "External health check passed"
+                            exit 0
+                        fi
+                        echo "External attempt $i/12 failed, retrying in 5s..."
+                        sleep 5
+                    done
+
+                    docker compose ps || true
+                    docker compose logs --tail=200 api-server nginx || true
+                    echo "External health check failed after 60s"
                     exit 1
                 ''')
             }

@@ -496,11 +496,11 @@ public class WorkProofLane1Service {
                 workProof.isCheckedIn() ? WorkProofRecordStatus.CHECKED_IN : WorkProofRecordStatus.CHECKED_OUT,
                 workplace == null ? null : new WorkProofRecordResponse.WorkplaceSnapshot(
                         workplace.getId(),
-                        workplace.getName(),
-                        workplace.getAddress(),
-                        workplace.getMapLabel(),
-                        workplace.getLatitude(),
-                        workplace.getLongitude()
+                        workProof.resolveWorkplaceName(),
+                        workProof.resolveWorkplaceAddress(),
+                        workProof.resolveWorkplaceMapLabel(),
+                        workProof.resolveWorkplaceLatitude(),
+                        workProof.resolveWorkplaceLongitude()
                 ),
                 contract == null ? null : toCurrentContractResponse(contract),
                 new WorkProofRecordResponse.EvidenceCaptureResponse(

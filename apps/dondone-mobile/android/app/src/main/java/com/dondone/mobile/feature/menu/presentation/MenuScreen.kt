@@ -82,6 +82,8 @@ import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileAction
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileUiState
 
 private data class MenuServiceAction(
     val label: String,
@@ -116,10 +118,14 @@ private val MenuReceiptHashBorder = Color(0xFFE2E8F0)
 @Composable
 fun MenuScreen(
     uiModel: MenuUiModel,
+    workproofPdfFileUiState: WorkproofPdfFileUiState,
     launchRequest: MenuLaunchRequest?,
     profileUpdateUiState: ProfileUpdateUiState,
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit,
+    onOpenWorkproofPdf: (Long) -> Unit,
+    onShareWorkproofPdf: (Long) -> Unit,
+    onClearPdfFileState: () -> Unit,
     onConsumeLaunchRequest: () -> Unit,
     onUpdateProfile: (String, String) -> Unit,
     onClearProfileUpdateMessage: () -> Unit,
@@ -136,6 +142,23 @@ fun MenuScreen(
     val proofDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Proof }
     val claimDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Claim }
     val selectedReceipt = if (activeSheet == MenuOverlaySheet.Receipt) uiModel.receipt else null
+
+    LaunchedEffect(workproofPdfFileUiState.fileUri, workproofPdfFileUiState.pendingAction) {
+        val fileUri = workproofPdfFileUiState.fileUri ?: return@LaunchedEffect
+        val action = workproofPdfFileUiState.pendingAction ?: return@LaunchedEffect
+        val uri = Uri.parse(fileUri)
+        when (action) {
+            WorkproofPdfFileAction.OPEN -> openMenuWorkproofPdfFile(context, uri)
+            WorkproofPdfFileAction.SHARE -> shareMenuWorkproofPdfFile(context, uri, workproofPdfFileUiState.fileName)
+        }
+        onClearPdfFileState()
+    }
+
+    LaunchedEffect(workproofPdfFileUiState.errorMessage) {
+        val message = workproofPdfFileUiState.errorMessage ?: return@LaunchedEffect
+        onShowToast(message, BadgeTone.Warning)
+        onClearPdfFileState()
+    }
 
     LaunchedEffect(launchRequest?.requestId, proofDocument?.id, claimDocument?.id) {
         val request = launchRequest ?: return@LaunchedEffect
@@ -296,6 +319,24 @@ fun MenuScreen(
         ) {
             MenuDocumentSheet(
                 document = selectedDocument,
+                onOpenProofDocument = {
+                    val documentId = selectedDocument.documentId
+                    if (documentId == null) {
+                        onShowToast("아직 준비된 문서가 없어요.", BadgeTone.Warning)
+                    } else {
+                        selectedDocumentId = null
+                        onOpenWorkproofPdf(documentId)
+                    }
+                },
+                onShareProofDocument = {
+                    val documentId = selectedDocument.documentId
+                    if (documentId == null) {
+                        onShowToast("아직 공유할 문서가 없어요.", BadgeTone.Warning)
+                    } else {
+                        selectedDocumentId = null
+                        onShareWorkproofPdf(documentId)
+                    }
+                },
                 onOpenClaimFlow = {
                     selectedDocumentId = null
                     activeSheet = MenuOverlaySheet.Claim
@@ -336,6 +377,44 @@ private fun openMenuReceiptExplorer(
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+    }.isSuccess
+}
+
+private fun openMenuWorkproofPdfFile(
+    context: Context,
+    uri: Uri
+): Boolean {
+    return runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }.isSuccess
+}
+
+private fun shareMenuWorkproofPdfFile(
+    context: Context,
+    uri: Uri,
+    fileName: String?
+): Boolean {
+    return runCatching {
+        context.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TITLE, fileName ?: "근무 기록 문서")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },
+                "근무 기록 문서 공유"
+            ).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         )
     }.isSuccess
@@ -844,6 +923,8 @@ private fun menuDocumentColors(accent: MenuDocumentAccent): MenuDocumentColors {
 @Composable
 private fun MenuDocumentSheet(
     document: MenuDocumentUiModel,
+    onOpenProofDocument: () -> Unit,
+    onShareProofDocument: () -> Unit,
     onOpenClaimFlow: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -876,7 +957,7 @@ private fun MenuDocumentSheet(
             )
             Text(
                 text = when (document.accent) {
-                    MenuDocumentAccent.Proof -> "근무 기록과 차액 검토 근거가 반영된 최신 증빙 문서예요."
+                    MenuDocumentAccent.Proof -> "근무 탭에서 선택한 기간의 출퇴근 기록과 변경 이력을 다시 열고 공유할 수 있는 문서예요."
                     MenuDocumentAccent.Claim -> "차액 검토 결과를 토대로 신고 준비 흐름으로 이어지는 묶음 문서예요."
                     MenuDocumentAccent.Receipt -> "최근 테스트넷 송금 내역과 전송 해시를 확인할 수 있는 영수증 문서예요."
                 },
@@ -885,11 +966,35 @@ private fun MenuDocumentSheet(
             )
         }
 
-        PrimaryActionButton(
-            text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
-            onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (document.accent == MenuDocumentAccent.Proof) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                MenuDocumentActionButton(
+                    text = "공유",
+                    icon = Icons.Default.Share,
+                    onClick = onShareProofDocument,
+                    enabled = document.statusTone == BadgeTone.Success,
+                    primary = false,
+                    modifier = Modifier.weight(1f)
+                )
+                MenuDocumentActionButton(
+                    text = "열기",
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    onClick = onOpenProofDocument,
+                    enabled = document.statusTone == BadgeTone.Success,
+                    primary = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            PrimaryActionButton(
+                text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
+                onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -1102,7 +1207,7 @@ private fun MenuClaimSheet(
             }
             proofDocument?.let { document ->
                 MenuClaimFileCard(
-                    title = "Proof Pack",
+                    title = "근무 기록 문서",
                     badgeText = document.statusText,
                     badgeTone = document.statusTone,
                     accentBackground = DawnSecondary,
@@ -1151,7 +1256,7 @@ private fun MenuClaimSheet(
         }
 
         MenuSheetSection(title = "체크리스트") {
-            MenuChecklistRow(text = "Proof Pack 준비")
+            MenuChecklistRow(text = "근무 기록 문서 준비")
             MenuChecklistRow(text = "근거 자료 묶음 준비")
             MenuChecklistRow(text = "접수 경로 확인(온라인/전화/방문)", isInfo = true)
         }

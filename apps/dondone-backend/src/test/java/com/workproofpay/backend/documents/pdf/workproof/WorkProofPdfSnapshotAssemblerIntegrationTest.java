@@ -63,7 +63,7 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
 
     @Test
     void assemblesProofPackSnapshotFromOwnedRecords() {
-        User user = userRepository.saveAndFlush(User.register("pdf-assembler@test.com", "hashed", "Assembler User"));
+        User user = userRepository.saveAndFlush(User.register("pdf-assembler@test.com", "hashed", "Assembler User", "010-1111-2222"));
         Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
                 user,
                 "Proof Pack Cafe",
@@ -164,22 +164,173 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
         ));
 
         assertThat(snapshot.worker().name()).isEqualTo("Assembler User");
+        assertThat(snapshot.worker().phoneNumber()).isEqualTo("010-1111-2222");
         assertThat(snapshot.workplace().name()).isEqualTo("Proof Pack Cafe");
-        assertThat(snapshot.contract().payUnit()).isEqualTo("시급");
-        assertThat(snapshot.summary().totalRecordCount()).isEqualTo(2);
-        assertThat(snapshot.summary().reflectedCount()).isEqualTo(1);
-        assertThat(snapshot.summary().needsReviewCount()).isEqualTo(1);
+        assertThat(snapshot.statement().title()).isEqualTo("근무 기록 문서");
+        assertThat(snapshot.statement().subtitle()).contains("출퇴근 기록");
+        assertThat(snapshot.period().periodLabel()).isEqualTo("대상 기간: 2026-03-01 ~ 2026-03-31");
+        assertThat(snapshot.summary().totalWorkDayCount()).isEqualTo(2);
+        assertThat(snapshot.summary().totalWorkDayCountLabel()).isEqualTo("2일");
         assertThat(snapshot.summary().editedCount()).isEqualTo(1);
-        assertThat(snapshot.summary().totalAttachmentCount()).isEqualTo(2);
+        assertThat(snapshot.summary().issueCount()).isEqualTo(1);
+        assertThat(snapshot.summary().issueCountLabel()).isEqualTo("1건");
         assertThat(snapshot.summary().totalWorkedMinutes()).isEqualTo(1_140L);
         assertThat(snapshot.records()).hasSize(2);
         assertThat(snapshot.audits()).hasSize(1);
-        assertThat(snapshot.notices())
-                .anyMatch(notice -> notice.contains("검토 필요"))
-                .anyMatch(notice -> notice.contains("허용 반경 밖"))
-                .anyMatch(notice -> notice.contains("수정된 기록"));
         assertThat(snapshot.records())
-                .anyMatch(item -> item.financialStatus().equals("NEEDS_REVIEW"))
-                .anyMatch(WorkProofPdfSnapshot.WorkProofRecordItem::edited);
+                .anyMatch(item -> item.remarks().contains("수정 기록 있음"))
+                .anyMatch(item -> item.remarks().contains("기록 확인 필요"));
+        assertThat(snapshot.audits().get(0).changeSummary()).contains("출근 09:00→09:10");
+        assertThat(snapshot.audits().get(0).workDate()).isEqualTo("2026-03-10");
+        assertThat(snapshot.audits().get(0).editReason()).isEqualTo("Correction");
+    }
+
+    @Test
+    void assemblesWorkproofStatementSnapshotFromPeriodRequest() {
+        User user = userRepository.saveAndFlush(User.register("pdf-statement@test.com", "hashed", "Statement User", "010-3333-4444"));
+        Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
+                user,
+                "Statement Cafe",
+                "Seoul Somewhere 2",
+                "Side door",
+                37.5,
+                127.0,
+                150
+        ));
+        WorkContract contract = workContractRepository.saveAndFlush(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(11_000),
+                480,
+                10_560,
+                BigDecimal.valueOf(11_000),
+                LocalDate.of(2026, 1, 1)
+        ));
+
+        WorkProof record = WorkProof.checkIn(
+                user,
+                workplace,
+                contract,
+                LocalDateTime.of(2026, 2, 1, 9, 0),
+                LocalDateTime.of(2026, 2, 1, 9, 1),
+                37.5,
+                127.0,
+                "Side door"
+        );
+        record.completeCheckOut(
+                LocalDateTime.of(2026, 2, 1, 18, 0),
+                LocalDateTime.of(2026, 2, 1, 18, 1),
+                37.5,
+                127.0,
+                "Side door",
+                false
+        );
+        workProofRepository.saveAndFlush(record);
+
+        DocumentGenerationRequest request = documentGenerationRequestRepository.saveAndFlush(
+                DocumentGenerationRequest.queueWorkproofStatement(
+                        user,
+                        workplace.getId(),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 2, 23),
+                        "workproof-statement-key"
+                )
+        );
+
+        WorkProofPdfSnapshot snapshot = assembler.assemble(new WorkProofPdfAssembleCommand(
+                user.getId(),
+                request.getId(),
+                request.getRequestId(),
+                workplace.getId(),
+                request.getStartDate(),
+                request.getEndDate(),
+                ZoneId.of("Asia/Seoul"),
+                Locale.KOREA
+        ));
+
+        assertThat(snapshot.meta().documentType()).isEqualTo("WORKPROOF_STATEMENT");
+        assertThat(snapshot.meta().documentNumber()).startsWith("WS-");
+        assertThat(snapshot.statement().title()).isEqualTo("근무 기록 문서");
+        assertThat(snapshot.period().startDate()).isEqualTo("2026-01-01");
+        assertThat(snapshot.period().endDate()).isEqualTo("2026-02-23");
+        assertThat(snapshot.period().yearMonth()).isEqualTo("2026-01-01 ~ 2026-02-23");
+        assertThat(snapshot.period().periodLabel()).isEqualTo("대상 기간: 2026-01-01 ~ 2026-02-23");
+        assertThat(snapshot.summary().totalWorkDayCount()).isEqualTo(1);
+        assertThat(snapshot.summary().totalWorkDayCountLabel()).isEqualTo("1일");
+        assertThat(snapshot.records()).hasSize(1);
+        assertThat(snapshot.worker().phoneNumber()).isEqualTo("010-3333-4444");
+        assertThat(snapshot.records().get(0).remarks()).isEqualTo("-");
+    }
+
+    @Test
+    void keepsHistoricalWorkplaceInfoAfterWorkplaceSettingsChange() {
+        User user = userRepository.saveAndFlush(User.register("pdf-snapshot@test.com", "hashed", "Snapshot User"));
+        Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
+                user,
+                "Proof Pack Cafe",
+                "Seoul Somewhere 1",
+                "Front door",
+                37.5,
+                127.0,
+                150
+        ));
+        WorkContract contract = workContractRepository.saveAndFlush(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(12_000),
+                480,
+                10_560,
+                BigDecimal.valueOf(12_000),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof record = WorkProof.checkIn(
+                user,
+                workplace,
+                contract,
+                LocalDateTime.of(2026, 3, 12, 9, 0),
+                LocalDateTime.of(2026, 3, 12, 9, 1),
+                37.5,
+                127.0,
+                "Front door"
+        );
+        record.completeCheckOut(
+                LocalDateTime.of(2026, 3, 12, 18, 0),
+                LocalDateTime.of(2026, 3, 12, 18, 1),
+                37.5,
+                127.0,
+                "Front door",
+                false
+        );
+        workProofRepository.saveAndFlush(record);
+
+        workplace.updateEmployerSettings(
+                "Seoul Updated 99",
+                "Back door",
+                37.6,
+                127.1,
+                500,
+                LocalDateTime.of(2026, 3, 12, 19, 0),
+                user.getId()
+        );
+        workplaceRepository.saveAndFlush(workplace);
+
+        DocumentGenerationRequest request = documentGenerationRequestRepository.saveAndFlush(
+                DocumentGenerationRequest.queueProofPack(user, 500L, "2026-03", workplace.getId(), "proof-pack-snapshot-key")
+        );
+
+        WorkProofPdfSnapshot snapshot = assembler.assemble(new WorkProofPdfAssembleCommand(
+                user.getId(),
+                request.getId(),
+                request.getRequestId(),
+                workplace.getId(),
+                null,
+                null,
+                ZoneId.of("Asia/Seoul"),
+                Locale.KOREA
+        ));
+
+        assertThat(snapshot.workplace().address()).isEqualTo("Seoul Somewhere 1");
+        assertThat(snapshot.workplace().name()).isEqualTo("Proof Pack Cafe");
     }
 }

@@ -1,6 +1,7 @@
 package com.workproofpay.backend.auth.model;
 
 import com.workproofpay.backend.shared.util.CompanyCodeUtils;
+import com.workproofpay.backend.auth.support.EmailNormalizer;
 import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -51,13 +52,14 @@ public class User extends BaseTimeEntity {
             String companyCode,
             UserRole role
     ) {
-        this.email = email;
+        this.email = EmailNormalizer.normalize(email);
         this.passwordHash = passwordHash;
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.companyCode = companyCode;
         this.role = role;
     }
+
 
     public static User register(String email, String encodedPassword, String name) {
         return register(email, encodedPassword, name, null, CompanyCodeUtils.DEFAULT_COMPANY_CODE);
@@ -84,5 +86,9 @@ public class User extends BaseTimeEntity {
 
     public void updateCompanyCode(String companyCode) {
         this.companyCode = CompanyCodeUtils.normalizeOrThrow(companyCode);
+    }
+
+    public static User registerEmployer(String email, String encodedPassword, String name) {
+        return new User(email, encodedPassword, name, null, null, UserRole.EMPLOYER);
     }
 }

@@ -69,7 +69,8 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"))
                 .andExpect(jsonPath("$.data.companyCode").isEmpty());
 
-        User user = userRepository.findByEmail("phone-auth@test.com").orElseThrow();
+        User user = userRepository.findByEmailIgnoreCase("phone-auth@test.com").orElseThrow();
+
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", bearer(tokenFor(user))))
                 .andExpect(status().isOk())

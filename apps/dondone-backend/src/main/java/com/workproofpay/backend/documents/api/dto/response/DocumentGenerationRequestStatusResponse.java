@@ -5,7 +5,7 @@ import com.workproofpay.backend.documents.model.DocumentGenerationStatus;
 import com.workproofpay.backend.documents.model.DocumentType;
 
 /**
- * poll 응답은 requestId 기준 진행 상태와 실제 detail 경로를 함께 돌려준다.
+ * 문서 요청 상태 응답은 requestId 기준 진행 상태와 실제 접근 경로를 함께 돌려준다.
  */
 public record DocumentGenerationRequestStatusResponse(
         String requestId,
@@ -22,7 +22,15 @@ public record DocumentGenerationRequestStatusResponse(
                 request.getDocumentType(),
                 request.getStatus(),
                 "/api/documents/requests/" + request.getRequestId(),
-                "/api/documents/" + request.getId()
+                resolveDocumentUrl(request)
         );
+    }
+
+    private static String resolveDocumentUrl(DocumentGenerationRequest request) {
+        if (request.getDocumentType().usesOnDemandDownload()
+                || request.getStatus() == DocumentGenerationStatus.READY) {
+            return "/api/documents/" + request.getId() + "/download";
+        }
+        return null;
     }
 }
