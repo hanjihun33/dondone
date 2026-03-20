@@ -22,6 +22,22 @@
   - employer signup-code reissue/revoke
   - worker registration code issuance
 
+## 2026-03-20 Admin Advance Approval Update
+- admin mock `advance request approval` table is now backed by real APIs.
+- newly wired admin advance flows:
+  - `GET /api/admin/advance/requests`
+  - `POST /api/admin/advance/requests/{requestId}/approve`
+  - `POST /api/admin/advance/requests/{requestId}/reject`
+- advance worker contract changed with this flow:
+  - `POST /api/advance/requests` now creates `SUBMITTED` requests instead of immediate `APPROVED`
+  - `approvedAmount` can be `null` while the request is pending or rejected
+  - same workplace/month requests are blocked while an open `SUBMITTED` or `APPROVED` request exists
+- current admin UI scope:
+  - status filters: `전체 / 승인 대기 / 승인 완료 / 반려`
+  - list-only review surface with inline approve/reject actions
+  - no separate admin advance detail page yet
+- mobile advance screen now tolerates pending/rejected `approvedAmount=null` and renders pending-friendly copy.
+
 ## 2026-03-20 Shared Policy Update
 - worker app and employer web now share the same policy vocabulary through `docs/web/app-web-shared-policy.md`.
 - fixed wording for current scope:

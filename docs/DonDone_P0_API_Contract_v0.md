@@ -717,7 +717,7 @@ Response:
 
 배경: 신청 계열은 중복 호출 시 혼선이 커서 `Idempotency-Key`를 필수로 둔다.
 v0 메모: 실제 대출 집행이 아니라 데모 시뮬레이션 승인/거절 결과를 돌려준다.
-현재 구현 가정: P0 데모에서는 적격 시 즉시 `APPROVED` 응답을 반환하고, 동일 `Idempotency-Key` + 동일 payload 재시도는 기존 응답을 재생한다.
+현재 구현 가정: P0 데모에서는 worker 요청 생성 시 `SUBMITTED` 응답을 반환하고, service admin 승인/반려 후 `APPROVED / REJECTED`로 전이한다. 동일 `Idempotency-Key` + 동일 payload 재시도는 기존 응답을 재생한다.
 
 Headers:
 | 헤더 | 규칙 | 설명 |
@@ -736,7 +736,7 @@ Response `201 Created`:
 | --- | --- |
 | `requestId` | - |
 | `status` | `SUBMITTED`, `APPROVED`, `REJECTED`, `NEEDS_REVIEW` |
-| `approvedAmount` | - |
+| `approvedAmount` | pending/rejected 상태에서는 `null` 가능 |
 | `feeAmount` | - |
 | `repaymentDueDate` | - |
 | `eligibilitySnapshot` | object. 하위 필드: availableAmount, maxCap, policyRate, reflectedWorkDays, reflectedWorkMinutes, needsReviewRecordCount |
@@ -759,7 +759,7 @@ Response:
 | 필드 | 설명 |
 | --- | --- |
 | `month` | - |
-| `requests[]` | array<object>. 배열 항목: requestId, workplaceId, requestedAmount, approvedAmount, status, repaymentDueDate, requestedAt |
+| `requests[]` | array<object>. 배열 항목: requestId, workplaceId, requestedAmount, approvedAmount(nullable), status, repaymentDueDate, requestedAt |
 
 ### 3.4 `GET /api/advance/requests/{requestId}`
 
@@ -771,7 +771,7 @@ Response:
 | `requestId` | - |
 | `workplaceId` | - |
 | `requestedAmount` | - |
-| `approvedAmount` | - |
+| `approvedAmount` | pending/rejected 상태에서는 `null` 가능 |
 | `feeAmount` | - |
 | `status` | - |
 | `repaymentDueDate` | - |
