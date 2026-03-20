@@ -63,7 +63,7 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
 
     @Test
     void assemblesProofPackSnapshotFromOwnedRecords() {
-        User user = userRepository.saveAndFlush(User.register("pdf-assembler@test.com", "hashed", "Assembler User"));
+        User user = userRepository.saveAndFlush(User.register("pdf-assembler@test.com", "hashed", "Assembler User", "010-1111-2222"));
         Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
                 user,
                 "Proof Pack Cafe",
@@ -164,37 +164,30 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
         ));
 
         assertThat(snapshot.worker().name()).isEqualTo("Assembler User");
+        assertThat(snapshot.worker().phoneNumber()).isEqualTo("010-1111-2222");
         assertThat(snapshot.workplace().name()).isEqualTo("Proof Pack Cafe");
-        assertThat(snapshot.contract().payUnit()).isEqualTo("시급");
         assertThat(snapshot.statement().title()).isEqualTo("근무 기록 문서");
         assertThat(snapshot.statement().subtitle()).contains("출퇴근 기록");
         assertThat(snapshot.period().periodLabel()).isEqualTo("대상 기간: 2026-03-01 ~ 2026-03-31");
-        assertThat(snapshot.summary().totalRecordCount()).isEqualTo(2);
         assertThat(snapshot.summary().totalWorkDayCount()).isEqualTo(2);
         assertThat(snapshot.summary().totalWorkDayCountLabel()).isEqualTo("2일");
-        assertThat(snapshot.summary().reflectedCount()).isEqualTo(1);
-        assertThat(snapshot.summary().needsReviewCount()).isEqualTo(1);
         assertThat(snapshot.summary().editedCount()).isEqualTo(1);
-        assertThat(snapshot.summary().totalAttachmentCount()).isEqualTo(2);
+        assertThat(snapshot.summary().issueCount()).isEqualTo(1);
+        assertThat(snapshot.summary().issueCountLabel()).isEqualTo("1건");
         assertThat(snapshot.summary().totalWorkedMinutes()).isEqualTo(1_140L);
         assertThat(snapshot.records()).hasSize(2);
         assertThat(snapshot.audits()).hasSize(1);
         assertThat(snapshot.records())
-                .anyMatch(item -> item.locationSummaryLabel().contains("출근"))
-                .anyMatch(item -> item.memoOrReason().contains("사유: Correction"));
+                .anyMatch(item -> item.remarks().contains("수정 기록 있음"))
+                .anyMatch(item -> item.remarks().contains("기록 확인 필요"));
         assertThat(snapshot.audits().get(0).changeSummary()).contains("출근 09:00→09:10");
-        assertThat(snapshot.notices())
-                .anyMatch(notice -> notice.contains("검토 필요"))
-                .anyMatch(notice -> notice.contains("허용 반경 밖"))
-                .anyMatch(notice -> notice.contains("수정된 기록"));
-        assertThat(snapshot.records())
-                .anyMatch(item -> item.financialStatus().equals("NEEDS_REVIEW"))
-                .anyMatch(WorkProofPdfSnapshot.WorkProofRecordItem::edited);
+        assertThat(snapshot.audits().get(0).workDate()).isEqualTo("2026-03-10");
+        assertThat(snapshot.audits().get(0).editReason()).isEqualTo("Correction");
     }
 
     @Test
     void assemblesWorkproofStatementSnapshotFromPeriodRequest() {
-        User user = userRepository.saveAndFlush(User.register("pdf-statement@test.com", "hashed", "Statement User"));
+        User user = userRepository.saveAndFlush(User.register("pdf-statement@test.com", "hashed", "Statement User", "010-3333-4444"));
         Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
                 user,
                 "Statement Cafe",
@@ -265,6 +258,7 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
         assertThat(snapshot.summary().totalWorkDayCount()).isEqualTo(1);
         assertThat(snapshot.summary().totalWorkDayCountLabel()).isEqualTo("1일");
         assertThat(snapshot.records()).hasSize(1);
-        assertThat(snapshot.records().get(0).locationSummaryLabel()).isEqualTo("출근 Side door / 퇴근 Side door");
+        assertThat(snapshot.worker().phoneNumber()).isEqualTo("010-3333-4444");
+        assertThat(snapshot.records().get(0).remarks()).isEqualTo("-");
     }
 }

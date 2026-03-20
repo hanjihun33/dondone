@@ -7,12 +7,10 @@ public record WorkProofPdfSnapshot(
         StatementInfo statement,
         WorkerInfo worker,
         WorkplaceInfo workplace,
-        ContractInfo contract,
         PeriodInfo period,
         SummaryInfo summary,
         List<WorkProofRecordItem> records,
-        List<WorkProofAuditItem> audits,
-        List<String> notices
+        List<WorkProofAuditItem> audits
 ) {
     public record DocumentMeta(
             String documentType,
@@ -26,34 +24,20 @@ public record WorkProofPdfSnapshot(
 
     public record StatementInfo(
             String title,
-            String subtitle,
-            String intendedUseNotice
+            String subtitle
     ) {
     }
 
     public record WorkerInfo(
-            Long userId,
             String name,
-            String email
+            String email,
+            String phoneNumber
     ) {
     }
 
     public record WorkplaceInfo(
-            Long workplaceId,
             String name,
-            String address,
-            String mapLabel
-    ) {
-    }
-
-    public record ContractInfo(
-            String payUnit,
-            String basePayAmount,
-            String normalizedHourlyWage,
-            Integer dailyWorkMinutes,
-            Integer monthlyWorkMinutes,
-            String effectiveFrom,
-            String effectiveTo
+            String address
     ) {
     }
 
@@ -66,15 +50,13 @@ public record WorkProofPdfSnapshot(
     }
 
     public record SummaryInfo(
-            int totalRecordCount,
             int totalWorkDayCount,
-            int reflectedCount,
-            int needsReviewCount,
             int editedCount,
-            int totalAttachmentCount,
+            int issueCount,
             long totalWorkedMinutes,
             String totalWorkedHoursLabel,
-            String totalWorkDayCountLabel
+            String totalWorkDayCountLabel,
+            String issueCountLabel
     ) {
     }
 
@@ -85,37 +67,17 @@ public record WorkProofPdfSnapshot(
             String clockOutAt,
             long workedMinutes,
             String workedHoursLabel,
-            String clockInLocationLabel,
-            String clockOutLocationLabel,
-            String financialStatus,
-            String financialStatusLabel,
-            String financialStatusTone,
-            boolean edited,
-            boolean outsideAllowedRadius,
-            String outsideAllowedRadiusLabel,
-            String locationSummaryLabel,
-            String editReason,
-            String memo,
-            String memoOrReason,
-            int attachmentCount,
-            String createdAt,
-            String updatedAt
+            String remarks
     ) {
     }
 
     public record WorkProofAuditItem(
             Long auditId,
             Long recordId,
+            String workDate,
             String editedAt,
-            String beforeClockInAt,
-            String beforeClockOutAt,
-            String afterClockInAt,
-            String afterClockOutAt,
-            String beforeMemo,
-            String afterMemo,
-            String beforeEditReason,
-            String afterEditReason,
-            String changeSummary
+            String changeSummary,
+            String editReason
     ) {
     }
 }
