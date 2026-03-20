@@ -64,6 +64,26 @@ public class DemoRemittanceBlockchainGateway implements RemittanceBlockchainGate
         }
     }
 
+    public void debitToken(String walletAddress, BigInteger amountAtomic) {
+        BigInteger current = tokenBalances.getOrDefault(walletAddress, BigInteger.ZERO);
+        if (current.compareTo(amountAtomic) < 0) {
+            throw new IllegalStateException("insufficient demo token balance");
+        }
+        tokenBalances.put(walletAddress, current.subtract(amountAtomic));
+    }
+
+    public void creditToken(String walletAddress, BigInteger amountAtomic) {
+        tokenBalances.merge(walletAddress, amountAtomic, BigInteger::add);
+    }
+
+    public void consumeNativeGas(String walletAddress) {
+        BigInteger current = nativeBalances.getOrDefault(walletAddress, BigInteger.ZERO);
+        if (current.signum() <= 0) {
+            throw new IllegalStateException("insufficient demo native balance");
+        }
+        nativeBalances.put(walletAddress, current.subtract(BigInteger.ONE));
+    }
+
     @Override
     public BigInteger estimateTokenTransferGasCostWei() {
         Timer.Sample sample = remittanceMetrics.start();
