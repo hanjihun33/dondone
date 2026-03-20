@@ -8,6 +8,7 @@ import com.workproofpay.backend.remittance.model.RemittancePolicyCode;
 import com.workproofpay.backend.remittance.model.UserWallet;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.remittance.service.RecipientService;
+import com.workproofpay.backend.remittance.service.RemittanceMetrics;
 import com.workproofpay.backend.remittance.service.RemittancePolicyService;
 import com.workproofpay.backend.remittance.service.WalletService;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,9 @@ class RemittancePolicyServiceTest {
     @Mock
     private TransferRepository transferRepository;
 
+    @Mock
+    private RemittanceMetrics remittanceMetrics;
+
     private RemittancePolicyService remittancePolicyService;
 
     @BeforeEach
@@ -44,7 +48,8 @@ class RemittancePolicyServiceTest {
                 recipientService,
                 walletService,
                 transferRepository,
-                new RemittanceProperties()
+                new RemittanceProperties(),
+                remittanceMetrics
         );
     }
 

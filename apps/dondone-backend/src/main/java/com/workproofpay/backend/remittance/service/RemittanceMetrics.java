@@ -1,9 +1,12 @@
 package com.workproofpay.backend.remittance.service;
 
+import com.workproofpay.backend.jobs.model.JobType;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -38,9 +41,9 @@ public class RemittanceMetrics {
         );
     }
 
-    public void recordWorkerJob(Timer.Sample sample, String jobType, String outcome) {
+    public void recordWorkerJob(Timer.Sample sample, JobType jobType, String outcome) {
         stop(sample, "dondone.remittance.worker.job",
-                "job_type", sanitize(jobType),
+                "job_type", jobType == null ? UNKNOWN : jobType.name().toLowerCase(Locale.ROOT),
                 "outcome", sanitize(outcome)
         );
     }
