@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -103,8 +104,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.status").value("APPROVED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(100000))
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmount").value(150000))
                 .andReturn()
                 .getResponse()
@@ -119,19 +120,24 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(requestJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
-                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests")
                         .header("Authorization", bearer(token))
                         .param("month", nextMonth().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requests.length()").value(1))
-                .andExpect(jsonPath("$.data.requests[0].requestId").value(requestId));
+                .andExpect(jsonPath("$.data.requests[0].requestId").value(requestId))
+                .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[0].approvedAmount").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", requestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.needsReviewRecordCount").value(1));
     }
 
@@ -214,6 +220,36 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.workplaceId").value(secondWorkplaceId))
                 .andExpect(jsonPath("$.data.availableAmount").value(150000))
                 .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty());
+    }
+
+    @Test
+    void blocksSecondAdvanceRequestForSameWorkplaceWhileSubmittedRequestIsOpen() throws Exception {
+        User user = userRepository.save(User.register("advance-open@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long workplaceId = seedAdvanceEligibleScenario(user, 10, false);
+
+        String firstRequestJson = """
+                {
+                  "workplaceId": %d,
+                  "requestedAmount": 70000,
+                  "requestedAt": "2030-01-10T09:00:00"
+                }
+                """.formatted(workplaceId);
+
+        mockMvc.perform(post("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "advance-req-open-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(firstRequestJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"));
+
+        mockMvc.perform(get("/api/advance/eligibility")
+                        .header("Authorization", bearer(token))
+                        .param("workplaceId", workplaceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.availableAmount").value(0))
+                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("OUTSTANDING_ADVANCE_EXISTS"));
     }
 
     private Long seedAdvanceEligibleScenario(User user, int reflectedDayCount, boolean addPendingRecord) {
