@@ -18,3 +18,20 @@ ALTER TABLE document_generation_requests
 
 ALTER TABLE document_generation_requests
     ALTER COLUMN year_month DROP NOT NULL;
+
+ALTER TABLE document_generation_requests
+    ALTER COLUMN wage_verification_id DROP NOT NULL;
+
+ALTER TABLE document_generation_requests
+    DROP CONSTRAINT IF EXISTS document_generation_requests_document_type_check;
+
+ALTER TABLE document_generation_requests
+    ADD CONSTRAINT document_generation_requests_document_type_check
+    CHECK (
+        document_type IN (
+            'PROOF_PACK',
+            'CLAIM_KIT',
+            'TRANSFER_RECEIPT',
+            'WORKPROOF_STATEMENT'
+        )
+    );
