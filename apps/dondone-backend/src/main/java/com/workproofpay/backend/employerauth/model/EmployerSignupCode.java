@@ -26,6 +26,9 @@ public class EmployerSignupCode extends BaseTimeEntity {
     @Column(name = "code_hash", nullable = false, length = 64)
     private String codeHash;
 
+    @Column(name = "encrypted_code", length = 1024)
+    private String encryptedCode;
+
     @Column(name = "company_id", nullable = false)
     private Long companyId;
 
@@ -39,20 +42,23 @@ public class EmployerSignupCode extends BaseTimeEntity {
     private Long issuedByAccountId;
 
     private EmployerSignupCode(String code,
+                               String encryptedCode,
                                Long companyId,
                                Long defaultWorkplaceId,
                                Long issuedByAccountId) {
         this.codeHash = EmployerInvitationToken.hash(code);
+        this.encryptedCode = encryptedCode;
         this.companyId = companyId;
         this.defaultWorkplaceId = defaultWorkplaceId;
         this.issuedByAccountId = issuedByAccountId;
     }
 
     public static EmployerSignupCode create(String code,
+                                            String encryptedCode,
                                             Long companyId,
                                             Long defaultWorkplaceId,
                                             Long issuedByAccountId) {
-        return new EmployerSignupCode(code, companyId, defaultWorkplaceId, issuedByAccountId);
+        return new EmployerSignupCode(code, encryptedCode, companyId, defaultWorkplaceId, issuedByAccountId);
     }
 
     public boolean isUsable() {

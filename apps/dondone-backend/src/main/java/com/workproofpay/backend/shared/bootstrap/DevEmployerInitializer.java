@@ -19,6 +19,7 @@ import com.workproofpay.backend.employer.repo.EmployerProfileRepository;
 import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
 import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
+import com.workproofpay.backend.employerauth.service.EmployerSignupCodeCryptoService;
 import com.workproofpay.backend.workproof.api.dto.request.WorkProofAttachmentMetadataRequest;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofAuditLog;
@@ -70,6 +71,7 @@ public class DevEmployerInitializer implements CommandLineRunner {
     private final EmployerProfileRepository employerProfileRepository;
     private final EmploymentMembershipRepository employmentMembershipRepository;
     private final EmployerSignupCodeRepository employerSignupCodeRepository;
+    private final EmployerSignupCodeCryptoService employerSignupCodeCryptoService;
     private final WorkProofRepository workProofRepository;
     private final CorrectionRequestRepository correctionRequestRepository;
     private final CorrectionDecisionAuditRepository correctionDecisionAuditRepository;
@@ -173,6 +175,7 @@ public class DevEmployerInitializer implements CommandLineRunner {
         companyRepository.save(company);
         employerSignupCodeRepository.save(EmployerSignupCode.create(
                 EMPLOYER_SIGNUP_CODE,
+                employerSignupCodeCryptoService.encrypt(EMPLOYER_SIGNUP_CODE),
                 company.getId(),
                 workplace.getId(),
                 employerUser.getId()

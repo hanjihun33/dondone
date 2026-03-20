@@ -4,7 +4,8 @@ import {
   AdminEmployerCompanyCreatedResponse,
   AdminEmployerCompanySummaryResponse,
   createAdminEmployerCompany,
-  getAdminEmployerCompanies
+  getAdminEmployerCompanies,
+  getAdminEmployerSignupCode
 } from "../../shared/api/admin";
 import { ApiError } from "../../shared/api/client";
 import { clearStoredSession, getStoredAccessToken } from "../../shared/auth/session";
@@ -65,6 +66,13 @@ export function AdminPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [lastIssuedCode, setLastIssuedCode] =
     useState<AdminEmployerCompanyCreatedResponse | null>(null);
+  const [revealedCode, setRevealedCode] = useState<{
+    companyId: number;
+    companyName: string;
+    employerSignupCode: string;
+    issuedAt: string;
+  } | null>(null);
+  const [revealingCompanyId, setRevealingCompanyId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -176,6 +184,44 @@ export function AdminPage() {
     }
   };
 
+  const handleRevealCode = async (company: AdminEmployerCompanySummaryResponse) => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      clearStoredSession();
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setRevealingCompanyId(company.companyId);
+    setFormError(null);
+
+    try {
+      const response = await getAdminEmployerSignupCode(token, company.companyId);
+      setRevealedCode({
+        companyId: response.companyId,
+        companyName: response.companyName,
+        employerSignupCode: response.employerSignupCode,
+        issuedAt: response.issuedAt
+      });
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearStoredSession();
+        navigate("/", { replace: true });
+        return;
+      }
+
+      if (error instanceof ApiError) {
+        setFormError(error.message || error.code);
+      } else if (error instanceof Error) {
+        setFormError(error.message);
+      } else {
+        setFormError("고용주 가입 코드를 불러오지 못했어요.");
+      }
+    } finally {
+      setRevealingCompanyId(null);
+    }
+  };
+
   return (
     <div className="admin-page">
       <header className="admin-header">
@@ -208,6 +254,26 @@ export function AdminPage() {
               </p>
             </div>
             <div className="admin-code-banner-value">{lastIssuedCode.employerSignupCode}</div>
+          </div>
+        </section>
+      ) : null}
+
+      {revealedCode ? (
+        <section className="admin-section">
+          <div className="admin-section-head with-sub">
+            <div>
+              <h3>현재 고용주 가입 코드</h3>
+              <p className="admin-section-sub">
+                {revealedCode.companyName}의 현재 active 코드를 다시 확인한 결과입니다.
+              </p>
+            </div>
+          </div>
+          <div className="admin-code-banner">
+            <div>
+              <strong>{revealedCode.companyName}</strong>
+              <p>최근 발급: {formatDateTime(revealedCode.issuedAt)}</p>
+            </div>
+            <div className="admin-code-banner-value">{revealedCode.employerSignupCode}</div>
           </div>
         </section>
       ) : null}
@@ -290,6 +356,7 @@ export function AdminPage() {
                   <th>고용주 가입 상태</th>
                   <th>고용주 설정 상태</th>
                   <th>고용주 코드 상태</th>
+                  <th>코드 조회</th>
                   <th>등록일</th>
                 </tr>
               </thead>
@@ -341,6 +408,20 @@ export function AdminPage() {
                       <p className="admin-cell-sub">
                         최근 발급: {formatDateTime(company.latestEmployerSignupCodeIssuedAt)}
                       </p>
+                    </td>
+                    <td>
+                      {company.hasActiveEmployerSignupCode ? (
+                        <button
+                          type="button"
+                          className="admin-action-button"
+                          onClick={() => handleRevealCode(company)}
+                          disabled={revealingCompanyId === company.companyId}
+                        >
+                          {revealingCompanyId === company.companyId ? "조회 중..." : "코드 보기"}
+                        </button>
+                      ) : (
+                        <span className="admin-action-done">조회 불가</span>
+                      )}
                     </td>
                     <td>{formatDateTime(company.createdAt)}</td>
                   </tr>

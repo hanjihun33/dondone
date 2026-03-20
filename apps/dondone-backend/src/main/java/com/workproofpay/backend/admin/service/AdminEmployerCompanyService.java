@@ -4,6 +4,7 @@ import com.workproofpay.backend.admin.api.dto.request.AdminCreateEmployerCompany
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompaniesResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanyCreatedResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanySummaryResponse;
+import com.workproofpay.backend.admin.api.dto.response.AdminEmployerSignupCodeResponse;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.employer.model.Company;
@@ -13,6 +14,7 @@ import com.workproofpay.backend.employer.repo.EmployerProfileRepository;
 import com.workproofpay.backend.employerauth.model.EmployerInvitationToken;
 import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
 import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
+import com.workproofpay.backend.employerauth.service.EmployerSignupCodeCryptoService;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.model.Workplace;
@@ -51,6 +53,7 @@ public class AdminEmployerCompanyService {
     private final EmployerProfileRepository employerProfileRepository;
     private final WorkplaceRepository workplaceRepository;
     private final EmployerSignupCodeRepository employerSignupCodeRepository;
+    private final EmployerSignupCodeCryptoService employerSignupCodeCryptoService;
 
     @Transactional
     public AdminEmployerCompanyCreatedResponse createCompany(Long adminAccountId,
@@ -84,6 +87,7 @@ public class AdminEmployerCompanyService {
         String employerSignupCodeValue = generateEmployerSignupCode();
         EmployerSignupCode employerSignupCode = employerSignupCodeRepository.save(EmployerSignupCode.create(
                 employerSignupCodeValue,
+                employerSignupCodeCryptoService.encrypt(employerSignupCodeValue),
                 company.getId(),
                 workplace.getId(),
                 adminAccountId
@@ -156,6 +160,43 @@ public class AdminEmployerCompanyService {
         }
 
         return new AdminEmployerCompaniesResponse(summaries);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminEmployerSignupCodeResponse getEmployerSignupCode(Long adminAccountId, Long companyId) {
+        if (!userRepository.existsById(adminAccountId)) {
+            throw new ApiException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ApiException(ErrorCode.COMPANY_NOT_FOUND));
+        Long defaultWorkplaceId = company.getDefaultWorkplaceId();
+        if (defaultWorkplaceId == null) {
+            throw new ApiException(ErrorCode.EMPLOYER_SCOPE_NOT_READY);
+        }
+
+        Workplace workplace = workplaceRepository.findById(defaultWorkplaceId)
+                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+
+        EmployerSignupCode latestActiveCode = employerSignupCodeRepository
+                .findByCompanyIdAndDefaultWorkplaceId(company.getId(), defaultWorkplaceId)
+                .stream()
+                .filter(EmployerSignupCode::isUsable)
+                .max(Comparator.comparing(EmployerSignupCode::getCreatedAt))
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_EMPLOYER_SIGNUP_CODE));
+
+        if (latestActiveCode.getEncryptedCode() == null || latestActiveCode.getEncryptedCode().isBlank()) {
+            throw new ApiException(ErrorCode.INVALID_EMPLOYER_SIGNUP_CODE);
+        }
+
+        return new AdminEmployerSignupCodeResponse(
+                company.getId(),
+                company.getName(),
+                workplace.getId(),
+                workplace.getName(),
+                employerSignupCodeCryptoService.decrypt(latestActiveCode.getEncryptedCode()),
+                latestActiveCode.getCreatedAt()
+        );
     }
 
     private String normalizeCompanyCode(String companyCode) {

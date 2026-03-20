@@ -44,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "employer.signup-code-encryption-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "remittance.wallet.encryption-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 })
 @AutoConfigureMockMvc
@@ -297,6 +298,7 @@ class EmployerAuthIntegrationTest {
         ));
         employerSignupCodeRepository.save(EmployerSignupCode.create(
                 "EMP-SIGNUP-1",
+                null,
                 company.getId(),
                 workplace.getId(),
                 null
@@ -381,6 +383,7 @@ class EmployerAuthIntegrationTest {
         ));
         EmployerSignupCode signupCode = EmployerSignupCode.create(
                 "EMP-SIGNUP-3",
+                null,
                 company.getId(),
                 workplace.getId(),
                 null

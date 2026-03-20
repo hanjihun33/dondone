@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "employer.signup-code-encryption-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "remittance.wallet.encryption-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 })
 @AutoConfigureMockMvc
@@ -114,6 +115,12 @@ class AdminEmployerCompanyIntegrationTest {
                 .andExpect(jsonPath("$.data.companies[0].hasJoinedEmployer").value(false))
                 .andExpect(jsonPath("$.data.companies[0].employerCount").value(0))
                 .andExpect(jsonPath("$.data.companies[0].hasActiveEmployerSignupCode").value(true));
+
+        mockMvc.perform(get("/api/admin/employers/companies/{companyId}/signup-code", createBody.path("data").path("companyId").asLong())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyName").value("돈던 물류"))
+                .andExpect(jsonPath("$.data.employerSignupCode").value(employerSignupCode));
 
         EmployerSignupRequest signupRequest = new EmployerSignupRequest(
                 employerSignupCode,
