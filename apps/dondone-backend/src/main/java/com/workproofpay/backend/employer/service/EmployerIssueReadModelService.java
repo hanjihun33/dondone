@@ -51,6 +51,7 @@ public class EmployerIssueReadModelService {
     public EmployerIssuesResponse getIssues(Long accountId, EmployerIssuesQuery query) {
         EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(accountId);
         Set<EmployerIssueItemType> requestedTypes = normalizeItemTypes(query.itemTypes());
+        Set<EmployerIssueStatus> requestedStatuses = normalizeStatuses(query.statuses());
         List<CorrectionRequest> correctionRequests = requestedTypes.contains(EmployerIssueItemType.CORRECTION_REQUEST)
                 ? correctionRequestRepository.findByCompanyIdAndWorkplaceIdOrderByCreatedAtDescIdDesc(scope.companyId(), scope.defaultWorkplaceId()).stream()
                 .filter(CorrectionRequest::isPending)
@@ -69,6 +70,7 @@ public class EmployerIssueReadModelService {
                         correctionRequests.stream().map(request -> toCorrectionIssue(request, usersById)),
                         reviewRecords.stream().map(record -> toReviewIssue(record, usersById))
                 )
+                .filter(issue -> requestedStatuses.isEmpty() || requestedStatuses.contains(issue.issueStatus()))
                 .filter(issue -> matchesQuery(issue, normalizedQuery))
                 .sorted(Comparator.comparing(EmployerIssueSummaryResponse::raisedAt).reversed()
                         .thenComparing(EmployerIssueSummaryResponse::workProofId, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -224,6 +226,10 @@ public class EmployerIssueReadModelService {
             return Set.of(EmployerIssueItemType.CORRECTION_REQUEST, EmployerIssueItemType.REVIEW_REQUIRED_RECORD);
         }
         return Set.copyOf(itemTypes);
+    }
+
+    private Set<EmployerIssueStatus> normalizeStatuses(List<EmployerIssueStatus> statuses) {
+        return Set.copyOf(statuses == null ? List.of() : statuses);
     }
 
     private String normalizeQuery(String query) {

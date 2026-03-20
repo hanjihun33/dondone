@@ -60,7 +60,6 @@ public class CorrectionRequest extends BaseTimeEntity {
     @Column(name = "attachment_count", nullable = false)
     private int attachmentCount;
 
-    @Lob
     @Column(name = "attachment_metadata_json", columnDefinition = "TEXT")
     private String attachmentMetadataJson;
 

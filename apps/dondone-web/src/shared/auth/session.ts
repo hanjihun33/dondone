@@ -1,37 +1,147 @@
+import type {
+  EmployerAuthResponse,
+  EmployerProfileResponse
+} from "../api/employer";
+import type { AuthLoginResponse } from "../api/auth";
+
 export type UserRole = "admin" | "manager";
 
-const ROLE_STORAGE_KEY = "dondone_user_role";
-const ROLE_CHANGED_EVENT = "dondone:user-role-changed";
+type AdminSession = {
+  role: "admin";
+  accessToken: string;
+  expiresAt: string;
+  account: AuthLoginResponse;
+};
 
-export function getStoredUserRole(): UserRole | null {
-  if (typeof window === "undefined") {
+export type EmployerSession = {
+  role: "manager";
+  accessToken: string;
+  expiresAt: string;
+  scope: EmployerAuthResponse;
+  profile: EmployerProfileResponse | null;
+};
+
+type StoredSession = AdminSession | EmployerSession;
+
+const SESSION_STORAGE_KEY = "dondone_session";
+const SESSION_CHANGED_EVENT = "dondone:session-changed";
+
+function dispatchSessionChange() {
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
+}
+
+function parseStoredSession(raw: string | null): StoredSession | null {
+  if (!raw) {
     return null;
   }
 
-  const raw = window.localStorage.getItem(ROLE_STORAGE_KEY);
-  if (raw === "admin" || raw === "manager") {
-    return raw;
+  try {
+    const parsed = JSON.parse(raw) as StoredSession;
+    if (parsed.role === "admin" && parsed.accessToken) {
+      return parsed;
+    }
+
+    if (parsed.role === "manager" && parsed.accessToken) {
+      return parsed;
+    }
+  } catch {
+    return null;
   }
 
   return null;
 }
 
-export function setStoredUserRole(role: UserRole) {
+export function getStoredSession(): StoredSession | null {
   if (typeof window === "undefined") {
-    return;
+    return null;
   }
 
-  window.localStorage.setItem(ROLE_STORAGE_KEY, role);
-  window.dispatchEvent(new Event(ROLE_CHANGED_EVENT));
+  return parseStoredSession(window.localStorage.getItem(SESSION_STORAGE_KEY));
 }
 
-export function clearStoredUserRole() {
+export function getStoredEmployerSession(): EmployerSession | null {
+  const session = getStoredSession();
+  return session?.role === "manager" ? session : null;
+}
+
+export function getStoredAdminSession(): AdminSession | null {
+  const session = getStoredSession();
+  return session?.role === "admin" ? session : null;
+}
+
+export function getStoredUserRole(): UserRole | null {
+  return getStoredSession()?.role ?? null;
+}
+
+export function getStoredAccessToken() {
+  return getStoredSession()?.accessToken ?? null;
+}
+
+export function setStoredAdminSession(auth: AuthLoginResponse) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.removeItem(ROLE_STORAGE_KEY);
-  window.dispatchEvent(new Event(ROLE_CHANGED_EVENT));
+  const expiresAt = new Date(Date.now() + auth.expiresIn * 1000).toISOString();
+  window.localStorage.setItem(
+    SESSION_STORAGE_KEY,
+    JSON.stringify({
+      role: "admin",
+      accessToken: auth.accessToken,
+      expiresAt,
+      account: auth
+    } satisfies AdminSession)
+  );
+  dispatchSessionChange();
+}
+
+export function setStoredEmployerSession(
+  auth: EmployerAuthResponse,
+  profile: EmployerProfileResponse | null = null
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const expiresAt = new Date(Date.now() + auth.expiresIn * 1000).toISOString();
+  const nextSession: EmployerSession = {
+    role: "manager",
+    accessToken: auth.accessToken,
+    expiresAt,
+    scope: auth,
+    profile
+  };
+
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+  dispatchSessionChange();
+}
+
+export function updateStoredEmployerProfile(profile: EmployerProfileResponse) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const current = getStoredEmployerSession();
+  if (!current) {
+    return;
+  }
+
+  const nextSession: EmployerSession = {
+    ...current,
+    profile
+  };
+
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+  dispatchSessionChange();
+}
+
+export function clearStoredSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  dispatchSessionChange();
 }
 
 export function resolveUserRoleByEmail(email: string): UserRole {
@@ -45,16 +155,16 @@ export function subscribeUserRoleChange(listener: () => void): () => void {
   }
 
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === ROLE_STORAGE_KEY || event.key === null) {
+    if (event.key === SESSION_STORAGE_KEY || event.key === null) {
       listener();
     }
   };
 
   window.addEventListener("storage", handleStorage);
-  window.addEventListener(ROLE_CHANGED_EVENT, listener);
+  window.addEventListener(SESSION_CHANGED_EVENT, listener);
 
   return () => {
     window.removeEventListener("storage", handleStorage);
-    window.removeEventListener(ROLE_CHANGED_EVENT, listener);
+    window.removeEventListener(SESSION_CHANGED_EVENT, listener);
   };
 }

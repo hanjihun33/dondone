@@ -62,13 +62,12 @@ public class AdvanceService {
             throw new ApiException(ErrorCode.REQUEST_AMOUNT_EXCEEDS_LIMIT);
         }
 
-        AdvanceRequest saved = advanceRequestRepository.save(AdvanceRequest.approve(
+        AdvanceRequest saved = advanceRequestRepository.save(AdvanceRequest.submit(
                 findUser(userId),
                 eligibility.workplace(),
                 eligibility.contract(),
                 eligibility.yearMonth(),
                 idempotencyKey,
-                request.requestedAmount(),
                 request.requestedAmount(),
                 eligibility.response().estimatedFee(),
                 eligibility.response().estimatedRepaymentDate(),
@@ -111,18 +110,18 @@ public class AdvanceService {
 
         YearMonth targetMonth = resolveTargetMonth(userId, workplaceId);
         WorkProofMonthlySummaryContractResponse summary = toMonthlySummary(userId, workplaceId, targetMonth);
-        boolean hasOutstandingAdvance = advanceRequestRepository.existsByUserIdAndWorkplaceIdAndYearMonthAndStatus(
+        boolean hasOpenAdvanceRequest = advanceRequestRepository.existsByUserIdAndWorkplaceIdAndYearMonthAndStatusIn(
                 userId,
                 workplaceId,
                 targetMonth.toString(),
-                AdvanceRequestStatus.APPROVED
+                List.of(AdvanceRequestStatus.SUBMITTED, AdvanceRequestStatus.APPROVED)
         );
 
         AdvanceEligibilityResponse response = advancePolicyEngine.evaluate(
                 workplaceId,
                 contract,
                 summary,
-                hasOutstandingAdvance,
+                hasOpenAdvanceRequest,
                 java.time.LocalDate.now(),
                 targetMonth
         );

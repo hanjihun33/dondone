@@ -171,7 +171,8 @@ public class EmployerCorrectionRequestService {
         return requests.stream()
                 .filter(request -> requestedStatuses.isEmpty() || requestedStatuses.contains(request.getStatus()))
                 .filter(request -> matchesQuery(request, normalizedQuery))
-                .sorted(Comparator.comparing(CorrectionRequest::getCreatedAt).reversed().thenComparing(CorrectionRequest::getId).reversed())
+                .sorted(Comparator.comparing(CorrectionRequest::getCreatedAt).reversed()
+                        .thenComparing(CorrectionRequest::getId, Comparator.reverseOrder()))
                 .toList();
     }
 

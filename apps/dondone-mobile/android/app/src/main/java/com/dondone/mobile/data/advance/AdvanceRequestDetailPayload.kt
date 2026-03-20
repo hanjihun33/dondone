@@ -13,7 +13,7 @@ data class AdvanceRequestDetailPayload(
     val requestId: Long,
     val workplaceId: Long,
     val requestedAmount: Long,
-    val approvedAmount: Long,
+    val approvedAmount: Long?,
     val feeAmount: Long,
     val status: String,
     val repaymentDueDate: String,

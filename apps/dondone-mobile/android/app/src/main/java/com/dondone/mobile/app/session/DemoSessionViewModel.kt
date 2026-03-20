@@ -1104,8 +1104,13 @@ class DemoSessionViewModel(
                 loadAdvanceRemoteState(session)
                 mergeAdvanceRequestDetail(detail)
                 _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(detail = detail)
+                val successMessage = if (result.status == "SUBMITTED") {
+                    "미리받기 신청이 접수되었어요. 관리자 승인 후 금액이 확정됩니다."
+                } else {
+                    "미리받기 신청이 반영되었어요. ${result.status} · ${result.approvedAmount ?: 0L}원"
+                }
                 _advanceRequestUiState.value = AdvanceRequestUiState(
-                    message = "미리받기 신청이 반영됐어요. ${result.status} · ${result.approvedAmount}원",
+                    message = successMessage,
                     isError = false
                 )
             } catch (error: AdvanceUnauthorizedException) {

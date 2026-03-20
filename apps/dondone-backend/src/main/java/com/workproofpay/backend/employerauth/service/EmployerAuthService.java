@@ -4,15 +4,20 @@ import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.model.UserRole;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.auth.support.EmailNormalizer;
+import com.workproofpay.backend.employer.model.Company;
 import com.workproofpay.backend.employer.model.EmployerProfile;
+import com.workproofpay.backend.employer.repo.CompanyRepository;
 import com.workproofpay.backend.employer.repo.EmployerProfileRepository;
 import com.workproofpay.backend.employer.service.EmployerAccessScope;
 import com.workproofpay.backend.employer.service.EmployerAccessScopeService;
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerInvitationAcceptRequest;
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerLoginRequest;
+import com.workproofpay.backend.employerauth.api.dto.request.EmployerSignupRequest;
 import com.workproofpay.backend.employerauth.api.dto.response.EmployerAuthResponse;
 import com.workproofpay.backend.employerauth.model.EmployerInvitationToken;
+import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
 import com.workproofpay.backend.employerauth.repo.EmployerInvitationTokenRepository;
+import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
@@ -28,11 +33,61 @@ import java.time.LocalDateTime;
 public class EmployerAuthService {
 
     private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
     private final EmployerInvitationTokenRepository employerInvitationTokenRepository;
+    private final EmployerSignupCodeRepository employerSignupCodeRepository;
     private final EmployerProfileRepository employerProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmployerAccessScopeService employerAccessScopeService;
+
+    @Transactional
+    public EmployerAuthResponse signup(EmployerSignupRequest request) {
+        String normalizedEmail = EmailNormalizer.normalize(request.email());
+        String normalizedDisplayName = normalizeDisplayName(request.displayName());
+
+        EmployerSignupCode signupCode = employerSignupCodeRepository.findByCodeHash(
+                        EmployerInvitationToken.hash(request.companyCode()))
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_EMPLOYER_SIGNUP_CODE));
+
+        if (!signupCode.isUsable()) {
+            throw new ApiException(ErrorCode.INVALID_EMPLOYER_SIGNUP_CODE);
+        }
+
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
+
+        employerAccessScopeService.assertCompanyWorkplaceBinding(
+                signupCode.getCompanyId(),
+                signupCode.getDefaultWorkplaceId()
+        );
+
+        Company company = companyRepository.findById(signupCode.getCompanyId())
+                .orElseThrow(() -> new ApiException(ErrorCode.COMPANY_NOT_FOUND));
+
+        User savedUser = userRepository.save(User.registerEmployer(
+                normalizedEmail,
+                passwordEncoder.encode(request.password()),
+                normalizedDisplayName
+        ));
+
+        employerProfileRepository.save(EmployerProfile.create(
+                savedUser.getId(),
+                company.getId(),
+                signupCode.getDefaultWorkplaceId(),
+                normalizedDisplayName
+        ));
+
+        EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(savedUser.getId());
+        String accessToken = jwtTokenProvider.createAccessToken(
+                savedUser.getId(),
+                savedUser.getEmail(),
+                savedUser.getRole().name()
+        );
+
+        return EmployerAuthResponse.of(accessToken, jwtTokenProvider.getAccessExpirationSeconds(), scope);
+    }
 
     @Transactional
     public EmployerAuthResponse acceptInvitation(EmployerInvitationAcceptRequest request) {
@@ -100,5 +155,9 @@ public class EmployerAuthService {
         );
 
         return EmployerAuthResponse.of(accessToken, jwtTokenProvider.getAccessExpirationSeconds(), scope);
+    }
+
+    private String normalizeDisplayName(String displayName) {
+        return displayName == null ? "" : displayName.trim();
     }
 }

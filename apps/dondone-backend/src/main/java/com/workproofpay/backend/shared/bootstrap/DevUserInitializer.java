@@ -30,8 +30,10 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class DevUserInitializer implements CommandLineRunner {
 
-    private static final String DEFAULT_USER_EMAIL = "test@gmail.com";
-    private static final String DEFAULT_USER_PASSWORD = "qweqwe123";
+    private static final String DEV_USER_EMAIL = "test@gmail.com";
+    private static final String DEV_USER_PASSWORD = "qweqwe123";
+    private static final String DEV_ADMIN_EMAIL = "admin@dondone.local";
+    private static final String DEV_ADMIN_PASSWORD = "qweqwe123";
     private static final String PDF_DEMO_EMAIL = "demo@test.com";
     private static final String PDF_DEMO_PASSWORD = "qweqwe123";
     private static final String PDF_DEMO_WORKPLACE_NAME = "SSAFY";
@@ -40,7 +42,8 @@ public class DevUserInitializer implements CommandLineRunner {
     private static final double PDF_DEMO_LATITUDE = 35.2031092d;
     private static final double PDF_DEMO_LONGITUDE = 126.8083831d;
     private static final int PDF_DEMO_ALLOWED_RADIUS_METERS = 1_000;
-    private static final String PDF_DEMO_ATTACHMENT_METADATA_JSON = "{\"attachments\":[{\"name\":\"clock-correction.jpg\"}]}";
+    private static final String PDF_DEMO_ATTACHMENT_METADATA_JSON =
+            "{\"attachments\":[{\"name\":\"clock-correction.jpg\"}]}";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -52,22 +55,36 @@ public class DevUserInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        ensureDefaultUser();
+        seedWorkerAccount();
+        seedAdminAccount();
         ensurePdfDemoUser();
     }
 
-    @SuppressWarnings("null")
-    private void ensureDefaultUser() {
-        String normalizedEmail = EmailNormalizer.normalize(DEFAULT_USER_EMAIL);
+    private void seedWorkerAccount() {
+        String normalizedEmail = EmailNormalizer.normalize(DEV_USER_EMAIL);
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             return;
         }
+
         User user = User.register(
                 normalizedEmail,
-                passwordEncoder.encode(DEFAULT_USER_PASSWORD),
+                passwordEncoder.encode(DEV_USER_PASSWORD),
                 "Test User",
                 "01012345678");
         userRepository.save(user);
+    }
+
+    private void seedAdminAccount() {
+        String normalizedEmail = EmailNormalizer.normalize(DEV_ADMIN_EMAIL);
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            return;
+        }
+
+        userRepository.save(User.registerAdmin(
+                normalizedEmail,
+                passwordEncoder.encode(DEV_ADMIN_PASSWORD),
+                "서비스 관리자"
+        ));
     }
 
     @SuppressWarnings("null")
@@ -103,7 +120,8 @@ public class DevUserInitializer implements CommandLineRunner {
     @SuppressWarnings("null")
     private WorkContract ensurePdfDemoContract(User user, Workplace workplace) {
         return workContractRepository
-                .findFirstByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplace.getId(),
+                .findFirstByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNullOrderByEffectiveFromDesc(
+                        workplace.getId(),
                         user.getId())
                 .orElseGet(() -> Objects.requireNonNull(workContractRepository.save(WorkContract.activate(
                         workplace,
@@ -150,14 +168,14 @@ public class DevUserInitializer implements CommandLineRunner {
     }
 
     private WorkProof createReflectedRecord(User user,
-            Workplace workplace,
-            WorkContract contract,
-            LocalDate workDate,
-            int checkInHour,
-            int checkInMinute,
-            int checkOutHour,
-            int checkOutMinute,
-            boolean withAttachment) {
+                                            Workplace workplace,
+                                            WorkContract contract,
+                                            LocalDate workDate,
+                                            int checkInHour,
+                                            int checkInMinute,
+                                            int checkOutHour,
+                                            int checkOutMinute,
+                                            boolean withAttachment) {
         LocalDateTime checkInAt = workDate.atTime(checkInHour, checkInMinute);
         LocalDateTime checkOutAt = workDate.atTime(checkOutHour, checkOutMinute);
         WorkProof record = WorkProof.checkIn(
@@ -189,14 +207,14 @@ public class DevUserInitializer implements CommandLineRunner {
     }
 
     private WorkProof createReviewRecord(User user,
-            Workplace workplace,
-            WorkContract contract,
-            LocalDate workDate,
-            int checkInHour,
-            int checkInMinute,
-            int checkOutHour,
-            int checkOutMinute,
-            String clockOutLabel) {
+                                         Workplace workplace,
+                                         WorkContract contract,
+                                         LocalDate workDate,
+                                         int checkInHour,
+                                         int checkInMinute,
+                                         int checkOutHour,
+                                         int checkOutMinute,
+                                         String clockOutLabel) {
         LocalDateTime checkInAt = workDate.atTime(checkInHour, checkInMinute);
         LocalDateTime checkOutAt = workDate.atTime(checkOutHour, checkOutMinute);
         WorkProof record = WorkProof.checkIn(
@@ -220,21 +238,21 @@ public class DevUserInitializer implements CommandLineRunner {
 
     @SuppressWarnings("null")
     private WorkProof createEditedRecord(User user,
-            Workplace workplace,
-            WorkContract contract,
-            LocalDate workDate,
-            int originalInHour,
-            int originalInMinute,
-            int originalOutHour,
-            int originalOutMinute,
-            int updatedInHour,
-            int updatedInMinute,
-            int updatedOutHour,
-            int updatedOutMinute,
-            String editReason,
-            String memo,
-            int attachmentCount,
-            String attachmentMetadataJson) {
+                                         Workplace workplace,
+                                         WorkContract contract,
+                                         LocalDate workDate,
+                                         int originalInHour,
+                                         int originalInMinute,
+                                         int originalOutHour,
+                                         int originalOutMinute,
+                                         int updatedInHour,
+                                         int updatedInMinute,
+                                         int updatedOutHour,
+                                         int updatedOutMinute,
+                                         String editReason,
+                                         String memo,
+                                         int attachmentCount,
+                                         String attachmentMetadataJson) {
         LocalDateTime originalIn = workDate.atTime(originalInHour, originalInMinute);
         LocalDateTime originalOut = workDate.atTime(originalOutHour, originalOutMinute);
         LocalDateTime updatedIn = workDate.atTime(updatedInHour, updatedInMinute);

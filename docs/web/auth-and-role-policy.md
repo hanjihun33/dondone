@@ -1,5 +1,29 @@
 # Auth And Role Policy
 
+## 2026-03-20 Admin Employer Onboarding MVP
+- admin web now uses the shared `/api/auth/login` flow with an `ADMIN` account and a bearer token-backed session.
+- service admin onboarding flow:
+  - service admin creates `Company`
+  - system auto-creates a placeholder default `Workplace`
+  - the same action issues one employer signup code backed by `EmployerSignupCode`
+  - employer signs up and then completes workplace address/radius in settings
+- employer web signup uses `companyCode/displayName/email/password`
+- security policy:
+  - `Company.companyCode` and employer signup code are different values and must stay separate in UI, DTOs, and docs
+  - employer signup code raw value is shown only in the create response right after issuance
+  - list APIs expose issuance status and latest issued timestamp, not the raw signup code
+- worker company registration remains a separate app lane and is not part of admin/employer web auth.
+
+## 2026-03-20 Employer Signup Code Update
+- employer web signup is now aligned to a `company code` policy that later maps to service-admin issuance.
+- flow:
+  - current temporary step: seed/manual bootstrap prepares a reusable company code bound to `Company + default Workplace`
+  - future target step: service admin prepares `Company + default Workplace` and issues the same kind of company code
+  - employer opens web signup and submits `companyCode/displayName/email/password`
+  - backend creates the `EMPLOYER` account and links `EmployerProfile` to the prepared company/workplace
+- worker company registration stays out of this flow.
+- worker registration code is a separate lane and will be issued by employers later.
+
 ## 목적
 - 웹 전용 로그인/회원가입 흐름을 정의하되, 인증 인프라 중복을 막는다.
 

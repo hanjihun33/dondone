@@ -47,6 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "employer.signup-code-encryption-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "remittance.wallet.encryption-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 })
 @AutoConfigureMockMvc
@@ -125,6 +126,22 @@ class EmployerCorrectionRequestIntegrationTest {
                 .andExpect(jsonPath("$.data.requests[0].workerEmail").value("approvable-worker@acme.test"))
                 .andExpect(jsonPath("$.data.requests[0].requestedClockInAt").value(formatDateTime(fixture.approvableRequest().getRequestedClockInAt())))
                 .andExpect(jsonPath("$.data.requests[0].status").value("PENDING"));
+    }
+
+    @Test
+    void getCorrectionRequestsKeepsNewestPendingRequestFirst() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/employer/correction-requests")
+                        .header("Authorization", bearer(fixture.employerUser()))
+                        .queryParam("statuses", "PENDING")
+                        .queryParam("page", "1")
+                        .queryParam("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.requests[0].requestId").value(fixture.rejectableRequest().getId()))
+                .andExpect(jsonPath("$.data.requests[1].requestId").value(fixture.approvableRequest().getId()));
     }
 
     @Test
