@@ -882,72 +882,16 @@ private fun WorkproofDetailPage(
             onNextMonth = onNextMonth
         )
         WorkproofSectionDivider()
-        WorkproofPdfEntryCard(
-            onOpenPdfCreation = onOpenPdfCreation
-        )
-        WorkproofSectionDivider()
         WorkproofRecentLogsCard(
             records = records,
-            onEditRecord = onEditRecord
+            onEditRecord = onEditRecord,
+            onOpenPdfCreation = onOpenPdfCreation
         )
         WorkproofSectionDivider()
         WorkproofAuditCard(
             auditItems = auditItems
         )
         Spacer(modifier = Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun WorkproofPdfEntryCard(
-    onOpenPdfCreation: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-
-    WorkproofSurfaceCard(
-        modifier = Modifier
-            .pressableScale(
-                interactionSource = interactionSource,
-                pressedScale = 0.99f
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = rememberDonDoneGrayRipple(),
-                onClick = onOpenPdfCreation
-            )
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(WorkproofRowAccentBackground),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Description,
-                    contentDescription = null,
-                    tint = WorkproofRowAccentTint,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Text(
-                text = "근무기록 문서 생성",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
-                color = DawnText
-            )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = DawnTextSubtle,
-                modifier = Modifier.size(22.dp)
-            )
-        }
     }
 }
 
@@ -1422,10 +1366,45 @@ private fun WorkproofCalendarCard(
 @Composable
 private fun WorkproofRecentLogsCard(
     records: List<WorkproofRecordUiModel>,
-    onEditRecord: (WorkproofRecordUiModel) -> Unit
+    onEditRecord: (WorkproofRecordUiModel) -> Unit,
+    onOpenPdfCreation: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     WorkproofSurfaceCard {
-        WorkproofSectionHeader(title = "최근 기록")
+        WorkproofSectionHeader(
+            title = "최근 기록",
+            trailing = {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .pressableScale(
+                            interactionSource = interactionSource,
+                            pressedScale = 0.98f
+                        )
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = rememberDonDoneGrayRipple(),
+                            onClick = onOpenPdfCreation
+                        )
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "문서 생성",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        color = WorkproofRowAccentTint
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = WorkproofRowAccentTint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        )
 
         records.forEachIndexed { index, record ->
             WorkproofRecentRecordRow(
