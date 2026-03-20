@@ -3,7 +3,7 @@ package com.dondone.mobile.data.advance
 data class AdvanceCreateResult(
     val requestId: Long,
     val status: String,
-    val approvedAmount: Long,
+    val approvedAmount: Long?,
     val feeAmount: Long,
     val repaymentDueDate: String
 )

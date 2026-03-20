@@ -13,7 +13,7 @@ data class AdvanceEligibilityPayload(
 data class AdvanceRequestItemPayload(
     val requestId: Long,
     val requestedAmount: Long,
-    val approvedAmount: Long,
+    val approvedAmount: Long?,
     val status: String,
     val repaymentDueDate: String
 )
