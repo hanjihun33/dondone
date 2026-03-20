@@ -37,21 +37,21 @@ class JobServiceTest {
     void ignoresDuplicateActiveJobInsertWhenActiveKeyAlreadyExists() {
         when(jobRepository.saveAndFlush(any(Job.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate active key"));
-        when(jobRepository.existsByActiveKey("SUBMIT_TRANSFER:tr_1"))
+        when(jobRepository.existsByActiveKey("TRANSFER:SUBMIT_TRANSFER:tr_1"))
                 .thenReturn(true);
 
         assertThatNoException().isThrownBy(() ->
                 jobService.enqueue(JobType.SUBMIT_TRANSFER, "tr_1", LocalDateTime.now())
         );
 
-        verify(jobRepository).existsByActiveKey("SUBMIT_TRANSFER:tr_1");
+        verify(jobRepository).existsByActiveKey("TRANSFER:SUBMIT_TRANSFER:tr_1");
     }
 
     @Test
     void rethrowsUnexpectedIntegrityViolationWhenActiveKeyIsMissing() {
         when(jobRepository.saveAndFlush(any(Job.class)))
                 .thenThrow(new DataIntegrityViolationException("unexpected"));
-        when(jobRepository.existsByActiveKey(eq("SUBMIT_TRANSFER:tr_2")))
+        when(jobRepository.existsByActiveKey(eq("TRANSFER:SUBMIT_TRANSFER:tr_2")))
                 .thenReturn(false);
 
         assertThatThrownBy(() ->

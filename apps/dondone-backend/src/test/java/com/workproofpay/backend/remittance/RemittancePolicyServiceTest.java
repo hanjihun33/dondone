@@ -53,6 +53,7 @@ class RemittancePolicyServiceTest {
         Recipient recipient = Recipient.create(
                 "rcp_1",
                 1L,
+                null,
                 "수신자",
                 RecipientRelation.FRIEND,
                 "0x2222222222222222222222222222222222222222",

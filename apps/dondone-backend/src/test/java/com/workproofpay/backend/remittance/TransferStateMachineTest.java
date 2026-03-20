@@ -2,6 +2,7 @@ package com.workproofpay.backend.remittance;
 
 import com.workproofpay.backend.remittance.model.Transfer;
 import com.workproofpay.backend.remittance.model.TransferFailureCode;
+import com.workproofpay.backend.remittance.model.RecipientRelation;
 import com.workproofpay.backend.remittance.model.TransferStatus;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +55,9 @@ class TransferStateMachineTest {
                 50_000_000L,
                 "0x1111111111111111111111111111111111111111",
                 "0x2222222222222222222222222222222222222222",
+                "State Recipient",
+                RecipientRelation.FAMILY,
+                null,
                 "idem-state",
                 false,
                 true

@@ -8,6 +8,7 @@ import com.workproofpay.backend.jobs.repo.JobRepository;
 import com.workproofpay.backend.jobs.service.RemittanceJobWorker;
 import com.workproofpay.backend.remittance.api.dto.request.CreateTransferRequest;
 import com.workproofpay.backend.remittance.api.dto.request.UpsertRecipientRequest;
+import com.workproofpay.backend.remittance.model.Recipient;
 import com.workproofpay.backend.remittance.model.RecipientRelation;
 import com.workproofpay.backend.remittance.repo.RecipientRepository;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -38,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -431,6 +434,19 @@ class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void enforcesRecipientWalletUniquenessAtDatabaseLevel() {
+        User user = userRepository.save(User.register("dup-db@test.com", "hashed", "Dup DB"));
+
+        recipientRepository.saveAndFlush(
+                Recipient.create("rcp_db_1", user.getId(), null, "Mom", RecipientRelation.FAMILY, "0xabababababababababababababababababababab", true)
+        );
+
+        assertThatThrownBy(() -> recipientRepository.saveAndFlush(
+                Recipient.create("rcp_db_2", user.getId(), null, "Mom Again", RecipientRelation.FRIEND, "0xabababababababababababababababababababab", true)
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void searchesRecipientsByPhoneNumberAndMarksAlreadyRegistered() throws Exception {
         User owner = userRepository.save(User.register("search-owner@test.com", "hashed", "Owner", "01022223333"));
         User target = userRepository.save(User.register("search-target@test.com", "hashed", "Target", "01099998888"));
@@ -641,6 +657,80 @@ class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tokenBalanceAtomic").value("500000000"));
+    }
+
+    @Test
+    void keepsTransferSnapshotStableAfterRecipientUpdate() throws Exception {
+        User user = userRepository.save(User.register("snapshot@test.com", "hashed", "Snapshot"));
+        String token = tokenFor(user);
+
+        mockMvc.perform(post("/api/remittance/wallets/me")
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isCreated());
+
+        String recipientBody = mockMvc.perform(post("/api/remittance/recipients")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "alias": "Original Mom",
+                                  "relation": "FAMILY",
+                                  "walletAddress": "0x9191919191919191919191919191919191919191",
+                                  "allowed": true
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String recipientId = readText(recipientBody, "recipientId");
+
+        String createdBody = mockMvc.perform(post("/api/remittance/transfers")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "snapshot-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipientId": "%s",
+                                  "amountAtomic": 50000000,
+                                  "highAmountConfirmed": false,
+                                  "recentRecipientConfirmed": true
+                                }
+                                """.formatted(recipientId)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String transferId = readText(createdBody, "transferId");
+
+        mockMvc.perform(put("/api/remittance/recipients/{recipientId}", recipientId)
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "alias": "Updated Mom",
+                                  "relation": "FRIEND",
+                                  "walletAddress": "0x9292929292929292929292929292929292929292",
+                                  "allowed": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.alias").value("Updated Mom"))
+                .andExpect(jsonPath("$.data.walletAddress").value("0x9292929292929292929292929292929292929292"));
+
+        mockMvc.perform(get("/api/remittance/transfers")
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.transfers[0].transferId").value(transferId))
+                .andExpect(jsonPath("$.data.transfers[0].recipientAlias").value("Original Mom"))
+                .andExpect(jsonPath("$.data.transfers[0].recipientAddress").value("0x9191919191919191919191919191919191919191"));
+
+        mockMvc.perform(get("/api/remittance/transfers/{transferId}", transferId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.transferId").value(transferId))
+                .andExpect(jsonPath("$.data.recipientAlias").value("Original Mom"))
+                .andExpect(jsonPath("$.data.recipientAddress").value("0x9191919191919191919191919191919191919191"));
     }
 
     @Test
