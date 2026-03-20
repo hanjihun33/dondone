@@ -170,6 +170,54 @@ EOF
             }
         }
 
+        stage('Database Migrate') {
+            steps {
+                script {
+                    env.FAILED_STAGE = 'Database Migrate'
+                }
+                runLogged('''
+                    cd "$DEPLOY_DIR"
+                    docker compose up -d postgres
+
+                    set -a
+                    . ./.env
+                    set +a
+
+                    for i in $(seq 1 12); do
+                        POSTGRES_CONTAINER_ID="$(docker compose ps -q postgres || true)"
+                        POSTGRES_HEALTH="unknown"
+
+                        if [ -n "$POSTGRES_CONTAINER_ID" ]; then
+                            POSTGRES_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$POSTGRES_CONTAINER_ID" || echo unknown)"
+                        fi
+
+                        echo "Postgres health attempt $i/12: $POSTGRES_HEALTH"
+
+                        if [ "$POSTGRES_HEALTH" = "healthy" ]; then
+                            break
+                        fi
+
+                        sleep 5
+                    done
+
+                    if [ "$POSTGRES_HEALTH" != "healthy" ]; then
+                        docker compose ps || true
+                        docker compose logs --tail=200 postgres || true
+                        echo "postgres did not become healthy before migration"
+                        exit 1
+                    fi
+
+                    for sql_file in deploy/sql/*.sql; do
+                        [ -f "$sql_file" ] || continue
+                        echo "Applying migration: $sql_file"
+                        docker compose exec -T postgres \
+                          psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+                          < "$sql_file"
+                    done
+                ''')
+            }
+        }
+
         stage('Deploy') {
             steps {
                 script {
