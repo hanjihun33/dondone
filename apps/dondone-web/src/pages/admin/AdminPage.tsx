@@ -11,6 +11,7 @@ import {
 } from "../../shared/api/admin";
 import { ApiError } from "../../shared/api/client";
 import { clearStoredSession, getStoredAccessToken } from "../../shared/auth/session";
+import { AdminAdvanceRequestSection } from "./components/AdminAdvanceRequestSection";
 
 type AdminCompanyFormState = {
   companyName: string;
@@ -509,6 +510,8 @@ export function AdminPage() {
           </div>
         ) : null}
       </section>
+
+      <AdminAdvanceRequestSection />
 
       {selectedCompany ? (
         <section className="admin-section">

@@ -71,6 +71,29 @@ export type AdminEmployerCompanyEmployersResponse = {
   employers: AdminEmployerCompanyEmployerSummaryResponse[];
 };
 
+export type AdminAdvanceRequestItemResponse = {
+  requestId: number;
+  workerId: number;
+  workerName: string;
+  workerEmail: string;
+  companyName: string | null;
+  workplaceName: string;
+  requestedAmount: number;
+  approvedAmount: number | null;
+  feeAmount: number;
+  status: "SUBMITTED" | "APPROVED" | "REJECTED" | "NEEDS_REVIEW";
+  repaymentDueDate: string;
+  requestedAt: string;
+  reflectedWorkDays: number;
+  reflectedWorkMinutes: number;
+  needsReviewRecordCount: number;
+  reviewedAt: string | null;
+};
+
+export type AdminAdvanceRequestsResponse = {
+  requests: AdminAdvanceRequestItemResponse[];
+};
+
 type CreateAdminEmployerCompanyRequest = {
   companyName: string;
   companyCode: string;
@@ -109,4 +132,24 @@ export async function getAdminEmployerCompanyEmployers(token: string, companyId:
       token
     }
   );
+}
+
+export async function getAdminAdvanceRequests(token: string) {
+  return apiRequest<AdminAdvanceRequestsResponse>("/api/admin/advance/requests", {
+    token
+  });
+}
+
+export async function approveAdminAdvanceRequest(token: string, requestId: number) {
+  return apiRequest<void>(`/api/admin/advance/requests/${requestId}/approve`, {
+    method: "POST",
+    token
+  });
+}
+
+export async function rejectAdminAdvanceRequest(token: string, requestId: number) {
+  return apiRequest<void>(`/api/admin/advance/requests/${requestId}/reject`, {
+    method: "POST",
+    token
+  });
 }
