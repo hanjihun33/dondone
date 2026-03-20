@@ -17,6 +17,8 @@ import com.workproofpay.backend.employer.model.EmploymentMembership;
 import com.workproofpay.backend.employer.repo.CompanyRepository;
 import com.workproofpay.backend.employer.repo.EmployerProfileRepository;
 import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
+import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
+import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
 import com.workproofpay.backend.workproof.api.dto.request.WorkProofAttachmentMetadataRequest;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofAuditLog;
@@ -46,6 +48,7 @@ public class DevEmployerInitializer implements CommandLineRunner {
     private static final String EMPLOYER_DISPLAY_NAME = "돈던 관리자";
     private static final String COMPANY_NAME = "돈던 물류";
     private static final String COMPANY_CODE = "DN-SEOUL-2914";
+    private static final String EMPLOYER_SIGNUP_CODE = "EMPLOYER-SEOUL-2026";
     private static final String WORKPLACE_NAME = "서울 허브";
     private static final String WORKPLACE_ADDRESS = "서울특별시 강남구 테헤란로 212";
     private static final String WORKPLACE_DETAIL = "1층 정문";
@@ -66,6 +69,7 @@ public class DevEmployerInitializer implements CommandLineRunner {
     private final WorkplaceRepository workplaceRepository;
     private final EmployerProfileRepository employerProfileRepository;
     private final EmploymentMembershipRepository employmentMembershipRepository;
+    private final EmployerSignupCodeRepository employerSignupCodeRepository;
     private final WorkProofRepository workProofRepository;
     private final CorrectionRequestRepository correctionRequestRepository;
     private final CorrectionDecisionAuditRepository correctionDecisionAuditRepository;
@@ -136,6 +140,9 @@ public class DevEmployerInitializer implements CommandLineRunner {
         employmentMembershipRepository.deleteAll(
                 employmentMembershipRepository.findByCompanyIdAndWorkplaceId(companyId, workplaceId)
         );
+        employerSignupCodeRepository.deleteAll(
+                employerSignupCodeRepository.findByCompanyIdAndDefaultWorkplaceId(companyId, workplaceId)
+        );
         employerProfileRepository.delete(employerProfile);
         workplaceRepository.findById(workplaceId).ifPresent(workplaceRepository::delete);
         companyRepository.findById(companyId).ifPresent(companyRepository::delete);
@@ -161,6 +168,12 @@ public class DevEmployerInitializer implements CommandLineRunner {
                 WORKPLACE_LATITUDE,
                 WORKPLACE_LONGITUDE,
                 WORKPLACE_RADIUS_METERS
+        ));
+        employerSignupCodeRepository.save(EmployerSignupCode.create(
+                EMPLOYER_SIGNUP_CODE,
+                company.getId(),
+                workplace.getId(),
+                employerUser.getId()
         ));
         employerProfileRepository.save(EmployerProfile.create(
                 employerUser.getId(),

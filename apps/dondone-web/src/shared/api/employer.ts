@@ -248,6 +248,13 @@ type EmployerInvitationAcceptRequest = {
   displayName: string;
 };
 
+type EmployerSignupRequest = {
+  companyCode: string;
+  displayName: string;
+  email: string;
+  password: string;
+};
+
 type UpdateEmployerWorkplaceSettingsRequest = {
   address: string;
   detailAddress: string;
@@ -265,6 +272,13 @@ export async function loginEmployer(request: EmployerLoginRequest) {
 
 export async function acceptEmployerInvitation(request: EmployerInvitationAcceptRequest) {
   return apiRequest<EmployerAuthResponse>("/api/employer-auth/invitations/accept", {
+    method: "POST",
+    body: request
+  });
+}
+
+export async function signupEmployer(request: EmployerSignupRequest) {
+  return apiRequest<EmployerAuthResponse>("/api/employer-auth/signup", {
     method: "POST",
     body: request
   });

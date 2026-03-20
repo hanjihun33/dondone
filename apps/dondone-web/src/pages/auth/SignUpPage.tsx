@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../shared/api/client";
-import { acceptEmployerInvitation, getEmployerProfile } from "../../shared/api/employer";
+import { getEmployerProfile, signupEmployer } from "../../shared/api/employer";
 import {
   getStoredUserRole,
   setStoredEmployerSession,
@@ -10,7 +10,7 @@ import {
 import { RemoteConnectivityPanel } from "./components/RemoteConnectivityPanel";
 
 type SignUpFormState = {
-  token: string;
+  companyCode: string;
   displayName: string;
   email: string;
   password: string;
@@ -27,17 +27,17 @@ type SignUpField = {
 
 const SIGN_UP_FIELDS: SignUpField[] = [
   {
-    key: "token",
-    label: "초대 토큰",
+    key: "companyCode",
+    label: "회사 코드",
     type: "text",
-    placeholder: "초대 토큰을 입력하세요",
+    placeholder: "회사 코드를 입력하세요",
     autoComplete: "off"
   },
   {
     key: "displayName",
-    label: "이름",
+    label: "담당자명",
     type: "text",
-    placeholder: "이름을 입력하세요",
+    placeholder: "담당자명을 입력하세요",
     autoComplete: "name"
   },
   {
@@ -67,7 +67,7 @@ export function SignUpPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [formState, setFormState] = useState<SignUpFormState>({
-    token: searchParams.get("token") ?? "",
+    companyCode: searchParams.get("code")?.trim() ?? "",
     displayName: "",
     email: "",
     password: "",
@@ -88,6 +88,11 @@ export function SignUpPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (!formState.companyCode.trim()) {
+      setErrorMessage("회사 코드를 입력해 주세요.");
+      return;
+    }
+
     if (formState.password !== formState.confirmPassword) {
       setErrorMessage("비밀번호가 일치하지 않습니다.");
       return;
@@ -97,8 +102,8 @@ export function SignUpPage() {
     setErrorMessage(null);
 
     try {
-      const auth = await acceptEmployerInvitation({
-        token: formState.token.trim(),
+      const auth = await signupEmployer({
+        companyCode: formState.companyCode.trim(),
         displayName: formState.displayName.trim(),
         email: formState.email.trim().toLowerCase(),
         password: formState.password
@@ -142,6 +147,9 @@ export function SignUpPage() {
           </h2>
 
           <form className="logged-out-form" onSubmit={handleSubmit}>
+            <p className="logged-out-signup-hint">
+              서비스 관리자가 전달한 회사 코드로 고용주 회원가입을 완료해 주세요.
+            </p>
             {SIGN_UP_FIELDS.map((field) => (
               <label key={field.key} className="logged-out-field">
                 <span>{field.label}</span>

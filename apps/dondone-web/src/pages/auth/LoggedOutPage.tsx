@@ -148,6 +148,9 @@ export function LoggedOutPage() {
             <p className="logged-out-signup-hint">
               개발용 사업주 계정: <strong>manager@gmail.com</strong> / <strong>qweqwe123</strong>
             </p>
+            <p className="logged-out-signup-hint">
+              개발용 회사 코드: <strong>EMPLOYER-SEOUL-2026</strong>
+            </p>
             {errorMessage ? (
               <p className="logged-out-signup-hint" role="alert">
                 {errorMessage}

@@ -11,8 +11,11 @@ import com.workproofpay.backend.employer.repo.CompanyRepository;
 import com.workproofpay.backend.employer.repo.EmployerProfileRepository;
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerInvitationAcceptRequest;
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerLoginRequest;
+import com.workproofpay.backend.employerauth.api.dto.request.EmployerSignupRequest;
 import com.workproofpay.backend.employerauth.model.EmployerInvitationToken;
+import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
 import com.workproofpay.backend.employerauth.repo.EmployerInvitationTokenRepository;
+import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
 import com.workproofpay.backend.workproof.model.Workplace;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +69,9 @@ class EmployerAuthIntegrationTest {
     private EmployerInvitationTokenRepository employerInvitationTokenRepository;
 
     @Autowired
+    private EmployerSignupCodeRepository employerSignupCodeRepository;
+
+    @Autowired
     private EmployerProfileRepository employerProfileRepository;
 
     @Autowired
@@ -74,6 +80,7 @@ class EmployerAuthIntegrationTest {
     @BeforeEach
     void setUp() {
         employerInvitationTokenRepository.deleteAll();
+        employerSignupCodeRepository.deleteAll();
         employerProfileRepository.deleteAll();
         workplaceRepository.deleteAll();
         companyRepository.deleteAll();
@@ -268,6 +275,131 @@ class EmployerAuthIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("EMPLOYER_SCOPE_NOT_READY"));
+    }
+
+    @Test
+    void signupCreatesEmployerAccountFromReusableSignupCode() throws Exception {
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        User workplaceOwner = userRepository.save(User.register(
+                "worker-owner@example.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Owner"
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                workplaceOwner,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul",
+                null,
+                37.5665,
+                126.9780,
+                100
+        ));
+        employerSignupCodeRepository.save(EmployerSignupCode.create(
+                "EMP-SIGNUP-1",
+                company.getId(),
+                workplace.getId(),
+                null
+        ));
+
+        EmployerSignupRequest request = new EmployerSignupRequest(
+                "EMP-SIGNUP-1",
+                "Acme HR",
+                "manager@acme.test",
+                "qweqwe123"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/employer-auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("CREATED"))
+                .andExpect(jsonPath("$.data.companyId").value(company.getId()))
+                .andExpect(jsonPath("$.data.defaultWorkplaceId").value(workplace.getId()))
+                .andExpect(jsonPath("$.data.companyName").value("Acme Logistics"))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andReturn();
+
+        JsonNode signupBody = objectMapper.readTree(result.getResponse().getContentAsString());
+        String accessToken = signupBody.path("data").path("accessToken").asText();
+
+        mockMvc.perform(get("/api/employer/profile")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.displayName").value("Acme HR"));
+    }
+
+    @Test
+    void signupRejectsInvalidCompanyCode() throws Exception {
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        User workplaceOwner = userRepository.save(User.register(
+                "worker-owner@example.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Owner"
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                workplaceOwner,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul",
+                null,
+                37.5665,
+                126.9780,
+                100
+        ));
+        EmployerSignupRequest request = new EmployerSignupRequest(
+                "EMP-SIGNUP-UNKNOWN",
+                "Acme HR",
+                "manager@acme.test",
+                "qweqwe123"
+        );
+
+        mockMvc.perform(post("/api/employer-auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_EMPLOYER_SIGNUP_CODE"));
+    }
+
+    @Test
+    void signupRejectsRevokedSignupCode() throws Exception {
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        User workplaceOwner = userRepository.save(User.register(
+                "worker-owner@example.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Owner"
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                workplaceOwner,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul",
+                null,
+                37.5665,
+                126.9780,
+                100
+        ));
+        EmployerSignupCode signupCode = EmployerSignupCode.create(
+                "EMP-SIGNUP-3",
+                company.getId(),
+                workplace.getId(),
+                null
+        );
+        signupCode.revoke(LocalDateTime.now());
+        employerSignupCodeRepository.save(signupCode);
+
+        EmployerSignupRequest request = new EmployerSignupRequest(
+                "EMP-SIGNUP-3",
+                "Acme HR",
+                "manager@acme.test",
+                "qweqwe123"
+        );
+
+        mockMvc.perform(post("/api/employer-auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_EMPLOYER_SIGNUP_CODE"));
     }
 
     @Test
