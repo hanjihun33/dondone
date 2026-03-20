@@ -1,6 +1,7 @@
 package com.workproofpay.backend.remittance.service;
 
 import com.workproofpay.backend.jobs.model.JobType;
+import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.service.JobService;
 import com.workproofpay.backend.remittance.api.dto.request.CreateTransferRequest;
 import com.workproofpay.backend.remittance.api.dto.request.TransferPrecheckRequest;
@@ -10,14 +11,14 @@ import com.workproofpay.backend.remittance.api.dto.response.TransferListItemResp
 import com.workproofpay.backend.remittance.api.dto.response.TransferListResponse;
 import com.workproofpay.backend.remittance.api.dto.response.TransferPrecheckResponse;
 import com.workproofpay.backend.remittance.config.RemittanceProperties;
-import com.workproofpay.backend.remittance.model.Recipient;
 import com.workproofpay.backend.remittance.model.RemittancePolicyCode;
 import com.workproofpay.backend.remittance.model.Transfer;
-import com.workproofpay.backend.remittance.repo.RecipientRepository;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -26,16 +27,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class TransferService {
 
+    private static final Logger log = LoggerFactory.getLogger(TransferService.class);
+
     private final TransferRepository transferRepository;
-    private final RecipientRepository recipientRepository;
-    private final RecipientService recipientService;
     private final WalletService walletService;
     private final RemittancePolicyService policyService;
     private final JobService jobService;
@@ -66,50 +65,101 @@ public class TransferService {
 
     @Transactional
     public TransferCreateResult createTransfer(Long userId, String idempotencyKey, CreateTransferRequest request) {
+        long startNs = System.nanoTime();
+        long walletLockMs = 0L;
+        long idempotencyLookupMs = 0L;
+        long policyMs = 0L;
+        long saveMs = 0L;
+        long enqueueMs = 0L;
+        String outcome = "ERROR";
+        String transferId = null;
+        boolean replayed = false;
+
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            outcome = "FAILED_IDEMPOTENCY_KEY_REQUIRED";
             throw new ApiException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
         }
 
-        walletService.getRequiredWalletForUpdate(userId);
-
-        Transfer existing = transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
-        if (existing != null) {
-            return replay(existing, request);
-        }
-
-        RemittancePolicyDecision decision = policyService.evaluate(
-                userId,
-                request.recipientId(),
-                request.amountAtomic(),
-                request.highAmountConfirmed(),
-                request.recentRecipientConfirmed()
-        );
-        if (!decision.allowed()) {
-            throw policyViolation(decision);
-        }
-
-        Transfer transfer = Transfer.request(
-                generateTransferId(),
-                userId,
-                request.recipientId(),
-                properties.getPolicy().getAssetSymbol(),
-                request.amountAtomic(),
-                decision.wallet().getWalletAddress(),
-                decision.recipient().getWalletAddress(),
-                idempotencyKey,
-                request.highAmountConfirmed(),
-                request.recentRecipientConfirmed()
-        );
         try {
+            long stepStartNs = System.nanoTime();
+            walletService.getRequiredWalletForUpdate(userId);
+            walletLockMs = elapsedMillis(stepStartNs);
+
+            stepStartNs = System.nanoTime();
+            Transfer existing = transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
+            idempotencyLookupMs = elapsedMillis(stepStartNs);
+            if (existing != null) {
+                TransferCreateResult replayResult = replay(existing, request);
+                transferId = existing.getTransferId();
+                replayed = true;
+                outcome = "REPLAYED";
+                return replayResult;
+            }
+
+            stepStartNs = System.nanoTime();
+            RemittancePolicyDecision decision = policyService.evaluate(
+                    userId,
+                    request.recipientId(),
+                    request.amountAtomic(),
+                    request.highAmountConfirmed(),
+                    request.recentRecipientConfirmed()
+            );
+            policyMs = elapsedMillis(stepStartNs);
+            if (!decision.allowed()) {
+                outcome = "BLOCKED_" + decision.policyCode().name();
+                throw policyViolation(decision);
+            }
+
+            Transfer transfer = Transfer.request(
+                    generateTransferId(),
+                    userId,
+                    request.recipientId(),
+                    properties.getPolicy().getAssetSymbol(),
+                    request.amountAtomic(),
+                    decision.wallet().getWalletAddress(),
+                    decision.recipient().getWalletAddress(),
+                    decision.recipient().getAlias(),
+                    decision.recipient().getRelation(),
+                    decision.recipient().getTargetUserId(),
+                    idempotencyKey,
+                    request.highAmountConfirmed(),
+                    request.recentRecipientConfirmed()
+            );
+
+            stepStartNs = System.nanoTime();
             transferRepository.saveAndFlush(transfer);
-            jobService.enqueue(JobType.SUBMIT_TRANSFER, transfer.getTransferId(), LocalDateTime.now());
+            saveMs = elapsedMillis(stepStartNs);
+
+            stepStartNs = System.nanoTime();
+            jobService.enqueue(JobReferenceKind.TRANSFER, JobType.SUBMIT_TRANSFER, transfer.getTransferId(), LocalDateTime.now());
+            enqueueMs = elapsedMillis(stepStartNs);
+            transferId = transfer.getTransferId();
+            outcome = "CREATED";
+            return new TransferCreateResult(false, toCreateResponse(transfer));
         } catch (DataIntegrityViolationException e) {
             Transfer conflicted = transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
                     .orElseThrow(() -> e);
-            return replay(conflicted, request);
+            TransferCreateResult replayResult = replay(conflicted, request);
+            transferId = conflicted.getTransferId();
+            replayed = true;
+            outcome = "REPLAY_AFTER_CONFLICT";
+            return replayResult;
+        } finally {
+            logCreateTransferPerf(
+                    outcome,
+                    userId,
+                    request.recipientId(),
+                    request.amountAtomic(),
+                    transferId,
+                    replayed,
+                    walletLockMs,
+                    idempotencyLookupMs,
+                    policyMs,
+                    saveMs,
+                    enqueueMs,
+                    elapsedMillis(startNs)
+            );
         }
-
-        return new TransferCreateResult(false, toCreateResponse(transfer));
     }
 
     @Transactional(readOnly = true)
@@ -119,28 +169,19 @@ public class TransferService {
         if (transfers.isEmpty()) {
             return new TransferListResponse(java.util.List.of());
         }
-        Map<String, Recipient> recipientsById = recipientRepository.findByUserIdAndRecipientIdIn(
-                        userId,
-                        transfers.stream().map(Transfer::getRecipientId).collect(Collectors.toSet())
-                ).stream()
-                .collect(Collectors.toMap(Recipient::getRecipientId, Function.identity()));
-
         return new TransferListResponse(
                 transfers.stream()
-                        .map(transfer -> {
-                            Recipient recipient = recipientsById.get(transfer.getRecipientId());
-                            return new TransferListItemResponse(
-                                    transfer.getTransferId(),
-                                    transfer.getStatus().name(),
-                                    transfer.getAssetSymbol(),
-                                    transfer.getAmountAtomic(),
-                                    transfer.getRecipientId(),
-                                    recipient == null ? null : recipient.getAlias(),
-                                    transfer.getRecipientAddress(),
-                                    transfer.getTxHash(),
-                                    transfer.getUpdatedAt()
-                            );
-                        })
+                        .map(transfer -> new TransferListItemResponse(
+                                transfer.getTransferId(),
+                                transfer.getStatus().name(),
+                                transfer.getAssetSymbol(),
+                                transfer.getAmountAtomic(),
+                                transfer.getRecipientId(),
+                                transfer.getRecipientAliasSnapshot(),
+                                transfer.getRecipientAddress(),
+                                transfer.getTxHash(),
+                                transfer.getUpdatedAt()
+                        ))
                         .toList()
         );
     }
@@ -149,7 +190,6 @@ public class TransferService {
     public TransferDetailResponse getTransfer(Long userId, String transferId) {
         Transfer transfer = transferRepository.findByTransferIdAndUserId(transferId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.TRANSFER_NOT_FOUND));
-        Recipient recipient = recipientService.getRequiredRecipient(userId, transfer.getRecipientId());
 
         return new TransferDetailResponse(
                 transfer.getTransferId(),
@@ -158,7 +198,7 @@ public class TransferService {
                 transfer.getAmountAtomic(),
                 transfer.getSenderAddress(),
                 transfer.getRecipientId(),
-                recipient.getAlias(),
+                transfer.getRecipientAliasSnapshot(),
                 transfer.getRecipientAddress(),
                 transfer.getTxHash(),
                 transfer.getFailureCode() == null ? null : transfer.getFailureCode().name(),
@@ -214,5 +254,43 @@ public class TransferService {
                         "recentRecipientUpdatedAt", decision.recipient().getUpdatedAt()
                 )
         );
+    }
+
+    private void logCreateTransferPerf(
+            String outcome,
+            Long userId,
+            String recipientId,
+            long amountAtomic,
+            String transferId,
+            boolean replayed,
+            long walletLockMs,
+            long idempotencyLookupMs,
+            long policyMs,
+            long saveMs,
+            long enqueueMs,
+            long totalMs
+    ) {
+        if (!properties.getObservability().isPerfLogEnabled()) {
+            return;
+        }
+        log.info(
+                "remittance_perf event=create_transfer outcome={} replayed={} user_id={} recipient_id={} amount_atomic={} transfer_id={} total_ms={} wallet_lock_ms={} idempotency_lookup_ms={} policy_ms={} save_ms={} enqueue_ms={}",
+                outcome,
+                replayed,
+                userId,
+                recipientId,
+                amountAtomic,
+                transferId,
+                totalMs,
+                walletLockMs,
+                idempotencyLookupMs,
+                policyMs,
+                saveMs,
+                enqueueMs
+        );
+    }
+
+    private long elapsedMillis(long startNs) {
+        return (System.nanoTime() - startNs) / 1_000_000L;
     }
 }
