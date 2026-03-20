@@ -137,27 +137,29 @@ private fun DocumentItem.toMenuDocumentUiModel(): MenuDocumentUiModel {
 
 private fun WorkproofPdfCreateUiState.toLiveProofDocument(): MenuDocumentUiModel? {
     val currentStatus = status ?: return null
+    val isActionable = documentId != null && !isFailed
     val statusTone = when (currentStatus) {
-        "READY" -> BadgeTone.Success
         "FAILED" -> BadgeTone.Warning
-        else -> BadgeTone.Info
+        else -> if (isActionable) BadgeTone.Success else BadgeTone.Info
     }
     val statusText = when (currentStatus) {
-        "QUEUED" -> DOCUMENT_STATUS_PENDING
+        "QUEUED" -> if (isActionable) "열기 가능" else DOCUMENT_STATUS_PENDING
         "RUNNING" -> DOCUMENT_STATUS_GENERATING
         "READY" -> DOCUMENT_STATUS_READY
         "FAILED" -> "생성 실패"
         else -> DOCUMENT_STATUS_PENDING
     }
     val summaryText = when (currentStatus) {
-        "READY" -> "방금 생성한 근무 기록 PDF를 메뉴에서 다시 열거나 공유할 수 있어요."
         "FAILED" -> "근무 기록 문서 생성이 실패했어요. 기간을 다시 선택해 재시도해 주세요."
-        else -> "선택한 기간의 출퇴근 기록과 변경 이력을 정리한 PDF 문서를 준비하고 있어요."
+        else -> if (isActionable) {
+            "메뉴에서 문서를 열거나 공유할 때 선택한 기간의 PDF를 바로 생성할 수 있어요."
+        } else {
+            "선택한 기간의 출퇴근 기록과 변경 이력을 정리한 PDF 문서 요청이 저장됐어요."
+        }
     }
     val updatedAtText = when (currentStatus) {
-        "READY" -> "업데이트 방금 생성"
         "FAILED" -> "업데이트 생성 실패"
-        else -> "업데이트 생성 요청 접수됨"
+        else -> if (isActionable) "업데이트 바로 생성 가능" else "업데이트 생성 요청 접수됨"
     }
 
     return MenuDocumentUiModel(

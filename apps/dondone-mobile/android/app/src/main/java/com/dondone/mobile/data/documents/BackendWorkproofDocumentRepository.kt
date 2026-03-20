@@ -110,11 +110,14 @@ class BackendWorkproofDocumentRepository(
             }
 
             val data = JSONObject(responseBody.ifBlank { "{}" }).getJSONObject("data")
+            val documentUrl = if (data.isNull("documentUrl")) null else data.getString("documentUrl")
             return@withContext WorkproofDocumentCreatePayload(
                 requestId = data.getString("requestId"),
+                documentId = parseDocumentId(documentUrl),
                 documentType = data.getString("documentType"),
                 status = data.getString("status"),
-                pollUrl = data.getString("pollUrl")
+                pollUrl = data.getString("pollUrl"),
+                documentUrl = documentUrl
             )
         }
     }
@@ -207,4 +210,12 @@ private fun extractFileName(headers: Headers, documentId: Long): String {
     } else {
         fileName
     }
+}
+
+private fun parseDocumentId(documentUrl: String?): Long? {
+    val value = documentUrl ?: return null
+    return value
+        .substringAfter("/api/documents/", "")
+        .substringBefore("/")
+        .toLongOrNull()
 }

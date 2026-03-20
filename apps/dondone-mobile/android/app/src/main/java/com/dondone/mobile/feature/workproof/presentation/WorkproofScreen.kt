@@ -1226,23 +1226,20 @@ private fun WorkproofPdfGenerationResultSheet(
     onOpenDocuments: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val isReady = createUiState.isReady
+    val isActionable = createUiState.isActionable
     val isFailed = createUiState.isFailed
-    val isPolling = createUiState.isPolling
     val title = when {
-        isReady -> "PDF 생성 완료"
         isFailed -> "PDF 생성 실패"
-        isPolling -> "PDF 생성 중"
+        isActionable -> "PDF 열기 준비 완료"
         else -> "PDF 생성 요청 완료"
     }
     val description = when {
-        isReady -> "선택한 기간의 근무 기록 문서가 준비됐어요."
         isFailed -> createUiState.errorMessage ?: "문서 생성에 실패했어요."
-        isPolling -> "문서 준비 상태를 확인하고 있어요. 잠시만 기다려 주세요."
-        else -> "선택한 기간의 근무 기록 문서 생성 요청이 접수됐어요."
+        isActionable -> "열기 또는 공유를 누르면 선택한 기간의 근무 기록 문서를 바로 생성해요."
+        else -> "선택한 기간의 근무 기록 문서 생성 요청이 접수됐어요. 문서를 열 때 바로 생성해요."
     }
     val statusLabel = when (createUiState.status) {
-        "QUEUED" -> "대기 중"
+        "QUEUED" -> if (isActionable) "열기 시 생성" else "요청 접수"
         "RUNNING" -> "생성 중"
         "READY" -> "준비 완료"
         "FAILED" -> "실패"
@@ -1269,7 +1266,7 @@ private fun WorkproofPdfGenerationResultSheet(
             ) {
                 Icon(
                     imageVector = when {
-                        isReady -> Icons.Default.CheckCircle
+                        isActionable -> Icons.Default.CheckCircle
                         isFailed -> Icons.Default.SyncAlt
                         else -> Icons.Default.Schedule
                     },
@@ -1321,13 +1318,13 @@ private fun WorkproofPdfGenerationResultSheet(
             PrimaryActionButton(
                 text = "열기",
                 onClick = onOpen,
-                enabled = isReady,
+                enabled = isActionable,
                 modifier = Modifier.weight(1f)
             )
             SecondaryActionButton(
                 text = "공유",
                 onClick = onShare,
-                enabled = isReady,
+                enabled = isActionable,
                 modifier = Modifier.weight(1f)
             )
         }

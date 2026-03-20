@@ -8,7 +8,6 @@ data class WorkproofPdfPreviewUiState(
 
 data class WorkproofPdfCreateUiState(
     val isSubmitting: Boolean = false,
-    val isPolling: Boolean = false,
     val requestId: String? = null,
     val documentId: Long? = null,
     val documentUrl: String? = null,
@@ -16,8 +15,8 @@ data class WorkproofPdfCreateUiState(
     val pollUrl: String? = null,
     val errorMessage: String? = null
 ) {
-    val isReady: Boolean
-        get() = status == "READY"
+    val isActionable: Boolean
+        get() = documentId != null && !isFailed
 
     val isFailed: Boolean
         get() = status == "FAILED"

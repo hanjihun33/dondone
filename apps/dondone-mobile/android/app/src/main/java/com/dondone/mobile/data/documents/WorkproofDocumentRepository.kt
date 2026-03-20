@@ -46,9 +46,11 @@ data class WorkproofDocumentPreviewPayload(
 
 data class WorkproofDocumentCreatePayload(
     val requestId: String,
+    val documentId: Long?,
     val documentType: String,
     val status: String,
-    val pollUrl: String
+    val pollUrl: String,
+    val documentUrl: String?
 )
 
 data class WorkproofDocumentRequestStatusPayload(
