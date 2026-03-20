@@ -32,6 +32,21 @@ public class WorkProof extends BaseTimeEntity {
     @JoinColumn(name = "workplace_id")
     private Workplace workplace;
 
+    @Column(name = "workplace_name_snapshot", length = 100)
+    private String workplaceNameSnapshot;
+
+    @Column(name = "workplace_address_snapshot", length = 255)
+    private String workplaceAddressSnapshot;
+
+    @Column(name = "workplace_map_label_snapshot", length = 100)
+    private String workplaceMapLabelSnapshot;
+
+    @Column(name = "workplace_latitude_snapshot")
+    private Double workplaceLatitudeSnapshot;
+
+    @Column(name = "workplace_longitude_snapshot")
+    private Double workplaceLongitudeSnapshot;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id")
     private WorkContract contract;
@@ -98,6 +113,11 @@ public class WorkProof extends BaseTimeEntity {
 
     private WorkProof(User user,
                       Workplace workplace,
+                      String workplaceNameSnapshot,
+                      String workplaceAddressSnapshot,
+                      String workplaceMapLabelSnapshot,
+                      Double workplaceLatitudeSnapshot,
+                      Double workplaceLongitudeSnapshot,
                       WorkContract contract,
                       LocalDate workDate,
                       LocalDateTime clockInAt,
@@ -120,6 +140,11 @@ public class WorkProof extends BaseTimeEntity {
                       WorkProofFinancialStatus financialStatus) {
         this.user = user;
         this.workplace = workplace;
+        this.workplaceNameSnapshot = workplaceNameSnapshot;
+        this.workplaceAddressSnapshot = workplaceAddressSnapshot;
+        this.workplaceMapLabelSnapshot = workplaceMapLabelSnapshot;
+        this.workplaceLatitudeSnapshot = workplaceLatitudeSnapshot;
+        this.workplaceLongitudeSnapshot = workplaceLongitudeSnapshot;
         this.contract = contract;
         this.workDate = workDate;
         this.clockInAt = clockInAt;
@@ -160,6 +185,11 @@ public class WorkProof extends BaseTimeEntity {
                 user,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 workDate,
                 clockInAt,
                 clockOutAt,
@@ -193,6 +223,11 @@ public class WorkProof extends BaseTimeEntity {
         return new WorkProof(
                 user,
                 workplace,
+                workplace.getName(),
+                workplace.getAddress(),
+                workplace.getMapLabel(),
+                workplace.getLatitude(),
+                workplace.getLongitude(),
                 contract,
                 deviceAt.toLocalDate(),
                 deviceAt,
@@ -279,5 +314,40 @@ public class WorkProof extends BaseTimeEntity {
         this.financialStatus = outsideAllowedRadius
                 ? WorkProofFinancialStatus.NEEDS_REVIEW
                 : WorkProofFinancialStatus.REFLECTED;
+    }
+
+    public String resolveWorkplaceName() {
+        if (workplaceNameSnapshot != null) {
+            return workplaceNameSnapshot;
+        }
+        return workplace == null ? null : workplace.getName();
+    }
+
+    public String resolveWorkplaceAddress() {
+        if (workplaceAddressSnapshot != null) {
+            return workplaceAddressSnapshot;
+        }
+        return workplace == null ? null : workplace.getAddress();
+    }
+
+    public String resolveWorkplaceMapLabel() {
+        if (workplaceMapLabelSnapshot != null) {
+            return workplaceMapLabelSnapshot;
+        }
+        return workplace == null ? null : workplace.getMapLabel();
+    }
+
+    public Double resolveWorkplaceLatitude() {
+        if (workplaceLatitudeSnapshot != null) {
+            return workplaceLatitudeSnapshot;
+        }
+        return workplace == null ? null : workplace.getLatitude();
+    }
+
+    public Double resolveWorkplaceLongitude() {
+        if (workplaceLongitudeSnapshot != null) {
+            return workplaceLongitudeSnapshot;
+        }
+        return workplace == null ? null : workplace.getLongitude();
     }
 }

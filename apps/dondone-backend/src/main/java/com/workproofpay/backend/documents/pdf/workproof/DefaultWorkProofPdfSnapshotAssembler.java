@@ -102,6 +102,7 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 .map(audit -> toAuditItem(audit, locale))
                 .toList();
 
+        WorkProof latestRecord = records.get(0);
         return new WorkProofPdfSnapshot(
                 buildMeta(request, yearMonth, zoneId, locale),
                 buildStatementInfo(locale),
@@ -111,8 +112,8 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                         nullToDash(request.getUser().getPhoneNumber())
                 ),
                 new WorkProofPdfSnapshot.WorkplaceInfo(
-                        nullToDash(workplace.getName()),
-                        nullToDash(workplace.getAddress())
+                        nullToDash(latestRecord.resolveWorkplaceName()),
+                        nullToDash(latestRecord.resolveWorkplaceAddress())
                 ),
                 new WorkProofPdfSnapshot.PeriodInfo(
                         formatDate(startDate),

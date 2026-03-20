@@ -2,6 +2,7 @@ package com.workproofpay.backend.shared.bootstrap;
 
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.auth.support.EmailNormalizer;
 import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofAuditLog;
@@ -55,11 +56,12 @@ public class DevUserInitializer implements CommandLineRunner {
 
     @SuppressWarnings("null")
     private void ensureDefaultUser() {
-        if (userRepository.existsByEmail(DEFAULT_USER_EMAIL)) {
+        String normalizedEmail = EmailNormalizer.normalize(DEFAULT_USER_EMAIL);
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             return;
         }
         User user = User.register(
-                DEFAULT_USER_EMAIL,
+                normalizedEmail,
                 passwordEncoder.encode(DEFAULT_USER_PASSWORD),
                 "Test User",
                 "01012345678");
@@ -68,9 +70,10 @@ public class DevUserInitializer implements CommandLineRunner {
 
     @SuppressWarnings("null")
     private void ensurePdfDemoUser() {
-        User user = userRepository.findByEmail(PDF_DEMO_EMAIL)
+        String normalizedEmail = EmailNormalizer.normalize(PDF_DEMO_EMAIL);
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseGet(() -> Objects.requireNonNull(userRepository.save(User.register(
-                        PDF_DEMO_EMAIL,
+                        normalizedEmail,
                         passwordEncoder.encode(PDF_DEMO_PASSWORD),
                         "PDF Demo User",
                         "01098765432"))));

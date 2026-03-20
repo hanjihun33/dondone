@@ -7,6 +7,7 @@ import com.workproofpay.backend.auth.api.dto.response.LoginResponse;
 import com.workproofpay.backend.auth.api.dto.response.MeResponse;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.auth.support.EmailNormalizer;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
@@ -26,14 +27,16 @@ public class AuthService {
 
     @Transactional
     public MeResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        String normalizedEmail = EmailNormalizer.normalize(request.email());
+
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new ApiException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
         String normalizedPhoneNumber = PhoneNumberUtils.normalizeOrThrow(request.phoneNumber());
         ensurePhoneNumberAvailable(normalizedPhoneNumber, null);
 
         User user = User.register(
-                request.email(),
+                normalizedEmail,
                 passwordEncoder.encode(request.password()),
                 request.name().trim(),
                 normalizedPhoneNumber
@@ -45,7 +48,9 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        String normalizedEmail = EmailNormalizer.normalize(request.email());
+
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(() -> new ApiException(ErrorCode.INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {

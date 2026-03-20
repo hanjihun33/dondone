@@ -17,6 +17,8 @@
 - 현재 어디까지 진행했는지는 `implementation-slices.md`에서 본다.
 - 현재 세션의 실제 작업 범위는 최신 `docs/execplans/active/` 문서에서 본다.
 - 구현 중 발견한 리스크와 검증 결과는 `docs/reviews/active/`에 남긴다.
+- 대화 중 후속 작업으로 미룬 항목은 `docs/reviews/active/` follow-up note와 다음 대화 시작 문구 둘 다에 남긴다.
+- 임시 처리한 항목은 단순 후속 작업이 아니라 `temporary` 또는 `shared_policy_pending` 성격까지 같이 남긴다.
 
 ## 문서 목록
 | 문서 | 역할 | 먼저 볼 시점 |
@@ -44,7 +46,8 @@
 1. 이 문서를 읽고 필요한 기준 문서를 찾는다.
 2. `implementation-slices.md`에서 현재 `in_progress` 또는 첫 `not_started` slice를 확인한다.
 3. 최신 `docs/execplans/active/` 문서에서 현재 세션 범위를 확인한다.
-4. 최근 검증 이슈가 있으면 `docs/reviews/active/`의 최신 review note를 본다.
+4. 최근 검증 이슈나 후속 작업이 있으면 `docs/reviews/active/`의 최신 review note와 follow-up note를 본다.
+5. 새 대화를 열 때는 마지막 응답에 남긴 “바로 복붙용 시작 문구”를 우선 사용한다.
 
 ## 작업 단계별 추천 참조
 ### 계획 고정 전
@@ -70,6 +73,11 @@
 - DB/엔티티 영향이 있는 변경은 `shared-entity-validation.md`를 먼저 갱신한 뒤 진행한다.
 - 실제 작업 순서와 담당 범위는 `docs/execplans/active/`에서 관리한다.
 - 구현 중 발견한 리스크와 검증 결과는 `docs/reviews/active/`에 남긴다.
+- 구현 중 의도적으로 미룬 항목은 active follow-up note에 즉시 추가하고, 다음 대화 시작 문구에도 같은 순서로 남긴다.
+- 임시 처리 항목은 follow-up note에 아래 세 줄을 같이 남긴다.
+  - 현재 임시 처리
+  - 지금 확정하지 않은 이유
+  - 닫히는 조건
 - 웹 구현 중 기존 앱 API 변경이 필요해지면 바로 범위를 다시 검토한다.
 
 ## 갱신 규칙

@@ -24,6 +24,18 @@
 # Goal
 기존 worker 앱 auth 계약은 유지한 채, 웹 전용 Slice 2에서 employer 초대 수락, employer 로그인, employer 프로필 부트스트랩, membership 기반 authorization source of truth를 구현할 수 있는 최소 코드 경계와 계약을 고정한다.
 
+# Status
+- 상태: `implemented`
+- 완료일: `2026-03-19`
+- 검증: `apps/dondone-backend`에서 `./gradlew test` 통과
+
+# Outcome Summary
+- `POST /api/employer-auth/invitations/accept`, `POST /api/employer-auth/login`, `GET /api/employer/profile`를 backend에 구현했다.
+- `UserRole.EMPLOYER`, `EmployerProfile`, `EmployerInvitationToken`, `EmploymentMembership`, `EmployerAccessScope` 기반 foundation을 추가했다.
+- `SecurityConfig`에서 `/api/employer-auth/**` 공개, `/api/employer/**` employer 전용, 기존 `/api/**` worker/admin 전용 경계를 명시했다.
+- 리뷰 반영으로 invitation token은 DB row 기반 hash 저장으로 전환했고, 이메일 canonicalization은 worker/employer 공통 정책으로 맞췄다.
+- company-workplace scope 위조를 막기 위해 `Workplace.companyId` 보조 연결과 company-workplace binding 검증을 추가했다.
+
 # In Scope
 - backend에 웹 전용 public auth 표면 추가:
   - `POST /api/employer-auth/invitations/accept`
@@ -78,11 +90,10 @@
 
 ## Docs
 - `docs/web/implementation-slices.md`
+- `docs/web/auth-and-role-policy.md`
+- `docs/web/shared-entity-validation.md`
+- `docs/web/employer-worker-domain-map.md`
 - `docs/execplans/active/2026-03-19-web-auth-profile-foundation.md`
-- 구현 중 계약이 달라지면:
-  - `docs/web/auth-and-role-policy.md`
-  - `docs/web/shared-entity-validation.md`
-  - `docs/web/employer-web-api-map.md`
 
 ## Shared
 - `apps/dondone-backend/src/main/resources/**`
@@ -137,15 +148,20 @@
 - 신규 조직 엔티티는 `추가 테이블 + 보조 연결` 접근을 유지하고 기존 worker 레거시 소유 컬럼을 바로 제거하지 않는다.
 
 # Implementation Steps
-1. backend 현재 auth/security 코드를 기준으로 employer 전용 공개/보호 endpoint 경계를 설계한다.
-2. `UserRole` 확장과 employer account 생성 경로를 추가하되 기존 `/api/auth/signup` 흐름은 그대로 둔다.
-3. `EmployerInvitationToken`과 `EmployerProfile` 저장 모델을 도입하고 invitation accept service에서 1회성/만료/폐기/binding 검증을 구현한다.
-4. `EmploymentMembership`을 employer authz canonical source로 도입하거나, 최소한 동일 의미의 조직 연결 모델을 확정한다.
-5. `EmployerAccessScope`와 membership 재검증 helper를 만들어 향후 `/api/employer/*` endpoint가 공통으로 쓰게 한다.
-6. `POST /api/employer-auth/login`, `GET /api/employer/profile`을 추가하고 employer status/company/defaultWorkplace 검증을 연결한다.
-7. web 앱에 employer auth API client, 세션/profile bootstrap, route guard 진입점을 추가한다.
-8. integration/security tests로 token contract, role 분리, membership authz source-of-truth를 검증한다.
-9. 구현 결과가 문서 계약과 다르면 `docs/web/*`와 review note 후속 필요 여부를 같이 정리한다.
+1. backend auth/security 경계에 employer 전용 공개/보호 endpoint를 추가했다.
+2. `UserRole.EMPLOYER`와 employer account 생성 경로를 도입하고 기존 `/api/auth/signup` 흐름은 유지했다.
+3. `EmployerInvitationToken`, `EmployerProfile`, `Company`, `EmploymentMembership` 저장 모델을 도입했다.
+4. invitation accept/login/profile bootstrap에 company-default workplace binding 검증을 연결했다.
+5. `EmployerAccessScope` 기반 helper를 추가해 향후 `/api/employer/*` endpoint 재사용 기반을 만들었다.
+6. 리뷰 반영으로 invitation token hash 저장, 이메일 canonicalization 공통화, company-workplace mismatch 차단을 적용했다.
+7. integration/security tests로 token contract, role 분리, membership authz source of truth, email normalization 회귀를 검증했다.
+8. 문서 계약과 실제 구현이 맞도록 Slice 2 기준 문서를 갱신했다.
+
+# Remaining Follow-ups
+- `Workplace.companyId`는 현재 employer 검증용 additive 연결이므로, app/web 공통 리팩터링 시점에 공용 필수 소속 키 승격 여부를 다시 결정해야 한다.
+- DB 차원의 `lower(email)` 유니크 인덱스는 아직 추가하지 않았으므로, 장기 hardening 후보로 남긴다.
+- invitation 발급/운영 bootstrap endpoint는 이번 slice 범위에 포함하지 않았고 seed/bootstrap 흐름으로 한정했다.
+- Slice 3에서는 `EmployerAccessScope`를 재사용해 workplace settings 계약과 효력 시점 규칙을 고정해야 한다.
 
 # Test Plan
 - backend integration
@@ -187,13 +203,14 @@ Single lane
 3. `test: cover employer auth token and membership authorization`
 
 # Open Questions
-- `defaultWorkplaceId`를 `EmployerProfile`에 직접 둘지, 별도 preference 엔티티로 둘지
-- `EmploymentMembership`를 이번 slice에서 실테이블까지 도입할지, authz helper가 기대하는 최소 읽기 모델만 먼저 둘지
-- employer invitation 발급 endpoint를 이번 slice에 포함하지 않고 seed/bootstrap 방식으로 한정해도 데모 흐름이 성립하는지
+- `defaultWorkplaceId`를 장기적으로도 `EmployerProfile`에 직접 둘지, workplace switcher 도입 시 preference 엔티티로 분리할지
+- `Workplace.companyId`를 언제 worker 앱까지 포함한 공용 필수 소속 키로 승격할지
+- invitation 발급/운영 bootstrap 흐름을 Slice 3 이전에 별도 endpoint로 열 필요가 있는지
 
 # Assumptions
 - Slice 2의 목표는 employer web이 로그인과 최소 프로필 부트스트랩까지 가능한 foundation을 만드는 것이지, worker list/dashboard read-model을 여는 것이 아니다.
-- invitation token 저장은 signed token 단독보다 DB row 기반이 MVP 검증과 운영 회수에 유리하다.
+- invitation token 저장은 signed token 단독보다 DB row 기반이 MVP 검증과 운영 회수에 유리하고, 저장 값은 hash로 유지한다.
 - employer 한 명은 MVP에서 company 1곳, default workplace 1곳만 가진다.
 - worker/employer 겸용 계정은 허용하지 않는다.
 - 기존 app auth/API를 바꾸지 않고도 web 전용 endpoint와 DTO를 추가하는 방식으로 범위를 닫을 수 있다.
+- employer authz source of truth는 `EmployerProfile + EmploymentMembership`이고, `Workplace.companyId`는 binding 검증용 보조 연결로 취급한다.
