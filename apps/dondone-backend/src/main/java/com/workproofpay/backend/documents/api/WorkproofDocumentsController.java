@@ -77,8 +77,8 @@ public class WorkproofDocumentsController {
 
                     현재 범위:
                     - WORKPROOF_STATEMENT 문서 타입만 지원합니다.
-                    - 요청이 저장되면 QUEUED 상태와 pollUrl을 반환합니다.
-                    - 실제 PDF 생성과 다운로드는 후속 workflow에서 연결합니다.
+                    - 요청이 저장되면 requestId와 download 경로를 함께 반환합니다.
+                    - 실제 PDF 렌더링은 download 호출 시점에 수행합니다.
                     """,
             security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
     )
@@ -99,7 +99,8 @@ public class WorkproofDocumentsController {
                 accepted.requestId(),
                 accepted.documentType(),
                 accepted.status(),
-                accepted.pollUrl()
+                accepted.pollUrl(),
+                accepted.documentUrl()
         ));
     }
 }

@@ -152,7 +152,11 @@ class DefaultWorkproofDocumentServiceTest {
                 "workproof-1"
         )).thenReturn(false);
         when(documentGenerationRequestRepository.saveAndFlush(any(DocumentGenerationRequest.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation -> {
+                    DocumentGenerationRequest saved = invocation.getArgument(0);
+                    setId(saved, 42L);
+                    return saved;
+                });
 
         WorkproofDocumentAcceptedResult result = service.create(
                 1L,
@@ -167,6 +171,7 @@ class DefaultWorkproofDocumentServiceTest {
 
         assertEquals(DocumentType.WORKPROOF_STATEMENT, result.documentType());
         assertEquals(DocumentGenerationStatus.QUEUED, result.status());
+        assertEquals("/api/documents/42/download", result.documentUrl());
     }
 
     @Test
@@ -181,5 +186,15 @@ class DefaultWorkproofDocumentServiceTest {
         ));
 
         assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
+    }
+
+    private void setId(DocumentGenerationRequest request, Long id) {
+        try {
+            var field = DocumentGenerationRequest.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(request, id);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to set document request id for test", e);
+        }
     }
 }

@@ -7,6 +7,7 @@ public record WorkproofDocumentAcceptedResult(
         String requestId,
         DocumentType documentType,
         DocumentGenerationStatus status,
-        String pollUrl
+        String pollUrl,
+        String documentUrl
 ) {
 }

@@ -89,7 +89,8 @@ public class DefaultWorkproofDocumentService implements WorkproofDocumentService
                     saved.getRequestId(),
                     saved.getDocumentType(),
                     saved.getStatus(),
-                    "/api/documents/requests/" + saved.getRequestId()
+                    "/api/documents/requests/" + saved.getRequestId(),
+                    "/api/documents/" + saved.getId() + "/download"
             );
         } catch (DataIntegrityViolationException e) {
             if (isDuplicateRequestViolation(e)) {
