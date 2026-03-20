@@ -38,6 +38,7 @@ import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DonDoneToastHost
 import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.designsystem.DawnWarning
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.rememberDonDoneToastState
@@ -46,6 +47,7 @@ import com.dondone.mobile.feature.auth.presentation.LoginLoadingScreen
 import com.dondone.mobile.feature.auth.presentation.LoginScreen
 
 private const val COMPANY_CODE_MAX_LENGTH = 12
+private const val COMPANY_CODE_MIN_LENGTH = 6
 
 @Composable
 fun DonDoneApp(
@@ -88,6 +90,8 @@ private fun AuthenticatedDonDoneAppShell(
     val workproofShellState = rememberWorkproofShellState(currentRoute)
     var isCompanyCodeSheetVisible by rememberSaveable { mutableStateOf(false) }
     var companyCodeInput by rememberSaveable { mutableStateOf("") }
+    val companyCodeValidationMessage = companyCodeValidationMessage(companyCodeInput)
+    val isCompanyCodeSavable = companyCodeInput.isNotBlank() && companyCodeValidationMessage == null
 
     val chrome = resolveScreenChrome(
         route = currentRoute,
@@ -191,10 +195,10 @@ private fun AuthenticatedDonDoneAppShell(
         if (isCompanyCodeSheetVisible) {
             CompanyCodeSheet(
                 companyCode = companyCodeInput,
-                onCompanyCodeChange = { nextValue ->
-                    companyCodeInput = normalizeCompanyCodeInput(nextValue)
-                },
+                validationMessage = companyCodeValidationMessage,
+                onCompanyCodeChange = { nextValue -> companyCodeInput = normalizeCompanyCodeInput(nextValue) },
                 isSubmitting = companyCodeUpdateUiState.isSubmitting,
+                isSaveEnabled = isCompanyCodeSavable,
                 onDismiss = {
                     if (!companyCodeUpdateUiState.isSubmitting) {
                         isCompanyCodeSheetVisible = false
@@ -213,8 +217,10 @@ private fun AuthenticatedDonDoneAppShell(
 @Composable
 private fun CompanyCodeSheet(
     companyCode: String,
+    validationMessage: String?,
     onCompanyCodeChange: (String) -> Unit,
     isSubmitting: Boolean,
+    isSaveEnabled: Boolean,
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
@@ -238,19 +244,20 @@ private fun CompanyCodeSheet(
                     .fillMaxWidth()
                     .padding(top = 20.dp),
                 singleLine = true,
+                isError = validationMessage != null,
                 label = { Text("회사코드") },
-                placeholder = { Text("예: DONDONE2026") }
-            )
-            Text(
-                text = "영문 대문자와 숫자만 입력할 수 있어요.",
-                modifier = Modifier.padding(top = 10.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnTextSubtle
+                placeholder = { Text("예: DONDONE2026") },
+                supportingText = {
+                    Text(
+                        text = validationMessage ?: "영문 대문자와 숫자만 입력할 수 있어요.",
+                        color = if (validationMessage != null) DawnWarning else DawnTextSubtle
+                    )
+                }
             )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp, bottom = 12.dp)
+                    .padding(top = 16.dp, bottom = 12.dp)
             ) {
                 SecondaryActionButton(
                     text = "닫기",
@@ -261,7 +268,7 @@ private fun CompanyCodeSheet(
                 PrimaryActionButton(
                     text = if (isSubmitting) "저장 중..." else "저장",
                     onClick = onSave,
-                    enabled = !isSubmitting,
+                    enabled = !isSubmitting && isSaveEnabled,
                     modifier = Modifier
                         .weight(1f)
                         .padding(start = 12.dp)
@@ -276,8 +283,25 @@ internal fun normalizeCompanyCodeInput(
 ): String {
     return rawValue
         .uppercase()
-        .filter { it.isDigit() || it in 'A'..'Z' }
         .take(COMPANY_CODE_MAX_LENGTH)
+}
+
+internal fun companyCodeValidationMessage(
+    companyCode: String
+): String? {
+    if (companyCode.isBlank()) {
+        return null
+    }
+    if (companyCode.any { !it.isDigit() && it !in 'A'..'Z' }) {
+        return "영문 대문자와 숫자만 입력할 수 있어요."
+    }
+    if (companyCode.length < COMPANY_CODE_MIN_LENGTH) {
+        return "회사코드는 6자 이상이어야 해요."
+    }
+    if (companyCode.length > COMPANY_CODE_MAX_LENGTH) {
+        return "회사코드는 12자 이하여야 해요."
+    }
+    return null
 }
 
 @Composable
