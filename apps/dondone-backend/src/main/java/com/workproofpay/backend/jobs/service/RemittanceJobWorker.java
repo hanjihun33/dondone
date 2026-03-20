@@ -15,9 +15,9 @@ import com.workproofpay.backend.remittance.model.TransferStatus;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
+import com.workproofpay.backend.remittance.service.RemittanceMetrics;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -32,7 +32,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class RemittanceJobWorker {
 
-    private static final Logger log = LoggerFactory.getLogger(RemittanceJobWorker.class);
     private static final List<JobStatus> ACTIVE_JOB_STATUSES = List.of(JobStatus.QUEUED, JobStatus.RUNNING);
 
     private final JobRepository jobRepository;
@@ -43,6 +42,7 @@ public class RemittanceJobWorker {
     private final JobService jobService;
     private final RemittanceProperties properties;
     private final TransactionTemplate transactionTemplate;
+    private final RemittanceMetrics remittanceMetrics;
 
     @Scheduled(fixedDelayString = "${remittance.worker.poll-interval-ms:2000}")
     public void run() {
@@ -95,49 +95,22 @@ public class RemittanceJobWorker {
     }
 
     private void handleSubmit(ClaimedJob claimedJob) {
-        long startNs = System.nanoTime();
-        long prepareMs = 0L;
-        long broadcastMs = 0L;
-        long completeMs = 0L;
-        String outcome = "ERROR";
-        String transferId = claimedJob.referenceId();
-        Long transferAgeMs = null;
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "error";
 
         try {
-            long stepStartNs = System.nanoTime();
             PendingSubmission submission = transactionTemplate.execute(status -> prepareSubmission(claimedJob.jobId()));
-            prepareMs = elapsedMillis(stepStartNs);
             if (submission == null) {
-                stepStartNs = System.nanoTime();
                 markJobDone(claimedJob.jobId());
-                completeMs = elapsedMillis(stepStartNs);
-                outcome = "SKIPPED";
+                outcome = "skipped";
                 return;
             }
 
-            transferId = submission.transferId();
-
-            stepStartNs = System.nanoTime();
             blockchainGateway.broadcastSignedTransaction(submission.signedTransaction());
-            broadcastMs = elapsedMillis(stepStartNs);
-
-            stepStartNs = System.nanoTime();
             transactionTemplate.executeWithoutResult(status -> completeSubmit(claimedJob.jobId(), submission.transferId()));
-            completeMs = elapsedMillis(stepStartNs);
-            transferAgeMs = positiveMillis(Duration.between(submission.createdAt(), LocalDateTime.now()).toMillis());
-            outcome = "BROADCASTED";
+            outcome = "broadcasted";
         } finally {
-            logWorkerPerf(
-                    "worker_submit",
-                    outcome,
-                    claimedJob,
-                    transferId,
-                    prepareMs,
-                    broadcastMs,
-                    completeMs,
-                    elapsedMillis(startNs),
-                    transferAgeMs
-            );
+            remittanceMetrics.recordWorkerJob(sample, JobType.SUBMIT_TRANSFER.name().toLowerCase(), outcome);
         }
     }
 
@@ -177,16 +150,10 @@ public class RemittanceJobWorker {
     }
 
     private void handlePoll(ClaimedJob claimedJob) {
-        long startNs = System.nanoTime();
-        long targetLookupMs = 0L;
-        long receiptLookupMs = 0L;
-        long applyMs = 0L;
-        String outcome = "ERROR";
-        String transferId = claimedJob.referenceId();
-        Long transferAgeMs = null;
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "error";
 
         try {
-            long stepStartNs = System.nanoTime();
             PollTarget pollTarget = transactionTemplate.execute(status -> {
                 Transfer transfer = requiredTransfer(requiredJob(claimedJob.jobId()).getReferenceId());
                 if (transfer.getStatus() != TransferStatus.BROADCASTED || transfer.getTxHash() == null) {
@@ -194,38 +161,17 @@ public class RemittanceJobWorker {
                 }
                 return new PollTarget(transfer.getTransferId(), transfer.getTxHash(), transfer.getCreatedAt());
             });
-            targetLookupMs = elapsedMillis(stepStartNs);
 
             if (pollTarget == null) {
-                stepStartNs = System.nanoTime();
                 markJobDone(claimedJob.jobId());
-                applyMs = elapsedMillis(stepStartNs);
-                outcome = "SKIPPED";
+                outcome = "skipped";
                 return;
             }
 
-            transferId = pollTarget.transferId();
-
-            stepStartNs = System.nanoTime();
             Optional<ChainReceiptResult> receiptResult = blockchainGateway.getReceipt(pollTarget.txHash());
-            receiptLookupMs = elapsedMillis(stepStartNs);
-
-            stepStartNs = System.nanoTime();
             outcome = transactionTemplate.execute(status -> applyPollResult(claimedJob.jobId(), pollTarget.transferId(), receiptResult));
-            applyMs = elapsedMillis(stepStartNs);
-            transferAgeMs = positiveMillis(Duration.between(pollTarget.createdAt(), LocalDateTime.now()).toMillis());
         } finally {
-            logWorkerPerf(
-                    "worker_poll",
-                    outcome,
-                    claimedJob,
-                    transferId,
-                    targetLookupMs,
-                    receiptLookupMs,
-                    applyMs,
-                    elapsedMillis(startNs),
-                    transferAgeMs
-            );
+            remittanceMetrics.recordWorkerJob(sample, JobType.POLL_TRANSFER_RECEIPT.name().toLowerCase(), outcome);
         }
     }
 
@@ -234,34 +180,34 @@ public class RemittanceJobWorker {
         Transfer transfer = requiredTransfer(transferId);
         if (transfer.getStatus() != TransferStatus.BROADCASTED || transfer.getTxHash() == null) {
             job.markDone();
-            return "SKIPPED";
+            return "skipped";
         }
 
         if (receiptResult.isEmpty()) {
             if (isReceiptTimedOut(transfer) && !blockchainGateway.isTransactionKnown(transfer.getTxHash())) {
                 transfer.markTimedOut(TransferFailureCode.NETWORK_ERROR);
                 job.markDone();
-                return "TIMED_OUT_NETWORK_ERROR";
+                return "timed_out_network_error";
             }
             if (isReceiptTimedOut(transfer)) {
                 job.requeue(nextPollAt(), "receipt delayed for known transaction");
-                return "REQUEUED_KNOWN_TRANSACTION";
+                return "requeued_known_transaction";
             }
             job.requeue(nextPollAt(), null);
-            return "REQUEUED_WAITING_RECEIPT";
+            return "requeued_waiting_receipt";
         }
 
         if (receiptResult.get().success()) {
             transfer.markConfirmed();
             job.markDone();
-            return "CONFIRMED";
+            return "confirmed";
         }
 
         transfer.markFailed(receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode());
         job.markDone();
-        return "FAILED_" + (receiptResult.get().failureCode() == null
+        return "failed_" + (receiptResult.get().failureCode() == null
                 ? TransferFailureCode.UNKNOWN.name()
-                : receiptResult.get().failureCode().name());
+                : receiptResult.get().failureCode().name()).toLowerCase();
     }
 
     private void handleFailure(Long jobId, Exception e) {
@@ -350,44 +296,6 @@ public class RemittanceJobWorker {
         } catch (IllegalArgumentException | IllegalStateException ignored) {
             return encryptedOrLegacySignedTransaction;
         }
-    }
-
-    private void logWorkerPerf(
-            String event,
-            String outcome,
-            ClaimedJob claimedJob,
-            String transferId,
-            long stageOneMs,
-            long stageTwoMs,
-            long stageThreeMs,
-            long totalMs,
-            Long transferAgeMs
-    ) {
-        if (!properties.getObservability().isPerfLogEnabled()) {
-            return;
-        }
-        log.info(
-                "remittance_perf event={} outcome={} job_id={} job_type={} transfer_id={} ready_delay_ms={} stage_one_ms={} stage_two_ms={} stage_three_ms={} total_ms={} transfer_age_ms={}",
-                event,
-                outcome,
-                claimedJob.jobId(),
-                claimedJob.jobType(),
-                transferId,
-                positiveMillis(Duration.between(claimedJob.runAt(), claimedJob.claimedAt()).toMillis()),
-                stageOneMs,
-                stageTwoMs,
-                stageThreeMs,
-                totalMs,
-                transferAgeMs
-        );
-    }
-
-    private long elapsedMillis(long startNs) {
-        return (System.nanoTime() - startNs) / 1_000_000L;
-    }
-
-    private long positiveMillis(long value) {
-        return Math.max(0L, value);
     }
 
     private record PendingSubmission(

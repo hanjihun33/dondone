@@ -11,6 +11,7 @@ import com.workproofpay.backend.remittance.model.WalletFundingStatus;
 import com.workproofpay.backend.remittance.repo.UserWalletRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class WalletService {
     private final WalletCryptoService walletCryptoService;
     private final RemittanceBlockchainGateway blockchainGateway;
     private final RemittanceProperties properties;
+    private final RemittanceMetrics remittanceMetrics;
 
     public WalletCreateResult createWalletIfAbsent(Long userId) {
         UserWallet existing = userWalletRepository.findById(userId).orElse(null);
@@ -146,14 +148,32 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public UserWallet getRequiredWallet(Long userId) {
-        return userWalletRepository.findById(userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
+        try {
+            return userWalletRepository.findById(userId)
+                    .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            remittanceMetrics.recordWalletLookup(sample, "read", outcome);
+        }
     }
 
     @Transactional
     public UserWallet getRequiredWalletForUpdate(Long userId) {
-        return userWalletRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
+        try {
+            return userWalletRepository.findByUserIdForUpdate(userId)
+                    .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            remittanceMetrics.recordWalletLookup(sample, "for_update", outcome);
+        }
     }
 
     @Transactional

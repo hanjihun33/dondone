@@ -16,9 +16,8 @@ import com.workproofpay.backend.remittance.model.Transfer;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -32,13 +31,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TransferService {
 
-    private static final Logger log = LoggerFactory.getLogger(TransferService.class);
-
     private final TransferRepository transferRepository;
     private final WalletService walletService;
     private final RemittancePolicyService policyService;
     private final JobService jobService;
     private final RemittanceProperties properties;
+    private final RemittanceMetrics remittanceMetrics;
 
     @Transactional
     public TransferPrecheckResponse precheck(Long userId, TransferPrecheckRequest request) {
@@ -65,38 +63,25 @@ public class TransferService {
 
     @Transactional
     public TransferCreateResult createTransfer(Long userId, String idempotencyKey, CreateTransferRequest request) {
-        long startNs = System.nanoTime();
-        long walletLockMs = 0L;
-        long idempotencyLookupMs = 0L;
-        long policyMs = 0L;
-        long saveMs = 0L;
-        long enqueueMs = 0L;
-        String outcome = "ERROR";
-        String transferId = null;
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "error";
         boolean replayed = false;
 
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            outcome = "FAILED_IDEMPOTENCY_KEY_REQUIRED";
+            outcome = "invalid_idempotency_key";
             throw new ApiException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
         }
 
         try {
-            long stepStartNs = System.nanoTime();
             walletService.getRequiredWalletForUpdate(userId);
-            walletLockMs = elapsedMillis(stepStartNs);
 
-            stepStartNs = System.nanoTime();
             Transfer existing = transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
-            idempotencyLookupMs = elapsedMillis(stepStartNs);
             if (existing != null) {
-                TransferCreateResult replayResult = replay(existing, request);
-                transferId = existing.getTransferId();
                 replayed = true;
-                outcome = "REPLAYED";
-                return replayResult;
+                outcome = "replayed";
+                return replay(existing, request);
             }
 
-            stepStartNs = System.nanoTime();
             RemittancePolicyDecision decision = policyService.evaluate(
                     userId,
                     request.recipientId(),
@@ -104,9 +89,8 @@ public class TransferService {
                     request.highAmountConfirmed(),
                     request.recentRecipientConfirmed()
             );
-            policyMs = elapsedMillis(stepStartNs);
             if (!decision.allowed()) {
-                outcome = "BLOCKED_" + decision.policyCode().name();
+                outcome = "blocked";
                 throw policyViolation(decision);
             }
 
@@ -126,39 +110,18 @@ public class TransferService {
                     request.recentRecipientConfirmed()
             );
 
-            stepStartNs = System.nanoTime();
             transferRepository.saveAndFlush(transfer);
-            saveMs = elapsedMillis(stepStartNs);
-
-            stepStartNs = System.nanoTime();
             jobService.enqueue(JobReferenceKind.TRANSFER, JobType.SUBMIT_TRANSFER, transfer.getTransferId(), LocalDateTime.now());
-            enqueueMs = elapsedMillis(stepStartNs);
-            transferId = transfer.getTransferId();
-            outcome = "CREATED";
+            outcome = "created";
             return new TransferCreateResult(false, toCreateResponse(transfer));
         } catch (DataIntegrityViolationException e) {
             Transfer conflicted = transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
                     .orElseThrow(() -> e);
-            TransferCreateResult replayResult = replay(conflicted, request);
-            transferId = conflicted.getTransferId();
             replayed = true;
-            outcome = "REPLAY_AFTER_CONFLICT";
-            return replayResult;
+            outcome = "replayed_after_conflict";
+            return replay(conflicted, request);
         } finally {
-            logCreateTransferPerf(
-                    outcome,
-                    userId,
-                    request.recipientId(),
-                    request.amountAtomic(),
-                    transferId,
-                    replayed,
-                    walletLockMs,
-                    idempotencyLookupMs,
-                    policyMs,
-                    saveMs,
-                    enqueueMs,
-                    elapsedMillis(startNs)
-            );
+            remittanceMetrics.recordTransferCreate(sample, outcome, replayed);
         }
     }
 
@@ -256,41 +219,4 @@ public class TransferService {
         );
     }
 
-    private void logCreateTransferPerf(
-            String outcome,
-            Long userId,
-            String recipientId,
-            long amountAtomic,
-            String transferId,
-            boolean replayed,
-            long walletLockMs,
-            long idempotencyLookupMs,
-            long policyMs,
-            long saveMs,
-            long enqueueMs,
-            long totalMs
-    ) {
-        if (!properties.getObservability().isPerfLogEnabled()) {
-            return;
-        }
-        log.info(
-                "remittance_perf event=create_transfer outcome={} replayed={} user_id={} recipient_id={} amount_atomic={} transfer_id={} total_ms={} wallet_lock_ms={} idempotency_lookup_ms={} policy_ms={} save_ms={} enqueue_ms={}",
-                outcome,
-                replayed,
-                userId,
-                recipientId,
-                amountAtomic,
-                transferId,
-                totalMs,
-                walletLockMs,
-                idempotencyLookupMs,
-                policyMs,
-                saveMs,
-                enqueueMs
-        );
-    }
-
-    private long elapsedMillis(long startNs) {
-        return (System.nanoTime() - startNs) / 1_000_000L;
-    }
 }
