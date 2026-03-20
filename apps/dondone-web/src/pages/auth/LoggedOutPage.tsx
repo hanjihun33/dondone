@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { loginUser } from "../../shared/api/auth";
 import { ApiError } from "../../shared/api/client";
 import { getEmployerProfile, loginEmployer } from "../../shared/api/employer";
 import {
@@ -29,14 +30,14 @@ const LOGGED_OUT_FIELDS: LoggedOutField[] = [
     key: "email",
     label: "이메일",
     type: "email",
-    placeholder: "이메일을 입력하세요",
+    placeholder: "이메일을 입력해주세요.",
     autoComplete: "email"
   },
   {
     key: "password",
     label: "비밀번호",
     type: "password",
-    placeholder: "비밀번호를 입력하세요",
+    placeholder: "비밀번호를 입력해주세요.",
     autoComplete: "current-password"
   }
 ];
@@ -76,7 +77,11 @@ export function LoggedOutPage() {
 
     try {
       if (role === "admin") {
-        setStoredAdminSession();
+        const auth = await loginUser({
+          email: normalizedEmail,
+          password: formState.password
+        });
+        setStoredAdminSession(auth);
         navigate("/admin", { replace: true });
         return;
       }
@@ -110,7 +115,7 @@ export function LoggedOutPage() {
           <RemoteConnectivityPanel />
         </section>
 
-        <section className="logged-out-form-pane" aria-label="로그인 폼">
+        <section className="logged-out-form-pane" aria-label="로그인">
           <h2 className="logged-out-form-logo" aria-label="DonDone">
             <span className="brand-wordmark-don">Don</span>
             <span className="brand-wordmark-done">Done</span>
@@ -146,10 +151,13 @@ export function LoggedOutPage() {
               </Link>
             </p>
             <p className="logged-out-signup-hint">
-              개발용 사업주 계정: <strong>manager@gmail.com</strong> / <strong>qweqwe123</strong>
+              개발용 고용주 계정: <strong>manager@gmail.com</strong> / <strong>qweqwe123</strong>
             </p>
             <p className="logged-out-signup-hint">
               개발용 회사 코드: <strong>EMPLOYER-SEOUL-2026</strong>
+            </p>
+            <p className="logged-out-signup-hint">
+              개발용 관리자 계정: <strong>admin@dondone.local</strong> / <strong>qweqwe123</strong>
             </p>
             {errorMessage ? (
               <p className="logged-out-signup-hint" role="alert">

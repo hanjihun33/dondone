@@ -53,6 +53,7 @@ public enum ErrorCode {
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     PHONE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "Phone number already exists"),
+    COMPANY_CODE_ALREADY_EXISTS(HttpStatus.CONFLICT, "Company code already exists"),
     CORRECTION_REQUEST_PENDING_EXISTS(HttpStatus.CONFLICT, "A pending correction request already exists for this workproof"),
     CORRECTION_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "Correction request is already processed"),
     CORRECTION_REQUEST_SCOPE_NOT_READY(HttpStatus.CONFLICT, "Correction request is not available for the current workproof scope"),

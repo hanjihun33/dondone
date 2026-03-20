@@ -1,0 +1,187 @@
+package com.workproofpay.backend.admin.service;
+
+import com.workproofpay.backend.admin.api.dto.request.AdminCreateEmployerCompanyRequest;
+import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompaniesResponse;
+import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanyCreatedResponse;
+import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanySummaryResponse;
+import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.employer.model.Company;
+import com.workproofpay.backend.employer.repo.CompanyRepository;
+import com.workproofpay.backend.employerauth.model.EmployerInvitationToken;
+import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
+import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
+import com.workproofpay.backend.shared.exception.ApiException;
+import com.workproofpay.backend.shared.exception.ErrorCode;
+import com.workproofpay.backend.workproof.model.Workplace;
+import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class AdminEmployerCompanyService {
+
+    private static final String DEFAULT_WORKPLACE_NAME_SUFFIX = " 기본 사업장";
+    private static final String PLACEHOLDER_ADDRESS = "설정 필요";
+    private static final double PLACEHOLDER_LATITUDE = 37.5665;
+    private static final double PLACEHOLDER_LONGITUDE = 126.9780;
+    private static final int PLACEHOLDER_ALLOWED_RADIUS_METERS = 300;
+    private static final char[] SIGNUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
+    private static final int SIGNUP_CODE_SEGMENT_LENGTH = 4;
+    private static final int SIGNUP_CODE_SEGMENT_COUNT = 3;
+    private static final SecureRandom SIGNUP_CODE_RANDOM = new SecureRandom();
+
+    private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
+    private final WorkplaceRepository workplaceRepository;
+    private final EmployerSignupCodeRepository employerSignupCodeRepository;
+
+    @Transactional
+    public AdminEmployerCompanyCreatedResponse createCompany(Long adminAccountId,
+                                                             AdminCreateEmployerCompanyRequest request) {
+        User adminUser = userRepository.findById(adminAccountId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+
+        String normalizedCompanyCode = normalizeCompanyCode(request.companyCode());
+        if (companyRepository.existsByCompanyCodeIgnoreCase(normalizedCompanyCode)) {
+            throw new ApiException(ErrorCode.COMPANY_CODE_ALREADY_EXISTS);
+        }
+
+        Company company = companyRepository.save(Company.create(
+                request.companyName().trim(),
+                normalizedCompanyCode
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                adminUser,
+                company.getId(),
+                buildDefaultWorkplaceName(company.getName()),
+                PLACEHOLDER_ADDRESS,
+                null,
+                PLACEHOLDER_LATITUDE,
+                PLACEHOLDER_LONGITUDE,
+                PLACEHOLDER_ALLOWED_RADIUS_METERS
+        ));
+
+        company.bindDefaultWorkplace(workplace.getId());
+        company = companyRepository.save(company);
+
+        String employerSignupCodeValue = generateEmployerSignupCode();
+        EmployerSignupCode employerSignupCode = employerSignupCodeRepository.save(EmployerSignupCode.create(
+                employerSignupCodeValue,
+                company.getId(),
+                workplace.getId(),
+                adminAccountId
+        ));
+
+        return new AdminEmployerCompanyCreatedResponse(
+                company.getId(),
+                company.getName(),
+                company.getCompanyCode(),
+                workplace.getId(),
+                workplace.getName(),
+                workplace.getAddress(),
+                workplace.resolveDetailAddress(),
+                workplace.getLatitude(),
+                workplace.getLongitude(),
+                workplace.getAllowedRadiusMeters(),
+                isWorkplaceSettingsConfigured(workplace),
+                employerSignupCodeValue,
+                employerSignupCode.getCreatedAt(),
+                company.getCreatedAt()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public AdminEmployerCompaniesResponse getCompanies(Long adminAccountId) {
+        if (!userRepository.existsById(adminAccountId)) {
+            throw new ApiException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        List<Company> companies = companyRepository.findAll(
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+        );
+        List<AdminEmployerCompanySummaryResponse> summaries = new ArrayList<>();
+
+        for (Company company : companies) {
+            if (company.getDefaultWorkplaceId() == null) {
+                continue;
+            }
+
+            Optional<Workplace> workplaceOptional = workplaceRepository.findById(company.getDefaultWorkplaceId());
+            if (workplaceOptional.isEmpty()) {
+                continue;
+            }
+
+            Workplace workplace = workplaceOptional.get();
+            Optional<EmployerSignupCode> latestActiveCode = employerSignupCodeRepository
+                    .findByCompanyIdAndDefaultWorkplaceId(company.getId(), workplace.getId())
+                    .stream()
+                    .filter(EmployerSignupCode::isUsable)
+                    .max(Comparator.comparing(EmployerSignupCode::getCreatedAt));
+
+            summaries.add(AdminEmployerCompanySummaryResponse.of(
+                    company,
+                    workplace,
+                    isWorkplaceSettingsConfigured(workplace),
+                    latestActiveCode.isPresent(),
+                    latestActiveCode.map(EmployerSignupCode::getCreatedAt).orElse(null)
+            ));
+        }
+
+        return new AdminEmployerCompaniesResponse(summaries);
+    }
+
+    private String normalizeCompanyCode(String companyCode) {
+        return companyCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String buildDefaultWorkplaceName(String companyName) {
+        return companyName + DEFAULT_WORKPLACE_NAME_SUFFIX;
+    }
+
+    private boolean isWorkplaceSettingsConfigured(Workplace workplace) {
+        return !PLACEHOLDER_ADDRESS.equals(workplace.getAddress());
+    }
+
+    private String generateEmployerSignupCode() {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            String candidate = buildReadableSignupCode();
+            if (employerSignupCodeRepository.findByCodeHash(EmployerInvitationToken.hash(candidate)).isEmpty()) {
+                return candidate;
+            }
+        }
+
+        throw new IllegalStateException("Failed to issue a unique employer signup code.");
+    }
+
+    private String buildReadableSignupCode() {
+        StringBuilder builder = new StringBuilder("EMP");
+        for (int segment = 0; segment < SIGNUP_CODE_SEGMENT_COUNT; segment++) {
+            builder.append('-');
+            for (int index = 0; index < SIGNUP_CODE_SEGMENT_LENGTH; index++) {
+                builder.append(SIGNUP_CODE_ALPHABET[SIGNUP_CODE_RANDOM.nextInt(SIGNUP_CODE_ALPHABET.length)]);
+            }
+        }
+        return builder.toString();
+    }
+}

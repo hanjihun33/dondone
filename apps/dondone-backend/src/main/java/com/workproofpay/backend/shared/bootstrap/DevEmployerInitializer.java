@@ -169,6 +169,8 @@ public class DevEmployerInitializer implements CommandLineRunner {
                 WORKPLACE_LONGITUDE,
                 WORKPLACE_RADIUS_METERS
         ));
+        company.bindDefaultWorkplace(workplace.getId());
+        companyRepository.save(company);
         employerSignupCodeRepository.save(EmployerSignupCode.create(
                 EMPLOYER_SIGNUP_CODE,
                 company.getId(),

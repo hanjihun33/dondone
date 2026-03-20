@@ -22,17 +22,25 @@ public class Company extends BaseTimeEntity {
     @Column(name = "company_code", nullable = false, unique = true, length = 50)
     private String companyCode;
 
+    @Column(name = "default_workplace_id")
+    private Long defaultWorkplaceId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CompanyStatus status;
 
-    private Company(String name, String companyCode, CompanyStatus status) {
+    private Company(String name, String companyCode, Long defaultWorkplaceId, CompanyStatus status) {
         this.name = name;
         this.companyCode = companyCode;
+        this.defaultWorkplaceId = defaultWorkplaceId;
         this.status = status;
     }
 
     public static Company create(String name, String companyCode) {
-        return new Company(name, companyCode, CompanyStatus.ACTIVE);
+        return new Company(name, companyCode, null, CompanyStatus.ACTIVE);
+    }
+
+    public void bindDefaultWorkplace(Long defaultWorkplaceId) {
+        this.defaultWorkplaceId = defaultWorkplaceId;
     }
 }

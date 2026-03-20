@@ -2,11 +2,15 @@ import type {
   EmployerAuthResponse,
   EmployerProfileResponse
 } from "../api/employer";
+import type { AuthLoginResponse } from "../api/auth";
 
 export type UserRole = "admin" | "manager";
 
 type AdminSession = {
   role: "admin";
+  accessToken: string;
+  expiresAt: string;
+  account: AuthLoginResponse;
 };
 
 export type EmployerSession = {
@@ -33,7 +37,7 @@ function parseStoredSession(raw: string | null): StoredSession | null {
 
   try {
     const parsed = JSON.parse(raw) as StoredSession;
-    if (parsed.role === "admin") {
+    if (parsed.role === "admin" && parsed.accessToken) {
       return parsed;
     }
 
@@ -60,23 +64,32 @@ export function getStoredEmployerSession(): EmployerSession | null {
   return session?.role === "manager" ? session : null;
 }
 
+export function getStoredAdminSession(): AdminSession | null {
+  const session = getStoredSession();
+  return session?.role === "admin" ? session : null;
+}
+
 export function getStoredUserRole(): UserRole | null {
   return getStoredSession()?.role ?? null;
 }
 
 export function getStoredAccessToken() {
-  return getStoredEmployerSession()?.accessToken ?? null;
+  return getStoredSession()?.accessToken ?? null;
 }
 
-export function setStoredAdminSession() {
+export function setStoredAdminSession(auth: AuthLoginResponse) {
   if (typeof window === "undefined") {
     return;
   }
 
+  const expiresAt = new Date(Date.now() + auth.expiresIn * 1000).toISOString();
   window.localStorage.setItem(
     SESSION_STORAGE_KEY,
     JSON.stringify({
-      role: "admin"
+      role: "admin",
+      accessToken: auth.accessToken,
+      expiresAt,
+      account: auth
     } satisfies AdminSession)
   );
   dispatchSessionChange();
