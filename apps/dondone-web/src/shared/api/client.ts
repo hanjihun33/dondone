@@ -34,15 +34,26 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
-const DEFAULT_API_BASE_URL = "http://localhost:8080";
+const DEFAULT_DEV_API_BASE_URL = "http://localhost:8080";
 
 function getApiBaseUrl() {
-  const configured = import.meta.env.VITE_API_BASE_URL;
-  return (configured || DEFAULT_API_BASE_URL).replace(/\/$/, "");
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+
+  if (import.meta.env.DEV) {
+    return DEFAULT_DEV_API_BASE_URL;
+  }
+
+  return "";
 }
 
 function buildUrl(path: string, query?: RequestQuery) {
-  const url = new URL(`${getApiBaseUrl()}${path}`);
+  const baseUrl = getApiBaseUrl();
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : DEFAULT_DEV_API_BASE_URL;
+  const url = new URL(baseUrl ? `${baseUrl}${path}` : path, origin);
 
   if (!query) {
     return url.toString();
