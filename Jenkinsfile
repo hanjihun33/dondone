@@ -189,18 +189,36 @@ EOF
                     env.FAILED_STAGE = 'Health Check'
                 }
                 runLogged('''
-                    for i in $(seq 1 12); do
-                        if curl -fsS --max-time 5 "$HEALTHCHECK_URL"; then
+                    cd "$DEPLOY_DIR"
+
+                    for i in $(seq 1 24); do
+                        API_CONTAINER_ID="$(docker compose ps -q api-server || true)"
+                        API_HEALTH="unknown"
+
+                        if [ -n "$API_CONTAINER_ID" ]; then
+                            API_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$API_CONTAINER_ID" || echo unknown)"
+                        fi
+
+                        echo "Attempt $i/24: api-server health=$API_HEALTH"
+
+                        if [ "$API_HEALTH" = "unhealthy" ]; then
+                            docker compose ps || true
+                            docker compose logs --tail=200 api-server nginx || true
+                            echo "api-server became unhealthy"
+                            exit 1
+                        fi
+
+                        if [ "$API_HEALTH" = "healthy" ] && curl -fsS --max-time 5 "$HEALTHCHECK_URL"; then
                             echo "Health check passed"
                             exit 0
                         fi
-                        echo "Attempt $i/12 failed, retrying in 5s..."
+
+                        echo "Attempt $i/24 failed, retrying in 5s..."
                         sleep 5
                     done
-                    cd "$DEPLOY_DIR"
                     docker compose ps || true
                     docker compose logs --tail=200 api-server nginx || true
-                    echo "Health check failed after 60s"
+                    echo "Health check failed after 120s"
                     exit 1
                 ''')
             }
