@@ -1155,16 +1155,8 @@ private fun WorkproofPdfGenerationResultSheet(
     }
     val description = when {
         isFailed -> createUiState.errorMessage ?: "문서 생성에 실패했어요."
-        isActionable -> "열기 또는 공유를 누르면 선택한 기간의 근무 기록 문서를 바로 생성해요."
-        else -> "선택한 기간의 근무 기록 문서 생성 요청이 접수됐어요. 문서를 열 때 바로 생성해요."
-    }
-    val statusLabel = when (createUiState.status) {
-        "QUEUED" -> if (isActionable) "열기 시 생성" else "요청 접수"
-        "RUNNING" -> "생성 중"
-        "READY" -> "준비 완료"
-        "FAILED" -> "실패"
-        null -> "요청 접수"
-        else -> createUiState.status
+        isActionable -> "열기 또는 공유를 눌러 문서를 확인해 주세요."
+        else -> "선택한 기간의 근무기록 문서를 준비하고 있어요."
     }
 
     Column(
@@ -1219,8 +1211,6 @@ private fun WorkproofPdfGenerationResultSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             WorkproofKeyValueRow(label = "선택 기간", value = periodText)
-            WorkproofKeyValueRow(label = "생성 상태", value = statusLabel)
-            WorkproofKeyValueRow(label = "요청 ID", value = createUiState.requestId.orEmpty())
             WorkproofKeyValueRow(label = "파일명", value = fileName)
             if (createUiState.errorMessage != null) {
                 Text(
