@@ -2,6 +2,7 @@ package com.workproofpay.backend.shared.bootstrap;
 
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.auth.support.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,11 +17,13 @@ public class DevUserInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepository.existsByEmail("test@gmail.com")) {
+        String normalizedEmail = EmailNormalizer.normalize("test@gmail.com");
+
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             return;
         }
         User user = User.register(
-                "test@gmail.com",
+                normalizedEmail,
                 passwordEncoder.encode("qweqwe123"),
                 "Test User",
                 "01012345678"

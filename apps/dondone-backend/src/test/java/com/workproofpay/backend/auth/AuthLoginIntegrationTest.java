@@ -59,6 +59,18 @@ class AuthLoginIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void loginSuccessWithUppercaseEmail() throws Exception {
+        LoginRequest request = new LoginRequest("TEST@GMAIL.COM", "qweqwe123");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
+    }
+
+    @Test
     void loginFailWithWrongPassword() throws Exception {
         LoginRequest request = new LoginRequest("test@gmail.com", "wrong-password");
 

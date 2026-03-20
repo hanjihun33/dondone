@@ -8,6 +8,20 @@
 - `apps/dondone-web/src/pages/settings/SettingsPage.tsx`
 - `apps/dondone-web/src/pages/settings/components/KakaoWorkplaceMap.tsx`
 
+## 현재 backend foundation 기준
+- endpoint
+  - `GET /api/employer/workplace-settings`
+  - `PUT /api/employer/workplace-settings`
+- authz source
+  - settings 대상 사업장은 request 파라미터가 아니라 `EmployerAccessScope.defaultWorkplaceId`로 해석한다.
+  - settings가 영향을 줄 근로자 범위는 `EmploymentMembership.companyId/workplaceId` 기준으로 해석한다.
+- 저장 모델
+  - `detailAddress`는 현재 `Workplace.mapLabel` 저장소를 재사용한다.
+  - `effectiveFrom`는 `Workplace.settingsEffectiveFrom`에 저장하고, legacy row는 `updatedAt/createAt` fallback으로 읽는다.
+  - `updatedBy`는 `Workplace.settingsUpdatedByAccountId`로 남긴다.
+- additive 경계
+  - 기존 `Workplace.user`, `WorkProof.user`는 worker legacy ownership 용도로 유지하고 settings authz source로 사용하지 않는다.
+
 ## 다루는 값
 - `workplaceId`
 - `address`
@@ -40,6 +54,7 @@
 
 ## 기본 계약 원칙
 - settings 수정은 사업주 권한이 필요하다.
+- 사업주는 임의 `companyId`, `workplaceId`, `effectiveFrom`를 요청으로 넘겨 scope를 넓힐 수 없다.
 - 설정 변경은 최소한 `미래 기록`에 대한 기준을 바꾼다.
 - 기존 기록에 소급 적용할지 여부는 별도 규칙으로 명시해야 한다.
 
@@ -69,6 +84,35 @@
 - `GET /api/employer/workplace-settings`
 - `PUT /api/employer/workplace-settings`
 
+## 현재 응답/요청 계약
+### GET response
+- `workplaceId`
+- `workplaceName`
+- `companyId`
+- `companyName`
+- `address`
+- `detailAddress`
+- `latitude`
+- `longitude`
+- `allowedRadiusMeters`
+- `effectiveFrom`
+- `updatedAt`
+- `updatedByAccountId`
+- `activeMembershipCount`
+
+### PUT request
+- `address`
+- `detailAddress`
+- `latitude`
+- `longitude`
+- `allowedRadiusMeters`
+
+### PUT에서 받지 않는 값
+- `companyId`
+- `workplaceId`
+- `effectiveFrom`
+- worker 목록 또는 기존 `WorkProof` 재계산 대상
+
 ## 수정 시 검증
 - 사업주가 해당 workplace를 관리하는지
 - 반경이 허용 범위 안인지
@@ -78,7 +122,7 @@
 
 ## 응답/저장 시 같이 남길 값
 - `updatedAt`
-- `updatedBy`
+- `updatedByAccountId`
 - `effectiveFrom`
 - 필요 시 이전 설정 요약
 
@@ -87,6 +131,8 @@
 - 새 check-out 시 반경 이탈 판정
 - `needsReview` 또는 유사 상태 판정 기준
 - 미래 근로기록에만 영향을 주는지 여부
+- `PUT /api/employer/workplace-settings`는 기존 완료 `WorkProof`를 직접 수정하거나 재계산하지 않는다.
+- evidence drift를 막기 위해 `WorkProof` 상세/PDF는 live `Workplace` 대신 record 시점 workplace snapshot을 우선 사용한다.
 
 ## 검증해야 할 edge case
 - setting 저장과 check-in이 거의 동시에 발생하는 경우

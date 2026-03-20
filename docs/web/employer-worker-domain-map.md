@@ -5,21 +5,23 @@
 - API보다 먼저 `누가 누구를 볼 수 있고, 무엇을 변경할 수 있는지`를 정리한다.
 
 ## 현재 코드 기준 관찰
-- 현재 `User`는 계정 공통 필드 중심이다.
-- 현재 `Workplace`는 개인 사용자 소유 구조에 가깝다.
+- 현재 `User`는 worker/employer/admin이 함께 쓰는 공통 계정 축이다.
+- 현재 `Workplace`는 여전히 개인 사용자 소유 구조에 가깝지만, employer scope 검증을 위한 `companyId` 보조 연결이 추가된 과도기 상태다.
 - 현재 `WorkProof`는 근로자 개인 기록 중심이다.
-- 즉, 고용주 관점의 `회사 -> 사업장 -> 근로자` 모델이 명시적으로 드러나지 않는다.
+- 즉, 고용주 관점의 `회사 -> 사업장 -> 근로자` 모델은 새 employer/profile/membership 축으로 보강됐고, worker legacy ownership은 아직 공존한다.
 
 ## 현재 코드 근거
 ### Account
 - `apps/dondone-backend/src/main/java/com/workproofpay/backend/auth/model/User.java`
   - `email`, `passwordHash`, `name`, `role`만 존재
-  - worker/employer 분리 profile 필드가 없음
+  - worker/employer 분리 profile 필드는 별도 엔티티로 둔다
+  - 이메일은 공통 canonicalization 규칙으로 관리한다
 
 ### Workplace
 - `apps/dondone-backend/src/main/java/com/workproofpay/backend/workproof/model/Workplace.java`
-  - `Workplace.user`로 개인 사용자 소유
-  - company 또는 employer 조직 축이 없음
+  - `Workplace.user`로 개인 사용자 소유 레거시를 유지한다
+  - employer scope 검증을 위해 `companyId` 보조 연결을 추가했다
+  - 아직은 worker 앱 공용 필수 소속 키가 아니라 employer authorization binding 검증용이다
 
 ### WorkProof
 - `apps/dondone-backend/src/main/java/com/workproofpay/backend/workproof/model/WorkProof.java`
@@ -122,6 +124,11 @@
   - `latitude`
   - `longitude`
   - `allowedRadiusMeters`
+  - `settingsEffectiveFrom`
+  - `settingsUpdatedByAccountId`
+- 구현 메모
+  - Slice 3 foundation에서는 `detailAddress`를 기존 `Workplace.mapLabel` 저장소로 매핑한다.
+  - `effectiveFrom`는 settings command의 server-time 효력 시점으로 취급한다.
 
 ### EmploymentMembership
 - 목적: worker를 company/workplace에 연결하는 canonical source
@@ -185,14 +192,14 @@
 - 근로자/고용주 겸용 계정이 필요한지
 
 ## 현재 백엔드와의 충돌 포인트
-- 현재 데이터 소유가 개인 사용자 중심인지
-- 사업주 관점 집계 read-model이 없는지
-- 근로자 목록 화면에 필요한 프로필 필드가 현재 모델에 없는지
+- `Workplace.user`와 `Workplace.companyId`가 동시에 존재하는 과도기 모델을 얼마나 오래 유지할지
+- 사업주 관점 집계 read-model이 아직 없어 Slice 4 전까지는 profile/bootstrap 범위만 보장된다는 점
+- 근로자 목록 화면에 필요한 프로필/집계 필드가 아직 read-model로 구현되지 않았다는 점
 
 ## 문서화할 결정 포인트
 - worker/employer 계정 겸용 허용 여부
-- company와 workplace를 둘 다 둘지, workplace만 둘지
-- employment 소속의 기준 키를 company로 볼지 workplace로 볼지
+- `Workplace.companyId`를 언제 공용 필수값으로 승격할지
+- employment 소속의 기준 키를 company와 workplace 중 어느 조합으로 장기 고정할지
 - correction request가 snapshot을 갖는지 원본 참조만 갖는지
 
 ## 지금 단계의 권장 결론
@@ -200,6 +207,7 @@
 - 조직 축은 `Company -> Workplace -> EmploymentMembership`으로 두는 편이 확장성에 유리하다.
 - employer web의 모든 조회 권한은 `EmploymentMembership` 또는 그에 준하는 연결 모델을 기준으로 제한한다.
 - employer web의 authorization source of truth는 `EmployerProfile.companyId`와 `EmploymentMembership.companyId/workplaceId`다.
+- `Workplace.companyId`는 employer scope의 company-workplace binding을 증명하는 보조 연결로 사용하고, worker legacy ownership 대체물로 섣불리 승격하지 않는다.
 - 기존 `Workplace.user`, `WorkProof.user`는 worker legacy ownership과 하위 호환을 위한 값으로만 보고, employer web 권한 판정 기준으로 사용하지 않는다.
 
 ## MVP 기본 가정
@@ -208,6 +216,7 @@
 - worker 1명은 MVP에서 활성 membership 1건만 가진다고 가정한다.
 - worker의 현재 소속 workplace가 dashboard, workers list, correction queue의 범위를 결정한다고 가정한다.
 - 다중 소속이나 겸직은 P0 범위 밖으로 둔다.
+- `defaultWorkplaceId`는 MVP에서 `EmployerProfile`에 직접 둔다.
 - employer web의 목록/집계 endpoint는 `인증 사용자 -> EmployerProfile -> defaultWorkplaceId 또는 현재 선택 workplace` 순으로 scope를 해석한다.
 - MVP에서는 workplace switcher가 없으면 `defaultWorkplaceId`를 서버가 자동 적용하고, 클라이언트가 임의 `companyId`를 넘겨 scope를 넓히지 못하게 한다.
 
@@ -218,6 +227,7 @@
 
 ## 왜 이 결론이 필요한가
 - 현재 `Workplace.user`, `WorkProof.user` 구조만으로는 "고용주가 여러 근로자를 본다"는 웹 요구사항을 안정적으로 표현하기 어렵다.
+- 그래서 employer web은 `EmployerProfile + EmploymentMembership`을 source of truth로 두고, `Workplace.companyId`로 company-workplace binding을 증명하는 단계적 모델을 택했다.
 - 즉, 웹 전용 API를 따로 만들더라도 소속 관계를 표현하는 별도 모델 없이 가면 권한과 조회 범위가 쉽게 꼬인다.
 
 ## 문서 갱신 시점
