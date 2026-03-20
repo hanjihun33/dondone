@@ -97,6 +97,8 @@ class AdminEmployerCompanyIntegrationTest {
                 .andExpect(jsonPath("$.data.companyCode").value("DN-SEOUL-3001"))
                 .andExpect(jsonPath("$.data.defaultWorkplaceName").value("돈던 물류 기본 사업장"))
                 .andExpect(jsonPath("$.data.workplaceSettingsConfigured").value(false))
+                .andExpect(jsonPath("$.data.hasJoinedEmployer").value(false))
+                .andExpect(jsonPath("$.data.employerCount").value(0))
                 .andExpect(jsonPath("$.data.employerSignupCode").isNotEmpty())
                 .andReturn();
 
@@ -109,6 +111,8 @@ class AdminEmployerCompanyIntegrationTest {
                 .andExpect(jsonPath("$.data.companies[0].companyName").value("돈던 물류"))
                 .andExpect(jsonPath("$.data.companies[0].companyCode").value("DN-SEOUL-3001"))
                 .andExpect(jsonPath("$.data.companies[0].workplaceSettingsConfigured").value(false))
+                .andExpect(jsonPath("$.data.companies[0].hasJoinedEmployer").value(false))
+                .andExpect(jsonPath("$.data.companies[0].employerCount").value(0))
                 .andExpect(jsonPath("$.data.companies[0].hasActiveEmployerSignupCode").value(true));
 
         EmployerSignupRequest signupRequest = new EmployerSignupRequest(
@@ -134,6 +138,12 @@ class AdminEmployerCompanyIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.displayName").value("돈던 담당자"))
                 .andExpect(jsonPath("$.data.companyCode").value("DN-SEOUL-3001"));
+
+        mockMvc.perform(get("/api/admin/employers/companies")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companies[0].hasJoinedEmployer").value(true))
+                .andExpect(jsonPath("$.data.companies[0].employerCount").value(1));
     }
 
     @Test

@@ -17,6 +17,9 @@ public record AdminEmployerCompanySummaryResponse(
         Double longitude,
         Integer allowedRadiusMeters,
         boolean workplaceSettingsConfigured,
+        boolean hasJoinedEmployer,
+        long employerCount,
+        LocalDateTime latestEmployerJoinedAt,
         boolean hasActiveEmployerSignupCode,
         LocalDateTime latestEmployerSignupCodeIssuedAt,
         LocalDateTime createdAt
@@ -24,6 +27,9 @@ public record AdminEmployerCompanySummaryResponse(
     public static AdminEmployerCompanySummaryResponse of(Company company,
                                                          Workplace workplace,
                                                          boolean workplaceSettingsConfigured,
+                                                         boolean hasJoinedEmployer,
+                                                         long employerCount,
+                                                         LocalDateTime latestEmployerJoinedAt,
                                                          boolean hasActiveEmployerSignupCode,
                                                          LocalDateTime latestEmployerSignupCodeIssuedAt) {
         return new AdminEmployerCompanySummaryResponse(
@@ -38,6 +44,9 @@ public record AdminEmployerCompanySummaryResponse(
                 workplace.getLongitude(),
                 workplace.getAllowedRadiusMeters(),
                 workplaceSettingsConfigured,
+                hasJoinedEmployer,
+                employerCount,
+                latestEmployerJoinedAt,
                 hasActiveEmployerSignupCode,
                 latestEmployerSignupCodeIssuedAt,
                 company.getCreatedAt()

@@ -14,6 +14,9 @@ public record AdminEmployerCompanyCreatedResponse(
         Double longitude,
         Integer allowedRadiusMeters,
         boolean workplaceSettingsConfigured,
+        boolean hasJoinedEmployer,
+        long employerCount,
+        LocalDateTime latestEmployerJoinedAt,
         String employerSignupCode,
         LocalDateTime employerSignupCodeIssuedAt,
         LocalDateTime createdAt

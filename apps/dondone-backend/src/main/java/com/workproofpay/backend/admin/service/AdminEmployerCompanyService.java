@@ -7,7 +7,9 @@ import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanySumma
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.employer.model.Company;
+import com.workproofpay.backend.employer.model.EmployerProfile;
 import com.workproofpay.backend.employer.repo.CompanyRepository;
+import com.workproofpay.backend.employer.repo.EmployerProfileRepository;
 import com.workproofpay.backend.employerauth.model.EmployerInvitationToken;
 import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
 import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
@@ -23,9 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -44,6 +48,7 @@ public class AdminEmployerCompanyService {
 
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
+    private final EmployerProfileRepository employerProfileRepository;
     private final WorkplaceRepository workplaceRepository;
     private final EmployerSignupCodeRepository employerSignupCodeRepository;
 
@@ -96,6 +101,9 @@ public class AdminEmployerCompanyService {
                 workplace.getLongitude(),
                 workplace.getAllowedRadiusMeters(),
                 isWorkplaceSettingsConfigured(workplace),
+                false,
+                0,
+                null,
                 employerSignupCodeValue,
                 employerSignupCode.getCreatedAt(),
                 company.getCreatedAt()
@@ -111,6 +119,7 @@ public class AdminEmployerCompanyService {
         List<Company> companies = companyRepository.findAll(
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
         );
+        Map<Long, List<EmployerProfile>> employerProfilesByCompanyId = loadEmployerProfilesByCompanyId(companies);
         List<AdminEmployerCompanySummaryResponse> summaries = new ArrayList<>();
 
         for (Company company : companies) {
@@ -124,6 +133,10 @@ public class AdminEmployerCompanyService {
             }
 
             Workplace workplace = workplaceOptional.get();
+            List<EmployerProfile> employerProfiles = employerProfilesByCompanyId.getOrDefault(company.getId(), List.of());
+            Optional<LocalDateTime> latestEmployerJoinedAt = employerProfiles.stream()
+                    .map(EmployerProfile::getCreatedAt)
+                    .max(LocalDateTime::compareTo);
             Optional<EmployerSignupCode> latestActiveCode = employerSignupCodeRepository
                     .findByCompanyIdAndDefaultWorkplaceId(company.getId(), workplace.getId())
                     .stream()
@@ -134,6 +147,9 @@ public class AdminEmployerCompanyService {
                     company,
                     workplace,
                     isWorkplaceSettingsConfigured(workplace),
+                    !employerProfiles.isEmpty(),
+                    employerProfiles.size(),
+                    latestEmployerJoinedAt.orElse(null),
                     latestActiveCode.isPresent(),
                     latestActiveCode.map(EmployerSignupCode::getCreatedAt).orElse(null)
             ));
@@ -157,6 +173,22 @@ public class AdminEmployerCompanyService {
 
     private String buildDefaultWorkplaceName(String companyName) {
         return companyName + DEFAULT_WORKPLACE_NAME_SUFFIX;
+    }
+
+    private Map<Long, List<EmployerProfile>> loadEmployerProfilesByCompanyId(List<Company> companies) {
+        List<Long> companyIds = companies.stream()
+                .map(Company::getId)
+                .toList();
+        Map<Long, List<EmployerProfile>> grouped = new HashMap<>();
+        if (companyIds.isEmpty()) {
+            return grouped;
+        }
+
+        for (EmployerProfile employerProfile : employerProfileRepository.findByCompanyIdIn(companyIds)) {
+            grouped.computeIfAbsent(employerProfile.getCompanyId(), ignored -> new ArrayList<>())
+                    .add(employerProfile);
+        }
+        return grouped;
     }
 
     private boolean isWorkplaceSettingsConfigured(Workplace workplace) {

@@ -12,6 +12,9 @@ export type AdminEmployerCompanySummaryResponse = {
   longitude: number;
   allowedRadiusMeters: number;
   workplaceSettingsConfigured: boolean;
+  hasJoinedEmployer: boolean;
+  employerCount: number;
+  latestEmployerJoinedAt: string | null;
   hasActiveEmployerSignupCode: boolean;
   latestEmployerSignupCodeIssuedAt: string | null;
   createdAt: string;
@@ -33,6 +36,9 @@ export type AdminEmployerCompanyCreatedResponse = {
   longitude: number;
   allowedRadiusMeters: number;
   workplaceSettingsConfigured: boolean;
+  hasJoinedEmployer: boolean;
+  employerCount: number;
+  latestEmployerJoinedAt: string | null;
   employerSignupCode: string;
   employerSignupCodeIssuedAt: string;
   createdAt: string;

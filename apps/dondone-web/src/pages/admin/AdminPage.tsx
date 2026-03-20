@@ -22,20 +22,16 @@ const INITIAL_FORM_STATE: AdminCompanyFormState = {
 const CREATE_FIELDS: Array<{
   key: keyof AdminCompanyFormState;
   label: string;
-  type: "text" | "number";
   placeholder: string;
-  step?: string;
 }> = [
   {
     key: "companyName",
     label: "회사명",
-    type: "text",
     placeholder: "예: 돈던 물류"
   },
   {
     key: "companyCode",
     label: "회사 코드",
-    type: "text",
     placeholder: "예: DN-SEOUL-2914"
   }
 ];
@@ -150,6 +146,9 @@ export function AdminPage() {
           longitude: created.longitude,
           allowedRadiusMeters: created.allowedRadiusMeters,
           workplaceSettingsConfigured: created.workplaceSettingsConfigured,
+          hasJoinedEmployer: created.hasJoinedEmployer,
+          employerCount: created.employerCount,
+          latestEmployerJoinedAt: created.latestEmployerJoinedAt,
           hasActiveEmployerSignupCode: true,
           latestEmployerSignupCodeIssuedAt: created.employerSignupCodeIssuedAt,
           createdAt: created.createdAt
@@ -183,8 +182,8 @@ export function AdminPage() {
         <div>
           <h2 className="admin-title">회사 온보딩 관리</h2>
           <p className="admin-subtitle">
-            서비스 관리자가 회사와 기본 사업장을 등록하고, 고용주 회원가입에 사용할 회사 코드를
-            발급합니다.
+            서비스 관리자가 회사를 등록하고, 고용주 가입 코드 발급과 가입/설정 진행 상태를 함께
+            확인합니다.
           </p>
         </div>
       </header>
@@ -192,22 +191,23 @@ export function AdminPage() {
       {lastIssuedCode ? (
         <section className="admin-section">
           <div className="admin-section-head with-sub">
-          <div>
-            <h3>최근 발급된 고용주 회사 코드</h3>
-            <p className="admin-section-sub">
-              raw 코드는 발급 직후에만 다시 볼 수 있습니다. 필요한 담당자에게 지금 전달하고,
-              고용주는 가입 후 설정에서 사업장 위치와 허용 반경을 직접 완료해야 합니다.
-            </p>
+            <div>
+              <h3>최근 발급된 고용주 가입 코드</h3>
+              <p className="admin-section-sub">
+                raw 코드는 발급 직후에만 다시 볼 수 있습니다. 필요한 담당자에게 지금 전달하고,
+                고용주는 가입 후 설정에서 사업장 위치와 허용 반경을 직접 완료해야 합니다.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="admin-code-banner">
-          <div>
-            <strong>{lastIssuedCode.companyName}</strong>
-            <p>
-              기본 사업장: {lastIssuedCode.defaultWorkplaceName} / 회사 코드: {lastIssuedCode.companyCode}
-            </p>
-          </div>
-          <div className="admin-code-banner-value">{lastIssuedCode.employerSignupCode}</div>
+          <div className="admin-code-banner">
+            <div>
+              <strong>{lastIssuedCode.companyName}</strong>
+              <p>
+                기본 사업장: {lastIssuedCode.defaultWorkplaceName} / 회사 코드:{" "}
+                {lastIssuedCode.companyCode}
+              </p>
+            </div>
+            <div className="admin-code-banner-value">{lastIssuedCode.employerSignupCode}</div>
           </div>
         </section>
       ) : null}
@@ -228,9 +228,8 @@ export function AdminPage() {
               <label key={field.key} className="admin-company-field">
                 <span>{field.label}</span>
                 <input
-                  type={field.type}
+                  type="text"
                   value={formState[field.key]}
-                  step={field.step}
                   onChange={(event) => handleFieldChange(field.key, event.currentTarget.value)}
                   placeholder={field.placeholder}
                 />
@@ -262,8 +261,7 @@ export function AdminPage() {
           <div>
             <h3>등록된 회사</h3>
             <p className="admin-section-sub">
-              회사 코드와 기본 사업장 초기 상태를 확인합니다. raw 고용주 회사 코드는 보안상 다시
-              노출하지 않고, 위치/반경은 고용주가 설정에서 마무리합니다.
+              회사 생성 이후 고용주 가입 여부와 설정 완료 여부를 함께 확인합니다.
             </p>
           </div>
         </div>
@@ -289,6 +287,7 @@ export function AdminPage() {
                 <tr>
                   <th>회사</th>
                   <th>기본 사업장</th>
+                  <th>고용주 가입 상태</th>
                   <th>고용주 설정 상태</th>
                   <th>고용주 코드 상태</th>
                   <th>등록일</th>
@@ -304,6 +303,18 @@ export function AdminPage() {
                     <td>
                       <strong>{company.defaultWorkplaceName}</strong>
                       <p className="admin-cell-sub">#{company.defaultWorkplaceId}</p>
+                    </td>
+                    <td>
+                      <span
+                        className={`admin-status ${company.hasJoinedEmployer ? "active" : "pending"}`}
+                      >
+                        {company.hasJoinedEmployer ? "가입 완료" : "가입 대기"}
+                      </span>
+                      <p className="admin-cell-sub">
+                        {company.hasJoinedEmployer
+                          ? `가입 고용주 ${company.employerCount}명 / 최근 ${formatDateTime(company.latestEmployerJoinedAt)}`
+                          : "발급된 코드로 아직 가입한 고용주가 없습니다."}
+                      </p>
                     </td>
                     <td>
                       <span
