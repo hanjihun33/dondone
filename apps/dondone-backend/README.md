@@ -58,6 +58,8 @@ docker compose -f docker-compose.dev.yml up -d
 - Redis: `localhost:6379`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
 - MinIO bucket: `dondone-private`
 
 MinIO 기본 계정:
@@ -65,6 +67,37 @@ MinIO 기본 계정:
 - Secret Key: `dondone123!`
 
 현재 레포에는 `pdf-service` 구현 디렉터리가 없어 `docker-compose.dev.yml`에는 포함하지 않았습니다.
+
+## Observability
+
+로컬에서 backend를 `./gradlew bootRun` 으로 띄운 상태라면, 개발용 compose의 Prometheus가 `host.docker.internal:8080/actuator/prometheus` 를 scrape 합니다.
+
+```bash
+docker compose -f docker-compose.dev.yml up -d prometheus grafana
+```
+
+기본 접속 정보:
+- Grafana ID: `admin`
+- Grafana Password: `admin`
+
+주의:
+- 기존 `grafana_data` 볼륨이 남아 있으면 최초 비밀번호가 유지될 수 있다.
+- remittance 전용 metric은 송금 흐름을 한 번 실행한 뒤부터 Grafana에 나타난다.
+- 기본 대시보드 이름은 `DonDone Remittance Latency` 이다.
+
+확인 순서:
+1. backend 실행: `./gradlew bootRun`
+2. metrics 확인: `http://localhost:8080/actuator/prometheus`
+3. Prometheus 확인: `http://localhost:9090`
+4. Grafana 확인: `http://localhost:3000`
+5. Grafana에서 `Dashboards > DonDone > DonDone Remittance Latency` 확인
+
+주요 remittance metric:
+- `dondone_remittance_transfer_create_seconds`
+- `dondone_remittance_policy_evaluate_seconds`
+- `dondone_remittance_wallet_lookup_seconds`
+- `dondone_remittance_worker_job_seconds`
+- `dondone_remittance_chain_operation_seconds`
 
 ## Test
 
