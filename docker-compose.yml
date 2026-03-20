@@ -76,6 +76,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     mem_limit: 1280m
     networks:
       - dondone-network
@@ -91,7 +97,7 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       api-server:
-        condition: service_started
+        condition: service_healthy
     mem_limit: 128m
     networks:
       - dondone-network

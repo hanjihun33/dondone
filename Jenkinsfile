@@ -197,6 +197,9 @@ EOF
                         echo "Attempt $i/12 failed, retrying in 5s..."
                         sleep 5
                     done
+                    cd "$DEPLOY_DIR"
+                    docker compose ps || true
+                    docker compose logs --tail=200 api-server nginx || true
                     echo "Health check failed after 60s"
                     exit 1
                 ''')
