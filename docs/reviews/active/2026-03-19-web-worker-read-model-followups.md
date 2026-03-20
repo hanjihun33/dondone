@@ -7,6 +7,20 @@
   - `EmployerAccessScope + EmploymentMembership` scope
   - `recordStatus/reflectionStatus + attendanceStatus` read-model foundation
 
+# 2026-03-20 Slice 6 Classification
+## accepted risk
+- worker summary/detail의 `employeeCode`, `team`, `role`, `phone`, `avatarUrl`는 계속 `null` 허용 contract로 유지한다.
+  - 현재 backend에는 이 필드들의 canonical source가 없고, web 전용 추정값을 넣으면 app/web shared policy와 충돌 위험이 크다.
+- dashboard/attendance-board는 계속 `WORKING / COMPLETED / NEEDS_REVIEW / NO_RECORD` 네 상태만 노출한다.
+  - `late/leave/absent`를 source-of-truth 없이 파생하지 않는 현재 제한은 evidence-first MVP 방향과 맞다.
+- Querydsl/read-model 분리는 지금 즉시 열지 않는다.
+  - 현재 default workplace 범위와 employer 데이터 규모에서는 in-memory 조합이 허용 가능한 복잡도다.
+
+## rescope
+- worker profile canonical source 결정은 별도 shared profile 설계 작업으로 분리한다.
+- `late/leave/absent` canonical source 결정도 schedule/leave/correction 책임 경계를 여는 별도 shared policy 작업으로 분리한다.
+- Querydsl/read-model 분리는 실제 성능 신호 또는 endpoint 중복 조합 신호가 생기면 별도 slice로 연다.
+
 # Closed In Slice 4 Foundation
 - employer read-model scope를 `EmployerProfile.companyId + defaultWorkplaceId`와 `EmploymentMembership` 기준으로 고정했다.
 - worker list, dashboard summary, attendance board를 현재 `WorkProof`가 증명 가능한 상태만으로 열었다.

@@ -1,5 +1,41 @@
 # Implementation Slices
 
+## 2026-03-20 Web Wiring Update
+- employer web mock routes now call backend APIs for:
+  - `POST /api/employer-auth/login`
+  - `POST /api/employer-auth/invitations/accept`
+  - `GET /api/employer/profile`
+  - `GET /api/employer/dashboard/summary`
+  - `GET /api/employer/dashboard/attendance-board`
+  - `GET /api/employer/workers`
+  - `GET/PUT /api/employer/workplace-settings`
+  - `GET /api/employer/issues`
+  - `GET /api/employer/issues/review-records/{workProofId}`
+  - `GET /api/employer/correction-requests/{requestId}`
+  - `POST /api/employer/correction-requests/{requestId}/approve`
+  - `POST /api/employer/correction-requests/{requestId}/reject`
+- current web scope still excludes:
+  - dedicated employer profile page route
+  - `NEEDS_REVIEW` resolve command
+  - attachment download surface beyond metadata display
+  - mobile correction flow migration
+- frontend verification:
+  - `.\node_modules\.bin\tsc.cmd -b` passed
+  - `npm.cmd run build` remains blocked in sandbox with `spawn EPERM` from Vite/esbuild
+
+## 2026-03-20 Slice 6 Update
+- Slice 6 `Hardening` is now `in_progress`.
+- `GET /api/employer/issues` now supports `statuses` filtering, matching the documented queue contract.
+- employer correction request queue ordering is fixed to keep newest pending requests first.
+- employer auth regression coverage now includes mixed-case email login.
+- targeted verification passed:
+  - `.\gradlew.bat test --tests com.workproofpay.backend.employer.EmployerIssueReadModelIntegrationTest --tests com.workproofpay.backend.employer.EmployerCorrectionRequestIntegrationTest --tests com.workproofpay.backend.employerauth.EmployerAuthIntegrationTest`
+  - `.\gradlew.bat test --tests com.workproofpay.backend.employer.*`
+- Remaining Slice 6 work is follow-up classification and doc closure:
+  1. auth/profile canonical uniqueness disposition
+  2. worker read-model accepted risk / rescope confirmation
+  3. correction/issues deferred items and Querydsl timing decision
+
 ## 2026-03-20 Slice 5 Update
 - `GET /api/employer/issues` foundation is done.
 - `GET /api/employer/issues/review-records/{workProofId}` read-only detail foundation is done.
@@ -55,7 +91,7 @@
 | 3 | Workplace settings | `done` | `GET/PUT /api/employer/workplace-settings`, employer 전용 DTO/service/controller, `Workplace` settings metadata additive 필드, settings authz/validation 테스트, `WorkProof` workplace snapshot 고정, 관련 문서 정리를 완료함 | Slice 4 read-model scope와 worker list/dashboard 입력 소스를 고정한다 | `workplace-settings-contract.md`, `shared-entity-validation.md` |
 | 4 | Worker directory and dashboard read-model | `done` | `GET /api/employer/workers`, `GET /api/employer/workers/{workerId}`, `GET /api/employer/dashboard/summary`, `GET /api/employer/dashboard/attendance-board` foundation, active membership/week overlap scope, `recordStatus/reflectionStatus + attendanceStatus` 조합, search/status filter/pagination backend 테스트를 추가함 | shared-policy pending 항목은 follow-up note에서 계속 추적한다 | `employer-web-api-map.md`, `employer-worker-domain-map.md` |
 | 5 | Correction request flow | `in_progress` | `GET /api/employer/issues`, `GET /api/employer/correction-requests`, `GET /api/employer/correction-requests/{requestId}`, `POST /api/employer/correction-requests/{requestId}/approve`, `POST /api/employer/correction-requests/{requestId}/reject`, `POST /api/workproof/{workProofId}/correction-requests`, `CorrectionRequest`, `CorrectionDecisionAudit`, `WorkProofAuditLog` 연동 foundation, correction detail attachment metadata(`type`, `fileName`) 노출, legacy direct edit endpoint deprecated 정책 고정을 추가함 | invalidation 규칙, review-required record 후속 surface, attachment download/display 후속 같은 backend/docs 항목을 정리한다 | `correction-request-flow.md`, `shared-entity-validation.md` |
-| 6 | Hardening | `not_started` | 미시작 | 테스트, 리뷰, 리스크 정리와 prior slice follow-up 회수 | 관련 review note |
+| 6 | Hardening | `in_progress` | `GET /api/employer/issues` status filter contract 보강, employer correction request 최신순 정렬 회귀 수정, employer mixed-case login 회귀 테스트 추가, targeted employer backend tests 통과 | follow-up 항목을 `fixed / accepted risk / rescope`로 닫고 review note에 반영 | 관련 review note |
 
 ## 지금 기준 다음에 해야 할 일
 1. 승인 후 화면 갱신은 재조회로 유지하고, cache/event invalidation은 hardening에서 재평가한다.

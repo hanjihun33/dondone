@@ -10,6 +10,29 @@
   - `POST /api/workproof/{workProofId}/correction-requests`
   - `PATCH /api/workproof/{id}` deprecated legacy surface
 
+# 2026-03-20 Slice 6 Classification
+## fixed
+- `GET /api/employer/issues` now supports `statuses` filtering.
+  - queue contract is aligned with the documented `query + itemTypes + statuses + page + size` shape.
+- employer correction request queue ordering is fixed to keep newest pending requests first.
+- targeted tests now lock:
+  - issue queue status filtering
+  - invalid page rejection
+  - correction request latest-first ordering
+
+## accepted risk
+- attachment detail contract stays metadata-only.
+  - backend detail response continues to expose only `type`, `fileName`, `downloadAvailable=false`.
+  - raw `fileRef`, storage path, and download URL remain hidden.
+- employer issue queue DB paging / Querydsl 전환은 지금 열지 않는다.
+  - 현재는 default workplace 한정 MVP 범위와 데이터 규모를 accepted risk로 본다.
+  - 성능 신호가 생기면 별도 read-model hardening slice로 연다.
+
+## rescope
+- `NEEDS_REVIEW` record resolve command surface는 계속 deferred다.
+- worker direct edit flow migration은 mobile/client 범위가 열릴 때까지 deferred다.
+- web issues API wiring은 web 구현 범위가 열릴 때까지 deferred다.
+
 # Closed In Slice 5 Foundation
 - employer correction queue/history/command foundation 완료
 - worker correction request create backend 완료

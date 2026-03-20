@@ -9,6 +9,22 @@
   - `EmploymentMembership`
   - `EmployerAccessScope`
 
+# 2026-03-20 Slice 6 Classification
+## fixed
+- employer auth regression coverage now includes mixed-case email login, so the current `EmailNormalizer + findByEmailIgnoreCase` behavior is explicitly locked by test.
+
+## accepted risk
+- `IgnoreCase` 조회는 현재 제거하지 않는다.
+  - 근거: 신규 저장은 `EmailNormalizer`와 `User` 생성자에서 canonical lower-case로 고정된다.
+  - 근거: worker/employer auth 모두 normalized input 뒤 `findByEmailIgnoreCase` / `existsByEmailIgnoreCase`를 사용한다.
+  - 판단: 현재 단계에서는 mixed-case legacy row 호환성과 auth 회귀 안정성이 더 중요하다.
+- `Workplace.companyId`는 계속 employer scope/company-workplace binding 검증용 additive 필드로 유지한다.
+  - 장기 shared source-of-truth 승격은 이번 slice 범위 밖이다.
+
+## rescope
+- DB 차원의 `lower(email)` uniqueness 또는 동등한 schema hardening은 별도 migration 작업으로 분리한다.
+- invitation 발급/revoke/reissue/audit 운영 경로는 auth/profile foundation hardening이 아니라 별도 admin/ops scope로 분리한다.
+
 # Closed In Slice 2
 - employer web auth/profile foundation 완료
 - invitation token hash 저장, email canonicalization, company-workplace binding foundation 완료
