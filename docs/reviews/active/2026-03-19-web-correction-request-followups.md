@@ -1,7 +1,8 @@
 # Scope
 - Slice 5 `Correction request flow` foundation 이후 남은 backend/docs 후속 정리
-- 기준 범위
+- 대상 범위
   - `GET /api/employer/issues`
+  - `GET /api/employer/issues/review-records/{workProofId}`
   - `GET /api/employer/correction-requests`
   - `GET /api/employer/correction-requests/{requestId}`
   - `POST /api/employer/correction-requests/{requestId}/approve`
@@ -12,11 +13,12 @@
 # Closed In Slice 5 Foundation
 - employer correction queue/history/command foundation 완료
 - worker correction request create backend 완료
-- correction detail attachment metadata(`type`, `fileName`) 노출 완료
+- correction detail attachment metadata(`type`, `fileName`, `downloadAvailable=false`) 노출 완료
 - employer issue queue foundation 완료
   - `PENDING` correction request
   - `NEEDS_REVIEW` record
   - `itemType`으로 함께 노출
+- `GET /api/employer/issues/review-records/{workProofId}` read-only detail foundation 완료
 - legacy direct edit endpoint 정책 고정 완료
   - `PATCH /api/workproof/{id}`는 deprecated legacy surface로 유지
   - 새 클라이언트는 `POST /api/workproof/{workProofId}/correction-requests` 사용
@@ -24,7 +26,7 @@
   - 별도 cache/event invalidation 없음
   - approve/reject 후 다음 조회에서 source-of-truth 재조회로 최신 반영
 - Slice 5 backend/API 범위는 사실상 마감 가능 상태
-  - 남은 항목은 deferred policy, mobile migration, web wiring 중심
+  - 남은 항목은 deferred policy, mobile migration, web wiring, hardening 중심
 
 # Deferred Work Order
 ## 1. attachment detail surface
@@ -44,7 +46,7 @@
   - `GET /api/employer/issues/review-records/{workProofId}`로 scoped read-only detail surface는 열려 있다.
   - 별도 resolve command surface는 아직 없다.
 - 지금 확정하지 않은 이유
-  - correction request approval flow foundation과 review detail read-model까지 닫았고, review-needed record의 별도 command/state transition은 아직 제품 정책이 더 필요하다.
+  - correction request approval flow와 review detail read-model까지는 닫았지만, review-needed record의 별도 command/state transition은 아직 제품 정책이 더 필요하다.
 - 닫히는 조건
   - `NEEDS_REVIEW` record용 employer resolve contract 또는 accepted risk가 고정된다.
 
@@ -68,6 +70,19 @@
   - 현재 범위는 backend/API 우선이며 web 구현은 후속이다.
 - 닫히는 조건
   - web issues 화면이 backend issue queue read-model과 command를 실제로 연결한다.
+
+## 5. employer issue queue DB paging / Querydsl 전환 판단
+- 라벨: `hardening`
+- 현재 상태
+  - `EmployerIssueReadModelService#getIssues(...)`는 scoped correction request와 `NEEDS_REVIEW` record를 읽은 뒤 애플리케이션 메모리에서 필터링, 정렬, pagination을 처리한다.
+- 지금 바로 확정하지 않은 이유
+  - MVP에서는 default workplace 기준으로 범위를 좁히고 계약 고정을 우선했다.
+- 닫히는 조건
+  - Querydsl 또는 동등한 DB query 레벨 filtering/sorting/paging 전환 시점을 정한다.
+  - 전환하지 않을 경우 현재 in-memory 전략을 accepted risk로 명시한다.
+- 리뷰 반영
+  - reviewer가 지적한 메모리 filtering/paging 이슈를 중복 없이 이 항목에 수용한다.
+  - Slice 4의 generic read-model 분리 후보와는 별개로, Slice 5 employer issue queue 전용 hardening으로 관리한다.
 
 # Fixed In This Session
 ## dashboard/wage/docs invalidation strategy
@@ -121,7 +136,7 @@ Slice 5 correction request flow backend로 이어가자.
 - `POST /api/employer/correction-requests/{requestId}/reject` foundation 완료
 - `POST /api/workproof/{workProofId}/correction-requests` foundation 완료
 - `PATCH /api/workproof/{id}` deprecated legacy 정책 고정 완료
-- correction detail attachment metadata(`type`, `fileName`) 노출 완료
+- correction detail attachment metadata(`type`, `fileName`, `downloadAvailable=false`) 노출 완료
 - invalidation policy는 `다음 조회 source-of-truth 재조회`로 고정 완료
 - backend employer/workproof targeted tests 통과 완료
 
@@ -136,12 +151,14 @@ Slice 5 correction request flow backend로 이어가자.
 - 2. review-required record resolve command 후속 정리
 - 3. worker direct edit flow migration 후속 범위 정리
 - 4. web issues API wiring 후속 범위 정리
+- 5. employer issue queue DB paging / Querydsl 전환 판단
 
 임시/후속 항목:
-- `temporary / shared_policy_pending`: correction detail은 현재 `attachmentCount`와 attachment metadata(`type`, `fileName`)까지만 노출
+- `temporary / shared_policy_pending`: correction detail은 현재 `attachmentCount`와 attachment metadata(`type`, `fileName`, `downloadAvailable=false`)까지만 노출
 - `deferred`: `NEEDS_REVIEW` record resolve command surface는 아직 미구현
 - `deferred`: worker correction request create backend는 구현됐지만 worker client migration은 아직 미구현이며 mobile 범위는 현재 제외
 - `deferred`: web issues 화면은 아직 mock 기반이며 backend issue queue wiring은 후속
+- `hardening`: employer issue queue는 아직 in-memory filtering/sorting/paging을 사용하며 Querydsl/DB paging 전환 시점 판단이 남아 있음
 
 제외 범위:
 - 기존 worker API 제거
