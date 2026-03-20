@@ -1,5 +1,15 @@
 # Auth And Role Policy
 
+## 2026-03-20 Employer Signup Code Update
+- employer web signup is now aligned to a `company code` policy that later maps to service-admin issuance.
+- flow:
+  - current temporary step: seed/manual bootstrap prepares a reusable company code bound to `Company + default Workplace`
+  - future target step: service admin prepares `Company + default Workplace` and issues the same kind of company code
+  - employer opens web signup and submits `companyCode/displayName/email/password`
+  - backend creates the `EMPLOYER` account and links `EmployerProfile` to the prepared company/workplace
+- worker company registration stays out of this flow.
+- worker registration code is a separate lane and will be issued by employers later.
+
 ## 목적
 - 웹 전용 로그인/회원가입 흐름을 정의하되, 인증 인프라 중복을 막는다.
 

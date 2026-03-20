@@ -1,5 +1,19 @@
 # Source Inputs
 
+## 2026-03-20 Addendum
+
+- Slice 6 web hardening now also fixes shared wording between worker app and employer web.
+- Reference policy doc: `docs/web/app-web-shared-policy.md`
+- In-scope hardening additions:
+  - issues queue pagination UI aligned with workers page
+  - explicit separation between `정정 요청` and `검토 필요 기록`
+  - attachment wording fixed as evidence metadata, not default attendance input
+- Still deferred from this slice:
+  - worker-side `기록 검토 요청` command
+  - employer-side `검토 확인 / 검토 반려` command
+  - attachment preview/download surface
+  - `late / leave / absent`
+
 - `docs/web/README.md`
 - `docs/web/implementation-slices.md`
 - `docs/web/employer-web-api-map.md`

@@ -1,9 +1,22 @@
 # Implementation Slices
 
+## 2026-03-20 Shared Policy Update
+- worker app and employer web now share the same policy vocabulary through `docs/web/app-web-shared-policy.md`.
+- fixed wording for current scope:
+  - `정정 요청`: time correction request
+  - `검토 필요 기록`: system-generated `NEEDS_REVIEW` workproof
+  - `기록 검토`: human review policy term for the above record
+  - `첨부 파일`: evidence for correction/review, not a default attendance input
+- deferred from Slice 6:
+  - worker-side `기록 검토 요청`
+  - employer-side `검토 확인 / 검토 반려`
+  - attachment preview/download
+  - `late / leave / absent`
+
 ## 2026-03-20 Web Wiring Update
 - employer web mock routes now call backend APIs for:
   - `POST /api/employer-auth/login`
-  - `POST /api/employer-auth/invitations/accept`
+  - `POST /api/employer-auth/signup`
   - `GET /api/employer/profile`
   - `GET /api/employer/dashboard/summary`
   - `GET /api/employer/dashboard/attendance-board`
@@ -19,6 +32,10 @@
   - `NEEDS_REVIEW` resolve command
   - attachment download surface beyond metadata display
   - mobile correction flow migration
+- `/signup` now completes employer signup with `companyCode/displayName/email/password`.
+- current company code is a temporary seed/manual bootstrap code bound to `companyId/defaultWorkplaceId`.
+- the same signup flow is intended to be reused later when admin-issued company code management is implemented.
+- worker company registration flow remains a separate app lane and is not part of the current employer web wiring scope.
 - frontend verification:
   - `.\node_modules\.bin\tsc.cmd -b` passed
   - `npm.cmd run build` remains blocked in sandbox with `spawn EPERM` from Vite/esbuild
