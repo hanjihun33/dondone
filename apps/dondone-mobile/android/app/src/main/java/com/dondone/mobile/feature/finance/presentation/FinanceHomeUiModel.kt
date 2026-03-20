@@ -4,8 +4,14 @@ import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.app.session.AdvanceRequestUiState
 import com.dondone.mobile.app.session.AdvanceRequestDetailUiState
+import com.dondone.mobile.app.session.VaultActionUiState
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
 import com.dondone.mobile.data.advance.AdvanceRemoteState
+import com.dondone.mobile.data.vault.VaultActionType
+import com.dondone.mobile.data.vault.VaultRemoteMode
+import com.dondone.mobile.data.vault.VaultRemoteState
+import com.dondone.mobile.data.vault.VaultSummaryPayload
+import com.dondone.mobile.data.vault.VaultTransactionDetailPayload
 import com.dondone.mobile.data.wage.WageRemoteState
 import com.dondone.mobile.domain.calculator.AdvanceCalculator
 import com.dondone.mobile.domain.calculator.VaultCalculator
@@ -14,6 +20,8 @@ import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import com.dondone.mobile.domain.advance.AdvanceSurfaceState
 import com.dondone.mobile.domain.advance.toAdvanceContractState
 import com.dondone.mobile.domain.model.DemoState
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
@@ -113,9 +121,15 @@ data class FinanceAdvanceUiModel(
 
 data class FinanceVaultDetailUiModel(
     val subtitleText: String,
+    val isLoading: Boolean,
     val isActive: Boolean,
+    val selectedActionType: VaultActionType,
+    val depositEnabled: Boolean,
+    val withdrawEnabled: Boolean,
+    val walletBalanceText: String,
     val availableText: String,
     val balanceText: String,
+    val selectedAmountText: String,
     val aprText: String,
     val accruedInterestText: String,
     val monthlyInterestText: String,
@@ -126,8 +140,16 @@ data class FinanceVaultDetailUiModel(
     val defiRatioText: String,
     val advanceRatioText: String,
     val advanceUsageText: String,
+    val statusTitleText: String?,
+    val statusBodyText: String?,
+    val statusIsError: Boolean,
     val noteText: String,
+    val disclaimerText: String,
     val actionText: String,
+    val actionEnabled: Boolean,
+    val actionInFlight: Boolean,
+    val requestFeedbackText: String?,
+    val requestFeedbackIsError: Boolean,
     val amountOptions: List<FinanceAmountOptionUiModel>
 )
 
@@ -152,6 +174,8 @@ data class FinanceVaultUiModel(
     val accruedInterestText: String,
     val aprText: String,
     val helperText: String,
+    val latestStatusText: String?,
+    val latestStatusIsError: Boolean,
     val actionText: String,
     val detail: FinanceVaultDetailUiModel
 )
@@ -167,9 +191,13 @@ data class FinanceHomeUiModel(
 fun DemoState.toFinanceHomeUiModel(
     remoteState: AdvanceRemoteState? = null,
     wageRemoteState: WageRemoteState? = null,
+    vaultRemoteState: VaultRemoteState? = null,
     selectedAdvanceAmount: Int? = null,
+    selectedVaultAmount: Int? = null,
+    selectedVaultActionType: VaultActionType = VaultActionType.DEPOSIT,
     advanceRequestUiState: AdvanceRequestUiState = AdvanceRequestUiState(),
-    advanceRequestDetailUiState: AdvanceRequestDetailUiState = AdvanceRequestDetailUiState()
+    advanceRequestDetailUiState: AdvanceRequestDetailUiState = AdvanceRequestDetailUiState(),
+    vaultActionUiState: VaultActionUiState = VaultActionUiState()
 ): FinanceHomeUiModel {
     val selectedAccount = remittance.selectedAccount()
     val advanceSnapshot = AdvanceCalculator.calculate(this)
@@ -327,26 +355,107 @@ fun DemoState.toFinanceHomeUiModel(
         AdvanceSurfaceState.LOADING -> "근거 보기"
     }
 
-    val vaultAvailable = selectedAccount.balance
-    val vaultAmountPresets = listOf(100_000, 300_000, 500_000, 1_000_000)
-    val vaultSelectedAmount = if (vault.userDeposit > 0) {
-        vault.userDeposit
+    val remoteVaultSummary = vaultRemoteState?.payload?.summary
+    val remoteLatestVaultTransaction = vaultRemoteState?.payload?.latestTransaction
+    val vaultStatusMessage = remoteLatestVaultTransaction?.toVaultStatusMessage()
+        ?: when (vaultRemoteState?.mode) {
+            VaultRemoteMode.LOADING -> FinanceVaultStatusMessage(
+                title = "실연동 확인 중",
+                body = "지갑과 예치 상태를 불러오는 중이에요.",
+                isError = false
+            )
+
+            VaultRemoteMode.ERROR -> FinanceVaultStatusMessage(
+                title = "다시 확인 필요",
+                body = vaultRemoteState.errorMessage ?: "예치 상태를 다시 불러와 주세요.",
+                isError = true
+            )
+
+            VaultRemoteMode.UNAUTHENTICATED -> FinanceVaultStatusMessage(
+                title = "로그인 필요",
+                body = vaultRemoteState.errorMessage ?: "로그인 후 예치 실연동 데이터를 불러옵니다.",
+                isError = true
+            )
+
+            else -> null
+        }
+    val usesRemoteVault = remoteVaultSummary != null
+    val remoteVaultAssetSymbol = remoteVaultSummary?.assetSymbol.orEmpty()
+    val remoteVaultDecimals = remoteVaultSummary?.assetDecimals ?: 6
+    val remoteStoredUnits = remoteVaultSummary?.storedAmountAtomic?.toWholeAssetUnits(remoteVaultDecimals) ?: 0
+    val remoteAvailableDepositUnits = remoteVaultSummary?.availableToStoreAmountAtomic?.toWholeAssetUnits(remoteVaultDecimals) ?: 0
+    val remoteAvailableWithdrawUnits = remoteStoredUnits
+    val effectiveVaultActionType = if (selectedVaultActionType == VaultActionType.WITHDRAW && remoteAvailableWithdrawUnits <= 0) {
+        VaultActionType.DEPOSIT
     } else {
-        pickClosestAmountOption(
-            target = vaultSnapshot.suggestedDeposit.coerceAtMost(vaultAvailable),
-            presets = vaultAmountPresets,
-            available = vaultAvailable
+        selectedVaultActionType
+    }
+    val effectiveVaultSelectedAmount = when {
+        usesRemoteVault -> {
+            val availableUnits = if (effectiveVaultActionType == VaultActionType.DEPOSIT) {
+                remoteAvailableDepositUnits
+            } else {
+                remoteAvailableWithdrawUnits
+            }
+            when {
+                availableUnits <= 0 -> 0
+                selectedVaultAmount != null && selectedVaultAmount in 1..availableUnits -> selectedVaultAmount
+                else -> pickClosestAmountOption(
+                    target = availableUnits,
+                    presets = listOf(10, 25, 50, 100),
+                    available = availableUnits
+                )
+            }
+        }
+
+        vault.userDeposit > 0 -> vault.userDeposit
+        else -> {
+            val vaultAvailable = selectedAccount.balance
+            pickClosestAmountOption(
+                target = vaultSnapshot.suggestedDeposit.coerceAtMost(vaultAvailable),
+                presets = listOf(100_000, 300_000, 500_000, 1_000_000),
+                available = vaultAvailable
+            )
+        }
+    }
+    val vaultAmountOptions = if (usesRemoteVault) {
+        val availableUnits = if (effectiveVaultActionType == VaultActionType.DEPOSIT) {
+            remoteAvailableDepositUnits
+        } else {
+            remoteAvailableWithdrawUnits
+        }
+        buildAmountOptions(
+            available = availableUnits,
+            selected = effectiveVaultSelectedAmount,
+            presets = listOf(10, 25, 50, 100),
+            labelFormatter = { amount -> "$amount $remoteVaultAssetSymbol" }
+        )
+    } else {
+        val vaultAvailable = selectedAccount.balance
+        buildAmountOptions(
+            available = vaultAvailable,
+            selected = effectiveVaultSelectedAmount,
+            presets = listOf(100_000, 300_000, 500_000, 1_000_000),
+            labelFormatter = ::formatTenThousandUnit
         )
     }
-    val vaultAmountOptions = buildAmountOptions(
-        available = vaultAvailable,
-        selected = vaultSelectedAmount,
-        presets = vaultAmountPresets,
-        labelFormatter = ::formatTenThousandUnit
+    val userDepositForBreakdown = max(
+        1,
+        if (usesRemoteVault) remoteStoredUnits.coerceAtLeast(effectiveVaultSelectedAmount) else {
+            if (vault.userDeposit > 0) vault.userDeposit else effectiveVaultSelectedAmount
+        }
     )
-    val userDepositForBreakdown = max(1, if (vault.userDeposit > 0) vault.userDeposit else vaultSelectedAmount)
-    val defiMonthly = floor(userDepositForBreakdown * (vault.apr / 12)).toInt()
-    val feeShare = floor(vault.monthlyFeeRevenue * (userDepositForBreakdown / max(1, vault.totalPool).toDouble())).toInt()
+    val vaultAprRate = if (usesRemoteVault) {
+        (remoteVaultSummary?.interestPreview?.apyBps ?: 0) / 10_000.0
+    } else {
+        vault.apr
+    }
+    val defiMonthly = floor(userDepositForBreakdown * (vaultAprRate / 12)).toInt()
+    val feeShare = if (usesRemoteVault) {
+        0
+    } else {
+        floor(vault.monthlyFeeRevenue * (userDepositForBreakdown / max(1, vault.totalPool).toDouble())).toInt()
+    }
 
     return FinanceHomeUiModel(
         account = FinanceAccountUiModel(
@@ -450,40 +559,178 @@ fun DemoState.toFinanceHomeUiModel(
             null
         },
         vault = FinanceVaultUiModel(
-            depositStatusText = if (vault.enabled && vault.userDeposit > 0) {
-                formatKrw(vault.userDeposit)
-            } else {
-                "미신청"
+            depositStatusText = when {
+                usesRemoteVault && remoteStoredUnits > 0 ->
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.storedAmountAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+
+                usesRemoteVault -> "미예치"
+                vault.enabled && vault.userDeposit > 0 -> formatKrw(vault.userDeposit)
+                else -> "미신청"
             },
-            accruedInterestText = formatKrw(vault.accruedInterest),
-            aprText = String.format(Locale.US, "%.1f%%", vault.apr * 100),
-            helperText = if (vault.enabled && vault.userDeposit > 0) {
-                "예치 중인 금액과 누적 이자를 확인할 수 있어요."
+            accruedInterestText = if (usesRemoteVault) {
+                formatTokenAmount(
+                    atomic = remoteVaultSummary!!.accruedYieldAtomic,
+                    decimals = remoteVaultDecimals,
+                    symbol = remoteVaultAssetSymbol
+                )
             } else {
-                "예치 시작 전 예상 이자와 수익 구성을 먼저 확인할 수 있어요."
+                formatKrw(vault.accruedInterest)
             },
-            actionText = if (vault.enabled && vault.userDeposit > 0) "보관 보기" else "신청",
+            aprText = if (usesRemoteVault) {
+                formatApy(remoteVaultSummary!!.interestPreview.apyBps)
+            } else {
+                String.format(Locale.US, "%.1f%%", vault.apr * 100)
+            },
+            helperText = when {
+                vaultStatusMessage != null -> vaultStatusMessage.body
+                usesRemoteVault && remoteStoredUnits > 0 -> "예치 잔액과 예상 이자를 바로 확인할 수 있어요."
+                usesRemoteVault -> "예치 가능 금액과 예상 이자를 먼저 확인할 수 있어요."
+                vault.enabled && vault.userDeposit > 0 -> "예치 중인 금액과 누적 이자를 확인할 수 있어요."
+                else -> "예치 시작 전 예상 이자와 수익 구성을 먼저 확인할 수 있어요."
+            },
+            latestStatusText = vaultStatusMessage?.title,
+            latestStatusIsError = vaultStatusMessage?.isError == true,
+            actionText = if (usesRemoteVault) "관리" else if (vault.enabled && vault.userDeposit > 0) "보관 보기" else "신청",
             detail = FinanceVaultDetailUiModel(
-                subtitleText = "스테이블 코인 예치 기준 예상 이자 현황입니다.",
-                isActive = vault.enabled && vault.userDeposit > 0,
-                availableText = formatKrw(vaultAvailable),
-                balanceText = if (vault.userDeposit > 0) formatKrw(vault.userDeposit) else formatKrw(vaultSelectedAmount),
-                aprText = String.format(Locale.US, "%.1f%%", vault.apr * 100),
-                accruedInterestText = formatKrw(vault.accruedInterest),
-                monthlyInterestText = formatKrw(vaultSnapshot.monthlyInterest),
-                dailyInterestText = formatKrw(vaultSnapshot.dailyInterest),
-                defiMonthlyText = formatKrw(defiMonthly),
-                feeShareText = formatKrw(feeShare),
-                totalMonthlyText = formatKrw(defiMonthly + feeShare),
-                defiRatioText = "${((1 - vault.advanceRatio) * 100).toInt()}%",
-                advanceRatioText = "${(vault.advanceRatio * 100).toInt()}%",
-                advanceUsageText = "${(vault.advanceUtilization * 100).toInt()}%",
-                noteText = if (vault.enabled && vault.userDeposit > 0) {
+                subtitleText = if (usesRemoteVault) {
+                    "${remoteVaultSummary!!.network} ${remoteVaultAssetSymbol} 예치 상태를 기준으로 표시합니다."
+                } else {
+                    "스테이블 코인 예치 기준 예상 이자 현황입니다."
+                },
+                isLoading = vaultRemoteState?.isLoading == true && !usesRemoteVault,
+                isActive = if (usesRemoteVault) remoteStoredUnits > 0 else vault.enabled && vault.userDeposit > 0,
+                selectedActionType = effectiveVaultActionType,
+                depositEnabled = if (usesRemoteVault) remoteAvailableDepositUnits > 0 else true,
+                withdrawEnabled = if (usesRemoteVault) remoteAvailableWithdrawUnits > 0 else vault.enabled && vault.userDeposit > 0,
+                walletBalanceText = if (usesRemoteVault) {
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.walletTokenBalanceAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else {
+                    formatKrw(selectedAccount.balance)
+                },
+                availableText = if (usesRemoteVault) {
+                    val availableAtomic = if (effectiveVaultActionType == VaultActionType.DEPOSIT) {
+                        remoteVaultSummary!!.availableToStoreAmountAtomic
+                    } else {
+                        remoteVaultSummary!!.storedAmountAtomic
+                    }
+                    formatTokenAmount(
+                        atomic = availableAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else {
+                    formatKrw(selectedAccount.balance)
+                },
+                balanceText = if (usesRemoteVault) {
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.storedAmountAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else if (vault.userDeposit > 0) {
+                    formatKrw(vault.userDeposit)
+                } else {
+                    formatKrw(effectiveVaultSelectedAmount)
+                },
+                selectedAmountText = if (usesRemoteVault) {
+                    "${effectiveVaultSelectedAmount.coerceAtLeast(0)} $remoteVaultAssetSymbol"
+                } else {
+                    formatKrw(effectiveVaultSelectedAmount)
+                },
+                aprText = if (usesRemoteVault) {
+                    formatApy(remoteVaultSummary!!.interestPreview.apyBps)
+                } else {
+                    String.format(Locale.US, "%.1f%%", vault.apr * 100)
+                },
+                accruedInterestText = if (usesRemoteVault) {
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.accruedYieldAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else {
+                    formatKrw(vault.accruedInterest)
+                },
+                monthlyInterestText = if (usesRemoteVault) {
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.interestPreview.monthlyEstimatedYieldAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else {
+                    formatKrw(vaultSnapshot.monthlyInterest)
+                },
+                dailyInterestText = if (usesRemoteVault) {
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.interestPreview.dailyEstimatedYieldAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else {
+                    formatKrw(vaultSnapshot.dailyInterest)
+                },
+                defiMonthlyText = if (usesRemoteVault) {
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.interestPreview.monthlyEstimatedYieldAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else {
+                    formatKrw(defiMonthly)
+                },
+                feeShareText = if (usesRemoteVault) {
+                    "시뮬레이션 제외"
+                } else {
+                    formatKrw(feeShare)
+                },
+                totalMonthlyText = if (usesRemoteVault) {
+                    formatTokenAmount(
+                        atomic = remoteVaultSummary!!.interestPreview.monthlyEstimatedYieldAtomic,
+                        decimals = remoteVaultDecimals,
+                        symbol = remoteVaultAssetSymbol
+                    )
+                } else {
+                    formatKrw(defiMonthly + feeShare)
+                },
+                defiRatioText = if (usesRemoteVault) "demo" else "${((1 - vault.advanceRatio) * 100).toInt()}%",
+                advanceRatioText = if (usesRemoteVault) "demo" else "${(vault.advanceRatio * 100).toInt()}%",
+                advanceUsageText = if (usesRemoteVault) "demo" else "${(vault.advanceUtilization * 100).toInt()}%",
+                statusTitleText = vaultStatusMessage?.title,
+                statusBodyText = vaultStatusMessage?.body,
+                statusIsError = vaultStatusMessage?.isError == true,
+                noteText = if (usesRemoteVault) {
+                    "예치/출금은 비동기 처리라 요청 후 잠시 상태 확인이 필요합니다."
+                } else if (vault.enabled && vault.userDeposit > 0) {
                     "이자 수치는 데모용 추정값이며 실제 수익을 보장하지 않습니다."
                 } else {
                     "예치금은 Vault 풀에 들어가며, DeFi 운용 수익 + 가불 수수료 기여분으로 이자가 적립됩니다."
                 },
-                actionText = if (vault.enabled && vault.userDeposit > 0) "닫기" else "예치 시작하기",
+                disclaimerText = if (usesRemoteVault) {
+                    remoteVaultSummary!!.disclaimer
+                } else {
+                    "예상 이자는 데모용 추정값이며 실제 수익을 보장하지 않습니다."
+                },
+                actionText = when {
+                    vaultActionUiState.isSubmitting && effectiveVaultActionType == VaultActionType.WITHDRAW -> "출금 요청 중..."
+                    vaultActionUiState.isSubmitting -> "예치 요청 중..."
+                    effectiveVaultActionType == VaultActionType.WITHDRAW -> "출금 요청하기"
+                    else -> "예치 요청하기"
+                },
+                actionEnabled = usesRemoteVault &&
+                    !vaultActionUiState.isSubmitting &&
+                    effectiveVaultSelectedAmount > 0 &&
+                    vaultAmountOptions.isNotEmpty(),
+                actionInFlight = vaultActionUiState.isSubmitting,
+                requestFeedbackText = vaultActionUiState.message,
+                requestFeedbackIsError = vaultActionUiState.isError,
                 amountOptions = vaultAmountOptions
             )
         )
@@ -619,6 +866,77 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
         snapshotReviewText = detailValue?.eligibilitySnapshot?.needsReviewRecordCount?.let { "${it}건" } ?: "-",
         errorMessage = errorMessage
     )
+}
+
+private data class FinanceVaultStatusMessage(
+    val title: String,
+    val body: String,
+    val isError: Boolean
+)
+
+private fun VaultTransactionDetailPayload.toVaultStatusMessage(): FinanceVaultStatusMessage {
+    val actionLabel = if (txType == "WITHDRAW") "출금" else "예치"
+    return when (status) {
+        "CONFIRMED" -> FinanceVaultStatusMessage(
+            title = "${actionLabel} 완료",
+            body = "${actionLabel}가 확정됐어요.",
+            isError = false
+        )
+
+        "FAILED", "TIMED_OUT" -> FinanceVaultStatusMessage(
+            title = "${actionLabel} 실패",
+            body = failureCode ?: "${actionLabel}가 완료되지 않았어요. 잠시 후 다시 시도해 주세요.",
+            isError = true
+        )
+
+        "BROADCASTED" -> FinanceVaultStatusMessage(
+            title = "${actionLabel} 확인 대기",
+            body = "체인 전송이 완료돼 확정을 기다리는 중입니다.",
+            isError = false
+        )
+
+        else -> FinanceVaultStatusMessage(
+            title = "${actionLabel} 처리 중",
+            body = "요청이 접수돼 서명과 전송을 준비하는 중입니다.",
+            isError = false
+        )
+    }
+}
+
+private fun formatApy(apyBps: Int): String =
+    String.format(Locale.US, "%.2f%%", apyBps / 100.0)
+
+private fun formatTokenAmount(
+    atomic: String,
+    decimals: Int,
+    symbol: String,
+    fractionDigits: Int = 2
+): String {
+    val normalized = atomic.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val divisor = BigDecimal.TEN.pow(decimals.coerceAtLeast(0))
+    val major = if (divisor.compareTo(BigDecimal.ZERO) == 0) {
+        normalized
+    } else {
+        normalized.divide(divisor, fractionDigits, RoundingMode.DOWN)
+    }
+    val text = major.stripTrailingZeros().toPlainString()
+    return "$text $symbol"
+}
+
+private fun String.toWholeAssetUnits(decimals: Int): Int {
+    val sanitized = trim().ifBlank { return 0 }
+    if (sanitized == "0") return 0
+    if (decimals <= 0) {
+        return sanitized.toLongOrNull()
+            ?.coerceIn(0L, Int.MAX_VALUE.toLong())
+            ?.toInt()
+            ?: 0
+    }
+    val wholePart = if (sanitized.length > decimals) sanitized.dropLast(decimals) else "0"
+    return wholePart.toLongOrNull()
+        ?.coerceIn(0L, Int.MAX_VALUE.toLong())
+        ?.toInt()
+        ?: 0
 }
 
 private fun formatHours(hours: Double): String {

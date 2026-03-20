@@ -7,6 +7,7 @@ import com.dondone.mobile.data.advance.BackendAdvanceRepository
 import com.dondone.mobile.data.auth.AuthSessionStore
 import com.dondone.mobile.data.auth.BackendAuthRepository
 import com.dondone.mobile.data.remittance.BackendRemittanceRepository
+import com.dondone.mobile.data.vault.BackendVaultRepository
 import com.dondone.mobile.data.wage.BackendWageRepository
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
 import okhttp3.OkHttpClient
@@ -28,6 +29,7 @@ class DemoSessionViewModelFactory(
                 advanceRepository = BackendAdvanceRepository(client = client),
                 workproofRepository = BackendWorkproofRepository(client = client),
                 remittanceRepository = BackendRemittanceRepository(client = client),
+                vaultRepository = BackendVaultRepository(client = client),
                 wageRepository = BackendWageRepository(client = client)
             ) as T
         }

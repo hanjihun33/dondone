@@ -1,9 +1,8 @@
 package com.workproofpay.backend.vault.adapter;
 
-import com.workproofpay.backend.remittance.adapter.DemoRemittanceBlockchainGateway;
+import com.workproofpay.backend.remittance.adapter.ChainBalanceSnapshot;
 import com.workproofpay.backend.remittance.service.WalletService;
 import com.workproofpay.backend.vault.config.VaultProperties;
-import com.workproofpay.backend.vault.model.VaultFailureCode;
 import com.workproofpay.backend.vault.model.VaultPosition;
 import com.workproofpay.backend.vault.repo.VaultPositionRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,23 +22,22 @@ import java.util.concurrent.atomic.AtomicReference;
 @ConditionalOnProperty(name = "vault.chain.mode", havingValue = "demo", matchIfMissing = true)
 public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
 
-    private final DemoRemittanceBlockchainGateway remittanceBlockchainGateway;
     private final WalletService walletService;
     private final VaultProperties properties;
     private final VaultPositionRepository vaultPositionRepository;
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, BigInteger> shareBalances = new ConcurrentHashMap<>();
     private final Map<String, DemoVaultTxState> txStates = new ConcurrentHashMap<>();
+    private final Map<String, BigInteger> walletTokenAdjustments = new ConcurrentHashMap<>();
+    private final Map<String, BigInteger> walletNativeGasAdjustments = new ConcurrentHashMap<>();
     private final AtomicReference<BigInteger> totalShares = new AtomicReference<>(BigInteger.ZERO);
     private final AtomicReference<BigInteger> totalAssets = new AtomicReference<>(BigInteger.ZERO);
 
     public DemoVaultBlockchainGateway(
-            DemoRemittanceBlockchainGateway remittanceBlockchainGateway,
             WalletService walletService,
             VaultProperties properties,
             VaultPositionRepository vaultPositionRepository
     ) {
-        this.remittanceBlockchainGateway = remittanceBlockchainGateway;
         this.walletService = walletService;
         this.properties = properties;
         this.vaultPositionRepository = vaultPositionRepository;
@@ -48,10 +46,16 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
     @Override
     public VaultChainState getState(String walletAddress) {
         synchronizeFromPersistedPositions();
-        var balances = walletService.getBalances(walletAddress);
+        ChainBalanceSnapshot balances = walletService.getBalances(walletAddress);
+        BigInteger adjustedTokenBalance = balances.tokenBalanceAtomic()
+                .add(walletTokenAdjustments.getOrDefault(walletAddress, BigInteger.ZERO))
+                .max(BigInteger.ZERO);
+        BigInteger adjustedNativeBalance = balances.nativeBalanceWei()
+                .add(walletNativeGasAdjustments.getOrDefault(walletAddress, BigInteger.ZERO))
+                .max(BigInteger.ZERO);
         return new VaultChainState(
-                balances.tokenBalanceAtomic(),
-                balances.nativeBalanceWei(),
+                adjustedTokenBalance,
+                adjustedNativeBalance,
                 shareBalances.getOrDefault(walletAddress, BigInteger.ZERO)
         );
     }
@@ -140,23 +144,29 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
             return;
         }
         synchronized (this) {
-            synchronizeFromPersistedPositions();
+            VaultChainState chainState = getState(state.senderAddress());
             if (state.action() == VaultAction.DEPOSIT) {
-                remittanceBlockchainGateway.debitToken(state.senderAddress(), state.amountAtomic());
-                remittanceBlockchainGateway.consumeNativeGas(state.senderAddress());
+                if (chainState.walletTokenBalanceAtomic().compareTo(state.amountAtomic()) < 0
+                        || chainState.walletNativeBalanceWei().signum() <= 0) {
+                    throw new IllegalStateException("insufficient vault wallet balance");
+                }
+                walletTokenAdjustments.merge(state.senderAddress(), state.amountAtomic().negate(), BigInteger::add);
+                walletNativeGasAdjustments.merge(state.senderAddress(), BigInteger.ONE.negate(), BigInteger::add);
                 totalAssets.updateAndGet(current -> current.add(state.amountAtomic()));
                 totalShares.updateAndGet(current -> current.add(state.shareDelta()));
                 shareBalances.merge(state.receiverAddress(), state.shareDelta(), BigInteger::add);
             } else {
                 BigInteger currentShares = shareBalances.getOrDefault(state.senderAddress(), BigInteger.ZERO);
-                if (currentShares.compareTo(state.shareDelta()) < 0 || totalAssets.get().compareTo(state.amountAtomic()) < 0) {
+                if (currentShares.compareTo(state.shareDelta()) < 0
+                        || totalAssets.get().compareTo(state.amountAtomic()) < 0
+                        || chainState.walletNativeBalanceWei().signum() <= 0) {
                     throw new IllegalStateException("insufficient vault balance");
                 }
-                remittanceBlockchainGateway.consumeNativeGas(state.senderAddress());
+                walletNativeGasAdjustments.merge(state.senderAddress(), BigInteger.ONE.negate(), BigInteger::add);
                 shareBalances.put(state.senderAddress(), currentShares.subtract(state.shareDelta()));
                 totalAssets.updateAndGet(current -> current.subtract(state.amountAtomic()));
                 totalShares.updateAndGet(current -> current.subtract(state.shareDelta()));
-                remittanceBlockchainGateway.creditToken(state.receiverAddress(), state.amountAtomic());
+                walletTokenAdjustments.merge(state.receiverAddress(), state.amountAtomic(), BigInteger::add);
             }
         }
         txStates.put(state.txHash(), state.withBroadcasted(true));
@@ -183,6 +193,8 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
         synchronized (this) {
             shareBalances.clear();
             txStates.clear();
+            walletTokenAdjustments.clear();
+            walletNativeGasAdjustments.clear();
             totalShares.set(BigInteger.ZERO);
             totalAssets.set(BigInteger.ZERO);
         }

@@ -21,6 +21,16 @@ import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.remittance.RemittanceRepository
 import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
 import com.dondone.mobile.data.remittance.RemittanceUnauthorizedException
+import com.dondone.mobile.data.vault.BackendVaultRepository
+import com.dondone.mobile.data.vault.VaultActionType
+import com.dondone.mobile.data.vault.VaultCreateTransactionPayload
+import com.dondone.mobile.data.vault.VaultRemoteMode
+import com.dondone.mobile.data.vault.VaultRemotePayload
+import com.dondone.mobile.data.vault.VaultRemoteState
+import com.dondone.mobile.data.vault.VaultRepository
+import com.dondone.mobile.data.vault.VaultSummaryPayload
+import com.dondone.mobile.data.vault.VaultTransactionDetailPayload
+import com.dondone.mobile.data.vault.VaultUnauthorizedException
 import com.dondone.mobile.data.wage.BackendWageRepository
 import com.dondone.mobile.data.wage.WageRemotePayload
 import com.dondone.mobile.data.wage.WageRemoteState
@@ -53,7 +63,10 @@ import java.time.YearMonth
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 private const val REMITTANCE_STATUS_POLL_DELAY_MS = 1500L
 private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 12
+private const val VAULT_STATUS_POLL_DELAY_MS = 1500L
+private const val VAULT_STATUS_POLL_ATTEMPTS = 16
 private const val REMITTANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 송금 실연동 데이터를 불러옵니다."
+private const val VAULT_REMOTE_LOGIN_MESSAGE = "로그인 후 예치 실연동 데이터를 불러옵니다."
 private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 실연동 데이터를 불러옵니다."
 private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
 private const val WAGE_REMOTE_LOGIN_MESSAGE = "로그인 후 급여 실연동 데이터를 불러옵니다."
@@ -63,16 +76,29 @@ private const val DOCUMENT_STATUS_NOT_CREATED = "NOT_CREATED"
 private const val DOCUMENT_ID_PROOF = "PROOF"
 private const val DOCUMENT_ID_CLAIM = "CLAIM"
 
+private enum class RemittanceRemoteLoadMode {
+    INITIAL,
+    SILENT_REFRESH
+}
+
+private enum class VaultRemoteLoadMode {
+    INITIAL,
+    SILENT_REFRESH
+}
+
 class DemoSessionViewModel(
     private val authRepository: AuthRepository,
     private val advanceRepository: AdvanceRepository = BackendAdvanceRepository(),
     private val workproofRepository: WorkproofRepository = BackendWorkproofRepository(),
     private val remittanceRepository: RemittanceRepository = BackendRemittanceRepository(),
+    private val vaultRepository: VaultRepository = BackendVaultRepository(),
     private val wageRepository: WageRepository = BackendWageRepository()
 ) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
     private var remittanceStatusPollingJob: Job? = null
+    private var vaultStatusPollingJob: Job? = null
+    private var activeVaultPollingRequestId: String? = null
     private val _uiState = MutableStateFlow(initialState)
     val uiState: StateFlow<DemoState> = _uiState.asStateFlow()
     private val _authUiState = MutableStateFlow(AuthUiState.restoring())
@@ -90,16 +116,25 @@ class DemoSessionViewModel(
         MutableStateFlow(WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE))
     private val _remittanceRemoteState =
         MutableStateFlow(RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE))
+    private val _vaultRemoteState =
+        MutableStateFlow(VaultRemoteState.unauthenticated(VAULT_REMOTE_LOGIN_MESSAGE))
     val wageRemoteState: StateFlow<WageRemoteState> = _wageRemoteState.asStateFlow()
     val remittanceRemoteState: StateFlow<RemittanceRemoteState> = _remittanceRemoteState.asStateFlow()
+    val vaultRemoteState: StateFlow<VaultRemoteState> = _vaultRemoteState.asStateFlow()
     private val _workproofActionUiState = MutableStateFlow(WorkproofActionUiState())
     val workproofActionUiState: StateFlow<WorkproofActionUiState> = _workproofActionUiState.asStateFlow()
     private val _wageActionUiState = MutableStateFlow(WageActionUiState())
     val wageActionUiState: StateFlow<WageActionUiState> = _wageActionUiState.asStateFlow()
     private val _remittanceActionUiState = MutableStateFlow(RemittanceActionUiState())
     val remittanceActionUiState: StateFlow<RemittanceActionUiState> = _remittanceActionUiState.asStateFlow()
+    private val _vaultActionUiState = MutableStateFlow(VaultActionUiState())
+    val vaultActionUiState: StateFlow<VaultActionUiState> = _vaultActionUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
+    private val _selectedVaultAmount = MutableStateFlow<Int?>(null)
+    val selectedVaultAmount: StateFlow<Int?> = _selectedVaultAmount.asStateFlow()
+    private val _selectedVaultActionType = MutableStateFlow(VaultActionType.DEPOSIT)
+    val selectedVaultActionType: StateFlow<VaultActionType> = _selectedVaultActionType.asStateFlow()
     private val _menuLaunchRequest = MutableStateFlow<MenuLaunchRequest?>(null)
     val menuLaunchRequest: StateFlow<MenuLaunchRequest?> = _menuLaunchRequest.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
@@ -985,6 +1020,112 @@ class DemoSessionViewModel(
         }
     }
 
+    fun refreshVaultRemoteState() {
+        val session = _authUiState.value.session
+        if (session == null) {
+            _vaultRemoteState.value = VaultRemoteState.unauthenticated(VAULT_REMOTE_LOGIN_MESSAGE)
+            return
+        }
+
+        viewModelScope.launch {
+            loadVaultRemoteState(session)
+        }
+    }
+
+    fun selectVaultAction(actionType: VaultActionType) {
+        if (_selectedVaultActionType.value == actionType) {
+            return
+        }
+        _selectedVaultActionType.value = actionType
+        syncSelectedVaultAmount(_vaultRemoteState.value)
+    }
+
+    fun selectVaultAmount(amount: Int) {
+        _selectedVaultAmount.value = amount
+    }
+
+    fun submitVaultAction() {
+        if (_vaultActionUiState.value.isSubmitting) {
+            return
+        }
+        val session = _authUiState.value.session ?: run {
+            _vaultActionUiState.value = VaultActionUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val summary = _vaultRemoteState.value.payload?.summary ?: run {
+            _vaultActionUiState.value = VaultActionUiState(
+                message = "예치 요약을 먼저 불러와 주세요.",
+                isError = true
+            )
+            return
+        }
+        val selectedAmount = _selectedVaultAmount.value ?: 0
+        if (selectedAmount <= 0) {
+            _vaultActionUiState.value = VaultActionUiState(
+                message = "금액을 먼저 선택해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        val amountAtomic = selectedAmount.toAtomicAmount(summary.assetDecimals)
+        if (amountAtomic <= 0L) {
+            _vaultActionUiState.value = VaultActionUiState(
+                message = "요청 금액이 올바르지 않아요.",
+                isError = true
+            )
+            return
+        }
+
+        val actionType = _selectedVaultActionType.value
+        viewModelScope.launch {
+            _vaultActionUiState.value = VaultActionUiState(
+                isSubmitting = true,
+                submittingAction = actionType.toSubmittingAction()
+            )
+            try {
+                val result = when (actionType) {
+                    VaultActionType.DEPOSIT -> vaultRepository.createDeposit(
+                        accessToken = session.accessToken,
+                        amountAtomic = amountAtomic
+                    )
+
+                    VaultActionType.WITHDRAW -> vaultRepository.createWithdrawal(
+                        accessToken = session.accessToken,
+                        amountAtomic = amountAtomic
+                    )
+                }
+                mergeVaultCreateResult(
+                    summary = summary,
+                    amountAtomic = amountAtomic.toString(),
+                    result = result
+                )
+                _vaultActionUiState.value = VaultActionUiState()
+                startVaultStatusPolling(session, result.requestId)
+            } catch (error: VaultUnauthorizedException) {
+                expireSession(error.message)
+                _vaultActionUiState.value = VaultActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _vaultActionUiState.value = VaultActionUiState(
+                    message = error.message ?: actionType.toCreateFailureMessage(),
+                    isError = true
+                )
+            }
+        }
+    }
+
+    fun clearVaultActionMessage() {
+        _vaultActionUiState.update { current ->
+            if (current.message == null) current else current.copy(message = null, isError = false)
+        }
+    }
+
     private fun restoreAuthSession() {
         viewModelScope.launch {
             val session = authRepository.restore()
@@ -994,6 +1135,7 @@ class DemoSessionViewModel(
                 _workproofRemoteState.value = WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE)
                 _wageRemoteState.value = WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE)
                 _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(REMITTANCE_REMOTE_LOGIN_MESSAGE)
+                _vaultRemoteState.value = VaultRemoteState.unauthenticated(VAULT_REMOTE_LOGIN_MESSAGE)
             } else {
                 onAuthenticated(session)
             }
@@ -1015,6 +1157,10 @@ class DemoSessionViewModel(
             return
         }
         loadRemittanceRemoteState(session)
+        if (!_authUiState.value.isAuthenticated) {
+            return
+        }
+        loadVaultRemoteState(session)
     }
 
     private suspend fun loadAdvanceRemoteState(session: AuthSession) {
@@ -1054,8 +1200,16 @@ class DemoSessionViewModel(
     ) {
         updateRemittanceRemoteState(
             session = session,
-            showLoading = true,
-            keepVisibleContentOnError = false
+            mode = RemittanceRemoteLoadMode.INITIAL
+        )
+    }
+
+    private suspend fun loadVaultRemoteState(
+        session: AuthSession
+    ) {
+        updateVaultRemoteState(
+            session = session,
+            mode = VaultRemoteLoadMode.INITIAL
         )
     }
 
@@ -1064,28 +1218,53 @@ class DemoSessionViewModel(
     ) {
         updateRemittanceRemoteState(
             session = session,
-            showLoading = false,
-            keepVisibleContentOnError = true
+            mode = RemittanceRemoteLoadMode.SILENT_REFRESH
+        )
+    }
+
+    private suspend fun refreshVaultRemoteStateSilently(
+        session: AuthSession
+    ) {
+        updateVaultRemoteState(
+            session = session,
+            mode = VaultRemoteLoadMode.SILENT_REFRESH
         )
     }
 
     private suspend fun updateRemittanceRemoteState(
         session: AuthSession,
-        showLoading: Boolean,
-        keepVisibleContentOnError: Boolean
+        mode: RemittanceRemoteLoadMode
     ) {
-        if (showLoading || _remittanceRemoteState.value.payload == null) {
+        if (mode == RemittanceRemoteLoadMode.INITIAL || _remittanceRemoteState.value.payload == null) {
             _remittanceRemoteState.value = RemittanceRemoteState.loading()
         }
         val remoteState = remittanceRepository.load(session.accessToken)
         if (
-            keepVisibleContentOnError &&
+            mode == RemittanceRemoteLoadMode.SILENT_REFRESH &&
             remoteState.mode == RemittanceRemoteMode.ERROR &&
             _remittanceRemoteState.value.payload != null
         ) {
             return
         }
         applyRemittanceRemoteState(remoteState)
+    }
+
+    private suspend fun updateVaultRemoteState(
+        session: AuthSession,
+        mode: VaultRemoteLoadMode
+    ) {
+        if (mode == VaultRemoteLoadMode.INITIAL || _vaultRemoteState.value.payload == null) {
+            _vaultRemoteState.value = VaultRemoteState.loading()
+        }
+        val remoteState = vaultRepository.load(session.accessToken)
+        if (
+            mode == VaultRemoteLoadMode.SILENT_REFRESH &&
+            remoteState.mode == VaultRemoteMode.ERROR &&
+            _vaultRemoteState.value.payload != null
+        ) {
+            return
+        }
+        applyVaultRemoteState(remoteState)
     }
 
     private suspend fun applyWorkproofRemoteState(remoteState: WorkproofRemoteState) {
@@ -1166,6 +1345,28 @@ class DemoSessionViewModel(
         _uiState.update { current -> current.syncRemoteRemittance(payload) }
     }
 
+    private suspend fun applyVaultRemoteState(remoteState: VaultRemoteState) {
+        if (!remoteState.isAuthenticated) {
+            clearAuthenticatedState(
+                AuthUiState.unauthenticated(
+                    remoteState.errorMessage ?: "세션이 만료되어 다시 로그인해 주세요."
+                )
+            )
+            return
+        }
+
+        _vaultRemoteState.value = remoteState
+        syncSelectedVaultAmount(remoteState)
+
+        val session = _authUiState.value.session
+        val latestTransaction = remoteState.payload?.latestTransaction
+        if (session != null && latestTransaction != null && !latestTransaction.isTerminalStatus()) {
+            startVaultStatusPolling(session, latestTransaction.requestId)
+        } else {
+            cancelVaultStatusPolling()
+        }
+    }
+
     private fun syncSelectedAdvanceAmount(remoteState: AdvanceRemoteState) {
         val availableAmount = remoteState.eligibility?.availableAmount?.toInt() ?: 0
         if (availableAmount <= 0) {
@@ -1177,6 +1378,28 @@ class DemoSessionViewModel(
             return
         }
         _selectedAdvanceAmount.value = availableAmount
+    }
+
+    private fun syncSelectedVaultAmount(remoteState: VaultRemoteState) {
+        val summary = remoteState.payload?.summary ?: run {
+            _selectedVaultAmount.value = null
+            return
+        }
+        val currentActionType = _selectedVaultActionType.value
+        val availableAmount = summary.availableAmountFor(currentActionType)
+        if (currentActionType == VaultActionType.WITHDRAW && availableAmount <= 0) {
+            _selectedVaultActionType.value = VaultActionType.DEPOSIT
+        }
+        val effectiveAvailableAmount = summary.availableAmountFor(_selectedVaultActionType.value)
+        if (effectiveAvailableAmount <= 0) {
+            _selectedVaultAmount.value = null
+            return
+        }
+        val current = _selectedVaultAmount.value
+        if (current != null && current in 1..effectiveAvailableAmount) {
+            return
+        }
+        _selectedVaultAmount.value = pickDefaultVaultAmount(effectiveAvailableAmount)
     }
 
     private fun mergeAdvanceRequestDetail(detail: AdvanceRequestDetailPayload) {
@@ -1229,16 +1452,23 @@ class DemoSessionViewModel(
         _remittanceRemoteState.value = RemittanceRemoteState.unauthenticated(
             unauthenticatedState.errorMessage ?: REMITTANCE_REMOTE_LOGIN_MESSAGE
         )
+        _vaultRemoteState.value = VaultRemoteState.unauthenticated(
+            unauthenticatedState.errorMessage ?: VAULT_REMOTE_LOGIN_MESSAGE
+        )
         _selectedAdvanceAmount.value = null
+        _selectedVaultAmount.value = null
+        _selectedVaultActionType.value = VaultActionType.DEPOSIT
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
         _wageActionUiState.value = WageActionUiState()
         _remittanceActionUiState.value = RemittanceActionUiState()
+        _vaultActionUiState.value = VaultActionUiState()
         _profileUpdateUiState.value = ProfileUpdateUiState()
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
         _menuLaunchRequest.value = null
         cancelRemittanceStatusPolling()
+        cancelVaultStatusPolling()
     }
 
     private fun submitRemoteRemittanceRecipientCreation(
@@ -1348,21 +1578,26 @@ class DemoSessionViewModel(
     private fun startRemittanceStatusPolling(session: AuthSession, transferId: String) {
         cancelRemittanceStatusPolling()
         remittanceStatusPollingJob = viewModelScope.launch {
-            repeat(REMITTANCE_STATUS_POLL_ATTEMPTS) {
-                delay(REMITTANCE_STATUS_POLL_DELAY_MS)
-                try {
-                    val detail = remittanceRepository.getTransferDetail(session.accessToken, transferId)
-                    mergeRemoteTransferDetail(detail)
-                    if (detail.isTerminalStatus()) {
-                        refreshRemittanceRemoteStateSilently(session)
+            try {
+                repeat(REMITTANCE_STATUS_POLL_ATTEMPTS) {
+                    delay(REMITTANCE_STATUS_POLL_DELAY_MS)
+                    try {
+                        val detail = remittanceRepository.getTransferDetail(session.accessToken, transferId)
+                        mergeRemoteTransferDetail(detail)
+                        if (detail.isTerminalStatus()) {
+                            refreshRemittanceRemoteStateSilently(session)
+                            return@launch
+                        }
+                    } catch (error: RemittanceUnauthorizedException) {
+                        expireSession(error.message)
                         return@launch
+                    } catch (_: Exception) {
+                        // Keep polling so a single network failure does not freeze the tracker UI.
                     }
-                } catch (error: RemittanceUnauthorizedException) {
-                    expireSession(error.message)
-                    return@launch
-                } catch (_: Exception) {
-                    return@launch
                 }
+                refreshRemittanceRemoteStateSilently(session)
+            } finally {
+                remittanceStatusPollingJob = null
             }
         }
     }
@@ -1370,6 +1605,46 @@ class DemoSessionViewModel(
     private fun cancelRemittanceStatusPolling() {
         remittanceStatusPollingJob?.cancel()
         remittanceStatusPollingJob = null
+    }
+
+    private fun startVaultStatusPolling(session: AuthSession, requestId: String) {
+        if (activeVaultPollingRequestId == requestId && vaultStatusPollingJob?.isActive == true) {
+            return
+        }
+        cancelVaultStatusPolling()
+        activeVaultPollingRequestId = requestId
+        vaultStatusPollingJob = viewModelScope.launch {
+            try {
+                repeat(VAULT_STATUS_POLL_ATTEMPTS) {
+                    delay(VAULT_STATUS_POLL_DELAY_MS)
+                    try {
+                        val detail = vaultRepository.getTransactionDetail(session.accessToken, requestId)
+                        mergeVaultTransactionDetail(detail)
+                        if (detail.isTerminalStatus()) {
+                            refreshVaultRemoteStateSilently(session)
+                            _vaultActionUiState.value = detail.toCompletionUiState()
+                            return@launch
+                        }
+                    } catch (error: VaultUnauthorizedException) {
+                        expireSession(error.message)
+                        return@launch
+                    } catch (_: Exception) {
+                        return@launch
+                    }
+                }
+            } finally {
+                if (activeVaultPollingRequestId == requestId) {
+                    activeVaultPollingRequestId = null
+                    vaultStatusPollingJob = null
+                }
+            }
+        }
+    }
+
+    private fun cancelVaultStatusPolling() {
+        vaultStatusPollingJob?.cancel()
+        vaultStatusPollingJob = null
+        activeVaultPollingRequestId = null
     }
 
     private fun mergeRemoteTransferDetail(detail: RemittanceTransferDetailPayload) {
@@ -1404,6 +1679,46 @@ class DemoSessionViewModel(
             )
         }
         _uiState.update { current -> current.syncTransferStatus(detail) }
+    }
+
+    private fun mergeVaultCreateResult(
+        summary: VaultSummaryPayload,
+        amountAtomic: String,
+        result: VaultCreateTransactionPayload
+    ) {
+        _vaultRemoteState.update { current ->
+            val payload = current.payload ?: return@update current
+            current.copy(
+                mode = VaultRemoteMode.CONTENT,
+                payload = payload.copy(
+                    latestTransaction = VaultTransactionDetailPayload(
+                        requestId = result.requestId,
+                        txType = result.txType,
+                        status = result.status,
+                        walletAddress = summary.walletAddress,
+                        vaultAddress = summary.vaultAddress,
+                        assetSymbol = summary.assetSymbol,
+                        amountAtomic = amountAtomic,
+                        shareDelta = null,
+                        txHash = null,
+                        failureCode = null,
+                        createdAt = result.createdAt,
+                        updatedAt = result.createdAt,
+                        confirmedAt = null
+                    )
+                )
+            )
+        }
+    }
+
+    private fun mergeVaultTransactionDetail(detail: VaultTransactionDetailPayload) {
+        _vaultRemoteState.update { current ->
+            val payload = current.payload ?: return@update current
+            current.copy(
+                mode = VaultRemoteMode.CONTENT,
+                payload = payload.copy(latestTransaction = detail)
+            )
+        }
     }
 
     private fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): DemoState {
@@ -1577,5 +1892,77 @@ private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload
         "TRANSFER_ALREADY_IN_PROGRESS" -> "진행 중인 송금이 있어 잠시 후 다시 시도해 주세요."
         "SELF_TRANSFER_NOT_ALLOWED" -> "내 지갑으로는 송금할 수 없어요."
         else -> "현재는 이 송금을 진행할 수 없어요."
+    }
+}
+
+private fun VaultActionType.toSubmittingAction(): VaultSubmittingAction =
+    when (this) {
+        VaultActionType.DEPOSIT -> VaultSubmittingAction.DEPOSIT_CREATE
+        VaultActionType.WITHDRAW -> VaultSubmittingAction.WITHDRAW_CREATE
+    }
+
+private fun VaultActionType.toCreateFailureMessage(): String =
+    when (this) {
+        VaultActionType.DEPOSIT -> "예치 요청을 보내지 못했어요."
+        VaultActionType.WITHDRAW -> "출금 요청을 보내지 못했어요."
+    }
+
+private fun VaultSummaryPayload.availableAmountFor(actionType: VaultActionType): Int =
+    when (actionType) {
+        VaultActionType.DEPOSIT -> availableToStoreAmountAtomic.toWholeAssetUnits(assetDecimals)
+        VaultActionType.WITHDRAW -> storedAmountAtomic.toWholeAssetUnits(assetDecimals)
+    }
+
+private fun String.toWholeAssetUnits(decimals: Int): Int {
+    val sanitized = trim().ifBlank { return 0 }
+    if (sanitized == "0") return 0
+    if (decimals <= 0) {
+        return sanitized.toLongOrNull()
+            ?.coerceIn(0L, Int.MAX_VALUE.toLong())
+            ?.toInt()
+            ?: 0
+    }
+    val wholePart = if (sanitized.length > decimals) {
+        sanitized.dropLast(decimals)
+    } else {
+        "0"
+    }
+    return wholePart.toLongOrNull()
+        ?.coerceIn(0L, Int.MAX_VALUE.toLong())
+        ?.toInt()
+        ?: 0
+}
+
+private fun Int.toAtomicAmount(decimals: Int): Long {
+    var scale = 1L
+    repeat(decimals) {
+        scale *= 10L
+    }
+    return toLong() * scale
+}
+
+private fun pickDefaultVaultAmount(availableAmount: Int): Int {
+    val presets = listOf(10, 25, 50, 100)
+    return presets.lastOrNull { it in 1..availableAmount }
+        ?: availableAmount
+}
+
+private fun VaultTransactionDetailPayload.isTerminalStatus(): Boolean =
+    status == "CONFIRMED" || status == "FAILED" || status == "TIMED_OUT"
+
+private fun VaultTransactionDetailPayload.toCompletionUiState(): VaultActionUiState {
+    return when (status) {
+        "CONFIRMED" -> VaultActionUiState(
+            message = if (txType == "WITHDRAW") "출금이 완료됐어요." else "예치가 완료됐어요."
+        )
+
+        else -> VaultActionUiState(
+            message = if (txType == "WITHDRAW") {
+                "출금이 완료되지 않았어요. 상태를 다시 확인해 주세요."
+            } else {
+                "예치가 완료되지 않았어요. 상태를 다시 확인해 주세요."
+            },
+            isError = true
+        )
     }
 }

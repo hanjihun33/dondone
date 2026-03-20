@@ -49,6 +49,7 @@ import com.dondone.mobile.core.designsystem.DonDoneProgressBar
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 import com.dondone.mobile.domain.advance.AdvanceSurfaceState
+import com.dondone.mobile.data.vault.VaultActionType
 
 private val FinanceCanvas = Color.White
 private val FinanceSurfaceMuted = Color(0xFFF5F6FA)
@@ -70,6 +71,10 @@ fun FinanceHomeScreen(
     onSelectAdvanceAmount: (Int) -> Unit,
     onRequestAdvance: () -> Unit,
     onClearAdvanceMessage: () -> Unit,
+    onSelectVaultAction: (VaultActionType) -> Unit,
+    onSelectVaultAmount: (Int) -> Unit,
+    onSubmitVaultAction: () -> Unit,
+    onClearVaultMessage: () -> Unit,
     onOpenAdvanceRequestDetail: (Long) -> Unit,
     onCloseAdvanceRequestDetail: () -> Unit
 ) {
@@ -156,7 +161,10 @@ fun FinanceHomeScreen(
 
     if (showVaultSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showVaultSheet = false },
+            onDismissRequest = {
+                onClearVaultMessage()
+                showVaultSheet = false
+            },
             sheetState = vaultSheetState,
             containerColor = Color.White,
             shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
@@ -164,8 +172,13 @@ fun FinanceHomeScreen(
         ) {
             FinanceVaultBottomSheet(
                 uiModel = uiModel.vault.detail,
-                onDismiss = { showVaultSheet = false },
-                onAction = { showVaultSheet = false }
+                onDismiss = {
+                    onClearVaultMessage()
+                    showVaultSheet = false
+                },
+                onSelectAction = onSelectVaultAction,
+                onSelectAmount = onSelectVaultAmount,
+                onAction = onSubmitVaultAction
             )
         }
     }
@@ -229,7 +242,7 @@ private fun FinanceVaultSection(
     uiModel: FinanceVaultUiModel,
     onOpenSheet: () -> Unit
 ) {
-    val description = if (uiModel.depositStatusText == "미신청") {
+    val description = if (uiModel.depositStatusText == "미신청" || uiModel.depositStatusText == "미예치") {
         ""
     } else {
         uiModel.helperText
@@ -242,6 +255,23 @@ private fun FinanceVaultSection(
         FinanceKeyValueRow(label = "예치 잔액", value = uiModel.depositStatusText)
         FinanceKeyValueRow(label = "누적 이자(추정)", value = uiModel.accruedInterestText)
         FinanceKeyValueRow(label = "예상 연이율", value = uiModel.aprText)
+        if (uiModel.latestStatusText != null) {
+            FinanceSheetPanel(
+                backgroundColor = if (uiModel.latestStatusIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
+                borderColor = if (uiModel.latestStatusIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
+            ) {
+                Text(
+                    text = uiModel.latestStatusText,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                    color = FinanceTextPrimary
+                )
+                Text(
+                    text = uiModel.helperText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FinanceTextMuted
+                )
+            }
+        }
         FinancePrimaryButton(
             text = uiModel.actionText,
             modifier = Modifier.fillMaxWidth(),
@@ -709,6 +739,8 @@ private fun FinanceAdvanceStatePanel(
 private fun FinanceVaultBottomSheet(
     uiModel: FinanceVaultDetailUiModel,
     onDismiss: () -> Unit,
+    onSelectAction: (VaultActionType) -> Unit,
+    onSelectAmount: (Int) -> Unit,
     onAction: () -> Unit
 ) {
     Column(
@@ -737,72 +769,112 @@ private fun FinanceVaultBottomSheet(
                 FinanceLinkButton(text = "닫기", onClick = onDismiss)
             }
 
-            FinanceKeyValueRow(
-                label = if (uiModel.isActive) "예상 연이율" else "지금 예치 가능",
-                value = if (uiModel.isActive) uiModel.aprText else uiModel.availableText
-            )
-            if (uiModel.isActive) {
-                FinanceKeyValueRow(label = "누적 이자(추정)", value = uiModel.accruedInterestText)
+            FinanceKeyValueRow(label = "내 지갑 잔액", value = uiModel.walletBalanceText)
+            FinanceKeyValueRow(label = "현재 예치 잔액", value = uiModel.balanceText)
+            FinanceKeyValueRow(label = "예상 연이율", value = uiModel.aprText)
+            if (uiModel.statusTitleText != null && uiModel.statusBodyText != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                FinanceSheetPanel(
+                    backgroundColor = if (uiModel.statusIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
+                    borderColor = if (uiModel.statusIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
+                ) {
+                    Text(
+                        text = uiModel.statusTitleText,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                        color = FinanceTextPrimary
+                    )
+                    Text(
+                        text = uiModel.statusBodyText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = FinanceTextMuted
+                    )
+                }
             }
         }
 
-        if (!uiModel.isActive) {
-            FinanceBottomSheetDivider()
-            FinanceBottomSheetSection {
-                FinanceBottomSheetHeader(title = "예치 금액")
-                FinanceAmountOptionGrid(options = uiModel.amountOptions)
+        FinanceBottomSheetDivider()
+        FinanceBottomSheetSection {
+            FinanceBottomSheetHeader(title = "요청 종류")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FinanceActionToggleButton(
+                    text = "예치",
+                    selected = uiModel.selectedActionType == VaultActionType.DEPOSIT,
+                    enabled = uiModel.depositEnabled && !uiModel.actionInFlight,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelectAction(VaultActionType.DEPOSIT) }
+                )
+                FinanceActionToggleButton(
+                    text = "출금",
+                    selected = uiModel.selectedActionType == VaultActionType.WITHDRAW,
+                    enabled = uiModel.withdrawEnabled && !uiModel.actionInFlight,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelectAction(VaultActionType.WITHDRAW) }
+                )
+            }
+        }
+
+        FinanceBottomSheetDivider()
+        FinanceBottomSheetSection {
+            FinanceBottomSheetHeader(title = "요청 금액")
+            FinanceKeyValueRow(label = "지금 선택됨", value = uiModel.selectedAmountText)
+            FinanceKeyValueRow(
+                label = if (uiModel.selectedActionType == VaultActionType.WITHDRAW) "지금 출금 가능" else "지금 예치 가능",
+                value = uiModel.availableText
+            )
+            FinanceAmountOptionGrid(
+                options = uiModel.amountOptions,
+                onSelect = onSelectAmount
+            )
+            if (uiModel.requestFeedbackText != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                FinanceSheetPanel(
+                    backgroundColor = if (uiModel.requestFeedbackIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
+                    borderColor = if (uiModel.requestFeedbackIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
+                ) {
+                    Text(
+                        text = uiModel.requestFeedbackText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTextPrimary
+                    )
+                }
             }
         }
 
         FinanceBottomSheetDivider()
         FinanceBottomSheetSection {
             FinanceBottomSheetHeader(title = "예상 수익")
-            FinanceKeyValueRow(label = "예상 연이율", value = uiModel.aprText)
             FinanceKeyValueRow(label = "월 예상 이자", value = uiModel.monthlyInterestText)
             FinanceKeyValueRow(label = "일 예상 이자", value = uiModel.dailyInterestText)
-        }
-
-        if (uiModel.isActive) {
-            FinanceBottomSheetDivider()
-            FinanceBottomSheetSection {
-                FinanceBottomSheetHeader(title = "월 수익 구성")
-                FinanceKeyValueRow(label = "DeFi 운용 수익", value = uiModel.defiMonthlyText)
-                FinanceKeyValueRow(label = "가불 수수료 기여분", value = uiModel.feeShareText)
-                FinanceKeyValueRow(label = "합계", value = uiModel.totalMonthlyText)
-            }
-
-            FinanceBottomSheetDivider()
-            FinanceBottomSheetSection {
-                FinanceBottomSheetHeader(title = "풀 운용 현황")
-                FinanceRatioBar(
-                    label = "DeFi 운용 비율",
-                    value = uiModel.defiRatioText,
-                    progress = ratioTextToFloat(uiModel.defiRatioText)
-                )
-                FinanceRatioBar(
-                    label = "가불 풀 비율",
-                    value = uiModel.advanceRatioText,
-                    progress = ratioTextToFloat(uiModel.advanceRatioText)
-                )
-                FinanceKeyValueRow(label = "가불 풀 사용률", value = uiModel.advanceUsageText)
-            }
+            FinanceKeyValueRow(label = "누적 이자(추정)", value = uiModel.accruedInterestText)
         }
 
         FinanceBottomSheetDivider()
         FinanceBottomSheetSection {
-            if (uiModel.isActive) {
-                FinanceGhostButton(
-                    text = "닫기",
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onDismiss
-                )
-            } else {
-                FinancePrimaryButton(
-                    text = uiModel.actionText,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onAction
-                )
-            }
+            FinanceBottomSheetHeader(title = "안내")
+            Text(
+                text = uiModel.noteText,
+                style = MaterialTheme.typography.bodySmall,
+                color = FinanceTextMuted
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = uiModel.disclaimerText,
+                style = MaterialTheme.typography.bodySmall,
+                color = FinanceTextMuted
+            )
+        }
+
+        FinanceBottomSheetDivider()
+        FinanceBottomSheetSection {
+            FinancePrimaryButton(
+                text = uiModel.actionText,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = uiModel.actionEnabled,
+                onClick = onAction
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -1270,6 +1342,45 @@ private fun FinanceSoftButton(
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = FinanceSurfaceMuted,
                 contentColor = FinanceTextPrimary
+            ),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FinanceActionToggleButton(
+    text: String,
+    selected: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.foundation.LocalIndication provides rememberDonDoneGrayRipple()
+    ) {
+        OutlinedButton(
+            modifier = modifier.pressableScale(interactionSource = interactionSource),
+            onClick = onClick,
+            enabled = enabled,
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (selected) FinanceAccent else FinanceDivider
+            ),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (selected) FinanceAdvanceSheetHero else Color.White,
+                contentColor = FinanceTextPrimary,
+                disabledContainerColor = FinanceSurfaceMuted,
+                disabledContentColor = FinanceTextMuted
             ),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
         ) {
