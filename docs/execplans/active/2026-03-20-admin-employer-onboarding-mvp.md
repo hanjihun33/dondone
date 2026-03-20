@@ -5,11 +5,13 @@
 - implemented contract:
   - `POST /api/admin/employers/companies`
   - `GET /api/admin/employers/companies`
-  - admin login uses existing `POST /api/auth/login`
+  - `GET /api/admin/employers/companies/{companyId}/employers`
+- admin login uses existing `POST /api/auth/login`
 - final response policy:
   - create response returns raw `employerSignupCode` once
   - list response does not return raw signup code
   - list response returns issuance status and `latestEmployerSignupCodeIssuedAt`
+  - company employer detail returns joined employer identities and current workplace-settings status
 - company onboarding now binds `Company.defaultWorkplaceId` so admin/company reads do not depend on inferring the workplace from signup-code rows.
 - current implementation creates a placeholder default workplace and defers real address/radius configuration to the employer settings flow.
 

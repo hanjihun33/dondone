@@ -78,13 +78,13 @@ class AdminEmployerCompanyIntegrationTest {
         User admin = userRepository.save(User.registerAdmin(
                 "admin@dondone.local",
                 passwordEncoder.encode("qweqwe123"),
-                "서비스 관리자"
+                "Service Admin"
         ));
 
         String adminToken = loginAndReadAccessToken(new LoginRequest("admin@dondone.local", "qweqwe123"));
 
         AdminCreateEmployerCompanyRequest createRequest = new AdminCreateEmployerCompanyRequest(
-                "돈던 물류",
+                "Acme Logistics",
                 "DN-SEOUL-3001"
         );
 
@@ -94,9 +94,9 @@ class AdminEmployerCompanyIntegrationTest {
                         .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("CREATED"))
-                .andExpect(jsonPath("$.data.companyName").value("돈던 물류"))
+                .andExpect(jsonPath("$.data.companyName").value(createRequest.companyName()))
                 .andExpect(jsonPath("$.data.companyCode").value("DN-SEOUL-3001"))
-                .andExpect(jsonPath("$.data.defaultWorkplaceName").value("돈던 물류 기본 사업장"))
+                .andExpect(jsonPath("$.data.defaultWorkplaceName").value("Acme Logistics 기본 사업장"))
                 .andExpect(jsonPath("$.data.workplaceSettingsConfigured").value(false))
                 .andExpect(jsonPath("$.data.hasJoinedEmployer").value(false))
                 .andExpect(jsonPath("$.data.employerCount").value(0))
@@ -104,27 +104,36 @@ class AdminEmployerCompanyIntegrationTest {
                 .andReturn();
 
         JsonNode createBody = objectMapper.readTree(createResult.getResponse().getContentAsString());
+        long companyId = createBody.path("data").path("companyId").asLong();
         String employerSignupCode = createBody.path("data").path("employerSignupCode").asText();
 
         mockMvc.perform(get("/api/admin/employers/companies")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.companies[0].companyName").value("돈던 물류"))
+                .andExpect(jsonPath("$.data.companies[0].companyName").value(createRequest.companyName()))
                 .andExpect(jsonPath("$.data.companies[0].companyCode").value("DN-SEOUL-3001"))
                 .andExpect(jsonPath("$.data.companies[0].workplaceSettingsConfigured").value(false))
                 .andExpect(jsonPath("$.data.companies[0].hasJoinedEmployer").value(false))
                 .andExpect(jsonPath("$.data.companies[0].employerCount").value(0))
                 .andExpect(jsonPath("$.data.companies[0].hasActiveEmployerSignupCode").value(true));
 
-        mockMvc.perform(get("/api/admin/employers/companies/{companyId}/signup-code", createBody.path("data").path("companyId").asLong())
+        mockMvc.perform(get("/api/admin/employers/companies/{companyId}/signup-code", companyId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.companyName").value("돈던 물류"))
+                .andExpect(jsonPath("$.data.companyName").value(createRequest.companyName()))
                 .andExpect(jsonPath("$.data.employerSignupCode").value(employerSignupCode));
+
+        mockMvc.perform(get("/api/admin/employers/companies/{companyId}/employers", companyId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyId").value(companyId))
+                .andExpect(jsonPath("$.data.companyName").value(createRequest.companyName()))
+                .andExpect(jsonPath("$.data.employers").isArray())
+                .andExpect(jsonPath("$.data.employers").isEmpty());
 
         EmployerSignupRequest signupRequest = new EmployerSignupRequest(
                 employerSignupCode,
-                "돈던 담당자",
+                "Acme Owner",
                 "owner@dondone.test",
                 "qweqwe123"
         );
@@ -133,8 +142,8 @@ class AdminEmployerCompanyIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(signupRequest)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.companyName").value("돈던 물류"))
-                .andExpect(jsonPath("$.data.defaultWorkplaceName").value("돈던 물류 기본 사업장"))
+                .andExpect(jsonPath("$.data.companyName").value(createRequest.companyName()))
+                .andExpect(jsonPath("$.data.defaultWorkplaceName").value("Acme Logistics 기본 사업장"))
                 .andReturn();
 
         JsonNode signupBody = objectMapper.readTree(signupResult.getResponse().getContentAsString());
@@ -143,7 +152,7 @@ class AdminEmployerCompanyIntegrationTest {
         mockMvc.perform(get("/api/employer/profile")
                         .header("Authorization", "Bearer " + employerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.displayName").value("돈던 담당자"))
+                .andExpect(jsonPath("$.data.displayName").value(signupRequest.displayName()))
                 .andExpect(jsonPath("$.data.companyCode").value("DN-SEOUL-3001"));
 
         mockMvc.perform(get("/api/admin/employers/companies")
@@ -151,6 +160,16 @@ class AdminEmployerCompanyIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.companies[0].hasJoinedEmployer").value(true))
                 .andExpect(jsonPath("$.data.companies[0].employerCount").value(1));
+
+        mockMvc.perform(get("/api/admin/employers/companies/{companyId}/employers", companyId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyId").value(companyId))
+                .andExpect(jsonPath("$.data.companyName").value(createRequest.companyName()))
+                .andExpect(jsonPath("$.data.employers[0].displayName").value(signupRequest.displayName()))
+                .andExpect(jsonPath("$.data.employers[0].email").value("owner@dondone.test"))
+                .andExpect(jsonPath("$.data.employers[0].profileStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.employers[0].workplaceSettingsConfigured").value(false));
     }
 
     @Test
@@ -158,13 +177,13 @@ class AdminEmployerCompanyIntegrationTest {
         User employer = userRepository.save(User.registerEmployer(
                 "manager@dondone.test",
                 passwordEncoder.encode("qweqwe123"),
-                "돈던 담당자"
+                "Acme Owner"
         ));
 
         String employerToken = loginAndReadAccessToken(new LoginRequest(employer.getEmail(), "qweqwe123"));
 
         AdminCreateEmployerCompanyRequest createRequest = new AdminCreateEmployerCompanyRequest(
-                "돈던 물류",
+                "Acme Logistics",
                 "DN-SEOUL-3002"
         );
 

@@ -9,5 +9,7 @@ import java.util.Optional;
 public interface EmployerProfileRepository extends JpaRepository<EmployerProfile, Long> {
     Optional<EmployerProfile> findByAccountId(Long accountId);
 
+    List<EmployerProfile> findByCompanyIdOrderByCreatedAtDesc(Long companyId);
+
     List<EmployerProfile> findByCompanyIdIn(List<Long> companyIds);
 }

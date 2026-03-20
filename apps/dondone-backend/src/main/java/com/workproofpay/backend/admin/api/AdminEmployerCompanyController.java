@@ -2,6 +2,7 @@ package com.workproofpay.backend.admin.api;
 
 import com.workproofpay.backend.admin.api.dto.request.AdminCreateEmployerCompanyRequest;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompaniesResponse;
+import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanyEmployersResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanyCreatedResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerSignupCodeResponse;
 import com.workproofpay.backend.admin.service.AdminEmployerCompanyService;
@@ -45,5 +46,13 @@ public class AdminEmployerCompanyController {
             @PathVariable Long companyId
     ) {
         return ApiResponse.success(adminEmployerCompanyService.getEmployerSignupCode(user.userId(), companyId));
+    }
+
+    @GetMapping("/{companyId}/employers")
+    public org.springframework.http.ResponseEntity<ApiResponse<AdminEmployerCompanyEmployersResponse>> getCompanyEmployers(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long companyId
+    ) {
+        return ApiResponse.success(adminEmployerCompanyService.getCompanyEmployers(user.userId(), companyId));
     }
 }

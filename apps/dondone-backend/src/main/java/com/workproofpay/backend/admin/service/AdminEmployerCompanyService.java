@@ -2,6 +2,8 @@ package com.workproofpay.backend.admin.service;
 
 import com.workproofpay.backend.admin.api.dto.request.AdminCreateEmployerCompanyRequest;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompaniesResponse;
+import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanyEmployerSummaryResponse;
+import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanyEmployersResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanyCreatedResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerCompanySummaryResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminEmployerSignupCodeResponse;
@@ -33,6 +35,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -199,6 +203,38 @@ public class AdminEmployerCompanyService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public AdminEmployerCompanyEmployersResponse getCompanyEmployers(Long adminAccountId, Long companyId) {
+        if (!userRepository.existsById(adminAccountId)) {
+            throw new ApiException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ApiException(ErrorCode.COMPANY_NOT_FOUND));
+
+        List<EmployerProfile> employerProfiles = employerProfileRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
+        if (employerProfiles.isEmpty()) {
+            return new AdminEmployerCompanyEmployersResponse(company.getId(), company.getName(), List.of());
+        }
+
+        Map<Long, User> usersById = userRepository.findAllById(employerProfiles.stream()
+                        .map(EmployerProfile::getAccountId)
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+        Map<Long, Workplace> workplacesById = workplaceRepository.findAllById(employerProfiles.stream()
+                        .map(EmployerProfile::getDefaultWorkplaceId)
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(Workplace::getId, Function.identity()));
+
+        List<AdminEmployerCompanyEmployerSummaryResponse> employers = employerProfiles.stream()
+                .map(profile -> toEmployerSummary(profile, usersById.get(profile.getAccountId()), workplacesById.get(profile.getDefaultWorkplaceId())))
+                .toList();
+
+        return new AdminEmployerCompanyEmployersResponse(company.getId(), company.getName(), employers);
+    }
+
     private String normalizeCompanyCode(String companyCode) {
         return companyCode.trim().toUpperCase(Locale.ROOT);
     }
@@ -214,6 +250,22 @@ public class AdminEmployerCompanyService {
 
     private String buildDefaultWorkplaceName(String companyName) {
         return companyName + DEFAULT_WORKPLACE_NAME_SUFFIX;
+    }
+
+    private AdminEmployerCompanyEmployerSummaryResponse toEmployerSummary(EmployerProfile profile,
+                                                                         User user,
+                                                                         Workplace workplace) {
+        return new AdminEmployerCompanyEmployerSummaryResponse(
+                profile.getId(),
+                profile.getAccountId(),
+                profile.getDisplayName(),
+                user != null ? user.getEmail() : null,
+                profile.getStatus().name(),
+                profile.getDefaultWorkplaceId(),
+                workplace != null ? workplace.getName() : null,
+                workplace != null && isWorkplaceSettingsConfigured(workplace),
+                profile.getCreatedAt()
+        );
     }
 
     private Map<Long, List<EmployerProfile>> loadEmployerProfilesByCompanyId(List<Company> companies) {

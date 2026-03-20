@@ -6,6 +6,7 @@
   - admin login via `POST /api/auth/login`
   - `POST /api/admin/employers/companies`
   - `GET /api/admin/employers/companies`
+  - `GET /api/admin/employers/companies/{companyId}/employers`
 - admin create flow now creates:
   - `Company`
   - placeholder default `Workplace`
@@ -13,6 +14,7 @@
 - current admin MVP policy:
   - raw employer signup code is returned only once in the create response
   - company list shows company/workplace info plus signup-code issuance status
+  - admin can open a company-scoped employer detail view to see who joined and when
   - workplace location/radius are completed later by the employer in settings
   - code reissue/revoke remains out of scope
 - remaining admin follow-up:

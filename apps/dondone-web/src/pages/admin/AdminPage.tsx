@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  AdminEmployerCompanyEmployerSummaryResponse,
   AdminEmployerCompanyCreatedResponse,
   AdminEmployerCompanySummaryResponse,
   createAdminEmployerCompany,
+  getAdminEmployerCompanyEmployers,
   getAdminEmployerCompanies,
   getAdminEmployerSignupCode
 } from "../../shared/api/admin";
@@ -73,6 +75,15 @@ export function AdminPage() {
     issuedAt: string;
   } | null>(null);
   const [revealingCompanyId, setRevealingCompanyId] = useState<number | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<{
+    companyId: number;
+    companyName: string;
+  } | null>(null);
+  const [companyEmployers, setCompanyEmployers] = useState<
+    AdminEmployerCompanyEmployerSummaryResponse[]
+  >([]);
+  const [detailState, setDetailState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -222,6 +233,56 @@ export function AdminPage() {
     }
   };
 
+  const handleToggleEmployerDetail = async (company: AdminEmployerCompanySummaryResponse) => {
+    if (selectedCompany?.companyId === company.companyId) {
+      setSelectedCompany(null);
+      setCompanyEmployers([]);
+      setDetailError(null);
+      setDetailState("idle");
+      return;
+    }
+
+    const token = getStoredAccessToken();
+    if (!token) {
+      clearStoredSession();
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setSelectedCompany({
+      companyId: company.companyId,
+      companyName: company.companyName
+    });
+    setCompanyEmployers([]);
+    setDetailError(null);
+    setDetailState("loading");
+
+    try {
+      const response = await getAdminEmployerCompanyEmployers(token, company.companyId);
+      setSelectedCompany({
+        companyId: response.companyId,
+        companyName: response.companyName
+      });
+      setCompanyEmployers(response.employers);
+      setDetailState("success");
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearStoredSession();
+        navigate("/", { replace: true });
+        return;
+      }
+
+      if (error instanceof ApiError) {
+        setDetailError(error.message || error.code);
+      } else if (error instanceof Error) {
+        setDetailError(error.message);
+      } else {
+        setDetailError("고용주 상세를 불러오지 못했어요.");
+      }
+      setDetailState("error");
+    }
+  };
+
   return (
     <div className="admin-page">
       <header className="admin-header">
@@ -357,6 +418,7 @@ export function AdminPage() {
                   <th>고용주 설정 상태</th>
                   <th>고용주 코드 상태</th>
                   <th>코드 조회</th>
+                  <th>고용주 상세</th>
                   <th>등록일</th>
                 </tr>
               </thead>
@@ -423,6 +485,22 @@ export function AdminPage() {
                         <span className="admin-action-done">조회 불가</span>
                       )}
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-action-button"
+                        onClick={() => handleToggleEmployerDetail(company)}
+                        disabled={
+                          detailState === "loading" && selectedCompany?.companyId === company.companyId
+                        }
+                      >
+                        {selectedCompany?.companyId === company.companyId
+                          ? detailState === "loading"
+                            ? "불러오는 중.."
+                            : "닫기"
+                          : "상세 보기"}
+                      </button>
+                    </td>
                     <td>{formatDateTime(company.createdAt)}</td>
                   </tr>
                 ))}
@@ -431,6 +509,80 @@ export function AdminPage() {
           </div>
         ) : null}
       </section>
+
+      {selectedCompany ? (
+        <section className="admin-section">
+          <div className="admin-section-head with-sub">
+            <div>
+              <h3>{selectedCompany.companyName} 고용주 상세</h3>
+              <p className="admin-section-sub">
+                어떤 담당자가 가입했는지, 언제 가입했는지, 기본 사업장 설정이 끝났는지 확인합니다.
+              </p>
+            </div>
+          </div>
+
+          {detailState === "loading" ? (
+            <div className="admin-empty-state">고용주 상세를 불러오는 중입니다.</div>
+          ) : null}
+
+          {detailState === "error" ? (
+            <div className="admin-empty-state" role="alert">
+              {detailError ?? "고용주 상세를 불러오지 못했어요."}
+            </div>
+          ) : null}
+
+          {detailState === "success" && companyEmployers.length === 0 ? (
+            <div className="admin-empty-state">아직 가입한 고용주가 없습니다.</div>
+          ) : null}
+
+          {detailState === "success" && companyEmployers.length > 0 ? (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>담당자</th>
+                    <th>이메일</th>
+                    <th>가입 상태</th>
+                    <th>기본 사업장</th>
+                    <th>사업장 설정</th>
+                    <th>가입일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {companyEmployers.map((employer) => (
+                    <tr key={employer.employerProfileId}>
+                      <td>
+                        <strong>{employer.displayName}</strong>
+                        <p className="admin-cell-sub">계정 #{employer.accountId}</p>
+                      </td>
+                      <td>{employer.email ?? "-"}</td>
+                      <td>
+                        <span className="admin-status active">
+                          {employer.profileStatus === "ACTIVE" ? "가입 완료" : employer.profileStatus}
+                        </span>
+                      </td>
+                      <td>
+                        <strong>{employer.defaultWorkplaceName ?? "-"}</strong>
+                        <p className="admin-cell-sub">#{employer.defaultWorkplaceId}</p>
+                      </td>
+                      <td>
+                        <span
+                          className={`admin-status ${
+                            employer.workplaceSettingsConfigured ? "active" : "pending"
+                          }`}
+                        >
+                          {employer.workplaceSettingsConfigured ? "설정 완료" : "설정 필요"}
+                        </span>
+                      </td>
+                      <td>{formatDateTime(employer.joinedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }

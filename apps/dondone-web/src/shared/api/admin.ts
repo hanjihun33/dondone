@@ -53,6 +53,24 @@ export type AdminEmployerSignupCodeResponse = {
   issuedAt: string;
 };
 
+export type AdminEmployerCompanyEmployerSummaryResponse = {
+  employerProfileId: number;
+  accountId: number;
+  displayName: string;
+  email: string | null;
+  profileStatus: string;
+  defaultWorkplaceId: number;
+  defaultWorkplaceName: string | null;
+  workplaceSettingsConfigured: boolean;
+  joinedAt: string;
+};
+
+export type AdminEmployerCompanyEmployersResponse = {
+  companyId: number;
+  companyName: string;
+  employers: AdminEmployerCompanyEmployerSummaryResponse[];
+};
+
 type CreateAdminEmployerCompanyRequest = {
   companyName: string;
   companyCode: string;
@@ -78,6 +96,15 @@ export async function createAdminEmployerCompany(
 export async function getAdminEmployerSignupCode(token: string, companyId: number) {
   return apiRequest<AdminEmployerSignupCodeResponse>(
     `/api/admin/employers/companies/${companyId}/signup-code`,
+    {
+      token
+    }
+  );
+}
+
+export async function getAdminEmployerCompanyEmployers(token: string, companyId: number) {
+  return apiRequest<AdminEmployerCompanyEmployersResponse>(
+    `/api/admin/employers/companies/${companyId}/employers`,
     {
       token
     }
