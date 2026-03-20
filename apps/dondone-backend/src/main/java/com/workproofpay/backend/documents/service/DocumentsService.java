@@ -11,6 +11,7 @@ import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfAssembleComm
 import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshot;
 import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshotAssembler;
 import com.workproofpay.backend.documents.model.DocumentGenerationRequest;
+import com.workproofpay.backend.documents.model.DocumentGenerationStrategy;
 import com.workproofpay.backend.documents.model.DocumentType;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
@@ -156,10 +157,7 @@ public class DocumentsService {
         documentGenerationRequestRepository.saveAndFlush(request);
 
         try {
-            RenderedPdf renderedPdf = switch (request.getDocumentType()) {
-                case WORKPROOF_STATEMENT, PROOF_PACK -> renderWorkproofDocument(userId, request);
-                case CLAIM_KIT, TRANSFER_RECEIPT -> throw new ApiException(ErrorCode.INVALID_REQUEST);
-            };
+            RenderedPdf renderedPdf = renderDocumentByStrategy(userId, request);
 
             request.markReady(renderedPdf.fileName(), LocalDateTime.now());
             documentGenerationRequestRepository.saveAndFlush(request);
@@ -245,5 +243,27 @@ public class DocumentsService {
             return new RenderedPdf(renderedPdf.bytes(), fileName, renderedPdf.contentType(), renderedPdf.sha256());
         }
         return renderedPdf;
+    }
+
+    private RenderedPdf renderDocumentByStrategy(Long userId, DocumentGenerationRequest request) {
+        return switch (request.getDocumentType().generationStrategy()) {
+            case ON_DEMAND_DOWNLOAD -> renderOnDemandDocument(userId, request);
+            case REQUEST_STATUS_WORKFLOW -> renderRequestWorkflowDocument(userId, request);
+        };
+    }
+
+    private RenderedPdf renderOnDemandDocument(Long userId, DocumentGenerationRequest request) {
+        if (request.getDocumentType() != DocumentType.WORKPROOF_STATEMENT) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+        return renderWorkproofDocument(userId, request);
+    }
+
+    private RenderedPdf renderRequestWorkflowDocument(Long userId, DocumentGenerationRequest request) {
+        return switch (request.getDocumentType()) {
+            case PROOF_PACK -> renderWorkproofDocument(userId, request);
+            case CLAIM_KIT, TRANSFER_RECEIPT -> throw new ApiException(ErrorCode.INVALID_REQUEST);
+            case WORKPROOF_STATEMENT -> throw new ApiException(ErrorCode.INVALID_REQUEST);
+        };
     }
 }
