@@ -4,6 +4,8 @@ import com.workproofpay.backend.remittance.adapter.DemoRemittanceBlockchainGatew
 import com.workproofpay.backend.remittance.service.WalletService;
 import com.workproofpay.backend.vault.config.VaultProperties;
 import com.workproofpay.backend.vault.model.VaultFailureCode;
+import com.workproofpay.backend.vault.model.VaultPosition;
+import com.workproofpay.backend.vault.repo.VaultPositionRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.web3j.crypto.Credentials;
@@ -24,6 +26,7 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
     private final DemoRemittanceBlockchainGateway remittanceBlockchainGateway;
     private final WalletService walletService;
     private final VaultProperties properties;
+    private final VaultPositionRepository vaultPositionRepository;
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, BigInteger> shareBalances = new ConcurrentHashMap<>();
     private final Map<String, DemoVaultTxState> txStates = new ConcurrentHashMap<>();
@@ -33,15 +36,18 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
     public DemoVaultBlockchainGateway(
             DemoRemittanceBlockchainGateway remittanceBlockchainGateway,
             WalletService walletService,
-            VaultProperties properties
+            VaultProperties properties,
+            VaultPositionRepository vaultPositionRepository
     ) {
         this.remittanceBlockchainGateway = remittanceBlockchainGateway;
         this.walletService = walletService;
         this.properties = properties;
+        this.vaultPositionRepository = vaultPositionRepository;
     }
 
     @Override
     public VaultChainState getState(String walletAddress) {
+        synchronizeFromPersistedPositions();
         var balances = walletService.getBalances(walletAddress);
         return new VaultChainState(
                 balances.tokenBalanceAtomic(),
@@ -55,6 +61,7 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
         if (assets == null || assets.signum() <= 0) {
             throw new IllegalArgumentException("assets must be greater than 0");
         }
+        synchronizeFromPersistedPositions();
         BigInteger shares = totalShares.get();
         BigInteger assetsInVault = totalAssets.get();
         if (shares.signum() == 0 || assetsInVault.signum() == 0) {
@@ -68,6 +75,7 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
         if (assets == null || assets.signum() <= 0) {
             throw new IllegalArgumentException("assets must be greater than 0");
         }
+        synchronizeFromPersistedPositions();
         BigInteger shares = totalShares.get();
         BigInteger assetsInVault = totalAssets.get();
         if (shares.signum() == 0 || assetsInVault.signum() == 0) {
@@ -132,6 +140,7 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
             return;
         }
         synchronized (this) {
+            synchronizeFromPersistedPositions();
             if (state.action() == VaultAction.DEPOSIT) {
                 remittanceBlockchainGateway.debitToken(state.senderAddress(), state.amountAtomic());
                 remittanceBlockchainGateway.consumeNativeGas(state.senderAddress());
@@ -170,9 +179,33 @@ public class DemoVaultBlockchainGateway implements VaultBlockchainGateway {
         return txStates.containsKey(txHash);
     }
 
+    public void resetState() {
+        synchronized (this) {
+            shareBalances.clear();
+            txStates.clear();
+            totalShares.set(BigInteger.ZERO);
+            totalAssets.set(BigInteger.ZERO);
+        }
+    }
+
     private String encodeSignedTransaction(String txHash) {
         return "vault-demo:" + Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(txHash.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private void synchronizeFromPersistedPositions() {
+        synchronized (this) {
+            shareBalances.clear();
+            BigInteger recalculatedTotalShares = BigInteger.ZERO;
+            BigInteger recalculatedTotalAssets = BigInteger.ZERO;
+            for (VaultPosition position : vaultPositionRepository.findAll()) {
+                shareBalances.put(position.getWalletAddress(), position.getShareBalance());
+                recalculatedTotalShares = recalculatedTotalShares.add(position.getShareBalance());
+                recalculatedTotalAssets = recalculatedTotalAssets.add(position.getPrincipalAmountAtomic());
+            }
+            totalShares.set(recalculatedTotalShares);
+            totalAssets.set(recalculatedTotalAssets);
+        }
     }
 
     private String decodeSignedTransaction(String signedTransaction) {

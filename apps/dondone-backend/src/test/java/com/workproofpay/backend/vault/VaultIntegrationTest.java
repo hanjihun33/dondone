@@ -21,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -64,6 +65,9 @@ class VaultIntegrationTest extends PostgresIntegrationTestSupport {
     @Autowired
     private VaultJobWorker vaultJobWorker;
 
+    @Autowired
+    private com.workproofpay.backend.vault.adapter.DemoVaultBlockchainGateway demoVaultBlockchainGateway;
+
     @BeforeEach
     void setUp() {
         jobRepository.deleteAll();
@@ -73,6 +77,7 @@ class VaultIntegrationTest extends PostgresIntegrationTestSupport {
         vaultPositionRepository.deleteAll();
         userWalletRepository.deleteAll();
         userRepository.deleteAll();
+        demoVaultBlockchainGateway.resetState();
     }
 
     @Test
@@ -124,6 +129,13 @@ class VaultIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.status").value("REQUESTED"));
 
         vaultJobWorker.run();
+        assertThat(vaultTransactionRepository.findById(depositRequestId))
+                .get()
+                .satisfies(transaction -> {
+                    assertThat(transaction.getStatus().name()).isEqualTo("BROADCASTED");
+                    assertThat(transaction.getSignedTransaction()).isNotBlank();
+                    assertThat(transaction.getSignedTransaction()).doesNotStartWith("vault-demo:");
+                });
         vaultJobWorker.run();
 
         mockMvc.perform(get("/api/vault/transactions/{vaultTransactionId}", depositRequestId)
@@ -237,6 +249,10 @@ class VaultIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("VAULT_INSUFFICIENT_STORED_BALANCE"));
 
+        mockMvc.perform(get("/api/vault/transactions"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
         mockMvc.perform(post("/api/vault/deposits")
                         .header("Authorization", token)
                         .header("Idempotency-Key", "vault-oversized-deposit")
@@ -248,6 +264,58 @@ class VaultIntegrationTest extends PostgresIntegrationTestSupport {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("VAULT_INSUFFICIENT_AVAILABLE_BALANCE"));
+    }
+
+    @Test
+    void rebuildsPersistedVaultStateAfterDemoGatewayReset() throws Exception {
+        User user = userRepository.save(User.register("vault-reload@test.com", "hashed", "Reload User"));
+        String token = bearer(tokenFor(user));
+
+        mockMvc.perform(post("/api/remittance/wallets/me")
+                        .header("Authorization", token))
+                .andExpect(status().isCreated());
+
+        String depositResponse = mockMvc.perform(post("/api/vault/deposits")
+                        .header("Authorization", token)
+                        .header("Idempotency-Key", "vault-reload-deposit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amountAtomic": 100000000
+                                }
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String depositRequestId = readText(depositResponse, "requestId");
+
+        vaultJobWorker.run();
+        vaultJobWorker.run();
+
+        demoVaultBlockchainGateway.resetState();
+
+        mockMvc.perform(get("/api/vault/summary")
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.storedAmountAtomic").value("100000000"))
+                .andExpect(jsonPath("$.data.shareBalance").value("100000000"));
+
+        mockMvc.perform(get("/api/vault/transactions/{vaultTransactionId}", depositRequestId)
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
+
+        mockMvc.perform(post("/api/vault/withdrawals")
+                        .header("Authorization", token)
+                        .header("Idempotency-Key", "vault-reload-withdraw")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amountAtomic": 50000000
+                                }
+                                """))
+                .andExpect(status().isAccepted());
     }
 
     private String tokenFor(User user) {

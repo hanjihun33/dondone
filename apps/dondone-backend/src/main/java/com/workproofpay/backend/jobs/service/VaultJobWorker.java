@@ -5,6 +5,7 @@ import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.model.JobStatus;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
+import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
 import com.workproofpay.backend.vault.adapter.PreparedVaultTransaction;
 import com.workproofpay.backend.vault.adapter.VaultBlockchainGateway;
@@ -39,6 +40,7 @@ public class VaultJobWorker {
     private final VaultTransactionRepository vaultTransactionRepository;
     private final VaultPositionRepository vaultPositionRepository;
     private final WalletService walletService;
+    private final WalletCryptoService walletCryptoService;
     private final VaultBlockchainGateway vaultBlockchainGateway;
     private final VaultYieldService vaultYieldService;
     private final JobService jobService;
@@ -119,14 +121,21 @@ public class VaultJobWorker {
                         transaction.getWalletAddress()
                 );
             }
-            transaction.markSigned(prepared.txHash(), prepared.signedTransaction(), prepared.shareDelta());
+            transaction.markSigned(
+                    prepared.txHash(),
+                    walletCryptoService.encrypt(prepared.signedTransaction()),
+                    prepared.shareDelta()
+            );
             return new PendingSubmission(transaction.getVaultTransactionId(), prepared.signedTransaction());
         }
 
         if (transaction.getStatus() == VaultTransactionStatus.SIGNED
                 && transaction.getSignedTransaction() != null
                 && transaction.getTxHash() != null) {
-            return new PendingSubmission(transaction.getVaultTransactionId(), transaction.getSignedTransaction());
+            return new PendingSubmission(
+                    transaction.getVaultTransactionId(),
+                    decryptSignedTransaction(transaction.getSignedTransaction())
+            );
         }
         return null;
     }
@@ -256,6 +265,14 @@ public class VaultJobWorker {
             return VaultFailureCode.INSUFFICIENT_BALANCE;
         }
         return VaultFailureCode.UNKNOWN;
+    }
+
+    private String decryptSignedTransaction(String encryptedOrLegacySignedTransaction) {
+        try {
+            return walletCryptoService.decrypt(encryptedOrLegacySignedTransaction);
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            return encryptedOrLegacySignedTransaction;
+        }
     }
 
     private BigInteger requiredShareDelta(VaultTransaction transaction) {

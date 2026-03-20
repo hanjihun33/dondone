@@ -62,7 +62,7 @@ public class VaultService {
                 position == null ? "0" : position.getPrincipalAmountAtomic().toString(),
                 position == null ? "0" : position.getAccruedYieldAtomic().toString(),
                 chainState.walletTokenBalanceAtomic().toString(),
-                chainState.walletTokenBalanceAtomic().toString(),
+                calculateAvailableToStoreAmount(chainState).toString(),
                 chainState.vaultShareBalance().toString(),
                 vaultYieldService.preview(position),
                 properties.getPolicy().getDisclaimer()
@@ -179,8 +179,11 @@ public class VaultService {
                 throw new ApiException(ErrorCode.VAULT_INSUFFICIENT_AVAILABLE_BALANCE);
             }
         } else {
-            BigInteger requiredShares = vaultBlockchainGateway.previewWithdraw(amountAtomic);
-            if (position.getPrincipalAmountAtomic().compareTo(amountAtomic) < 0 || chainState.vaultShareBalance().compareTo(requiredShares) < 0) {
+            if (position.getPrincipalAmountAtomic().compareTo(amountAtomic) < 0) {
+                throw new ApiException(ErrorCode.VAULT_INSUFFICIENT_STORED_BALANCE);
+            }
+            BigInteger requiredShares = previewWithdrawShares(amountAtomic);
+            if (chainState.vaultShareBalance().compareTo(requiredShares) < 0) {
                 throw new ApiException(ErrorCode.VAULT_INSUFFICIENT_STORED_BALANCE);
             }
         }
@@ -226,6 +229,21 @@ public class VaultService {
 
     private String generateTransactionId() {
         return "vtx_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    }
+
+    private BigInteger calculateAvailableToStoreAmount(VaultChainState chainState) {
+        if (chainState.walletNativeBalanceWei().signum() <= 0) {
+            return BigInteger.ZERO;
+        }
+        return chainState.walletTokenBalanceAtomic();
+    }
+
+    private BigInteger previewWithdrawShares(BigInteger amountAtomic) {
+        try {
+            return vaultBlockchainGateway.previewWithdraw(amountAtomic);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(ErrorCode.VAULT_INSUFFICIENT_STORED_BALANCE);
+        }
     }
 
     private void requireConfig() {
