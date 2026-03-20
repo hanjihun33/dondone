@@ -119,6 +119,21 @@ class EmployerIssueReadModelIntegrationTest {
     }
 
     @Test
+    void getIssuesCanFilterByStatus() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/employer/issues")
+                        .header("Authorization", bearer(fixture.employerUser()))
+                        .queryParam("statuses", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.issues[0].itemType").value("CORRECTION_REQUEST"))
+                .andExpect(jsonPath("$.data.issues[0].issueStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.issues[0].requestId").value(fixture.pendingRequest().getId()));
+    }
+
+    @Test
     void getIssuesCanSearchAcrossReasonAndWorker() throws Exception {
         Fixture fixture = createFixture();
 
@@ -130,6 +145,17 @@ class EmployerIssueReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.issues[0].itemType").value("REVIEW_REQUIRED_RECORD"))
                 .andExpect(jsonPath("$.data.issues[0].workerName").value("Review Worker"));
+    }
+
+    @Test
+    void getIssuesRejectsInvalidPage() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/employer/issues")
+                        .header("Authorization", bearer(fixture.employerUser()))
+                        .queryParam("page", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
     }
 
     @Test

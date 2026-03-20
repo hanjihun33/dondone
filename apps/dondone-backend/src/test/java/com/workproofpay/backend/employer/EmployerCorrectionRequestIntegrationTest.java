@@ -128,6 +128,22 @@ class EmployerCorrectionRequestIntegrationTest {
     }
 
     @Test
+    void getCorrectionRequestsKeepsNewestPendingRequestFirst() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(get("/api/employer/correction-requests")
+                        .header("Authorization", bearer(fixture.employerUser()))
+                        .queryParam("statuses", "PENDING")
+                        .queryParam("page", "1")
+                        .queryParam("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.requests[0].requestId").value(fixture.rejectableRequest().getId()))
+                .andExpect(jsonPath("$.data.requests[1].requestId").value(fixture.approvableRequest().getId()));
+    }
+
+    @Test
     void getCorrectionRequestReturnsScopedDetail() throws Exception {
         Fixture fixture = createFixture();
 

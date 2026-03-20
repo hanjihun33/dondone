@@ -322,6 +322,47 @@ class EmployerAuthIntegrationTest {
     }
 
     @Test
+    void employerLoginAcceptsMixedCaseEmail() throws Exception {
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        User workplaceOwner = userRepository.save(User.register(
+                "worker-owner@example.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Owner"
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                workplaceOwner,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul",
+                null,
+                37.5665,
+                126.9780,
+                100
+        ));
+        User employerUser = userRepository.save(User.registerEmployer(
+                "manager@acme.test",
+                passwordEncoder.encode("qweqwe123"),
+                "Acme HR"
+        ));
+        employerProfileRepository.save(EmployerProfile.create(
+                employerUser.getId(),
+                company.getId(),
+                workplace.getId(),
+                "Acme HR"
+        ));
+
+        EmployerLoginRequest loginRequest = new EmployerLoginRequest("Manager@Acme.Test", "qweqwe123");
+
+        mockMvc.perform(post("/api/employer-auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.companyName").value("Acme Logistics"))
+                .andExpect(jsonPath("$.data.defaultWorkplaceId").value(workplace.getId()));
+    }
+
+    @Test
     void workerTokenCannotAccessEmployerProfile() throws Exception {
         User workerUser = userRepository.save(User.register(
                 "worker@example.com",
