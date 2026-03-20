@@ -486,7 +486,7 @@ private fun WorkproofPunchCard(
     WorkproofSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             WorkproofSectionHeader(
-                title = "오늘 근무",
+                title = "출퇴근",
                 trailing = {
                     Box(
                         modifier = Modifier
@@ -535,22 +535,6 @@ private fun WorkproofPunchCard(
                     )
                 }
             }
-            WorkproofKeyValueRow(
-                label = stringResource(R.string.workproof_label_clock_in),
-                value = timeOrPlaceholder(uiModel.todayInTime)
-            )
-            WorkproofKeyValueRow(
-                label = stringResource(R.string.workproof_label_clock_out),
-                value = timeOrPlaceholder(uiModel.todayOutTime)
-            )
-            WorkproofKeyValueRow(
-                label = stringResource(R.string.workproof_label_work_days),
-                value = stringResource(R.string.workproof_value_day_count, uiModel.verifiedDays)
-            )
-            WorkproofKeyValueRow(
-                label = stringResource(R.string.workproof_label_audits),
-                value = stringResource(R.string.workproof_value_audit_count, uiModel.auditCount)
-            )
             HorizontalDivider(color = WorkproofDivider)
             WorkproofWorkplaceMapCard(uiModel = uiModel)
         }
@@ -2150,12 +2134,6 @@ private fun isRecordedCalendarTone(tone: WorkproofCalendarTone?): Boolean {
         tone == WorkproofCalendarTone.COMPLETE ||
         tone == WorkproofCalendarTone.MODIFIED
 }
-
-@Composable
-private fun timeOrPlaceholder(time: String?): String {
-    return time ?: stringResource(R.string.workproof_value_time_placeholder)
-}
-
 
 @Composable
 private fun recordStatusText(tone: WorkproofRecordTone): String = when (tone) {
