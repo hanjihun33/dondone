@@ -11,6 +11,7 @@ import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfAssembleComm
 import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshot;
 import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshotAssembler;
 import com.workproofpay.backend.documents.model.DocumentGenerationRequest;
+import com.workproofpay.backend.documents.model.DocumentGenerationStrategy;
 import com.workproofpay.backend.documents.model.DocumentType;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.NumberFormat;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
@@ -127,6 +129,16 @@ public class DocumentsService {
     public DocumentDetailResponse getDocumentDetail(Long userId, Long documentId) {
         DocumentGenerationRequest request = documentGenerationRequestRepository.findByIdAndUserId(documentId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (request.getDocumentType() == DocumentType.WORKPROOF_STATEMENT) {
+            return DocumentDetailResponse.from(
+                    request,
+                    buildTitle(request),
+                    buildWorkproofSummary(request),
+                    List.of()
+            );
+        }
+
         WageVerification verification = wageVerificationQueryService.getOwnedVerification(userId, request.getWageVerificationId());
 
         return DocumentDetailResponse.from(
@@ -137,39 +149,29 @@ public class DocumentsService {
         );
     }
 
-    public RenderedPdf generateProofPackPdf(Long userId, Long documentId) {
-        DocumentGenerationRequest request = documentGenerationRequestRepository.findByIdAndUserIdAndDocumentType(
-                        documentId,
-                        userId,
-                        DocumentType.PROOF_PACK
-                )
+    public RenderedPdf generateDocumentPdf(Long userId, Long documentId) {
+        DocumentGenerationRequest request = documentGenerationRequestRepository.findByIdAndUserId(documentId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         request.markRunning();
         documentGenerationRequestRepository.saveAndFlush(request);
 
         try {
-            WorkProofPdfSnapshot snapshot = workProofPdfSnapshotAssembler.assemble(new WorkProofPdfAssembleCommand(
-                    userId,
-                    request.getId(),
-                    request.getRequestId(),
-                    request.getWorkplaceId(),
-                    null,
-                    null,
-                    DEFAULT_PDF_ZONE_ID,
-                    DEFAULT_PDF_LOCALE
-            ));
-            RenderedPdf renderedPdf = pdfRenderer.render(WORKPROOF_TEMPLATE_NAME, snapshot);
+            RenderedPdf renderedPdf = renderDocumentByStrategy(userId, request);
 
-            request.markReady();
+            request.markReady(renderedPdf.fileName(), LocalDateTime.now());
             documentGenerationRequestRepository.saveAndFlush(request);
 
             return renderedPdf;
         } catch (RuntimeException e) {
-            request.markFailed();
+            request.markFailed(e.getClass().getSimpleName());
             documentGenerationRequestRepository.saveAndFlush(request);
             throw e;
         }
+    }
+
+    public RenderedPdf generateProofPackPdf(Long userId, Long documentId) {
+        return generateDocumentPdf(userId, documentId);
     }
 
     private boolean isDuplicateRequestViolation(DataIntegrityViolationException e) {
@@ -180,10 +182,16 @@ public class DocumentsService {
 
     private String buildTitle(DocumentGenerationRequest request) {
         return switch (request.getDocumentType()) {
+            case WORKPROOF_STATEMENT -> "근무 기록 문서";
             case PROOF_PACK -> request.getMonth() + " Proof Pack";
             case CLAIM_KIT -> request.getMonth() + " Claim Kit";
             case TRANSFER_RECEIPT -> "Transfer Receipt";
         };
+    }
+
+    private String buildWorkproofSummary(DocumentGenerationRequest request) {
+        return "%s부터 %s까지의 출퇴근 기록과 변경 이력을 정리하는 근무 기록 문서입니다."
+                .formatted(request.getStartDate(), request.getEndDate());
     }
 
     private String buildSummary(DocumentGenerationRequest request, WageVerification verification) {
@@ -193,6 +201,9 @@ public class DocumentsService {
         String difference = numberFormat.format(verification.getDifferenceAmount());
 
         return switch (request.getDocumentType()) {
+            case WORKPROOF_STATEMENT ->
+                    "%s부터 %s까지의 출퇴근 기록과 변경 이력을 정리하는 근무 기록 문서 요청입니다."
+                            .formatted(request.getStartDate(), request.getEndDate());
             case PROOF_PACK ->
                     "%s 급여 확인 근거를 정리한 Proof Pack입니다. 참고용 예상 %s원, 실제 확인 %s원, 차이 %s원을 같은 verification snapshot 기준으로 설명합니다."
                             .formatted(request.getMonth(), estimated, actual, difference);
@@ -213,5 +224,46 @@ public class DocumentsService {
                 "급여 확인 결과 보기",
                 "/api/wage/verifications/" + verification.getId()
         ));
+    }
+
+    private RenderedPdf renderWorkproofDocument(Long userId, DocumentGenerationRequest request) {
+        WorkProofPdfSnapshot snapshot = workProofPdfSnapshotAssembler.assemble(new WorkProofPdfAssembleCommand(
+                userId,
+                request.getId(),
+                request.getRequestId(),
+                request.getWorkplaceId(),
+                request.getStartDate(),
+                request.getEndDate(),
+                DEFAULT_PDF_ZONE_ID,
+                DEFAULT_PDF_LOCALE
+        ));
+        RenderedPdf renderedPdf = pdfRenderer.render(WORKPROOF_TEMPLATE_NAME, snapshot);
+        if (request.getDocumentType() == DocumentType.WORKPROOF_STATEMENT) {
+            String fileName = "workproof-%s-%s.pdf".formatted(request.getStartDate(), request.getEndDate());
+            return new RenderedPdf(renderedPdf.bytes(), fileName, renderedPdf.contentType(), renderedPdf.sha256());
+        }
+        return renderedPdf;
+    }
+
+    private RenderedPdf renderDocumentByStrategy(Long userId, DocumentGenerationRequest request) {
+        return switch (request.getDocumentType().generationStrategy()) {
+            case ON_DEMAND_DOWNLOAD -> renderOnDemandDocument(userId, request);
+            case REQUEST_STATUS_WORKFLOW -> renderRequestWorkflowDocument(userId, request);
+        };
+    }
+
+    private RenderedPdf renderOnDemandDocument(Long userId, DocumentGenerationRequest request) {
+        if (request.getDocumentType() != DocumentType.WORKPROOF_STATEMENT) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+        return renderWorkproofDocument(userId, request);
+    }
+
+    private RenderedPdf renderRequestWorkflowDocument(Long userId, DocumentGenerationRequest request) {
+        return switch (request.getDocumentType()) {
+            case PROOF_PACK -> renderWorkproofDocument(userId, request);
+            case CLAIM_KIT, TRANSFER_RECEIPT -> throw new ApiException(ErrorCode.INVALID_REQUEST);
+            case WORKPROOF_STATEMENT -> throw new ApiException(ErrorCode.INVALID_REQUEST);
+        };
     }
 }

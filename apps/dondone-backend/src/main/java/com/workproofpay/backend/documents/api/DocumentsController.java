@@ -83,7 +83,7 @@ public class DocumentsController {
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable @Positive(message = "documentId must be greater than 0") Long documentId
     ) {
-        RenderedPdf renderedPdf = documentsService.generateProofPackPdf(user.userId(), documentId);
+        RenderedPdf renderedPdf = documentsService.generateDocumentPdf(user.userId(), documentId);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + renderedPdf.fileName() + "\"")

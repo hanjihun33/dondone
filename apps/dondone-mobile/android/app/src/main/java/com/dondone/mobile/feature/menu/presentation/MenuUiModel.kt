@@ -10,6 +10,7 @@ import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.DocumentItem
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
 
 enum class MenuDocumentAccent {
     Proof,
@@ -25,7 +26,7 @@ enum class MenuReceiptStatus {
 
 private const val DOCUMENT_STATUS_READY = "준비됨"
 private const val DOCUMENT_STATUS_PENDING = "대기"
-private const val DOCUMENT_STATUS_REVIEW = "검토 필요"
+private const val DOCUMENT_STATUS_GENERATING = "준비 중"
 private const val RECEIPT_STATUS_PENDING = "확인 중"
 private const val RECEIPT_STATUS_CONFIRMED = "완료"
 private const val MENU_UPDATED_AT_PREFIX = "업데이트 "
@@ -47,6 +48,7 @@ private const val DOCUMENT_ID_RECEIPT = "RECEIPT"
 
 data class MenuDocumentUiModel(
     val id: String,
+    val documentId: Long?,
     val title: String,
     val summaryText: String,
     val updatedAtText: String,
@@ -87,9 +89,17 @@ data class MenuSessionUiModel(
 
 fun DemoState.toMenuUiModel(
     session: AuthSession?,
-    remittanceRemoteState: RemittanceRemoteState
+    remittanceRemoteState: RemittanceRemoteState,
+    workproofPdfCreateUiState: WorkproofPdfCreateUiState
 ): MenuUiModel {
     val receiptDocument = documents.firstOrNull(DocumentItem::isReceiptDocument)
+    val baseDocuments = documents.map(DocumentItem::toMenuDocumentUiModel)
+    val liveProofDocument = workproofPdfCreateUiState.toLiveProofDocument()
+    val mergedDocuments = if (liveProofDocument != null) {
+        listOf(liveProofDocument) + baseDocuments.filterNot { it.accent == MenuDocumentAccent.Proof }
+    } else {
+        baseDocuments
+    }
     val remoteTransfer = remittanceRemoteState.payload?.activeTransfer
 
     return MenuUiModel(
@@ -100,9 +110,7 @@ fun DemoState.toMenuUiModel(
                 phoneNumber = it.phoneNumber?.toDisplayPhoneNumber()
             )
         },
-        documents = documents
-            .filterNot(DocumentItem::isReceiptDocument)
-            .map(DocumentItem::toMenuDocumentUiModel),
+        documents = mergedDocuments,
         receipt = when {
             remoteTransfer != null -> toRemoteMenuReceiptUiModel(remoteTransfer, receiptDocument)
             receiptDocument != null -> toMenuReceiptUiModel(receiptDocument)
@@ -117,12 +125,52 @@ private fun DocumentItem.toMenuDocumentUiModel(): MenuDocumentUiModel {
 
     return MenuDocumentUiModel(
         id = id,
+        documentId = null,
         title = title,
         summaryText = accent.summaryText(),
         updatedAtText = updatedAt.toMenuUpdatedAtText(),
         statusText = accent.statusText(isReady = isReady),
         statusTone = if (isReady) BadgeTone.Success else BadgeTone.Warning,
         accent = accent
+    )
+}
+
+private fun WorkproofPdfCreateUiState.toLiveProofDocument(): MenuDocumentUiModel? {
+    val currentStatus = status ?: return null
+    val isActionable = documentId != null && !isFailed
+    val statusTone = when (currentStatus) {
+        "FAILED" -> BadgeTone.Warning
+        else -> if (isActionable) BadgeTone.Success else BadgeTone.Info
+    }
+    val statusText = when (currentStatus) {
+        "QUEUED" -> if (isActionable) "열기 가능" else DOCUMENT_STATUS_PENDING
+        "RUNNING" -> DOCUMENT_STATUS_GENERATING
+        "READY" -> DOCUMENT_STATUS_READY
+        "FAILED" -> "생성 실패"
+        else -> DOCUMENT_STATUS_PENDING
+    }
+    val summaryText = when (currentStatus) {
+        "FAILED" -> "근무 기록 문서 생성이 실패했어요. 기간을 다시 선택해 재시도해 주세요."
+        else -> if (isActionable) {
+            "메뉴에서 문서를 열거나 공유할 때 선택한 기간의 PDF를 바로 생성할 수 있어요."
+        } else {
+            "선택한 기간의 출퇴근 기록과 변경 이력을 정리한 PDF 문서 요청이 저장됐어요."
+        }
+    }
+    val updatedAtText = when (currentStatus) {
+        "FAILED" -> "업데이트 생성 실패"
+        else -> if (isActionable) "업데이트 바로 생성 가능" else "업데이트 생성 요청 접수됨"
+    }
+
+    return MenuDocumentUiModel(
+        id = "LIVE-WORKPROOF-PDF",
+        documentId = documentId,
+        title = "근무 기록 문서",
+        summaryText = summaryText,
+        updatedAtText = updatedAtText,
+        statusText = statusText,
+        statusTone = statusTone,
+        accent = MenuDocumentAccent.Proof
     )
 }
 
@@ -138,7 +186,7 @@ private fun DocumentItem.isReceiptDocument(): Boolean = id.contains(DOCUMENT_ID_
 
 private fun MenuDocumentAccent.summaryText(): String {
     return when (this) {
-        MenuDocumentAccent.Proof -> "근무 기록과 차액 검토 근거를 묶어 둔 문서예요."
+        MenuDocumentAccent.Proof -> "선택한 기간의 출퇴근 기록과 변경 이력을 정리한 PDF 문서예요."
         MenuDocumentAccent.Claim -> "신고 준비에 필요한 핵심 자료를 한 번에 정리해요."
         MenuDocumentAccent.Receipt -> "최근 송금 영수증과 전송 해시를 다시 확인할 수 있어요."
     }
@@ -149,7 +197,7 @@ private fun MenuDocumentAccent.statusText(isReady: Boolean): String {
         isReady -> DOCUMENT_STATUS_READY
         this == MenuDocumentAccent.Receipt -> RECEIPT_STATUS_PENDING
         this == MenuDocumentAccent.Claim -> DOCUMENT_STATUS_PENDING
-        else -> DOCUMENT_STATUS_REVIEW
+        else -> DOCUMENT_STATUS_GENERATING
     }
 }
 
