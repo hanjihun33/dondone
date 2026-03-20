@@ -11,6 +11,7 @@ import com.workproofpay.backend.remittance.model.WalletFundingStatus;
 import com.workproofpay.backend.remittance.repo.UserWalletRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class WalletService {
     private final WalletCryptoService walletCryptoService;
     private final RemittanceBlockchainGateway blockchainGateway;
     private final RemittanceProperties properties;
+    private final RemittanceMetrics remittanceMetrics;
 
     public WalletCreateResult createWalletIfAbsent(Long userId) {
         UserWallet existing = userWalletRepository.findById(userId).orElse(null);
@@ -50,25 +52,10 @@ public class WalletService {
                 ? createWalletRecord(userId)
                 : new WalletRecordResult(markWalletFundingPending(existing.getUserId()), false);
 
-        try {
-            FundingShortfall fundingShortfall = calculateFundingShortfall(walletResult.wallet().getWalletAddress());
-            if (fundingShortfall.isZero()) {
-                UserWallet fundedWallet = markWalletFunded(walletResult.wallet().getUserId());
-                return new WalletCreateResult(walletResult.created(), toResponse(fundedWallet));
-            }
-            blockchainGateway.fundWallet(
-                    walletResult.wallet().getWalletAddress(),
-                    fundingShortfall.tokenAmountAtomic(),
-                    fundingShortfall.nativeAmountWei()
-            );
-            UserWallet fundedWallet = markWalletFunded(walletResult.wallet().getUserId());
-            return new WalletCreateResult(walletResult.created(), toResponse(fundedWallet));
-        } catch (ApiException e) {
-            throw e;
-        } catch (Exception e) {
-            markWalletFundingFailed(walletResult.wallet().getUserId(), summarizeFundingFailure(e));
-            throw new ApiException(ErrorCode.WALLET_FUNDING_FAILED, "Failed to create and fund wallet");
-        }
+        return new WalletCreateResult(
+                walletResult.created(),
+                toResponse(ensureWalletFunded(walletResult.wallet(), "Failed to create and fund wallet"))
+        );
     }
 
     public WalletResponse recoverWalletFunding(Long userId) {
@@ -87,23 +74,7 @@ public class WalletService {
         }
 
         UserWallet pendingWallet = markWalletFundingPending(userId);
-        try {
-            FundingShortfall fundingShortfall = calculateFundingShortfall(pendingWallet.getWalletAddress());
-            if (fundingShortfall.isZero()) {
-                return toResponse(markWalletFunded(userId));
-            }
-            blockchainGateway.fundWallet(
-                    pendingWallet.getWalletAddress(),
-                    fundingShortfall.tokenAmountAtomic(),
-                    fundingShortfall.nativeAmountWei()
-            );
-            return toResponse(markWalletFunded(userId));
-        } catch (ApiException e) {
-            throw e;
-        } catch (Exception e) {
-            markWalletFundingFailed(userId, summarizeFundingFailure(e));
-            throw new ApiException(ErrorCode.WALLET_FUNDING_FAILED, "Failed to recover wallet funding");
-        }
+        return toResponse(ensureWalletFunded(pendingWallet, "Failed to recover wallet funding"));
     }
 
     @Transactional
@@ -146,14 +117,32 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public UserWallet getRequiredWallet(Long userId) {
-        return userWalletRepository.findById(userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
+        try {
+            return userWalletRepository.findById(userId)
+                    .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            remittanceMetrics.recordWalletLookup(sample, "read", outcome);
+        }
     }
 
     @Transactional
     public UserWallet getRequiredWalletForUpdate(Long userId) {
-        return userWalletRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
+        try {
+            return userWalletRepository.findByUserIdForUpdate(userId)
+                    .orElseThrow(() -> new ApiException(ErrorCode.WALLET_NOT_FOUND));
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            remittanceMetrics.recordWalletLookup(sample, "for_update", outcome);
+        }
     }
 
     @Transactional
@@ -236,6 +225,25 @@ public class WalletService {
     private boolean isFundingPendingStale(UserWallet wallet) {
         return Duration.between(wallet.getUpdatedAt(), java.time.LocalDateTime.now()).getSeconds()
                 >= properties.getWallet().getFundingPendingStaleSeconds();
+    }
+
+    private UserWallet ensureWalletFunded(UserWallet wallet, String failureMessage) {
+        try {
+            FundingShortfall fundingShortfall = calculateFundingShortfall(wallet.getWalletAddress());
+            if (!fundingShortfall.isZero()) {
+                blockchainGateway.fundWallet(
+                        wallet.getWalletAddress(),
+                        fundingShortfall.tokenAmountAtomic(),
+                        fundingShortfall.nativeAmountWei()
+                );
+            }
+            return markWalletFunded(wallet.getUserId());
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            markWalletFundingFailed(wallet.getUserId(), summarizeFundingFailure(e));
+            throw new ApiException(ErrorCode.WALLET_FUNDING_FAILED, failureMessage);
+        }
     }
 
     public record WalletRecordResult(UserWallet wallet, boolean created) {

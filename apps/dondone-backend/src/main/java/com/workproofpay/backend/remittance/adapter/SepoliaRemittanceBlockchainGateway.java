@@ -2,6 +2,8 @@ package com.workproofpay.backend.remittance.adapter;
 
 import com.workproofpay.backend.remittance.config.RemittanceProperties;
 import com.workproofpay.backend.remittance.model.TransferFailureCode;
+import com.workproofpay.backend.remittance.service.RemittanceMetrics;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.web3j.abi.FunctionEncoder;
@@ -42,26 +44,35 @@ import java.util.Optional;
 public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainGateway {
 
     private final RemittanceProperties properties;
+    private final RemittanceMetrics remittanceMetrics;
     private Web3j web3j;
 
-    public SepoliaRemittanceBlockchainGateway(RemittanceProperties properties) {
+    public SepoliaRemittanceBlockchainGateway(RemittanceProperties properties, RemittanceMetrics remittanceMetrics) {
         this.properties = properties;
+        this.remittanceMetrics = remittanceMetrics;
     }
 
     @Override
     public ChainBalanceSnapshot getBalances(String walletAddress) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
         try {
             EthGetBalance nativeBalanceResponse = web3j().ethGetBalance(walletAddress, DefaultBlockParameterName.LATEST).send();
             BigInteger nativeBalanceWei = nativeBalanceResponse.getBalance();
             BigInteger tokenBalanceAtomic = readTokenBalance(walletAddress);
             return new ChainBalanceSnapshot(tokenBalanceAtomic, nativeBalanceWei);
         } catch (IOException e) {
+            outcome = "error";
             throw new IllegalStateException("failed to fetch chain balances", e);
+        } finally {
+            remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "get_balances", outcome);
         }
     }
 
     @Override
     public void fundWallet(String walletAddress, BigInteger tokenAmountAtomic, BigInteger nativeAmountWei) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
         String treasuryKey = require(properties.getTreasury().getPrivateKey(), "REMITTANCE_TREASURY_PRIVATE_KEY");
         Credentials treasury = Credentials.create(treasuryKey);
         RawTransactionManager txManager = new RawTransactionManager(web3j(), treasury, properties.getChain().getChainId());
@@ -104,17 +115,34 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
                 waitForSuccessfulReceipt(require(tokenTx.getTransactionHash(), "tokenFundingTxHash"));
             }
         } catch (IOException e) {
+            outcome = "error";
             throw new IllegalStateException("wallet funding failed", e);
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "fund_wallet", outcome);
         }
     }
 
     @Override
     public BigInteger estimateTokenTransferGasCostWei() {
-        return getGasPrice().multiply(BigInteger.valueOf(properties.getChain().getTokenGasLimit()));
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
+        try {
+            return getGasPrice().multiply(BigInteger.valueOf(properties.getChain().getTokenGasLimit()));
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "estimate_transfer_gas", outcome);
+        }
     }
 
     @Override
     public PreparedTokenTransfer prepareTokenTransfer(String senderPrivateKey, String toAddress, BigInteger amountAtomic) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
         Credentials credentials = Credentials.create(require(senderPrivateKey, "senderPrivateKey"));
         Function transfer = new Function(
                 "transfer",
@@ -139,24 +167,43 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
             String txHash = Hash.sha3(signedTransaction);
             return new PreparedTokenTransfer(txHash, signedTransaction);
         } catch (IOException e) {
+            outcome = "error";
             throw new IllegalStateException("token transfer preparation failed", e);
+        } catch (RuntimeException e) {
+            outcome = "error";
+            throw e;
+        } finally {
+            remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "prepare_transfer", outcome);
         }
     }
 
     @Override
     public void broadcastSignedTransaction(String signedTransaction) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
         try {
             EthSendTransaction response = web3j().ethSendRawTransaction(require(signedTransaction, "signedTransaction")).send();
             if (response.hasError() && !isAlreadyKnown(response.getError().getMessage())) {
+                outcome = "chain_error";
                 throw new IllegalStateException("chain send error: " + response.getError().getMessage());
             }
         } catch (IOException e) {
+            outcome = "error";
             throw new IllegalStateException("token transfer submission failed", e);
+        } catch (RuntimeException e) {
+            if ("success".equals(outcome)) {
+                outcome = "error";
+            }
+            throw e;
+        } finally {
+            remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "broadcast_signed_transaction", outcome);
         }
     }
 
     @Override
     public Optional<ChainReceiptResult> getReceipt(String txHash) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "empty";
         try {
             EthGetTransactionReceipt receiptResponse = web3j().ethGetTransactionReceipt(txHash).send();
             if (receiptResponse.getTransactionReceipt().isEmpty()) {
@@ -164,21 +211,31 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
             }
             String status = receiptResponse.getResult().getStatus();
             if ("0x1".equalsIgnoreCase(status)) {
+                outcome = "success";
                 return Optional.of(new ChainReceiptResult(true, null));
             }
+            outcome = "failed";
             return Optional.of(new ChainReceiptResult(false, TransferFailureCode.CHAIN_REVERT));
         } catch (IOException e) {
+            outcome = "error";
             return Optional.empty();
+        } finally {
+            remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "get_receipt", outcome);
         }
     }
 
     @Override
     public boolean isTransactionKnown(String txHash) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "success";
         try {
             EthTransaction transactionResponse = web3j().ethGetTransactionByHash(txHash).send();
             return transactionResponse.getTransaction().isPresent();
         } catch (IOException e) {
+            outcome = "error";
             throw new IllegalStateException("failed to look up transaction", e);
+        } finally {
+            remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "is_transaction_known", outcome);
         }
     }
 

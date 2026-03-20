@@ -64,14 +64,15 @@ public class RecipientService {
 
     @Transactional
     public RecipientItemResponse createRecipient(Long userId, UpsertRecipientRequest request) {
-        String normalizedWalletAddress = resolveWalletAddress(request);
-        ensureWalletAddressAvailable(userId, normalizedWalletAddress, null);
+        ResolvedRecipientTarget resolvedTarget = resolveRecipientTarget(request);
+        ensureWalletAddressAvailable(userId, resolvedTarget.walletAddress(), null);
         Recipient recipient = Recipient.create(
                 generateRecipientId(),
                 userId,
+                resolvedTarget.targetUserId(),
                 request.alias().trim(),
                 request.relation(),
-                normalizedWalletAddress,
+                resolvedTarget.walletAddress(),
                 request.allowed()
         );
         return saveRecipient(recipient);
@@ -79,13 +80,14 @@ public class RecipientService {
 
     @Transactional
     public RecipientItemResponse updateRecipient(Long userId, String recipientId, UpsertRecipientRequest request) {
-        String normalizedWalletAddress = resolveWalletAddress(request);
-        ensureWalletAddressAvailable(userId, normalizedWalletAddress, recipientId);
+        ResolvedRecipientTarget resolvedTarget = resolveRecipientTarget(request);
+        ensureWalletAddressAvailable(userId, resolvedTarget.walletAddress(), recipientId);
         Recipient recipient = getRequiredRecipient(userId, recipientId);
         recipient.update(
                 request.alias().trim(),
                 request.relation(),
-                normalizedWalletAddress,
+                resolvedTarget.walletAddress(),
+                resolvedTarget.targetUserId(),
                 request.allowed()
         );
         return saveRecipient(recipient);
@@ -122,10 +124,10 @@ public class RecipientService {
         return new ApiException(ErrorCode.RECIPIENT_WALLET_ALREADY_EXISTS);
     }
 
-    private String resolveWalletAddress(UpsertRecipientRequest request) {
+    private ResolvedRecipientTarget resolveRecipientTarget(UpsertRecipientRequest request) {
         if (request.targetUserId() != null) {
             return userWalletRepository.findByUserId(request.targetUserId())
-                    .map(wallet -> wallet.getWalletAddress().toLowerCase())
+                    .map(wallet -> new ResolvedRecipientTarget(wallet.getWalletAddress().toLowerCase(), request.targetUserId()))
                     .orElseThrow(() -> new ApiException(ErrorCode.RECIPIENT_NOT_FOUND));
         }
 
@@ -136,7 +138,7 @@ public class RecipientService {
         if (!walletAddress.matches("^0x[a-fA-F0-9]{40}$")) {
             throw new ApiException(ErrorCode.INVALID_WALLET_ADDRESS);
         }
-        return walletAddress.toLowerCase();
+        return new ResolvedRecipientTarget(walletAddress.toLowerCase(), null);
     }
 
     private RecipientItemResponse toResponse(Recipient recipient) {
@@ -161,5 +163,8 @@ public class RecipientService {
             return walletAddress;
         }
         return walletAddress.substring(0, 6) + "..." + walletAddress.substring(walletAddress.length() - 4);
+    }
+
+    private record ResolvedRecipientTarget(String walletAddress, Long targetUserId) {
     }
 }

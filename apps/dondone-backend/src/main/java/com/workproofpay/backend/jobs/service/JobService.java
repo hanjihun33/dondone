@@ -1,6 +1,7 @@
 package com.workproofpay.backend.jobs.service;
 
 import com.workproofpay.backend.jobs.model.Job;
+import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,15 +18,20 @@ public class JobService {
     private final JobRepository jobRepository;
 
     @Transactional
-    public void enqueue(JobType jobType, String referenceId, LocalDateTime runAt) {
-        String activeKey = Job.buildActiveKey(jobType, referenceId);
+    public void enqueue(JobReferenceKind referenceKind, JobType jobType, String referenceId, LocalDateTime runAt) {
+        String activeKey = Job.buildActiveKey(referenceKind, jobType, referenceId);
         try {
-            jobRepository.saveAndFlush(Job.queue(jobType, referenceId, runAt));
+            jobRepository.saveAndFlush(Job.queue(referenceKind, jobType, referenceId, runAt));
         } catch (DataIntegrityViolationException e) {
             if (jobRepository.existsByActiveKey(activeKey)) {
                 return;
             }
             throw e;
         }
+    }
+
+    @Transactional
+    public void enqueue(JobType jobType, String referenceId, LocalDateTime runAt) {
+        enqueue(jobType.getReferenceKind(), jobType, referenceId, runAt);
     }
 }

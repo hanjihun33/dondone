@@ -1,6 +1,7 @@
 package com.workproofpay.backend.jobs.service;
 
 import com.workproofpay.backend.jobs.model.Job;
+import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.model.JobStatus;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
@@ -14,6 +15,8 @@ import com.workproofpay.backend.remittance.model.TransferStatus;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
+import com.workproofpay.backend.remittance.service.RemittanceMetrics;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -39,11 +42,16 @@ public class RemittanceJobWorker {
     private final JobService jobService;
     private final RemittanceProperties properties;
     private final TransactionTemplate transactionTemplate;
+    private final RemittanceMetrics remittanceMetrics;
 
     @Scheduled(fixedDelayString = "${remittance.worker.poll-interval-ms:2000}")
     public void run() {
         List<Long> jobIds = transactionTemplate.execute(status ->
-                jobRepository.findTop20ByStatusAndRunAtLessThanEqualOrderByIdAsc(JobStatus.QUEUED, LocalDateTime.now())
+                jobRepository.findTop20ByReferenceKindAndStatusAndRunAtLessThanEqualOrderByIdAsc(
+                                JobReferenceKind.TRANSFER,
+                                JobStatus.QUEUED,
+                                LocalDateTime.now()
+                        )
                         .stream()
                         .map(Job::getId)
                         .toList()
@@ -59,45 +67,54 @@ public class RemittanceJobWorker {
     }
 
     private void process(Long jobId) {
-        JobType jobType = claim(jobId);
-        if (jobType == null) {
+        ClaimedJob claimedJob = claim(jobId);
+        if (claimedJob == null) {
             return;
         }
 
         try {
-            switch (jobType) {
-                case SUBMIT_TRANSFER -> handleSubmit(jobId);
-                case POLL_TRANSFER_RECEIPT -> handlePoll(jobId);
+            switch (claimedJob.jobType()) {
+                case SUBMIT_TRANSFER -> handleSubmit(claimedJob);
+                case POLL_TRANSFER_RECEIPT -> handlePoll(claimedJob);
             }
         } catch (Exception e) {
-            handleFailure(jobId, e);
+            handleFailure(claimedJob.jobId(), e);
         }
     }
 
-    private JobType claim(Long jobId) {
+    private ClaimedJob claim(Long jobId) {
         return transactionTemplate.execute(status -> {
             Job job = jobRepository.findByIdForUpdate(jobId).orElse(null);
             if (job == null || job.getStatus() != JobStatus.QUEUED || job.getRunAt().isAfter(LocalDateTime.now())) {
                 return null;
             }
             job.markRunning();
-            return job.getJobType();
+            return new ClaimedJob(job.getId(), job.getJobType(), job.getReferenceId());
         });
     }
 
-    private void handleSubmit(Long jobId) {
-        PendingSubmission submission = transactionTemplate.execute(status -> prepareSubmission(jobId));
-        if (submission == null) {
-            markJobDone(jobId);
-            return;
-        }
+    private void handleSubmit(ClaimedJob claimedJob) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "error";
 
-        blockchainGateway.broadcastSignedTransaction(submission.signedTransaction());
-        transactionTemplate.executeWithoutResult(status -> completeSubmit(jobId, submission.transferId()));
+        try {
+            PendingSubmission submission = transactionTemplate.execute(status -> prepareSubmission(claimedJob.referenceId()));
+            if (submission == null) {
+                markJobDone(claimedJob.jobId());
+                outcome = "skipped";
+                return;
+            }
+
+            blockchainGateway.broadcastSignedTransaction(submission.signedTransaction());
+            transactionTemplate.executeWithoutResult(status -> completeSubmit(claimedJob.jobId(), submission.transferId()));
+            outcome = "broadcasted";
+        } finally {
+            remittanceMetrics.recordWorkerJob(sample, JobType.SUBMIT_TRANSFER, outcome);
+        }
     }
 
-    private PendingSubmission prepareSubmission(Long jobId) {
-        Transfer transfer = requiredTransfer(requiredJob(jobId).getReferenceId());
+    private PendingSubmission prepareSubmission(String transferId) {
+        Transfer transfer = requiredTransfer(transferId);
         if (transfer.getStatus() == TransferStatus.REQUESTED) {
             String senderPrivateKey = walletService.getDecryptedPrivateKey(transfer.getUserId());
             PreparedTokenTransfer prepared = blockchainGateway.prepareTokenTransfer(
@@ -130,52 +147,65 @@ public class RemittanceJobWorker {
         requiredJob(jobId).markDone();
     }
 
-    private void handlePoll(Long jobId) {
-        PollTarget pollTarget = transactionTemplate.execute(status -> {
-            Transfer transfer = requiredTransfer(requiredJob(jobId).getReferenceId());
-            if (transfer.getStatus() != TransferStatus.BROADCASTED || transfer.getTxHash() == null) {
-                return null;
+    private void handlePoll(ClaimedJob claimedJob) {
+        Timer.Sample sample = remittanceMetrics.start();
+        String outcome = "error";
+
+        try {
+            PollTarget pollTarget = transactionTemplate.execute(status -> {
+                Transfer transfer = requiredTransfer(claimedJob.referenceId());
+                if (transfer.getStatus() != TransferStatus.BROADCASTED || transfer.getTxHash() == null) {
+                    return null;
+                }
+                return new PollTarget(transfer.getTransferId(), transfer.getTxHash());
+            });
+
+            if (pollTarget == null) {
+                markJobDone(claimedJob.jobId());
+                outcome = "skipped";
+                return;
             }
-            return new PollTarget(transfer.getTransferId(), transfer.getTxHash());
-        });
 
-        if (pollTarget == null) {
-            markJobDone(jobId);
-            return;
+            Optional<ChainReceiptResult> receiptResult = blockchainGateway.getReceipt(pollTarget.txHash());
+            outcome = transactionTemplate.execute(status -> applyPollResult(claimedJob.jobId(), pollTarget.transferId(), receiptResult));
+        } finally {
+            remittanceMetrics.recordWorkerJob(sample, JobType.POLL_TRANSFER_RECEIPT, outcome);
         }
-
-        Optional<ChainReceiptResult> receiptResult = blockchainGateway.getReceipt(pollTarget.txHash());
-        transactionTemplate.executeWithoutResult(status -> applyPollResult(jobId, pollTarget.transferId(), receiptResult));
     }
 
-    private void applyPollResult(Long jobId, String transferId, Optional<ChainReceiptResult> receiptResult) {
+    private String applyPollResult(Long jobId, String transferId, Optional<ChainReceiptResult> receiptResult) {
         Job job = requiredJob(jobId);
         Transfer transfer = requiredTransfer(transferId);
         if (transfer.getStatus() != TransferStatus.BROADCASTED || transfer.getTxHash() == null) {
             job.markDone();
-            return;
+            return "skipped";
         }
 
         if (receiptResult.isEmpty()) {
             if (isReceiptTimedOut(transfer) && !blockchainGateway.isTransactionKnown(transfer.getTxHash())) {
                 transfer.markTimedOut(TransferFailureCode.NETWORK_ERROR);
                 job.markDone();
-                return;
+                return "timed_out_network_error";
             }
             if (isReceiptTimedOut(transfer)) {
                 job.requeue(nextPollAt(), "receipt delayed for known transaction");
-                return;
+                return "requeued_known_transaction";
             }
             job.requeue(nextPollAt(), null);
-            return;
+            return "requeued_waiting_receipt";
         }
 
         if (receiptResult.get().success()) {
             transfer.markConfirmed();
-        } else {
-            transfer.markFailed(receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode());
+            job.markDone();
+            return "confirmed";
         }
+
+        transfer.markFailed(receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode());
         job.markDone();
+        return "failed_" + (receiptResult.get().failureCode() == null
+                ? TransferFailureCode.UNKNOWN.name()
+                : receiptResult.get().failureCode().name()).toLowerCase();
     }
 
     private void handleFailure(Long jobId, Exception e) {
@@ -209,14 +239,15 @@ public class RemittanceJobWorker {
     }
 
     private void enqueuePollJobIfAbsent(String transferId) {
-        if (jobRepository.existsByReferenceIdAndJobTypeAndStatusIn(
+        if (jobRepository.existsByReferenceKindAndReferenceIdAndJobTypeAndStatusIn(
+                JobReferenceKind.TRANSFER,
                 transferId,
                 JobType.POLL_TRANSFER_RECEIPT,
                 ACTIVE_JOB_STATUSES
         )) {
             return;
         }
-        jobService.enqueue(JobType.POLL_TRANSFER_RECEIPT, transferId, nextPollAt());
+        jobService.enqueue(JobReferenceKind.TRANSFER, JobType.POLL_TRANSFER_RECEIPT, transferId, nextPollAt());
     }
 
     private void markJobDone(Long jobId) {
@@ -274,6 +305,13 @@ public class RemittanceJobWorker {
     private record PollTarget(
             String transferId,
             String txHash
+    ) {
+    }
+
+    private record ClaimedJob(
+            Long jobId,
+            JobType jobType,
+            String referenceId
     ) {
     }
 }

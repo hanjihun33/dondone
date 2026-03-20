@@ -8,6 +8,7 @@ import com.workproofpay.backend.remittance.config.RemittanceProperties;
 import com.workproofpay.backend.remittance.model.UserWallet;
 import com.workproofpay.backend.remittance.model.WalletFundingStatus;
 import com.workproofpay.backend.remittance.repo.UserWalletRepository;
+import com.workproofpay.backend.remittance.service.RemittanceMetrics;
 import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
 import com.workproofpay.backend.shared.exception.ApiException;
@@ -51,6 +52,9 @@ class WalletServiceTest {
     @Mock
     private RemittanceBlockchainGateway blockchainGateway;
 
+    @Mock
+    private RemittanceMetrics remittanceMetrics;
+
     private WalletService walletService;
     private Map<Long, UserWallet> walletStore;
 
@@ -64,7 +68,8 @@ class WalletServiceTest {
                 userRepository,
                 walletCryptoService,
                 blockchainGateway,
-                properties
+                properties,
+                remittanceMetrics
         );
 
         lenient().when(userRepository.findById(anyLong()))

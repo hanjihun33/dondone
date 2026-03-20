@@ -21,6 +21,7 @@ import com.dondone.mobile.data.documents.WorkproofDocumentPreviewPayload
 import com.dondone.mobile.data.documents.WorkproofDocumentRepository
 import com.dondone.mobile.data.documents.WorkproofDocumentUnauthorizedException
 import com.dondone.mobile.data.remittance.BackendRemittanceRepository
+import com.dondone.mobile.data.remittance.RemittanceRemoteMode
 import com.dondone.mobile.data.remittance.RemittanceRemotePayload
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.remittance.RemittanceRepository
@@ -515,7 +516,7 @@ class DemoSessionViewModel(
                     recentRecipientConfirmed = precheck?.recentRecipientConfirmationRequired == true
                 )
                 _uiState.update { state -> DemoSessionReducer.confirmTransfer(state) }
-                loadRemittanceRemoteState(session)
+                refreshRemittanceRemoteStateSilently(session)
                 _remittanceActionUiState.value = RemittanceActionUiState()
                 startRemittanceStatusPolling(session, result.transferId)
             } catch (error: RemittanceUnauthorizedException) {
@@ -1234,9 +1235,42 @@ class DemoSessionViewModel(
         applyWageRemoteState(remoteState, verificationId)
     }
 
-    private suspend fun loadRemittanceRemoteState(session: AuthSession) {
-        _remittanceRemoteState.value = RemittanceRemoteState.loading()
+    private suspend fun loadRemittanceRemoteState(
+        session: AuthSession
+    ) {
+        updateRemittanceRemoteState(
+            session = session,
+            showLoading = true,
+            keepVisibleContentOnError = false
+        )
+    }
+
+    private suspend fun refreshRemittanceRemoteStateSilently(
+        session: AuthSession
+    ) {
+        updateRemittanceRemoteState(
+            session = session,
+            showLoading = false,
+            keepVisibleContentOnError = true
+        )
+    }
+
+    private suspend fun updateRemittanceRemoteState(
+        session: AuthSession,
+        showLoading: Boolean,
+        keepVisibleContentOnError: Boolean
+    ) {
+        if (showLoading || _remittanceRemoteState.value.payload == null) {
+            _remittanceRemoteState.value = RemittanceRemoteState.loading()
+        }
         val remoteState = remittanceRepository.load(session.accessToken)
+        if (
+            keepVisibleContentOnError &&
+            remoteState.mode == RemittanceRemoteMode.ERROR &&
+            _remittanceRemoteState.value.payload != null
+        ) {
+            return
+        }
         applyRemittanceRemoteState(remoteState)
     }
 
@@ -1559,6 +1593,7 @@ class DemoSessionViewModel(
                     val detail = remittanceRepository.getTransferDetail(session.accessToken, transferId)
                     mergeRemoteTransferDetail(detail)
                     if (detail.isTerminalStatus()) {
+                        refreshRemittanceRemoteStateSilently(session)
                         return@launch
                     }
                 } catch (error: RemittanceUnauthorizedException) {

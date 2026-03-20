@@ -1,6 +1,7 @@
 package com.workproofpay.backend.remittance.service;
 
 import com.workproofpay.backend.jobs.model.Job;
+import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.model.JobStatus;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
@@ -51,9 +52,15 @@ public class RemittanceOpsService {
         Map<String, Long> walletFundingCounts = Arrays.stream(WalletFundingStatus.values())
                 .collect(Collectors.toMap(Enum::name, userWalletRepository::countByFundingStatus, (left, right) -> right, java.util.LinkedHashMap::new));
         Map<String, Long> jobCounts = Arrays.stream(JobStatus.values())
-                .collect(Collectors.toMap(Enum::name, jobRepository::countByStatus, (left, right) -> right, java.util.LinkedHashMap::new));
+                .collect(Collectors.toMap(
+                        Enum::name,
+                        status -> jobRepository.countByReferenceKindAndStatus(JobReferenceKind.TRANSFER, status),
+                        (left, right) -> right,
+                        java.util.LinkedHashMap::new
+                ));
 
-        List<String> recentFailureReasons = jobRepository.findByStatusInOrderByUpdatedAtDescIdDesc(
+        List<String> recentFailureReasons = jobRepository.findByReferenceKindAndStatusInOrderByUpdatedAtDescIdDesc(
+                        JobReferenceKind.TRANSFER,
                         List.of(JobStatus.FAILED),
                         PageRequest.of(0, 5)
                 ).stream()
@@ -91,7 +98,11 @@ public class RemittanceOpsService {
                 : requestedStatuses;
 
         return new RemittanceOpsJobListResponse(
-                jobRepository.findByStatusInOrderByUpdatedAtDescIdDesc(statuses, PageRequest.of(0, limit))
+                jobRepository.findByReferenceKindAndStatusInOrderByUpdatedAtDescIdDesc(
+                                JobReferenceKind.TRANSFER,
+                                statuses,
+                                PageRequest.of(0, limit)
+                        )
                         .stream()
                         .map(this::toOpsJobItem)
                         .toList()
@@ -137,17 +148,27 @@ public class RemittanceOpsService {
     }
 
     private void ensureSubmitJobQueued(String transferId) {
-        if (jobRepository.existsByReferenceIdAndJobTypeAndStatusIn(transferId, JobType.SUBMIT_TRANSFER, ACTIVE_JOB_STATUSES)) {
+        if (jobRepository.existsByReferenceKindAndReferenceIdAndJobTypeAndStatusIn(
+                JobReferenceKind.TRANSFER,
+                transferId,
+                JobType.SUBMIT_TRANSFER,
+                ACTIVE_JOB_STATUSES
+        )) {
             return;
         }
-        jobService.enqueue(JobType.SUBMIT_TRANSFER, transferId, LocalDateTime.now());
+        jobService.enqueue(JobReferenceKind.TRANSFER, JobType.SUBMIT_TRANSFER, transferId, LocalDateTime.now());
     }
 
     private void ensurePollJobQueued(String transferId) {
-        if (jobRepository.existsByReferenceIdAndJobTypeAndStatusIn(transferId, JobType.POLL_TRANSFER_RECEIPT, ACTIVE_JOB_STATUSES)) {
+        if (jobRepository.existsByReferenceKindAndReferenceIdAndJobTypeAndStatusIn(
+                JobReferenceKind.TRANSFER,
+                transferId,
+                JobType.POLL_TRANSFER_RECEIPT,
+                ACTIVE_JOB_STATUSES
+        )) {
             return;
         }
-        jobService.enqueue(JobType.POLL_TRANSFER_RECEIPT, transferId, LocalDateTime.now());
+        jobService.enqueue(JobReferenceKind.TRANSFER, JobType.POLL_TRANSFER_RECEIPT, transferId, LocalDateTime.now());
     }
 
     private int normalizeLimit(Integer requestedLimit) {
@@ -183,6 +204,7 @@ public class RemittanceOpsService {
     private RemittanceOpsJobItemResponse toOpsJobItem(Job job) {
         return new RemittanceOpsJobItemResponse(
                 job.getId(),
+                job.getReferenceKind().name(),
                 job.getJobType().name(),
                 job.getStatus().name(),
                 job.getReferenceId(),

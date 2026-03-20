@@ -22,13 +22,15 @@ import java.time.LocalDateTime;
         name = "jobs",
         indexes = {
                 @Index(name = "idx_jobs_status_run_at", columnList = "status, run_at, id"),
-                @Index(name = "idx_jobs_reference_type", columnList = "reference_id, job_type"),
+                @Index(name = "idx_jobs_reference_kind_id_type", columnList = "reference_kind, reference_id, job_type"),
                 @Index(name = "uk_jobs_active_key", columnList = "active_key", unique = true)
         }
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Job {
+
+    private static final int ACTIVE_KEY_MAX_LENGTH = 200;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,10 +40,14 @@ public class Job {
     @Column(name = "job_type", nullable = false, length = 40)
     private JobType jobType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reference_kind", nullable = false, length = 40)
+    private JobReferenceKind referenceKind;
+
     @Column(name = "reference_id", nullable = false, length = 64)
     private String referenceId;
 
-    @Column(name = "active_key", length = 128)
+    @Column(name = "active_key", length = ACTIVE_KEY_MAX_LENGTH)
     private String activeKey;
 
     @Enumerated(EnumType.STRING)
@@ -63,17 +69,22 @@ public class Job {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    private Job(JobType jobType, String referenceId, LocalDateTime runAt) {
+    private Job(JobReferenceKind referenceKind, JobType jobType, String referenceId, LocalDateTime runAt) {
+        this.referenceKind = referenceKind;
         this.jobType = jobType;
         this.referenceId = referenceId;
-        this.activeKey = buildActiveKey(jobType, referenceId);
+        this.activeKey = buildActiveKey(referenceKind, jobType, referenceId);
         this.status = JobStatus.QUEUED;
         this.attemptCount = 0;
         this.runAt = runAt;
     }
 
+    public static Job queue(JobReferenceKind referenceKind, JobType jobType, String referenceId, LocalDateTime runAt) {
+        return new Job(referenceKind, jobType, referenceId, runAt);
+    }
+
     public static Job queue(JobType jobType, String referenceId, LocalDateTime runAt) {
-        return new Job(jobType, referenceId, runAt);
+        return queue(jobType.getReferenceKind(), jobType, referenceId, runAt);
     }
 
     public void markRunning() {
@@ -99,8 +110,16 @@ public class Job {
         this.lastError = sanitizeError(lastError);
     }
 
+    public static String buildActiveKey(JobReferenceKind referenceKind, JobType jobType, String referenceId) {
+        String activeKey = referenceKind.name() + ":" + jobType.name() + ":" + referenceId;
+        if (activeKey.length() > ACTIVE_KEY_MAX_LENGTH) {
+            throw new IllegalArgumentException("Job active key exceeds max length");
+        }
+        return activeKey;
+    }
+
     public static String buildActiveKey(JobType jobType, String referenceId) {
-        return jobType.name() + ":" + referenceId;
+        return buildActiveKey(jobType.getReferenceKind(), jobType, referenceId);
     }
 
     @PrePersist

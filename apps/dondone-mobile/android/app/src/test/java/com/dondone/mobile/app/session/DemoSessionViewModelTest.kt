@@ -17,14 +17,23 @@ import com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload
 import com.dondone.mobile.data.remittance.RemittanceTransferSummaryPayload
 import com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload
 import com.dondone.mobile.data.remittance.RemittanceWalletPayload
+import com.dondone.mobile.data.wage.WageDepositRecordPayload
+import com.dondone.mobile.data.wage.WageRemoteState
+import com.dondone.mobile.data.wage.WageRepository
+import com.dondone.mobile.data.wage.WageVerificationCreatedPayload
+import com.dondone.mobile.data.wage.WageVerificationDetailPayload
 import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.data.workproof.WorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofWorkplacePayload
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.WorkproofData
+import com.dondone.mobile.feature.home.presentation.toHomeUiModel
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.YearMonth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -324,7 +333,8 @@ class DemoSessionViewModelTest {
             authRepository = authRepository,
             advanceRepository = advanceRepository,
             workproofRepository = FakeWorkproofRepository(),
-            remittanceRepository = remittanceRepository
+            remittanceRepository = remittanceRepository,
+            wageRepository = FakeWageRepository()
         )
 
         advanceUntilIdle()
@@ -577,6 +587,249 @@ class DemoSessionViewModelTest {
         assertFalse(viewModel.remittanceActionUiState.value.isError)
     }
 
+    @Test
+    fun `confirmed transfer reloads remote balance so home uses latest dusdc amount`() = runTest {
+        val session = testSession()
+        val walletAddress = "0x1111111111111111111111111111111111111111"
+        val recipientAddress = "0x2222222222222222222222222222222222222222"
+        val initialRemoteState = RemittanceRemoteState.content(
+            RemittanceRemotePayload(
+                wallet = RemittanceWalletPayload(
+                    walletAddress = walletAddress,
+                    fundingStatus = "FUNDED",
+                    fundingFailureReason = null,
+                    fundedAt = LocalDateTime.parse("2026-03-19T09:00:00"),
+                    createdAt = LocalDateTime.parse("2026-03-19T08:59:00")
+                ),
+                balance = RemittanceWalletBalancePayload(
+                    walletAddress = walletAddress,
+                    assetSymbol = "dUSDC",
+                    assetDecimals = 6,
+                    tokenBalanceAtomic = "500000000",
+                    nativeBalanceWei = "10000000000000000"
+                ),
+                recipients = listOf(
+                    RemittanceRecipientPayload(
+                        recipientId = "rcpt-1",
+                        alias = "테스트 수신자",
+                        relation = "FRIEND",
+                        walletAddress = recipientAddress,
+                        allowed = true,
+                        recentlyUpdated = false,
+                        updatedAt = LocalDateTime.parse("2026-03-19T09:05:00")
+                    )
+                ),
+                transfers = emptyList(),
+                activeTransfer = null
+            )
+        )
+        val confirmedTransferDetail = RemittanceTransferDetailPayload(
+            transferId = "tx-1",
+            status = "CONFIRMED",
+            assetSymbol = "dUSDC",
+            amountAtomic = 360_000_000L,
+            senderAddress = walletAddress,
+            recipientId = "rcpt-1",
+            recipientAlias = "테스트 수신자",
+            recipientAddress = recipientAddress,
+            txHash = "0xabc",
+            failureCode = null,
+            createdAt = LocalDateTime.parse("2026-03-19T09:09:00"),
+            updatedAt = LocalDateTime.parse("2026-03-19T09:10:00")
+        )
+        val remoteStateAfterConfirmation = RemittanceRemoteState.content(
+            RemittanceRemotePayload(
+                wallet = RemittanceWalletPayload(
+                    walletAddress = walletAddress,
+                    fundingStatus = "FUNDED",
+                    fundingFailureReason = null,
+                    fundedAt = LocalDateTime.parse("2026-03-19T09:00:00"),
+                    createdAt = LocalDateTime.parse("2026-03-19T08:59:00")
+                ),
+                balance = RemittanceWalletBalancePayload(
+                    walletAddress = walletAddress,
+                    assetSymbol = "dUSDC",
+                    assetDecimals = 6,
+                    tokenBalanceAtomic = "140000000",
+                    nativeBalanceWei = "10000000000000000"
+                ),
+                recipients = listOf(
+                    RemittanceRecipientPayload(
+                        recipientId = "rcpt-1",
+                        alias = "테스트 수신자",
+                        relation = "FRIEND",
+                        walletAddress = recipientAddress,
+                        allowed = true,
+                        recentlyUpdated = false,
+                        updatedAt = LocalDateTime.parse("2026-03-19T09:05:00")
+                    )
+                ),
+                transfers = listOf(
+                    RemittanceTransferSummaryPayload(
+                        transferId = "tx-1",
+                        status = "CONFIRMED",
+                        assetSymbol = "dUSDC",
+                        amountAtomic = 360_000_000L,
+                        recipientId = "rcpt-1",
+                        recipientAlias = "테스트 수신자",
+                        recipientAddress = recipientAddress,
+                        txHash = "0xabc",
+                        updatedAt = LocalDateTime.parse("2026-03-19T09:10:00")
+                    )
+                ),
+                activeTransfer = confirmedTransferDetail
+            )
+        )
+        val remittanceRepository = FakeRemittanceRepository(
+            result = initialRemoteState,
+            precheckResult = RemittanceTransferPrecheckPayload(
+                allowed = true,
+                policyCode = null,
+                assetSymbol = "dUSDC",
+                highAmountThresholdAtomic = 1_000_000_000L,
+                recentRecipientConfirmationRequired = false,
+                recentRecipientUpdatedAt = null,
+                walletAddress = walletAddress,
+                currentTokenBalanceAtomic = "500000000",
+                currentNativeBalanceWei = "10000000000000000"
+            ),
+            createTransferResult = RemittanceCreateTransferPayload(
+                transferId = "tx-1",
+                status = "REQUESTED",
+                assetSymbol = "dUSDC",
+                amountAtomic = 360_000_000L,
+                recipientId = "rcpt-1",
+                createdAt = LocalDateTime.parse("2026-03-19T09:09:00")
+            ),
+            transferDetailResults = listOf(confirmedTransferDetail),
+            resultAfterTerminalLoad = remoteStateAfterConfirmation
+        )
+        val viewModel = DemoSessionViewModel(
+            authRepository = FakeAuthRepository(restoredSession = session),
+            advanceRepository = FakeAdvanceRepository(),
+            workproofRepository = FakeWorkproofRepository(),
+            remittanceRepository = remittanceRepository,
+            wageRepository = FakeWageRepository()
+        )
+
+        advanceUntilIdle()
+        viewModel.updateTransferAmount(360)
+        viewModel.submitTransfer()
+        advanceUntilIdle()
+        viewModel.confirmTransfer()
+        advanceUntilIdle()
+        advanceTimeBy(1_500L)
+        advanceUntilIdle()
+
+        assertEquals("140000000", viewModel.remittanceRemoteState.value.payload?.balance?.tokenBalanceAtomic)
+        assertEquals(TransferStatus.CONFIRMED, viewModel.uiState.value.remittance.status)
+        assertEquals(3, remittanceRepository.loadedTokens.size)
+        assertEquals(
+            "140 dUSDC",
+            viewModel.uiState.value.toHomeUiModel(
+                remittanceRemoteState = viewModel.remittanceRemoteState.value,
+                isAuthenticated = true
+            ).account.balanceText
+        )
+    }
+
+    @Test
+    fun `silent remittance reload still expires session when terminal refresh becomes unauthenticated`() = runTest {
+        val session = testSession()
+        val walletAddress = "0x1111111111111111111111111111111111111111"
+        val recipientAddress = "0x2222222222222222222222222222222222222222"
+        val initialRemoteState = RemittanceRemoteState.content(
+            RemittanceRemotePayload(
+                wallet = RemittanceWalletPayload(
+                    walletAddress = walletAddress,
+                    fundingStatus = "FUNDED",
+                    fundingFailureReason = null,
+                    fundedAt = LocalDateTime.parse("2026-03-19T09:00:00"),
+                    createdAt = LocalDateTime.parse("2026-03-19T08:59:00")
+                ),
+                balance = RemittanceWalletBalancePayload(
+                    walletAddress = walletAddress,
+                    assetSymbol = "dUSDC",
+                    assetDecimals = 6,
+                    tokenBalanceAtomic = "500000000",
+                    nativeBalanceWei = "10000000000000000"
+                ),
+                recipients = listOf(
+                    RemittanceRecipientPayload(
+                        recipientId = "rcpt-1",
+                        alias = "테스트 수신자",
+                        relation = "FRIEND",
+                        walletAddress = recipientAddress,
+                        allowed = true,
+                        recentlyUpdated = false,
+                        updatedAt = LocalDateTime.parse("2026-03-19T09:05:00")
+                    )
+                ),
+                transfers = emptyList(),
+                activeTransfer = null
+            )
+        )
+        val confirmedTransferDetail = RemittanceTransferDetailPayload(
+            transferId = "tx-1",
+            status = "CONFIRMED",
+            assetSymbol = "dUSDC",
+            amountAtomic = 360_000_000L,
+            senderAddress = walletAddress,
+            recipientId = "rcpt-1",
+            recipientAlias = "테스트 수신자",
+            recipientAddress = recipientAddress,
+            txHash = "0xabc",
+            failureCode = null,
+            createdAt = LocalDateTime.parse("2026-03-19T09:09:00"),
+            updatedAt = LocalDateTime.parse("2026-03-19T09:10:00")
+        )
+        val authRepository = FakeAuthRepository(restoredSession = session)
+        val remittanceRepository = FakeRemittanceRepository(
+            result = initialRemoteState,
+            precheckResult = RemittanceTransferPrecheckPayload(
+                allowed = true,
+                policyCode = null,
+                assetSymbol = "dUSDC",
+                highAmountThresholdAtomic = 1_000_000_000L,
+                recentRecipientConfirmationRequired = false,
+                recentRecipientUpdatedAt = null,
+                walletAddress = walletAddress,
+                currentTokenBalanceAtomic = "500000000",
+                currentNativeBalanceWei = "10000000000000000"
+            ),
+            createTransferResult = RemittanceCreateTransferPayload(
+                transferId = "tx-1",
+                status = "REQUESTED",
+                assetSymbol = "dUSDC",
+                amountAtomic = 360_000_000L,
+                recipientId = "rcpt-1",
+                createdAt = LocalDateTime.parse("2026-03-19T09:09:00")
+            ),
+            transferDetailResults = listOf(confirmedTransferDetail),
+            resultAfterTerminalLoad = RemittanceRemoteState.unauthenticated("세션이 만료되어 다시 로그인해 주세요.")
+        )
+        val viewModel = DemoSessionViewModel(
+            authRepository = authRepository,
+            advanceRepository = FakeAdvanceRepository(),
+            workproofRepository = FakeWorkproofRepository(),
+            remittanceRepository = remittanceRepository,
+            wageRepository = FakeWageRepository()
+        )
+
+        advanceUntilIdle()
+        viewModel.updateTransferAmount(360)
+        viewModel.submitTransfer()
+        advanceUntilIdle()
+        viewModel.confirmTransfer()
+        advanceUntilIdle()
+        advanceTimeBy(1_500L)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.authUiState.value.isAuthenticated)
+        assertEquals("세션이 만료되어 다시 로그인해 주세요.", viewModel.authUiState.value.errorMessage)
+        assertTrue(authRepository.logoutCalled)
+    }
+
     private fun testSession(
         accessToken: String = "token-123",
         email: String = "test@gmail.com",
@@ -730,13 +983,50 @@ class DemoSessionViewModelTest {
         }
     }
 
+    private class FakeWageRepository : WageRepository {
+        override suspend fun load(
+            accessToken: String,
+            month: YearMonth,
+            asOf: LocalDate,
+            paydayDay: Int
+        ): WageRemoteState = WageRemoteState.empty("급여 데이터 없음")
+
+        override suspend fun createDeposit(
+            accessToken: String,
+            month: YearMonth,
+            depositDate: LocalDate,
+            actualDepositAmount: Long,
+            deductionsKnown: Boolean,
+            note: String?
+        ): WageDepositRecordPayload = error("not used")
+
+        override suspend fun createVerification(
+            accessToken: String,
+            month: YearMonth,
+            workplaceId: Long,
+            actualDepositAmount: Long,
+            deductionsKnown: Boolean,
+            memo: String?
+        ): WageVerificationCreatedPayload = error("not used")
+
+        override suspend fun getVerificationDetail(
+            accessToken: String,
+            verificationId: Long
+        ): WageVerificationDetailPayload = error("not used")
+    }
+
     private class FakeRemittanceRepository(
         private val result: RemittanceRemoteState,
         private val createdRecipient: RemittanceRecipientPayload? = null,
         private val resultAfterCreate: RemittanceRemoteState? = null,
-        private val resultAfterUpdate: RemittanceRemoteState? = null
+        private val resultAfterUpdate: RemittanceRemoteState? = null,
+        private val precheckResult: RemittanceTransferPrecheckPayload? = null,
+        private val createTransferResult: RemittanceCreateTransferPayload? = null,
+        transferDetailResults: List<RemittanceTransferDetailPayload> = emptyList(),
+        private val resultAfterTerminalLoad: RemittanceRemoteState? = null
     ) : RemittanceRepository {
         private var currentResult: RemittanceRemoteState = result
+        private val queuedTransferDetails = ArrayDeque(transferDetailResults)
         val loadedTokens = mutableListOf<String>()
         val createRecipientCalls = mutableListOf<CreateRecipientCall>()
         val updateRecipientCalls = mutableListOf<UpdateRecipientCall>()
@@ -782,7 +1072,9 @@ class DemoSessionViewModelTest {
             amountAtomic: Long,
             highAmountConfirmed: Boolean,
             recentRecipientConfirmed: Boolean
-        ): RemittanceTransferPrecheckPayload = error("not used")
+        ): RemittanceTransferPrecheckPayload {
+            return precheckResult ?: error("precheck should not be called without a prepared result")
+        }
 
         override suspend fun createTransfer(
             accessToken: String,
@@ -790,11 +1082,21 @@ class DemoSessionViewModelTest {
             amountAtomic: Long,
             highAmountConfirmed: Boolean,
             recentRecipientConfirmed: Boolean
-        ): RemittanceCreateTransferPayload = error("not used")
+        ): RemittanceCreateTransferPayload {
+            resultAfterCreate?.let { currentResult = it }
+            return createTransferResult ?: error("createTransfer should not be called without a prepared result")
+        }
 
         override suspend fun getTransferDetail(
             accessToken: String,
             transferId: String
-        ): RemittanceTransferDetailPayload = error("not used")
+        ): RemittanceTransferDetailPayload {
+            val detail = queuedTransferDetails.removeFirstOrNull()
+                ?: error("getTransferDetail should not be called without a prepared result")
+            if (detail.status == "CONFIRMED" || detail.status == "FAILED" || detail.status == "TIMED_OUT") {
+                resultAfterTerminalLoad?.let { currentResult = it }
+            }
+            return detail
+        }
     }
 }

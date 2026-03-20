@@ -1,6 +1,7 @@
 package com.workproofpay.backend.remittance;
 
 import com.workproofpay.backend.jobs.model.Job;
+import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.model.JobStatus;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
@@ -8,12 +9,14 @@ import com.workproofpay.backend.jobs.service.JobService;
 import com.workproofpay.backend.jobs.service.RemittanceJobWorker;
 import com.workproofpay.backend.remittance.adapter.RemittanceBlockchainGateway;
 import com.workproofpay.backend.remittance.config.RemittanceProperties;
+import com.workproofpay.backend.remittance.model.RecipientRelation;
 import com.workproofpay.backend.remittance.model.Transfer;
 import com.workproofpay.backend.remittance.model.TransferFailureCode;
 import com.workproofpay.backend.remittance.model.TransferStatus;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
+import com.workproofpay.backend.remittance.service.RemittanceMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -61,6 +65,9 @@ class RemittanceJobWorkerTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
+    @Mock
+    private RemittanceMetrics remittanceMetrics;
+
     private RemittanceJobWorker worker;
 
     @BeforeEach
@@ -77,12 +84,13 @@ class RemittanceJobWorkerTest {
                 blockchainGateway,
                 jobService,
                 properties,
-                transactionTemplate
+                transactionTemplate,
+                remittanceMetrics
         );
 
         when(transactionTemplate.execute(any(TransactionCallback.class)))
                 .thenAnswer(invocation -> ((TransactionCallback<?>) invocation.getArgument(0)).doInTransaction(null));
-        doAnswer(invocation -> {
+        lenient().doAnswer(invocation -> {
             ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(null);
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
@@ -105,6 +113,9 @@ class RemittanceJobWorkerTest {
                 50_000_000L,
                 "0x1111111111111111111111111111111111111111",
                 "0x2222222222222222222222222222222222222222",
+                "Worker Recipient",
+                RecipientRelation.FAMILY,
+                null,
                 "idem-timeout",
                 false,
                 true
@@ -119,11 +130,15 @@ class RemittanceJobWorkerTest {
         job.onCreate();
         ReflectionTestUtils.setField(job, "id", 1L);
 
-        when(jobRepository.findTop20ByStatusAndRunAtLessThanEqualOrderByIdAsc(any(), any()))
+        when(jobRepository.findTop20ByReferenceKindAndStatusAndRunAtLessThanEqualOrderByIdAsc(
+                eq(JobReferenceKind.TRANSFER),
+                any(),
+                any()
+        ))
                 .thenReturn(List.of(job));
         when(jobRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.of(job));
-        when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
-        when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
+        lenient().when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
+        lenient().when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
         when(blockchainGateway.getReceipt(transfer.getTxHash())).thenReturn(Optional.empty());
         when(blockchainGateway.isTransactionKnown(transfer.getTxHash())).thenReturn(false);
 
@@ -145,6 +160,9 @@ class RemittanceJobWorkerTest {
                 50_000_000L,
                 "0x1111111111111111111111111111111111111111",
                 "0x2222222222222222222222222222222222222222",
+                "Worker Recipient",
+                RecipientRelation.FAMILY,
+                null,
                 "idem-known",
                 false,
                 true
@@ -159,11 +177,15 @@ class RemittanceJobWorkerTest {
         job.onCreate();
         ReflectionTestUtils.setField(job, "id", 2L);
 
-        when(jobRepository.findTop20ByStatusAndRunAtLessThanEqualOrderByIdAsc(any(), any()))
+        when(jobRepository.findTop20ByReferenceKindAndStatusAndRunAtLessThanEqualOrderByIdAsc(
+                eq(JobReferenceKind.TRANSFER),
+                any(),
+                any()
+        ))
                 .thenReturn(List.of(job));
         when(jobRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.of(job));
-        when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
-        when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
+        lenient().when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
+        lenient().when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
         when(blockchainGateway.getReceipt(transfer.getTxHash())).thenReturn(Optional.empty());
         when(blockchainGateway.isTransactionKnown(transfer.getTxHash())).thenReturn(true);
 

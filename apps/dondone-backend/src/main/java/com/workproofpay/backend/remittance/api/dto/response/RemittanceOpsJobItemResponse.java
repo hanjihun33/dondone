@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public record RemittanceOpsJobItemResponse(
         Long jobId,
+        String referenceKind,
         String jobType,
         String status,
         String referenceId,

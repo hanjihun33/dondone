@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: DonDone
+    orgId: 1
+    folder: DonDone
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
