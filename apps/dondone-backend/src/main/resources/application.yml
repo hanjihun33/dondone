@@ -37,8 +37,8 @@ remittance:
     max-auto-retry-count: ${REMITTANCE_MAX_AUTO_RETRY_COUNT:2}
     default-list-limit: ${REMITTANCE_DEFAULT_LIST_LIMIT:20}
   worker:
-    poll-interval-ms: ${REMITTANCE_WORKER_POLL_INTERVAL_MS:2000}
-    receipt-poll-delay-seconds: ${REMITTANCE_RECEIPT_POLL_DELAY_SECONDS:2}
+    poll-interval-ms: ${REMITTANCE_WORKER_POLL_INTERVAL_MS:500}
+    receipt-poll-delay-seconds: ${REMITTANCE_RECEIPT_POLL_DELAY_SECONDS:0}
     receipt-timeout-seconds: ${REMITTANCE_RECEIPT_TIMEOUT_SECONDS:300}
   chain:
     mode: ${REMITTANCE_CHAIN_MODE:demo}
