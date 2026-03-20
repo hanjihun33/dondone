@@ -1,9 +1,13 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { ApiError } from "../shared/api/client";
+import { getEmployerProfile } from "../shared/api/employer";
 import {
-  clearStoredUserRole,
-  getStoredUserRole,
-  subscribeUserRoleChange
+  clearStoredSession,
+  getStoredAccessToken,
+  getStoredSession,
+  subscribeUserRoleChange,
+  updateStoredEmployerProfile
 } from "../shared/auth/session";
 import {
   AdminShieldIcon,
@@ -27,33 +31,85 @@ const managerNavItems: NavItem[] = [
   { icon: <SettingsIcon />, label: "설정", to: "/settings" }
 ];
 
-const adminNavItems: NavItem[] = [
-  { icon: <AdminShieldIcon />, label: "관리자", to: "/admin" }
-];
+const adminNavItems: NavItem[] = [{ icon: <AdminShieldIcon />, label: "관리자", to: "/admin" }];
 
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [userRole, setUserRole] = useState(() => getStoredUserRole());
-  const navItems = userRole === "admin" ? adminNavItems : managerNavItems;
+  const [session, setSession] = useState(() => getStoredSession());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     return subscribeUserRoleChange(() => {
-      setUserRole(getStoredUserRole());
+      setSession(getStoredSession());
     });
   }, []);
 
-  if (userRole === null) {
+  useEffect(() => {
+    if (session?.role !== "manager") {
+      setProfileError(null);
+      return;
+    }
+
+    const token = getStoredAccessToken();
+    if (!token) {
+      return;
+    }
+
+    let isDisposed = false;
+
+    void getEmployerProfile(token)
+      .then((profile) => {
+        if (isDisposed) {
+          return;
+        }
+
+        updateStoredEmployerProfile(profile);
+        setProfileError(null);
+      })
+      .catch((error: unknown) => {
+        if (isDisposed) {
+          return;
+        }
+
+        if (error instanceof ApiError && error.status === 401) {
+          clearStoredSession();
+          navigate("/", { replace: true });
+          return;
+        }
+
+        setProfileError(error instanceof Error ? error.message : "프로필을 불러오지 못했습니다.");
+      });
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [navigate, refreshTick, session?.role]);
+
+  if (session === null) {
     return <Navigate to="/" replace />;
   }
 
+  const userRole = session.role;
+  const navItems = userRole === "admin" ? adminNavItems : managerNavItems;
+  const employerSession = session.role === "manager" ? session : null;
+  const companyName = employerSession?.profile?.companyName ?? employerSession?.scope.companyName ?? "-";
+  const companyCode = employerSession?.profile?.companyCode ?? "확인 불가";
+  const workplaceName =
+    employerSession?.profile?.defaultWorkplaceName ??
+    employerSession?.scope.defaultWorkplaceName ??
+    "-";
+  const displayName = employerSession?.profile?.displayName ?? "운영 담당자";
+  const email = employerSession?.profile?.email ?? "-";
+  const status = employerSession?.profile?.status ?? "ACTIVE";
+
   const handleLogoutClick = () => {
-    clearStoredUserRole();
+    clearStoredSession();
     setIsHelpOpen(false);
     setIsSettingsOpen(false);
     setIsProfileOpen(false);
@@ -81,32 +137,30 @@ export function AppShell() {
         </div>
 
         <nav className="nav-group">
-          {navItems.map((item, idx) => {
-            return (
-              <NavLink
-                key={`${item.label}-${idx}`}
-                to={item.to}
-                className={({ isActive }) => {
-                  const active = isActive && location.pathname === item.to;
-                  return `nav-item${active ? " active" : ""}`;
-                }}
-                title={isSidebarCollapsed ? item.label : undefined}
-              >
-                <span className="nav-item-icon" aria-hidden="true">
-                  {item.icon}
-                </span>
-                <span className="nav-item-label">{item.label}</span>
-              </NavLink>
-            );
-          })}
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => {
+                const active = isActive && location.pathname === item.to;
+                return `nav-item${active ? " active" : ""}`;
+              }}
+              title={isSidebarCollapsed ? item.label : undefined}
+            >
+              <span className="nav-item-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className="nav-item-label">{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         <div className="sidebar-bottom">
           <section className="company-code-card">
             <div className="label">회사 확인 코드</div>
-            <div className="company-code">DN-SEOUL-2914</div>
+            <div className="company-code">{companyCode}</div>
             <div className="company-code-meta">
-              연결된 근로자 24명 · 마지막 확인 09:18
+              {companyName} / {workplaceName}
             </div>
           </section>
         </div>
@@ -169,7 +223,9 @@ export function AppShell() {
             <span className="header-profile-avatar" aria-hidden="true">
               <UserAvatarIcon />
             </span>
-            <span className="header-profile-name">내 프로필</span>
+            <span className="header-profile-name">
+              {userRole === "admin" ? "관리자" : displayName}
+            </span>
           </button>
         </div>
       </header>
@@ -187,21 +243,15 @@ export function AppShell() {
             setIsProfileOpen(false);
           }}
         >
-          <aside
-            className="header-popover-panel"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <aside className="header-popover-panel" onClick={(event) => event.stopPropagation()}>
             {isHelpOpen ? (
               <>
                 <div className="popover-kicker">도움말</div>
                 <h3 className="popover-title">이 화면에서 할 수 있는 일</h3>
                 <ul className="popover-list">
                   <li>오늘 출퇴근 현황과 요청 관리 상태를 한 번에 확인합니다.</li>
-                  <li>근무 수정, 휴가 생성, 위치 불일치 같은 이슈를 검토합니다.</li>
-                  <li>
-                    Verified Worker Summary와 회사 확인 코드는 운영 보조 신호로만
-                    사용합니다.
-                  </li>
+                  <li>근무 수정과 검토 필요 이슈를 확인하고 처리합니다.</li>
+                  <li>회사 확인 코드는 운영 보조 신호로만 사용합니다.</li>
                 </ul>
               </>
             ) : null}
@@ -212,15 +262,15 @@ export function AppShell() {
                 <h3 className="popover-title">회사 설정 요약</h3>
                 <div className="popover-setting-card">
                   <span>회사 확인 코드</span>
-                  <strong>DN-SEOUL-2914</strong>
+                  <strong>{companyCode}</strong>
                 </div>
                 <div className="popover-setting-card">
                   <span>연결 근로자</span>
-                  <strong>24명</strong>
+                  <strong>-</strong>
                 </div>
                 <div className="popover-setting-card">
                   <span>기본 사업장</span>
-                  <strong>서울본사</strong>
+                  <strong>{workplaceName}</strong>
                 </div>
               </>
             ) : null}
@@ -231,21 +281,29 @@ export function AppShell() {
                 <h3 className="popover-title">계정 정보</h3>
                 <div className="popover-setting-card">
                   <span>이름</span>
-                  <strong>김운영</strong>
+                  <strong>{userRole === "admin" ? "관리자" : displayName}</strong>
                 </div>
                 <div className="popover-setting-card">
                   <span>이메일</span>
-                  <strong>admin@dondone.local</strong>
+                  <strong>{userRole === "admin" ? "admin@dondone.local" : email}</strong>
                 </div>
                 <div className="popover-setting-card">
                   <span>권한</span>
                   <strong>{userRole === "admin" ? "관리자" : "운영 담당자"}</strong>
                 </div>
-                <button
-                  type="button"
-                  className="popover-logout-btn"
-                  onClick={handleLogoutClick}
-                >
+                {userRole === "manager" ? (
+                  <div className="popover-setting-card">
+                    <span>상태</span>
+                    <strong>{status}</strong>
+                  </div>
+                ) : null}
+                {profileError ? (
+                  <div className="popover-setting-card">
+                    <span>동기화 상태</span>
+                    <strong>{profileError}</strong>
+                  </div>
+                ) : null}
+                <button type="button" className="popover-logout-btn" onClick={handleLogoutClick}>
                   로그아웃
                 </button>
               </>

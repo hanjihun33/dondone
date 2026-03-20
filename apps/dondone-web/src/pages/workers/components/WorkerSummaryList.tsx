@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Badge } from "../../../shared/ui/Badge";
 import { UserAvatarIcon } from "../../../shared/ui/icons";
 import type { WorkerListColumn, WorkerListRow } from "../model/workerSummaryData";
 
@@ -44,11 +45,39 @@ function WorkerAvatar({ name, avatarTone, avatarUrl }: WorkerAvatarProps) {
   );
 }
 
-export function WorkerSummaryList({
-  columns,
-  rows,
-  pagination
-}: WorkerSummaryListProps) {
+function getStatusTone(status: WorkerListRow["attendanceStatus"]) {
+  if (status === "COMPLETED") {
+    return "success" as const;
+  }
+
+  if (status === "NEEDS_REVIEW") {
+    return "warn" as const;
+  }
+
+  if (status === "NO_RECORD") {
+    return "danger" as const;
+  }
+
+  return "soft" as const;
+}
+
+function getStatusLabel(status: WorkerListRow["attendanceStatus"]) {
+  if (status === "WORKING") {
+    return "근무중";
+  }
+
+  if (status === "COMPLETED") {
+    return "근무 완료";
+  }
+
+  if (status === "NEEDS_REVIEW") {
+    return "검토 필요";
+  }
+
+  return "기록 없음";
+}
+
+export function WorkerSummaryList({ columns, rows, pagination }: WorkerSummaryListProps) {
   const pageItems =
     pagination.totalPages <= 7
       ? Array.from({ length: pagination.totalPages }, (_, index) => index + 1)
@@ -98,7 +127,7 @@ export function WorkerSummaryList({
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={row.employeeCode}>
+                <tr key={row.id}>
                   <td className="employee-cell">
                     <div className="employee-info">
                       <WorkerAvatar
@@ -109,6 +138,9 @@ export function WorkerSummaryList({
                       <div>
                         <strong>{row.name}</strong>
                         <p>{row.employeeCode}</p>
+                        <Badge tone={getStatusTone(row.attendanceStatus)}>
+                          {getStatusLabel(row.attendanceStatus)}
+                        </Badge>
                       </div>
                     </div>
                   </td>
@@ -116,12 +148,13 @@ export function WorkerSummaryList({
                     <div className="worker-role">
                       <strong>{row.appliedFor}</strong>
                       <p>{row.team}</p>
+                      <p>{row.latestWorkDate ? `최근 근무일: ${row.latestWorkDate}` : "최근 근무일 없음"}</p>
                     </div>
                   </td>
                   <td>
                     <div className="worker-contact">
                       <strong>{row.email}</strong>
-                      <a href={`tel:${row.phone}`}>{row.phone}</a>
+                      {row.phone === "-" ? <span>{row.phone}</span> : <a href={`tel:${row.phone}`}>{row.phone}</a>}
                     </div>
                   </td>
                 </tr>
@@ -137,9 +170,7 @@ export function WorkerSummaryList({
           <select
             id="worker-rows-per-page"
             value={pagination.rowsPerPage}
-            onChange={(event) =>
-              pagination.onRowsPerPageChange(Number(event.currentTarget.value))
-            }
+            onChange={(event) => pagination.onRowsPerPageChange(Number(event.currentTarget.value))}
           >
             {pagination.rowsPerPageOptions.map((option) => (
               <option key={option} value={option}>
@@ -156,9 +187,7 @@ export function WorkerSummaryList({
           <button
             type="button"
             className="worker-pagination-nav"
-            onClick={() =>
-              pagination.onPageChange(Math.max(1, pagination.currentPage - 1))
-            }
+            onClick={() => pagination.onPageChange(Math.max(1, pagination.currentPage - 1))}
             disabled={pagination.currentPage <= 1}
             aria-label="이전 페이지"
           >
@@ -167,20 +196,14 @@ export function WorkerSummaryList({
 
           {pageItems.map((item, index) =>
             item === "ellipsis" ? (
-              <span
-                key={`ellipsis-${index}`}
-                className="worker-pagination-ellipsis"
-                aria-hidden="true"
-              >
-                …
+              <span key={`ellipsis-${index}`} className="worker-pagination-ellipsis" aria-hidden="true">
+                ...
               </span>
             ) : (
               <button
                 type="button"
                 key={item}
-                className={`worker-pagination-page${
-                  item === pagination.currentPage ? " active" : ""
-                }`}
+                className={`worker-pagination-page${item === pagination.currentPage ? " active" : ""}`}
                 onClick={() => pagination.onPageChange(item)}
                 aria-current={item === pagination.currentPage ? "page" : undefined}
               >
@@ -193,9 +216,7 @@ export function WorkerSummaryList({
             type="button"
             className="worker-pagination-nav"
             onClick={() =>
-              pagination.onPageChange(
-                Math.min(pagination.totalPages, pagination.currentPage + 1)
-              )
+              pagination.onPageChange(Math.min(pagination.totalPages, pagination.currentPage + 1))
             }
             disabled={pagination.currentPage >= pagination.totalPages}
             aria-label="다음 페이지"

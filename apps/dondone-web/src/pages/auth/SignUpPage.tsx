@@ -1,9 +1,17 @@
-import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ApiError } from "../../shared/api/client";
+import { acceptEmployerInvitation, getEmployerProfile } from "../../shared/api/employer";
+import {
+  getStoredUserRole,
+  setStoredEmployerSession,
+  updateStoredEmployerProfile
+} from "../../shared/auth/session";
 import { RemoteConnectivityPanel } from "./components/RemoteConnectivityPanel";
 
 type SignUpFormState = {
-  companyName: string;
+  token: string;
+  displayName: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -19,11 +27,18 @@ type SignUpField = {
 
 const SIGN_UP_FIELDS: SignUpField[] = [
   {
-    key: "companyName",
-    label: "회사명",
+    key: "token",
+    label: "초대 토큰",
     type: "text",
-    placeholder: "회사명을 입력하세요",
-    autoComplete: "organization"
+    placeholder: "초대 토큰을 입력하세요",
+    autoComplete: "off"
+  },
+  {
+    key: "displayName",
+    label: "이름",
+    type: "text",
+    placeholder: "이름을 입력하세요",
+    autoComplete: "name"
   },
   {
     key: "email",
@@ -50,16 +65,60 @@ const SIGN_UP_FIELDS: SignUpField[] = [
 
 export function SignUpPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formState, setFormState] = useState<SignUpFormState>({
-    companyName: "",
+    token: searchParams.get("token") ?? "",
+    displayName: "",
     email: "",
     password: "",
     confirmPassword: ""
   });
+  const [submitState, setSubmitState] = useState<"idle" | "submitting">("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    const role = getStoredUserRole();
+    if (!role) {
+      return;
+    }
+
+    navigate(role === "admin" ? "/admin" : "/dashboard", { replace: true });
+  }, [navigate]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    navigate("/");
+
+    if (formState.password !== formState.confirmPassword) {
+      setErrorMessage("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    setSubmitState("submitting");
+    setErrorMessage(null);
+
+    try {
+      const auth = await acceptEmployerInvitation({
+        token: formState.token.trim(),
+        displayName: formState.displayName.trim(),
+        email: formState.email.trim().toLowerCase(),
+        password: formState.password
+      });
+
+      setStoredEmployerSession(auth);
+      const profile = await getEmployerProfile(auth.accessToken);
+      updateStoredEmployerProfile(profile);
+      navigate("/dashboard", { replace: true });
+    } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        setErrorMessage(error.message || error.code);
+      } else if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("회원가입에 실패했어요.");
+      }
+    } finally {
+      setSubmitState("idle");
+    }
   };
 
   const handleFieldChange = (key: keyof SignUpFormState, value: string) => {
@@ -100,10 +159,16 @@ export function SignUpPage() {
               <button
                 type="submit"
                 className="logged-out-primary-button logged-out-primary-button-large"
+                disabled={submitState === "submitting"}
               >
-                가입하기
+                {submitState === "submitting" ? "가입 중..." : "가입하기"}
               </button>
             </div>
+            {errorMessage ? (
+              <p className="logged-out-signup-hint" role="alert">
+                {errorMessage}
+              </p>
+            ) : null}
             <p className="logged-out-signup-hint">
               계정이 이미 있다면{" "}
               <Link to="/" className="logged-out-signup-link">

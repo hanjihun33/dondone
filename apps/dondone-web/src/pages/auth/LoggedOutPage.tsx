@@ -1,6 +1,14 @@
-﻿import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { resolveUserRoleByEmail, setStoredUserRole } from "../../shared/auth/session";
+import { ApiError } from "../../shared/api/client";
+import { getEmployerProfile, loginEmployer } from "../../shared/api/employer";
+import {
+  getStoredUserRole,
+  resolveUserRoleByEmail,
+  setStoredAdminSession,
+  setStoredEmployerSession,
+  updateStoredEmployerProfile
+} from "../../shared/auth/session";
 import { RemoteConnectivityPanel } from "./components/RemoteConnectivityPanel";
 
 type LoggedOutFormState = {
@@ -36,9 +44,20 @@ const LOGGED_OUT_FIELDS: LoggedOutField[] = [
 export function LoggedOutPage() {
   const navigate = useNavigate();
   const [formState, setFormState] = useState<LoggedOutFormState>({
-    email: "admin@dondone.local",
-    password: ""
+    email: "manager@gmail.com",
+    password: "qweqwe123"
   });
+  const [submitState, setSubmitState] = useState<"idle" | "submitting">("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const role = getStoredUserRole();
+    if (!role) {
+      return;
+    }
+
+    navigate(role === "admin" ? "/admin" : "/dashboard", { replace: true });
+  }, [navigate]);
 
   const handleFieldChange = (key: keyof LoggedOutFormState, value: string) => {
     setFormState((prev) => ({
@@ -47,11 +66,41 @@ export function LoggedOutPage() {
     }));
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const role = resolveUserRoleByEmail(formState.email);
-    setStoredUserRole(role);
-    navigate(role === "admin" ? "/admin" : "/dashboard");
+    setSubmitState("submitting");
+    setErrorMessage(null);
+
+    const normalizedEmail = formState.email.trim().toLowerCase();
+    const role = resolveUserRoleByEmail(normalizedEmail);
+
+    try {
+      if (role === "admin") {
+        setStoredAdminSession();
+        navigate("/admin", { replace: true });
+        return;
+      }
+
+      const auth = await loginEmployer({
+        email: normalizedEmail,
+        password: formState.password
+      });
+
+      setStoredEmployerSession(auth);
+      const profile = await getEmployerProfile(auth.accessToken);
+      updateStoredEmployerProfile(profile);
+      navigate("/dashboard", { replace: true });
+    } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        setErrorMessage(error.message || error.code);
+      } else if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("로그인에 실패했어요.");
+      }
+    } finally {
+      setSubmitState("idle");
+    }
   };
 
   return (
@@ -85,8 +134,9 @@ export function LoggedOutPage() {
               <button
                 type="submit"
                 className="logged-out-primary-button logged-out-primary-button-large"
+                disabled={submitState === "submitting"}
               >
-                로그인
+                {submitState === "submitting" ? "로그인 중..." : "로그인"}
               </button>
             </div>
             <p className="logged-out-signup-hint">
@@ -95,6 +145,14 @@ export function LoggedOutPage() {
                 회원가입
               </Link>
             </p>
+            <p className="logged-out-signup-hint">
+              개발용 사업주 계정: <strong>manager@gmail.com</strong> / <strong>qweqwe123</strong>
+            </p>
+            {errorMessage ? (
+              <p className="logged-out-signup-hint" role="alert">
+                {errorMessage}
+              </p>
+            ) : null}
           </form>
         </section>
       </div>
