@@ -415,7 +415,6 @@ fun WorkproofScreen(
                     val documentId = pdfCreateUiState.documentId ?: return@WorkproofPdfGenerationResultSheet
                     onShareWorkproofPdf(documentId)
                 },
-                onOpenDocuments = { showWorkproofPdfDocumentBoxToast(context) },
                 onDismiss = {
                     showPdfGenerationResultSheet = false
                     onClearPdfCreateState()
@@ -1143,7 +1142,6 @@ private fun WorkproofPdfGenerationResultSheet(
     fileName: String,
     onOpen: () -> Unit,
     onShare: () -> Unit,
-    onOpenDocuments: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val isActionable = createUiState.isActionable
@@ -1238,11 +1236,6 @@ private fun WorkproofPdfGenerationResultSheet(
                 modifier = Modifier.weight(1f)
             )
         }
-        SecondaryActionButton(
-            text = "문서함에서 보기",
-            onClick = onOpenDocuments,
-            modifier = Modifier.fillMaxWidth()
-        )
         SecondaryActionButton(
             text = "닫기",
             onClick = onDismiss,
@@ -2155,14 +2148,6 @@ private fun showWorkproofPdfDateRangeSavedToast(
     Toast.makeText(
         context,
         "선택 기간 ${formatWorkproofPdfDateRange(startDate, endDate)}",
-        Toast.LENGTH_SHORT
-    ).show()
-}
-
-private fun showWorkproofPdfDocumentBoxToast(context: Context) {
-    Toast.makeText(
-        context,
-        "문서함 연결은 다음 단계에서 메뉴 탭과 연결됩니다.",
         Toast.LENGTH_SHORT
     ).show()
 }
