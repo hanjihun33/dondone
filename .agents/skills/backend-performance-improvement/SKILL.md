@@ -1,4 +1,4 @@
-﻿---
+---
 name: backend-performance-improvement
 description: Use when improving DonDone backend performance with measurable before/after numbers that can be defended in review. Focus on Spring Boot, JPA, Querydsl, and PostgreSQL bottlenecks in workproof, advance, wage, documents, or claim flows.
 ---
