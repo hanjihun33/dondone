@@ -2,6 +2,8 @@ package com.workproofpay.backend.documents.pdf;
 
 import com.workproofpay.backend.documents.pdf.workproof.WorkProofPdfSnapshot;
 import org.junit.jupiter.api.Test;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
@@ -27,6 +29,8 @@ class ThymeleafOpenHtmlPdfRendererTest {
         assertThat(renderedPdf.bytes()).isNotEmpty();
         assertThat(new String(renderedPdf.bytes(), 0, Math.min(4, renderedPdf.bytes().length), StandardCharsets.ISO_8859_1))
                 .startsWith("%PDF");
+        assertThat(normalizeExtractedText(extractText(renderedPdf.bytes())))
+                .contains("근무 기록 문서", "반영 완료", "검토 필요");
     }
 
     private ClassLoaderTemplateResolver templateResolver() {
@@ -73,5 +77,21 @@ class ThymeleafOpenHtmlPdfRendererTest {
                         "수정된 기록은 하단 수정 이력 섹션에서 변경 전후 내용을 함께 확인할 수 있습니다."
                 )
         );
+    }
+
+    private String extractText(byte[] pdfBytes) {
+        try (PDDocument document = PDDocument.load(pdfBytes)) {
+            return new PDFTextStripper().getText(document);
+        } catch (Exception e) {
+            throw new AssertionError("Failed to extract PDF text for verification", e);
+        }
+    }
+
+    private String normalizeExtractedText(String text) {
+        return text
+                .replace('\u00A0', ' ')
+                .replace('\u2011', '-')
+                .replace('\u2013', '-')
+                .replace('\u2014', '-');
     }
 }
