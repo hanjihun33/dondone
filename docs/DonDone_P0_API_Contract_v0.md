@@ -1308,74 +1308,134 @@ Response:
 
 ## 9. Vault
 
-> PRD 7G 기준. 데모 시뮬레이션이며 수익 보장을 의미하지 않는다.
+> testnet demo 기준. 비동기 예치/출금 상태를 제공하지만 실제 수익 보장을 의미하지 않는다.
 
 ### 주요 엔드포인트
 
 | Method | Path | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/vault/summary` | 보관/이자 요약 조회 |
-| `POST` | `/api/vault/allocations` | 보관 금액 설정 |
-| `POST` | `/api/vault/releases` | 보관 금액 해제 |
+| `POST` | `/api/vault/deposits` | Vault 예치 요청 생성 |
+| `POST` | `/api/vault/withdrawals` | Vault 출금 요청 생성 |
+| `GET` | `/api/vault/transactions` | Vault 거래 목록 조회 |
+| `GET` | `/api/vault/transactions/{requestId}` | Vault 거래 상세 조회 |
 
 ### 9.1 `GET /api/vault/summary`
 
-배경: Vault는 남는 돈을 따로 보관해보는 데모 시뮬레이션 요약 화면을 위한 조회다.
-v0 메모: 예시 이자는 시뮬레이션 값이며 수익 보장을 의미하지 않는다.
+배경: Vault는 testnet vault position과 wallet 잔액을 함께 보여주는 요약 조회다.
+v0 메모: 예상 이자는 예시값이며 수익 보장을 의미하지 않는다.
 
 Response:
 | 필드 | 설명 |
 | --- | --- |
-| `storedAmount` | - |
-| `availableToStoreAmount` | - |
-| `availableToTransferAmount` | - |
-| `interestPreview` | object. 하위 필드: daily, monthly, apr |
+| `walletAddress` | 사용자 remittance 지갑 주소 |
+| `vaultAddress` | Vault 컨트랙트 주소 |
+| `network` | 예: `sepolia` |
+| `assetSymbol` | 예: `dUSDC` |
+| `assetDecimals` | 예: `6` |
+| `storedAmountAtomic` | 현재 vault principal |
+| `accruedYieldAtomic` | 누적 예상 이자 |
+| `walletTokenBalanceAtomic` | 지갑에 남아 있는 토큰 잔액 |
+| `availableToStoreAmountAtomic` | 추가 예치 가능 잔액 |
+| `shareBalance` | vault share 잔액 |
+| `interestPreview` | object. 하위 필드: `dailyEstimatedYieldAtomic`, `monthlyEstimatedYieldAtomic`, `yearlyEstimatedYieldAtomic`, `apyBps` |
 | `disclaimer` | - |
 
-### 9.2 `POST /api/vault/allocations`
+### 9.2 `POST /api/vault/deposits`
 
-배경: 사용 가능한 잔액 중 일부를 `보관 중` 상태로 옮겨보는 데모 액션이다.
-v0 메모: 실제 온체인 예치나 락업은 수행하지 않는다.
+배경: 사용자 지갑의 testnet 토큰을 Vault로 예치하는 비동기 요청을 생성한다.
+v0 메모: `Idempotency-Key` 헤더가 필요하며, 응답은 `REQUESTED -> SIGNED -> BROADCASTED -> CONFIRMED` 흐름을 따른다.
 
 Request:
 | 필드 | 설명 |
 | --- | --- |
-| `amount` | - |
+| Header `Idempotency-Key` | 중복 요청 방지 키 |
+| `amountAtomic` | - |
 
 Response:
 | 필드 | 설명 |
 | --- | --- |
-| `allocationId` | - |
-| `storedAmount` | - |
-| `availableToStoreAmount` | - |
-| `interestPreview` | object. 하위 필드: daily, monthly, apr |
-| `simulatedAt` | - |
+| `requestId` | vault transaction 식별자 |
+| `txType` | `DEPOSIT` |
+| `status` | 최초 `REQUESTED` |
+| `detailPath` | `/api/vault/transactions/{requestId}` |
+| `createdAt` | - |
 
 주요 에러:
 | HTTP | Code | 설명 |
 | --- | --- | --- |
-| `400` | `INVALID_ALLOCATION_AMOUNT` | - |
-| `409` | `INSUFFICIENT_AVAILABLE_BALANCE` | - |
+| `400` | `IDEMPOTENCY_KEY_REQUIRED` | - |
+| `400` | `INVALID_VAULT_AMOUNT` | - |
+| `409` | `VAULT_INSUFFICIENT_AVAILABLE_BALANCE` | - |
+| `409` | `VAULT_TRANSACTION_ALREADY_IN_PROGRESS` | - |
+| `409` | `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD` | - |
 
-### 9.3 `POST /api/vault/releases`
+### 9.3 `POST /api/vault/withdrawals`
 
-배경: 보관 중 금액을 다시 생활비 또는 송금 가능 금액으로 되돌리는 데모 액션이다.
-v0 메모: `target` 분기는 화면 표현과 시뮬레이션 잔액 해석을 위한 값이다.
+배경: Vault에 보관 중인 금액을 사용자 지갑으로 되돌리는 비동기 요청을 생성한다.
+v0 메모: `Idempotency-Key` 헤더가 필요하다.
 
 Request:
 | 필드 | 설명 |
 | --- | --- |
-| `amount` | - |
-| `target` | `SPENDABLE`, `TRANSFERABLE` |
+| Header `Idempotency-Key` | 중복 요청 방지 키 |
+| `amountAtomic` | - |
 
 Response:
 | 필드 | 설명 |
 | --- | --- |
-| `releaseId` | - |
-| `storedAmount` | - |
-| `releasedAmount` | - |
-| `availableToTransferAmount` | - |
-| `simulatedAt` | - |
+| `requestId` | vault transaction 식별자 |
+| `txType` | `WITHDRAW` |
+| `status` | 최초 `REQUESTED` |
+| `detailPath` | `/api/vault/transactions/{requestId}` |
+| `createdAt` | - |
+
+주요 에러:
+| HTTP | Code | 설명 |
+| --- | --- | --- |
+| `400` | `IDEMPOTENCY_KEY_REQUIRED` | - |
+| `400` | `INVALID_VAULT_AMOUNT` | - |
+| `409` | `VAULT_INSUFFICIENT_STORED_BALANCE` | - |
+| `409` | `VAULT_TRANSACTION_ALREADY_IN_PROGRESS` | - |
+| `409` | `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD` | - |
+
+### 9.4 `GET /api/vault/transactions`
+
+배경: 예치/출금 비동기 상태를 최신순으로 확인한다.
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `transactions[]` | 거래 목록 |
+| `transactions[].requestId` | - |
+| `transactions[].txType` | `DEPOSIT`, `WITHDRAW` |
+| `transactions[].status` | `REQUESTED`, `SIGNED`, `BROADCASTED`, `CONFIRMED`, `FAILED`, `TIMED_OUT` |
+| `transactions[].amountAtomic` | - |
+| `transactions[].shareDelta` | - |
+| `transactions[].txHash` | - |
+| `transactions[].failureCode` | 실패 시 코드 |
+| `transactions[].updatedAt` | - |
+
+### 9.5 `GET /api/vault/transactions/{requestId}`
+
+배경: 단건 거래의 확정 여부와 txHash를 확인한다.
+
+Response:
+| 필드 | 설명 |
+| --- | --- |
+| `requestId` | - |
+| `txType` | `DEPOSIT`, `WITHDRAW` |
+| `status` | - |
+| `walletAddress` | - |
+| `vaultAddress` | - |
+| `assetSymbol` | - |
+| `amountAtomic` | - |
+| `shareDelta` | - |
+| `txHash` | - |
+| `failureCode` | - |
+| `createdAt` | - |
+| `updatedAt` | - |
+| `confirmedAt` | 성공 확정 시각 |
 
 ## 10. Copilot
 
