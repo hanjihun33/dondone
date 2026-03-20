@@ -67,59 +67,40 @@ public class TransferService {
         String outcome = "error";
         boolean replayed = false;
 
-        if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            outcome = "invalid_idempotency_key";
-            throw new ApiException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
-        }
-
         try {
+            validateIdempotencyKey(idempotencyKey);
             walletService.getRequiredWalletForUpdate(userId);
 
-            Transfer existing = transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
+            Transfer existing = findExistingTransfer(userId, idempotencyKey);
             if (existing != null) {
                 replayed = true;
                 outcome = "replayed";
                 return replay(existing, request);
             }
 
-            RemittancePolicyDecision decision = policyService.evaluate(
-                    userId,
-                    request.recipientId(),
-                    request.amountAtomic(),
-                    request.highAmountConfirmed(),
-                    request.recentRecipientConfirmed()
-            );
+            RemittancePolicyDecision decision = evaluateCreateDecision(userId, request);
             if (!decision.allowed()) {
                 outcome = "blocked";
                 throw policyViolation(decision);
             }
 
-            Transfer transfer = Transfer.request(
-                    generateTransferId(),
-                    userId,
-                    request.recipientId(),
-                    properties.getPolicy().getAssetSymbol(),
-                    request.amountAtomic(),
-                    decision.wallet().getWalletAddress(),
-                    decision.recipient().getWalletAddress(),
-                    decision.recipient().getAlias(),
-                    decision.recipient().getRelation(),
-                    decision.recipient().getTargetUserId(),
-                    idempotencyKey,
-                    request.highAmountConfirmed(),
-                    request.recentRecipientConfirmed()
-            );
-
-            transferRepository.saveAndFlush(transfer);
-            jobService.enqueue(JobReferenceKind.TRANSFER, JobType.SUBMIT_TRANSFER, transfer.getTransferId(), LocalDateTime.now());
+            Transfer transfer = buildRequestedTransfer(userId, idempotencyKey, request, decision);
+            saveTransferAndEnqueue(transfer);
             outcome = "created";
             return new TransferCreateResult(false, toCreateResponse(transfer));
         } catch (DataIntegrityViolationException e) {
-            Transfer conflicted = transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
-                    .orElseThrow(() -> e);
+            Transfer conflicted = findExistingTransfer(userId, idempotencyKey);
+            if (conflicted == null) {
+                throw e;
+            }
             replayed = true;
             outcome = "replayed_after_conflict";
             return replay(conflicted, request);
+        } catch (ApiException e) {
+            if (e.getErrorCode() == ErrorCode.IDEMPOTENCY_KEY_REQUIRED) {
+                outcome = "invalid_idempotency_key";
+            }
+            throw e;
         } finally {
             remittanceMetrics.recordTransferCreate(sample, outcome, replayed);
         }
@@ -195,6 +176,54 @@ public class TransferService {
 
     private String generateTransferId() {
         return "tr_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    }
+
+    private void validateIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new ApiException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
+        }
+    }
+
+    private Transfer findExistingTransfer(Long userId, String idempotencyKey) {
+        return transferRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
+    }
+
+    private RemittancePolicyDecision evaluateCreateDecision(Long userId, CreateTransferRequest request) {
+        return policyService.evaluate(
+                userId,
+                request.recipientId(),
+                request.amountAtomic(),
+                request.highAmountConfirmed(),
+                request.recentRecipientConfirmed()
+        );
+    }
+
+    private Transfer buildRequestedTransfer(
+            Long userId,
+            String idempotencyKey,
+            CreateTransferRequest request,
+            RemittancePolicyDecision decision
+    ) {
+        return Transfer.request(
+                generateTransferId(),
+                userId,
+                request.recipientId(),
+                properties.getPolicy().getAssetSymbol(),
+                request.amountAtomic(),
+                decision.wallet().getWalletAddress(),
+                decision.recipient().getWalletAddress(),
+                decision.recipient().getAlias(),
+                decision.recipient().getRelation(),
+                decision.recipient().getTargetUserId(),
+                idempotencyKey,
+                request.highAmountConfirmed(),
+                request.recentRecipientConfirmed()
+        );
+    }
+
+    private void saveTransferAndEnqueue(Transfer transfer) {
+        transferRepository.saveAndFlush(transfer);
+        jobService.enqueue(JobReferenceKind.TRANSFER, JobType.SUBMIT_TRANSFER, transfer.getTransferId(), LocalDateTime.now());
     }
 
     private ApiException policyViolation(RemittancePolicyDecision decision) {

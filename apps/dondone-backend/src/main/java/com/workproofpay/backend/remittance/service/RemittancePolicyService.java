@@ -35,8 +35,7 @@ public class RemittancePolicyService {
             boolean recentRecipientConfirmed
     ) {
         Timer.Sample sample = remittanceMetrics.start();
-        String outcome = "error";
-        String policyCode = null;
+        PolicyEvaluationTrace trace = new PolicyEvaluationTrace();
 
         try {
             Recipient recipient = recipientService.getRequiredRecipient(userId, recipientId);
@@ -44,24 +43,19 @@ public class RemittancePolicyService {
             ChainBalanceSnapshot balanceSnapshot = walletService.getBalances(wallet.getWalletAddress());
 
             if (!recipient.isAllowed()) {
-                policyCode = RemittancePolicyCode.RECIPIENT_NOT_ALLOWED.name().toLowerCase();
-                outcome = "blocked";
-                return blocked(RemittancePolicyCode.RECIPIENT_NOT_ALLOWED, recipient, wallet, balanceSnapshot, false);
+                return blocked(trace, RemittancePolicyCode.RECIPIENT_NOT_ALLOWED, recipient, wallet, balanceSnapshot, false);
             }
 
             if (recipient.getWalletAddress().equalsIgnoreCase(wallet.getWalletAddress())) {
-                policyCode = RemittancePolicyCode.SELF_TRANSFER_NOT_ALLOWED.name().toLowerCase();
-                outcome = "blocked";
-                return blocked(RemittancePolicyCode.SELF_TRANSFER_NOT_ALLOWED, recipient, wallet, balanceSnapshot, false);
+                return blocked(trace, RemittancePolicyCode.SELF_TRANSFER_NOT_ALLOWED, recipient, wallet, balanceSnapshot, false);
             }
 
             boolean recentConfirmationRequired = recipient.getUpdatedAt()
                     .plusSeconds(properties.getPolicy().getRecentRecipientWindowSeconds())
                     .isAfter(LocalDateTime.now());
             if (recentConfirmationRequired && !recentRecipientConfirmed) {
-                policyCode = RemittancePolicyCode.RECENT_RECIPIENT_CONFIRMATION_REQUIRED.name().toLowerCase();
-                outcome = "blocked";
                 return blocked(
+                        trace,
                         RemittancePolicyCode.RECENT_RECIPIENT_CONFIRMATION_REQUIRED,
                         recipient,
                         wallet,
@@ -71,9 +65,8 @@ public class RemittancePolicyService {
             }
 
             if (amountAtomic > properties.getPolicy().getHighAmountThresholdAtomic() && !highAmountConfirmed) {
-                policyCode = RemittancePolicyCode.HIGH_AMOUNT_CONFIRMATION_REQUIRED.name().toLowerCase();
-                outcome = "blocked";
                 return blocked(
+                        trace,
                         RemittancePolicyCode.HIGH_AMOUNT_CONFIRMATION_REQUIRED,
                         recipient,
                         wallet,
@@ -87,9 +80,8 @@ public class RemittancePolicyService {
                     List.of(TransferStatus.REQUESTED, TransferStatus.SIGNED, TransferStatus.BROADCASTED)
             );
             if (hasActiveTransfer) {
-                policyCode = RemittancePolicyCode.TRANSFER_ALREADY_IN_PROGRESS.name().toLowerCase();
-                outcome = "blocked";
                 return blocked(
+                        trace,
                         RemittancePolicyCode.TRANSFER_ALREADY_IN_PROGRESS,
                         recipient,
                         wallet,
@@ -101,9 +93,8 @@ public class RemittancePolicyService {
             BigInteger requiredGasCostWei = walletService.estimateTransferGasCostWei();
             if (balanceSnapshot.tokenBalanceAtomic().compareTo(BigInteger.valueOf(amountAtomic)) < 0
                     || balanceSnapshot.nativeBalanceWei().compareTo(requiredGasCostWei) < 0) {
-                policyCode = RemittancePolicyCode.INSUFFICIENT_WALLET_BALANCE.name().toLowerCase();
-                outcome = "blocked";
                 return blocked(
+                        trace,
                         RemittancePolicyCode.INSUFFICIENT_WALLET_BALANCE,
                         recipient,
                         wallet,
@@ -112,20 +103,21 @@ public class RemittancePolicyService {
                 );
             }
 
-            outcome = "allowed";
-            return new RemittancePolicyDecision(true, null, recipient, wallet, balanceSnapshot, recentConfirmationRequired);
+            return allowed(trace, recipient, wallet, balanceSnapshot, recentConfirmationRequired);
         } finally {
-            remittanceMetrics.recordPolicyEvaluate(sample, outcome, policyCode);
+            remittanceMetrics.recordPolicyEvaluate(sample, trace.outcome(), trace.policyCode());
         }
     }
 
     private RemittancePolicyDecision blocked(
+            PolicyEvaluationTrace trace,
             RemittancePolicyCode policyCode,
             Recipient recipient,
             UserWallet wallet,
             ChainBalanceSnapshot balanceSnapshot,
             boolean recentRecipientConfirmationRequired
     ) {
+        trace.markBlocked(policyCode);
         return new RemittancePolicyDecision(
                 false,
                 policyCode,
@@ -134,5 +126,47 @@ public class RemittancePolicyService {
                 balanceSnapshot,
                 recentRecipientConfirmationRequired
         );
+    }
+
+    private RemittancePolicyDecision allowed(
+            PolicyEvaluationTrace trace,
+            Recipient recipient,
+            UserWallet wallet,
+            ChainBalanceSnapshot balanceSnapshot,
+            boolean recentRecipientConfirmationRequired
+    ) {
+        trace.markAllowed();
+        return new RemittancePolicyDecision(
+                true,
+                null,
+                recipient,
+                wallet,
+                balanceSnapshot,
+                recentRecipientConfirmationRequired
+        );
+    }
+
+    private static final class PolicyEvaluationTrace {
+
+        private String outcome = "error";
+        private String policyCode;
+
+        private void markBlocked(RemittancePolicyCode policyCode) {
+            this.outcome = "blocked";
+            this.policyCode = policyCode.name().toLowerCase();
+        }
+
+        private void markAllowed() {
+            this.outcome = "allowed";
+            this.policyCode = null;
+        }
+
+        private String outcome() {
+            return outcome;
+        }
+
+        private String policyCode() {
+            return policyCode;
+        }
     }
 }

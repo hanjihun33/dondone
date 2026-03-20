@@ -16,6 +16,7 @@ import com.workproofpay.backend.remittance.model.TransferStatus;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import com.workproofpay.backend.remittance.service.WalletService;
+import com.workproofpay.backend.remittance.service.RemittanceMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,6 +65,9 @@ class RemittanceJobWorkerTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
+    @Mock
+    private RemittanceMetrics remittanceMetrics;
+
     private RemittanceJobWorker worker;
 
     @BeforeEach
@@ -80,12 +84,13 @@ class RemittanceJobWorkerTest {
                 blockchainGateway,
                 jobService,
                 properties,
-                transactionTemplate
+                transactionTemplate,
+                remittanceMetrics
         );
 
         when(transactionTemplate.execute(any(TransactionCallback.class)))
                 .thenAnswer(invocation -> ((TransactionCallback<?>) invocation.getArgument(0)).doInTransaction(null));
-        doAnswer(invocation -> {
+        lenient().doAnswer(invocation -> {
             ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(null);
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
@@ -132,8 +137,8 @@ class RemittanceJobWorkerTest {
         ))
                 .thenReturn(List.of(job));
         when(jobRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.of(job));
-        when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
-        when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
+        lenient().when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
+        lenient().when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
         when(blockchainGateway.getReceipt(transfer.getTxHash())).thenReturn(Optional.empty());
         when(blockchainGateway.isTransactionKnown(transfer.getTxHash())).thenReturn(false);
 
@@ -179,8 +184,8 @@ class RemittanceJobWorkerTest {
         ))
                 .thenReturn(List.of(job));
         when(jobRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.of(job));
-        when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
-        when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
+        lenient().when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
+        lenient().when(transferRepository.findById(anyString())).thenReturn(Optional.of(transfer));
         when(blockchainGateway.getReceipt(transfer.getTxHash())).thenReturn(Optional.empty());
         when(blockchainGateway.isTransactionKnown(transfer.getTxHash())).thenReturn(true);
 
