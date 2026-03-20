@@ -1,5 +1,25 @@
 # Implementation Slices
 
+## 2026-03-20 Admin Onboarding MVP Update
+- admin web is no longer a pure mock for onboarding.
+- newly wired flows:
+  - admin login via `POST /api/auth/login`
+  - `POST /api/admin/employers/companies`
+  - `GET /api/admin/employers/companies`
+- admin create flow now creates:
+  - `Company`
+  - placeholder default `Workplace`
+  - one employer signup code
+- current admin MVP policy:
+  - raw employer signup code is returned only once in the create response
+  - company list shows company/workplace info plus signup-code issuance status
+  - workplace location/radius are completed later by the employer in settings
+  - code reissue/revoke remains out of scope
+- remaining admin follow-up:
+  - service-admin operational polish
+  - employer signup-code reissue/revoke
+  - worker registration code issuance
+
 ## 2026-03-20 Shared Policy Update
 - worker app and employer web now share the same policy vocabulary through `docs/web/app-web-shared-policy.md`.
 - fixed wording for current scope:
