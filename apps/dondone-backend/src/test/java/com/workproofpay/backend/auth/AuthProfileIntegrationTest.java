@@ -52,7 +52,8 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(signupJson))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.email").value("phone-auth@test.com"))
-                .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"));
+                .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"))
+                .andExpect(jsonPath("$.data.companyCode").isEmpty());
 
         String loginJson = """
                 {
@@ -65,13 +66,15 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginJson))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"));
+                .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"))
+                .andExpect(jsonPath("$.data.companyCode").isEmpty());
 
         User user = userRepository.findByEmail("phone-auth@test.com").orElseThrow();
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", bearer(tokenFor(user))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"));
+                .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"))
+                .andExpect(jsonPath("$.data.companyCode").isEmpty());
     }
 
     @Test
@@ -112,6 +115,43 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(signupJson))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PHONE_NUMBER_ALREADY_EXISTS"));
+    }
+
+    @Test
+    void updateCompanyCodeNormalizesAndPersistsCurrentCompany() throws Exception {
+        User user = userRepository.save(User.register("company@test.com", "hashed", "Company", "01011112222"));
+
+        mockMvc.perform(put("/api/auth/me/company-code")
+                        .header("Authorization", bearer(tokenFor(user)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "companyCode": "dondone2026"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyCode").value("DONDONE2026"));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", bearer(tokenFor(user))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyCode").value("DONDONE2026"));
+    }
+
+    @Test
+    void updateCompanyCodeRejectsHyphenatedCode() throws Exception {
+        User user = userRepository.save(User.register("invalid-company@test.com", "hashed", "Invalid", "01022223333"));
+
+        mockMvc.perform(put("/api/auth/me/company-code")
+                        .header("Authorization", bearer(tokenFor(user)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "companyCode": "DON-DONE-2026"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test

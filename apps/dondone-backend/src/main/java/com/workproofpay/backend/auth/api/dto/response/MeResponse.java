@@ -12,6 +12,8 @@ public record MeResponse(
         String name,
         @Schema(description = "Authenticated user phone number", example = "01012345678")
         String phoneNumber,
+        @Schema(description = "Authenticated user company code", example = "DONDONE2026")
+        String companyCode,
         @Schema(description = "Authenticated user role", example = "USER")
         String role
 ) {
@@ -21,6 +23,7 @@ public record MeResponse(
                 user.getEmail(),
                 user.getName(),
                 user.getPhoneNumber(),
+                user.getCompanyCode(),
                 user.getRole().name()
         );
     }

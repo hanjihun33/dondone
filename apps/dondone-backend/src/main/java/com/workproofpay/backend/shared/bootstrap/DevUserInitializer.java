@@ -2,6 +2,7 @@ package com.workproofpay.backend.shared.bootstrap;
 
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.shared.util.CompanyCodeUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,7 +24,8 @@ public class DevUserInitializer implements CommandLineRunner {
                 "test@gmail.com",
                 passwordEncoder.encode("qweqwe123"),
                 "Test User",
-                "01012345678"
+                "01012345678",
+                CompanyCodeUtils.DEFAULT_COMPANY_CODE
         );
         userRepository.save(user);
     }

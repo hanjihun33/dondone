@@ -78,6 +78,8 @@ class DemoSessionViewModel(
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
     private val _profileUpdateUiState = MutableStateFlow(ProfileUpdateUiState())
     val profileUpdateUiState: StateFlow<ProfileUpdateUiState> = _profileUpdateUiState.asStateFlow()
+    private val _companyCodeUpdateUiState = MutableStateFlow(CompanyCodeUpdateUiState())
+    val companyCodeUpdateUiState: StateFlow<CompanyCodeUpdateUiState> = _companyCodeUpdateUiState.asStateFlow()
     private val _recipientPhoneSearchUiState = MutableStateFlow(RecipientPhoneSearchUiState())
     val recipientPhoneSearchUiState: StateFlow<RecipientPhoneSearchUiState> = _recipientPhoneSearchUiState.asStateFlow()
     private val _advanceRemoteState =
@@ -810,6 +812,53 @@ class DemoSessionViewModel(
         }
     }
 
+    fun updateCompanyCode(companyCode: String) {
+        val session = _authUiState.value.session ?: run {
+            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val normalizedCompanyCode = companyCode.trim().uppercase()
+        if (normalizedCompanyCode.isBlank()) {
+            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+                message = "회사코드를 입력해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(isSubmitting = true)
+            try {
+                val updatedSession = authRepository.updateCompanyCode(
+                    session = session,
+                    companyCode = normalizedCompanyCode
+                )
+                _authUiState.value = AuthUiState.authenticated(updatedSession)
+                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(message = "회사코드를 저장했어요.")
+            } catch (error: AuthUnauthorizedException) {
+                expireSession(error.message)
+                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+                    message = error.message ?: "회사코드를 저장하지 못했어요.",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    fun clearCompanyCodeUpdateMessage() {
+        if (!_companyCodeUpdateUiState.value.isSubmitting && _companyCodeUpdateUiState.value.message != null) {
+            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState()
+        }
+    }
+
     fun clearProfileUpdateMessage() {
         if (!_profileUpdateUiState.value.isSubmitting && _profileUpdateUiState.value.message != null) {
             _profileUpdateUiState.value = ProfileUpdateUiState()
@@ -1202,6 +1251,7 @@ class DemoSessionViewModel(
         _wageActionUiState.value = WageActionUiState()
         _remittanceActionUiState.value = RemittanceActionUiState()
         _profileUpdateUiState.value = ProfileUpdateUiState()
+        _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState()
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
         _menuLaunchRequest.value = null
         cancelRemittanceStatusPolling()

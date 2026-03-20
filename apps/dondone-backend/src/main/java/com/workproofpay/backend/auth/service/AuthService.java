@@ -2,6 +2,7 @@ package com.workproofpay.backend.auth.service;
 
 import com.workproofpay.backend.auth.api.dto.request.LoginRequest;
 import com.workproofpay.backend.auth.api.dto.request.SignupRequest;
+import com.workproofpay.backend.auth.api.dto.request.UpdateCompanyCodeRequest;
 import com.workproofpay.backend.auth.api.dto.request.UpdateProfileRequest;
 import com.workproofpay.backend.auth.api.dto.response.LoginResponse;
 import com.workproofpay.backend.auth.api.dto.response.MeResponse;
@@ -36,7 +37,8 @@ public class AuthService {
                 request.email(),
                 passwordEncoder.encode(request.password()),
                 request.name().trim(),
-                normalizedPhoneNumber
+                normalizedPhoneNumber,
+                null
         );
         User saved = userRepository.save(user);
 
@@ -76,6 +78,14 @@ public class AuthService {
         String normalizedPhoneNumber = PhoneNumberUtils.normalizeOrThrow(request.phoneNumber());
         ensurePhoneNumberAvailable(normalizedPhoneNumber, userId);
         user.updateProfile(request.name().trim(), normalizedPhoneNumber);
+        return MeResponse.from(user);
+    }
+
+    @Transactional
+    public MeResponse updateCompanyCode(Long userId, UpdateCompanyCodeRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        user.updateCompanyCode(request.companyCode());
         return MeResponse.from(user);
     }
 

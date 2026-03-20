@@ -55,7 +55,8 @@ class AuthLoginIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.data.phoneNumber").value("01012345678"));
+                .andExpect(jsonPath("$.data.phoneNumber").value("01012345678"))
+                .andExpect(jsonPath("$.data.companyCode").value("DONDONE2026"));
     }
 
     @Test
