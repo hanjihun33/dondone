@@ -43,7 +43,24 @@ function formatKrw(amount: number | null) {
     return "-";
   }
 
-  return new Intl.NumberFormat("ko-KR").format(amount) + "원";
+  return `${new Intl.NumberFormat("ko-KR").format(amount)}원`;
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
 }
 
 function formatDateTime(value: string | null) {
@@ -63,6 +80,21 @@ function formatDateTime(value: string | null) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+function formatWorkMinutes(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours <= 0) {
+    return `${remainingMinutes}분`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours}시간`;
+  }
+
+  return `${hours}시간 ${remainingMinutes}분`;
 }
 
 export function AdminAdvanceRequestSection() {
@@ -145,6 +177,34 @@ export function AdminAdvanceRequestSection() {
     return counts;
   }, [requests]);
 
+  const summary = useMemo(() => {
+    return requests.reduce(
+      (acc, request) => {
+        acc.totalRequestedAmount += request.requestedAmount;
+
+        if (request.status === "SUBMITTED") {
+          acc.pendingRequestedAmount += request.requestedAmount;
+        }
+
+        if (request.status === "APPROVED") {
+          acc.approvedAmount += request.approvedAmount ?? request.requestedAmount;
+        }
+
+        if (request.status === "REJECTED") {
+          acc.rejectedCount += 1;
+        }
+
+        return acc;
+      },
+      {
+        totalRequestedAmount: 0,
+        pendingRequestedAmount: 0,
+        approvedAmount: 0,
+        rejectedCount: 0
+      }
+    );
+  }, [requests]);
+
   const filteredRequests = useMemo(() => {
     return filter === "ALL" ? requests : requests.filter((request) => request.status === filter);
   }, [filter, requests]);
@@ -224,9 +284,32 @@ export function AdminAdvanceRequestSection() {
         <div>
           <h3>근로자 미리받기 요청</h3>
           <p className="admin-section-sub">
-            근로자가 앱에서 보낸 미리받기 요청을 확인하고 승인 또는 반려합니다.
+            앱에서 올라온 미리받기 요청을 현재 계약 범위 기준으로 검토하고 승인 또는 반려합니다.
           </p>
         </div>
+      </div>
+
+      <div className="admin-request-summary">
+        <article className="admin-request-summary-card">
+          <span>전체 요청</span>
+          <strong>{requestCountByStatus.ALL}건</strong>
+          <p>{formatKrw(summary.totalRequestedAmount)}</p>
+        </article>
+        <article className="admin-request-summary-card">
+          <span>승인 대기</span>
+          <strong>{requestCountByStatus.SUBMITTED}건</strong>
+          <p>{formatKrw(summary.pendingRequestedAmount)}</p>
+        </article>
+        <article className="admin-request-summary-card">
+          <span>승인 완료</span>
+          <strong>{requestCountByStatus.APPROVED}건</strong>
+          <p>{formatKrw(summary.approvedAmount)}</p>
+        </article>
+        <article className="admin-request-summary-card">
+          <span>반려</span>
+          <strong>{summary.rejectedCount}건</strong>
+          <p>처리 이력 포함</p>
+        </article>
       </div>
 
       <div className="admin-request-toolbar">
@@ -243,7 +326,7 @@ export function AdminAdvanceRequestSection() {
             </button>
           ))}
         </div>
-        <p className="admin-request-count">총 {filteredRequests.length}건</p>
+        <p className="admin-request-count">현재 {filteredRequests.length}건</p>
       </div>
 
       {errorMessage ? (
@@ -263,9 +346,8 @@ export function AdminAdvanceRequestSection() {
               <tr>
                 <th>근로자</th>
                 <th>요청 금액</th>
-                <th>상환 예정일</th>
-                <th>신청 일시</th>
-                <th>검토 기준</th>
+                <th>근무 기준</th>
+                <th>일정</th>
                 <th>상태</th>
                 <th>처리</th>
               </tr>
@@ -275,32 +357,40 @@ export function AdminAdvanceRequestSection() {
                 <tr key={request.requestId}>
                   <td>
                     <strong>{request.workerName}</strong>
+                    <p className="admin-cell-sub">{request.workerEmail}</p>
                     <p className="admin-cell-sub">
                       {[request.companyName, request.workplaceName].filter(Boolean).join(" / ")}
                     </p>
-                    <p className="admin-cell-sub">{request.workerEmail}</p>
                   </td>
                   <td>
-                    <strong>{formatKrw(request.requestedAmount)}</strong>
-                    <p className="admin-cell-sub">
-                      승인 금액:{" "}
-                      {request.status === "SUBMITTED"
-                        ? "승인 대기"
-                        : formatKrw(request.approvedAmount)}
-                    </p>
-                  </td>
-                  <td>{request.repaymentDueDate}</td>
-                  <td>
-                    <strong>{formatDateTime(request.requestedAt)}</strong>
-                    <p className="admin-cell-sub">
-                      처리 일시: {formatDateTime(request.reviewedAt)}
-                    </p>
+                    <div className="admin-metric-stack">
+                      <strong>{formatKrw(request.requestedAmount)}</strong>
+                      <p className="admin-cell-sub">
+                        승인 금액{" "}
+                        {request.status === "SUBMITTED"
+                          ? "대기"
+                          : formatKrw(request.approvedAmount)}
+                      </p>
+                      <p className="admin-cell-sub">수수료 {formatKrw(request.feeAmount)}</p>
+                    </div>
                   </td>
                   <td>
-                    <strong>{request.reflectedWorkDays}일 반영</strong>
-                    <p className="admin-cell-sub">
-                      {request.reflectedWorkMinutes}분 / 검토 필요 {request.needsReviewRecordCount}건
-                    </p>
+                    <div className="admin-metric-stack">
+                      <strong>{request.reflectedWorkDays}일 반영</strong>
+                      <p className="admin-cell-sub">
+                        반영 근무 {formatWorkMinutes(request.reflectedWorkMinutes)}
+                      </p>
+                      <p className="admin-cell-sub">
+                        검토 필요 기록 {request.needsReviewRecordCount}건
+                      </p>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="admin-metric-stack">
+                      <strong>신청 {formatDateTime(request.requestedAt)}</strong>
+                      <p className="admin-cell-sub">상환 예정 {formatDate(request.repaymentDueDate)}</p>
+                      <p className="admin-cell-sub">처리 {formatDateTime(request.reviewedAt)}</p>
+                    </div>
                   </td>
                   <td>
                     <span className={`admin-status ${STATUS_CLASS_NAMES[request.status]}`}>
@@ -333,10 +423,10 @@ export function AdminAdvanceRequestSection() {
                   </td>
                 </tr>
               ))}
-              {loadState === "success" && filteredRequests.length === 0 ? (
+              {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="admin-empty-cell">
-                    조건에 맞는 미리받기 요청이 없습니다.
+                  <td colSpan={6} className="admin-empty-cell">
+                    선택한 상태에 해당하는 미리받기 요청이 없습니다.
                   </td>
                 </tr>
               ) : null}
