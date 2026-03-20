@@ -39,7 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-@Profile("!test")
+@Profile("demo")
 @Component
 @RequiredArgsConstructor
 public class DevEmployerInitializer implements CommandLineRunner {
