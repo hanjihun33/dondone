@@ -542,9 +542,6 @@ export function AdminPage() {
                   <tr>
                     <th>담당자</th>
                     <th>이메일</th>
-                    <th>가입 상태</th>
-                    <th>기본 사업장</th>
-                    <th>사업장 설정</th>
                     <th>가입일</th>
                   </tr>
                 </thead>
@@ -556,24 +553,6 @@ export function AdminPage() {
                         <p className="admin-cell-sub">계정 #{employer.accountId}</p>
                       </td>
                       <td>{employer.email ?? "-"}</td>
-                      <td>
-                        <span className="admin-status active">
-                          {employer.profileStatus === "ACTIVE" ? "가입 완료" : employer.profileStatus}
-                        </span>
-                      </td>
-                      <td>
-                        <strong>{employer.defaultWorkplaceName ?? "-"}</strong>
-                        <p className="admin-cell-sub">#{employer.defaultWorkplaceId}</p>
-                      </td>
-                      <td>
-                        <span
-                          className={`admin-status ${
-                            employer.workplaceSettingsConfigured ? "active" : "pending"
-                          }`}
-                        >
-                          {employer.workplaceSettingsConfigured ? "설정 완료" : "설정 필요"}
-                        </span>
-                      </td>
                       <td>{formatDateTime(employer.joinedAt)}</td>
                     </tr>
                   ))}
