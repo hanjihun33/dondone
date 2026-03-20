@@ -83,16 +83,6 @@
             font-weight: 600;
         }
 
-        .notice-banner {
-            margin-top: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            background: #f9fafb;
-            padding: 10px 12px;
-            font-size: 10px;
-            color: #374151;
-        }
-
         .section {
             margin-bottom: 14px;
         }
@@ -167,12 +157,6 @@
             margin-top: 3px;
         }
 
-        .section-note {
-            font-size: 10px;
-            color: #4b5563;
-            margin: 0 0 8px 0;
-        }
-
         table.data-table {
             width: 100%;
             border-collapse: collapse;
@@ -197,76 +181,8 @@
             word-break: break-word;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 999px;
-            font-size: 9px;
-            font-weight: 700;
-        }
-
-        .status-success {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .status-warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-neutral {
-            background: #e5e7eb;
-            color: #374151;
-        }
-
-        .subtext {
-            font-size: 9px;
+        .muted {
             color: #6b7280;
-            margin-top: 4px;
-        }
-
-        .reference-box {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 10px 12px;
-            background: #fcfcfc;
-        }
-
-        .reference-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .reference-table th,
-        .reference-table td {
-            border: none;
-            padding: 2px 0;
-            font-size: 10px;
-            text-align: left;
-            vertical-align: top;
-        }
-
-        .reference-table th {
-            width: 92px;
-            color: #6b7280;
-            font-weight: 600;
-        }
-
-        .notices {
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            background: #fafafa;
-            padding: 10px 12px;
-        }
-
-        .notices ul {
-            margin: 0;
-            padding-left: 18px;
-        }
-
-        .notices li {
-            margin: 0 0 4px 0;
         }
 
         .page-break {
@@ -312,9 +228,6 @@
                 </td>
             </tr>
         </table>
-        <div class="notice-banner" th:text="${snapshot.statement.intendedUseNotice}">
-            근로자 확인, 고용주 검토, 진정/상담 첨부용으로 활용할 수 있습니다.
-        </div>
     </header>
 
     <section class="section">
@@ -326,16 +239,14 @@
                     <div class="info-value" th:text="${snapshot.worker.name}">홍길동</div>
                     <div class="info-label">이메일</div>
                     <div th:text="${snapshot.worker.email}">test@example.com</div>
-                    <div class="info-label">사용자 식별값</div>
-                    <div th:text="${snapshot.worker.userId}">1</div>
+                    <div class="info-label">연락처</div>
+                    <div th:text="${snapshot.worker.phoneNumber}">010-1234-5678</div>
                 </td>
                 <td class="info-card">
                     <div class="info-label">근무지명</div>
                     <div class="info-value" th:text="${snapshot.workplace.name}">Proof Pack Cafe</div>
                     <div class="info-label">주소</div>
                     <div th:text="${snapshot.workplace.address}">Seoul Somewhere 1</div>
-                    <div class="info-label">위치 라벨</div>
-                    <div th:text="${snapshot.workplace.mapLabel}">Front door</div>
                 </td>
             </tr>
         </table>
@@ -343,83 +254,57 @@
 
     <section class="section">
         <div class="section-title">기간 요약</div>
-        <p class="section-note">
-            선택한 기간의 출퇴근 기록 현황을 한눈에 볼 수 있도록 정리한 요약입니다.
-        </p>
         <table class="summary-grid">
             <tr>
                 <td>
                     <div class="summary-card">
                         <div class="summary-label">대상 기간</div>
-                        <div class="summary-number" th:text="${snapshot.summary.totalWorkDayCountLabel}">2일</div>
-                        <div class="summary-detail" th:text="${snapshot.period.periodLabel}">
-                            대상 기간: 2026-03-01 ~ 2026-03-31
-                        </div>
+                        <div class="summary-number" th:text="${snapshot.period.startDate + ' ~ ' + snapshot.period.endDate}">2026-03-01 ~ 2026-03-31</div>
+                        <div class="summary-detail" th:text="${snapshot.period.periodLabel}">대상 기간: 2026-03-01 ~ 2026-03-31</div>
                     </div>
                 </td>
                 <td>
                     <div class="summary-card">
-                        <div class="summary-label">총 기록 수</div>
-                        <div class="summary-number" th:text="${snapshot.summary.totalRecordCount}">18</div>
-                        <div class="summary-detail" th:text="'근무일 수 ' + ${snapshot.summary.totalWorkDayCountLabel}">
-                            근무일 수 12일
-                        </div>
+                        <div class="summary-label">근무일 수</div>
+                        <div class="summary-number" th:text="${snapshot.summary.totalWorkDayCountLabel}">8일</div>
                     </div>
                 </td>
                 <td>
                     <div class="summary-card">
                         <div class="summary-label">총 근무시간</div>
                         <div class="summary-number" th:text="${snapshot.summary.totalWorkedHoursLabel}">126시간 30분</div>
-                        <div class="summary-detail" th:text="'총 근무 분 ' + ${snapshot.summary.totalWorkedMinutes}">
-                            총 근무 분 7590
-                        </div>
+                        <div class="summary-detail" th:text="'총 근무 분 ' + ${snapshot.summary.totalWorkedMinutes}">총 근무 분 7590</div>
                     </div>
                 </td>
             </tr>
             <tr>
                 <td>
                     <div class="summary-card">
-                        <div class="summary-label">반영 완료</div>
-                        <div class="summary-number" th:text="${snapshot.summary.reflectedCount}">16</div>
+                        <div class="summary-label">수정 기록 수</div>
+                        <div class="summary-number" th:text="${snapshot.summary.editedCount}">1</div>
                     </div>
                 </td>
                 <td>
                     <div class="summary-card">
-                        <div class="summary-label">검토 필요</div>
-                        <div class="summary-number" th:text="${snapshot.summary.needsReviewCount}">1</div>
+                        <div class="summary-label">특이사항 수</div>
+                        <div class="summary-number" th:text="${snapshot.summary.issueCountLabel}">2건</div>
                     </div>
                 </td>
-                <td>
-                    <div class="summary-card">
-                        <div class="summary-label">수정/첨부</div>
-                        <div class="summary-number"
-                             th:text="${snapshot.summary.editedCount + ' / ' + snapshot.summary.totalAttachmentCount}">
-                            2 / 3
-                        </div>
-                        <div class="summary-detail">수정 기록 수 / 첨부 수</div>
-                    </div>
-                </td>
+                <td></td>
             </tr>
         </table>
     </section>
 
     <section class="section">
         <div class="section-title">출퇴근 기록</div>
-        <p class="section-note">
-            선택한 기간 안에 포함된 출근, 퇴근, 수정 여부와 비고를 일자별로 정리했습니다.
-        </p>
         <table class="data-table">
             <thead>
             <tr>
-                <th style="width: 11%;">날짜</th>
-                <th style="width: 8%;">출근</th>
-                <th style="width: 8%;">퇴근</th>
-                <th style="width: 11%;">근무시간</th>
-                <th style="width: 12%;">상태</th>
-                <th style="width: 7%;">수정</th>
-                <th style="width: 7%;">첨부</th>
-                <th style="width: 16%;">위치 요약</th>
-                <th style="width: 20%;">비고</th>
+                <th style="width: 16%;">날짜</th>
+                <th style="width: 13%;">출근</th>
+                <th style="width: 13%;">퇴근</th>
+                <th style="width: 16%;">근무시간</th>
+                <th style="width: 42%;">비고</th>
             </tr>
             </thead>
             <tbody>
@@ -428,20 +313,7 @@
                 <td th:text="${record.clockInAt}">09:00</td>
                 <td th:text="${record.clockOutAt}">18:00</td>
                 <td th:text="${record.workedHoursLabel}">9시간 00분</td>
-                <td>
-                    <span class="status-badge"
-                          th:classappend="' status-' + ${record.financialStatusTone}"
-                          th:text="${record.financialStatusLabel}">
-                        반영 완료
-                    </span>
-                    <div class="subtext" th:if="${record.outsideAllowedRadius}" th:text="${record.outsideAllowedRadiusLabel}">
-                        반경 외 퇴근
-                    </div>
-                </td>
-                <td th:text="${record.edited ? 'Y' : '-'}">Y</td>
-                <td th:text="${record.attachmentCount}">0</td>
-                <td th:text="${record.locationSummaryLabel}">출근 Front door / 퇴근 Front door</td>
-                <td th:text="${record.memoOrReason}">사유: Correction / 메모: memo</td>
+                <td th:text="${record.remarks}">수정 기록 있음 / 첨부 있음</td>
             </tr>
             </tbody>
         </table>
@@ -449,81 +321,24 @@
 
     <section class="section page-break" th:if="${!#lists.isEmpty(snapshot.audits)}">
         <div class="section-title">수정 이력</div>
-        <p class="section-note">
-            수정된 기록이 있는 경우, 변경 전후 출퇴근 시각과 관련 비고를 함께 확인할 수 있습니다.
-        </p>
         <table class="data-table">
             <thead>
             <tr>
-                <th style="width: 15%;">수정 시각</th>
-                <th style="width: 10%;">기록 ID</th>
-                <th style="width: 37%;">변경 내용</th>
-                <th style="width: 38%;">메모/사유</th>
+                <th style="width: 16%;">수정 시각</th>
+                <th style="width: 14%;">대상 날짜</th>
+                <th style="width: 48%;">변경 내용</th>
+                <th style="width: 22%;">수정 사유</th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="audit : ${snapshot.audits}">
                 <td th:text="${audit.editedAt}">2026-03-12 10:00:00</td>
-                <td th:text="${audit.recordId}">100</td>
+                <td th:text="${audit.workDate}">2026-03-10</td>
                 <td th:text="${audit.changeSummary}">출근 09:00→09:10 / 퇴근 18:00→18:10 / 사유: Correction</td>
-                <td>
-                    <div th:if="${audit.beforeMemo != '-' or audit.afterMemo != '-'}">
-                        <div th:text="'변경 전 메모: ' + ${audit.beforeMemo}">변경 전 메모: -</div>
-                        <div th:text="'변경 후 메모: ' + ${audit.afterMemo}">변경 후 메모: Updated memo</div>
-                    </div>
-                    <div th:if="${audit.beforeMemo == '-' and audit.afterMemo == '-'}"
-                         th:text="'사유: ' + ${audit.afterEditReason}">
-                        사유: Correction
-                    </div>
-                </td>
+                <td th:text="${audit.editReason}">Correction</td>
             </tr>
             </tbody>
         </table>
-    </section>
-
-    <section class="section" th:if="${!#lists.isEmpty(snapshot.notices)}">
-        <div class="section-title">안내 사항</div>
-        <div class="notices">
-            <ul>
-                <li th:each="notice : ${snapshot.notices}" th:text="${notice}">
-                    검토 필요 상태의 기록은 정산 전 수동 확인이 필요합니다.
-                </li>
-            </ul>
-        </div>
-    </section>
-
-    <section class="section">
-        <div class="section-title">참고 계약 정보</div>
-        <div class="reference-box">
-            <table class="reference-table">
-                <tr>
-                    <th>급여 단위</th>
-                    <td th:text="${snapshot.contract.payUnit}">시급</td>
-                </tr>
-                <tr>
-                    <th>기본급</th>
-                    <td th:text="${snapshot.contract.basePayAmount}">12,000원</td>
-                </tr>
-                <tr>
-                    <th>환산 시급</th>
-                    <td th:text="${snapshot.contract.normalizedHourlyWage}">12,000원</td>
-                </tr>
-                <tr>
-                    <th>일 기준 분</th>
-                    <td th:text="${snapshot.contract.dailyWorkMinutes != null ? snapshot.contract.dailyWorkMinutes : '-'}">-</td>
-                </tr>
-                <tr>
-                    <th>월 기준 분</th>
-                    <td th:text="${snapshot.contract.monthlyWorkMinutes != null ? snapshot.contract.monthlyWorkMinutes : '-'}">-</td>
-                </tr>
-                <tr>
-                    <th>적용 기간</th>
-                    <td th:text="${snapshot.contract.effectiveFrom + ' ~ ' + snapshot.contract.effectiveTo}">
-                        2026-03-01 ~ 현재
-                    </td>
-                </tr>
-            </table>
-        </div>
     </section>
 
     <footer class="footer">
