@@ -1378,6 +1378,8 @@ private fun WorkproofRecentLogsCard(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
+                        .background(WorkproofRowAccentBackground)
+                        .border(1.dp, WorkproofPdfPresetSelectedBorder, RoundedCornerShape(999.dp))
                         .pressableScale(
                             interactionSource = interactionSource,
                             pressedScale = 0.98f
@@ -1387,20 +1389,20 @@ private fun WorkproofRecentLogsCard(
                             indication = rememberDonDoneGrayRipple(),
                             onClick = onOpenPdfCreation
                         )
-                        .padding(horizontal = 2.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "문서 생성",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = WorkproofRowAccentTint
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = WorkproofRowAccentTint,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
