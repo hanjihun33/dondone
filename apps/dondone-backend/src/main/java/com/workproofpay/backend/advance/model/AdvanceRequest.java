@@ -49,7 +49,7 @@ public class AdvanceRequest extends BaseCreatedEntity {
     @Column(name = "requested_amount", nullable = false)
     private Long requestedAmount;
 
-    @Column(name = "approved_amount", nullable = false)
+    @Column(name = "approved_amount")
     private Long approvedAmount;
 
     @Column(name = "fee_amount", nullable = false)
@@ -64,6 +64,12 @@ public class AdvanceRequest extends BaseCreatedEntity {
 
     @Column(name = "requested_at", nullable = false)
     private LocalDateTime requestedAt;
+
+    @Column(name = "reviewed_by_account_id")
+    private Long reviewedByAccountId;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
 
     @Column(name = "snapshot_available_amount", nullable = false)
     private Long snapshotAvailableAmount;
@@ -95,6 +101,8 @@ public class AdvanceRequest extends BaseCreatedEntity {
             AdvanceRequestStatus status,
             LocalDate repaymentDueDate,
             LocalDateTime requestedAt,
+            Long reviewedByAccountId,
+            LocalDateTime reviewedAt,
             Long snapshotAvailableAmount,
             Long snapshotMaxCap,
             BigDecimal snapshotPolicyRate,
@@ -113,6 +121,8 @@ public class AdvanceRequest extends BaseCreatedEntity {
         this.status = status;
         this.repaymentDueDate = repaymentDueDate;
         this.requestedAt = requestedAt;
+        this.reviewedByAccountId = reviewedByAccountId;
+        this.reviewedAt = reviewedAt;
         this.snapshotAvailableAmount = snapshotAvailableAmount;
         this.snapshotMaxCap = snapshotMaxCap;
         this.snapshotPolicyRate = snapshotPolicyRate;
@@ -121,14 +131,13 @@ public class AdvanceRequest extends BaseCreatedEntity {
         this.snapshotNeedsReviewRecordCount = snapshotNeedsReviewRecordCount;
     }
 
-    public static AdvanceRequest approve(
+    public static AdvanceRequest submit(
             User user,
             Workplace workplace,
             WorkContract contract,
             String yearMonth,
             String idempotencyKey,
             Long requestedAmount,
-            Long approvedAmount,
             Long feeAmount,
             LocalDate repaymentDueDate,
             LocalDateTime requestedAt,
@@ -146,11 +155,13 @@ public class AdvanceRequest extends BaseCreatedEntity {
                 yearMonth,
                 idempotencyKey,
                 requestedAmount,
-                approvedAmount,
+                null,
                 feeAmount,
-                AdvanceRequestStatus.APPROVED,
+                AdvanceRequestStatus.SUBMITTED,
                 repaymentDueDate,
                 requestedAt,
+                null,
+                null,
                 snapshotAvailableAmount,
                 snapshotMaxCap,
                 snapshotPolicyRate,
@@ -160,10 +171,36 @@ public class AdvanceRequest extends BaseCreatedEntity {
         );
     }
 
+    public void approve(Long reviewedByAccountId) {
+        ensureSubmitted();
+        this.status = AdvanceRequestStatus.APPROVED;
+        this.approvedAmount = this.requestedAmount;
+        this.reviewedByAccountId = reviewedByAccountId;
+        this.reviewedAt = LocalDateTime.now();
+    }
+
+    public void reject(Long reviewedByAccountId) {
+        ensureSubmitted();
+        this.status = AdvanceRequestStatus.REJECTED;
+        this.approvedAmount = null;
+        this.reviewedByAccountId = reviewedByAccountId;
+        this.reviewedAt = LocalDateTime.now();
+    }
+
+    public boolean isSubmitted() {
+        return status == AdvanceRequestStatus.SUBMITTED;
+    }
+
     public boolean matches(String candidateKey, Long workplaceId, Long requestedAmount, LocalDateTime requestedAt) {
         return idempotencyKey.equals(candidateKey)
                 && workplace.getId().equals(workplaceId)
                 && this.requestedAmount.equals(requestedAmount)
                 && this.requestedAt.equals(requestedAt);
+    }
+
+    private void ensureSubmitted() {
+        if (status != AdvanceRequestStatus.SUBMITTED) {
+            throw new IllegalStateException("Advance request is not in SUBMITTED status.");
+        }
     }
 }

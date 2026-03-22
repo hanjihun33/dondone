@@ -7,6 +7,7 @@ import { SettingsPage } from "../pages/settings/SettingsPage";
 import { LoggedOutPage } from "../pages/auth/LoggedOutPage";
 import { SignUpPage } from "../pages/auth/SignUpPage";
 import { AdminPage } from "../pages/admin/AdminPage";
+import { LegacyAdminPage } from "../pages/admin/LegacyAdminPage";
 import { getStoredUserRole } from "../shared/auth/session";
 
 function AdminOnlyRoute({ element }: { element: JSX.Element }) {
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
       {
         path: "admin",
         element: <AdminOnlyRoute element={<AdminPage />} />
+      },
+      {
+        path: "admin/legacy",
+        element: <AdminOnlyRoute element={<LegacyAdminPage />} />
       }
     ]
   },

@@ -18,7 +18,16 @@ public interface AdvanceRequestRepository extends JpaRepository<AdvanceRequest, 
             AdvanceRequestStatus status
     );
 
+    boolean existsByUserIdAndWorkplaceIdAndYearMonthAndStatusIn(
+            Long userId,
+            Long workplaceId,
+            String yearMonth,
+            List<AdvanceRequestStatus> statuses
+    );
+
     List<AdvanceRequest> findByUserIdAndYearMonthOrderByRequestedAtDescCreatedAtDesc(Long userId, String yearMonth);
 
     Optional<AdvanceRequest> findByIdAndUserId(Long id, Long userId);
+
+    List<AdvanceRequest> findAllByOrderByRequestedAtDescCreatedAtDesc();
 }

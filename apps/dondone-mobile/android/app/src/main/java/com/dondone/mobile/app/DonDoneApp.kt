@@ -2,9 +2,17 @@ package com.dondone.mobile.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,10 +36,18 @@ import com.dondone.mobile.app.navigation.shouldResetWorkproofUiState
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DonDoneToastHost
+import com.dondone.mobile.core.designsystem.DawnSurface
+import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.designsystem.DawnWarning
+import com.dondone.mobile.core.designsystem.PrimaryActionButton
+import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.rememberDonDoneToastState
 import com.dondone.mobile.domain.model.DemoInfo
 import com.dondone.mobile.feature.auth.presentation.LoginLoadingScreen
 import com.dondone.mobile.feature.auth.presentation.LoginScreen
+
+private const val COMPANY_CODE_MAX_LENGTH = 12
+private const val COMPANY_CODE_MIN_LENGTH = 6
 
 @Composable
 fun DonDoneApp(
@@ -57,18 +73,25 @@ fun DonDoneApp(
     AuthenticatedDonDoneAppShell(viewModel = viewModel)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AuthenticatedDonDoneAppShell(
     viewModel: DemoSessionViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
+    val companyCodeUpdateUiState by viewModel.companyCodeUpdateUiState.collectAsStateWithLifecycle()
     val toastState = rememberDonDoneToastState()
     val navController = rememberNavController()
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
     val currentRoute = currentDestination?.route.orEmpty()
     val remittance = uiState.remittance
     val workproofShellState = rememberWorkproofShellState(currentRoute)
+    var isCompanyCodeSheetVisible by rememberSaveable { mutableStateOf(false) }
+    var companyCodeInput by rememberSaveable { mutableStateOf("") }
+    val companyCodeValidationMessage = companyCodeValidationMessage(companyCodeInput)
+    val isCompanyCodeSavable = companyCodeInput.isNotBlank() && companyCodeValidationMessage == null
 
     val chrome = resolveScreenChrome(
         route = currentRoute,
@@ -111,6 +134,19 @@ private fun AuthenticatedDonDoneAppShell(
         onBack = ::handleBack
     )
 
+    LaunchedEffect(companyCodeUpdateUiState.message, companyCodeUpdateUiState.isError) {
+        val message = companyCodeUpdateUiState.message ?: return@LaunchedEffect
+        toastState.show(
+            message = message,
+            tone = if (companyCodeUpdateUiState.isError) BadgeTone.Warning else BadgeTone.Success
+        )
+        if (!companyCodeUpdateUiState.isError) {
+            companyCodeInput = authUiState.session?.companyCode.orEmpty()
+            isCompanyCodeSheetVisible = false
+        }
+        viewModel.clearCompanyCodeUpdateMessage()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -119,7 +155,10 @@ private fun AuthenticatedDonDoneAppShell(
                 AppTopBar(
                     state = topBarState,
                     onBack = ::handleBack,
-                    onMenuClick = { navController.navigateToRootTab(Route.MENU) }
+                    onMenuClick = {
+                        companyCodeInput = authUiState.session?.companyCode.orEmpty()
+                        isCompanyCodeSheetVisible = true
+                    }
                 )
             },
             bottomBar = {
@@ -152,7 +191,117 @@ private fun AuthenticatedDonDoneAppShell(
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 20.dp, vertical = 28.dp)
         )
+
+        if (isCompanyCodeSheetVisible) {
+            CompanyCodeSheet(
+                companyCode = companyCodeInput,
+                validationMessage = companyCodeValidationMessage,
+                onCompanyCodeChange = { nextValue -> companyCodeInput = normalizeCompanyCodeInput(nextValue) },
+                isSubmitting = companyCodeUpdateUiState.isSubmitting,
+                isSaveEnabled = isCompanyCodeSavable,
+                onDismiss = {
+                    if (!companyCodeUpdateUiState.isSubmitting) {
+                        isCompanyCodeSheetVisible = false
+                        viewModel.clearCompanyCodeUpdateMessage()
+                    }
+                },
+                onSave = {
+                    viewModel.updateCompanyCode(companyCodeInput)
+                }
+            )
+        }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompanyCodeSheet(
+    companyCode: String,
+    validationMessage: String?,
+    onCompanyCodeChange: (String) -> Unit,
+    isSubmitting: Boolean,
+    isSaveEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = DawnSurface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "회사코드 입력",
+                style = MaterialTheme.typography.headlineSmall
+            )
+            OutlinedTextField(
+                value = companyCode,
+                onValueChange = onCompanyCodeChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp),
+                singleLine = true,
+                isError = validationMessage != null,
+                label = { Text("회사코드") },
+                placeholder = { Text("예: DONDONE2026") },
+                supportingText = {
+                    Text(
+                        text = validationMessage ?: "영문 대문자와 숫자만 입력할 수 있어요.",
+                        color = if (validationMessage != null) DawnWarning else DawnTextSubtle
+                    )
+                }
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 12.dp)
+            ) {
+                SecondaryActionButton(
+                    text = "닫기",
+                    onClick = onDismiss,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.weight(1f)
+                )
+                PrimaryActionButton(
+                    text = if (isSubmitting) "저장 중..." else "저장",
+                    onClick = onSave,
+                    enabled = !isSubmitting && isSaveEnabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+internal fun normalizeCompanyCodeInput(
+    rawValue: String
+): String {
+    return rawValue
+        .uppercase()
+        .take(COMPANY_CODE_MAX_LENGTH)
+}
+
+internal fun companyCodeValidationMessage(
+    companyCode: String
+): String? {
+    if (companyCode.isBlank()) {
+        return null
+    }
+    if (companyCode.any { !it.isDigit() && it !in 'A'..'Z' }) {
+        return "영문 대문자와 숫자만 입력할 수 있어요."
+    }
+    if (companyCode.length < COMPANY_CODE_MIN_LENGTH) {
+        return "회사코드는 6자 이상이어야 해요."
+    }
+    if (companyCode.length > COMPANY_CODE_MAX_LENGTH) {
+        return "회사코드는 12자 이하여야 해요."
+    }
+    return null
 }
 
 @Composable

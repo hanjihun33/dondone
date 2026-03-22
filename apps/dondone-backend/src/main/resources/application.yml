@@ -28,6 +28,9 @@ jwt:
   secret: ${JWT_SECRET}
   access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:86400000}
 
+employer:
+  signup-code-encryption-key: ${EMPLOYER_SIGNUP_CODE_ENCRYPTION_KEY:${REMITTANCE_WALLET_ENCRYPTION_KEY:}}
+
 remittance:
   policy:
     asset-symbol: ${REMITTANCE_ASSET_SYMBOL:dUSDC}

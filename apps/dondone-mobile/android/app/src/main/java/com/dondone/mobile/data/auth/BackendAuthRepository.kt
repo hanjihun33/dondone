@@ -89,7 +89,8 @@ class BackendAuthRepository(
                 userId = data.getLong("userId"),
                 email = data.getString("email"),
                 name = data.getString("name"),
-                phoneNumber = data.optString("phoneNumber").ifBlank { null }
+                phoneNumber = data.optNullableString("phoneNumber"),
+                companyCode = data.optNullableString("companyCode")
             )
             sessionStore.save(session)
             session
@@ -128,7 +129,44 @@ class BackendAuthRepository(
             val data = json.getJSONObject("data")
             val updatedSession = session.copy(
                 name = data.getString("name"),
-                phoneNumber = data.optString("phoneNumber").ifBlank { null }
+                phoneNumber = data.optNullableString("phoneNumber"),
+                companyCode = data.optNullableString("companyCode")
+            )
+            sessionStore.save(updatedSession)
+            updatedSession
+        }
+    }
+
+    override suspend fun updateCompanyCode(
+        session: AuthSession,
+        companyCode: String
+    ): AuthSession = withContext(Dispatchers.IO) {
+        val payload = JSONObject()
+            .put("companyCode", companyCode)
+            .toString()
+        val request = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/auth/me/company-code")
+            .header("Authorization", "Bearer ${session.accessToken}")
+            .put(payload.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val message = parseBackendErrorMessage(
+                    responseBody = responseBody,
+                    fallbackMessage = "회사코드를 저장하지 못했어요. 잠시 후 다시 시도해 주세요."
+                )
+                if (response.code == 401 || response.code == 403) {
+                    throw AuthUnauthorizedException(message)
+                }
+                throw BackendApiException(message)
+            }
+
+            val json = JSONObject(responseBody.ifBlank { "{}" })
+            val data = json.getJSONObject("data")
+            val updatedSession = session.copy(
+                companyCode = data.optNullableString("companyCode")
             )
             sessionStore.save(updatedSession)
             updatedSession
@@ -138,4 +176,11 @@ class BackendAuthRepository(
     override suspend fun logout() = withContext(Dispatchers.IO) {
         sessionStore.clear()
     }
+}
+
+private fun JSONObject.optNullableString(key: String): String? {
+    if (!has(key) || isNull(key)) {
+        return null
+    }
+    return optString(key).ifBlank { null }
 }

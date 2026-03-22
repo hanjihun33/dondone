@@ -48,6 +48,9 @@ fun DonDoneNavGraph(
     val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
     val vaultActionUiState by viewModel.vaultActionUiState.collectAsStateWithLifecycle()
     val workproofActionUiState by viewModel.workproofActionUiState.collectAsStateWithLifecycle()
+    val workproofPdfPreviewUiState by viewModel.workproofPdfPreviewUiState.collectAsStateWithLifecycle()
+    val workproofPdfCreateUiState by viewModel.workproofPdfCreateUiState.collectAsStateWithLifecycle()
+    val workproofPdfFileUiState by viewModel.workproofPdfFileUiState.collectAsStateWithLifecycle()
     val selectedAdvanceAmount by viewModel.selectedAdvanceAmount.collectAsStateWithLifecycle()
     val selectedVaultAmount by viewModel.selectedVaultAmount.collectAsStateWithLifecycle()
     val selectedVaultActionType by viewModel.selectedVaultActionType.collectAsStateWithLifecycle()
@@ -129,9 +132,19 @@ fun DonDoneNavGraph(
         composable(Route.WORKPROOF) {
             WorkproofScreen(
                 uiModel = uiState.toWorkproofUiModel(actionUiState = workproofActionUiState),
+                pdfPreviewUiState = workproofPdfPreviewUiState,
+                pdfCreateUiState = workproofPdfCreateUiState,
+                pdfFileUiState = workproofPdfFileUiState,
                 onClockIn = viewModel::clockIn,
                 onClockOut = viewModel::clockOut,
                 onSaveEdit = viewModel::saveWorkproofEdit,
+                onRefreshPdfPreview = viewModel::previewWorkproofPdf,
+                onClearPdfPreview = viewModel::clearWorkproofPdfPreview,
+                onCreateWorkproofPdf = viewModel::createWorkproofPdf,
+                onClearPdfCreateState = viewModel::clearWorkproofPdfCreateState,
+                onOpenWorkproofPdf = viewModel::openWorkproofPdf,
+                onShareWorkproofPdf = viewModel::shareWorkproofPdf,
+                onClearPdfFileState = viewModel::clearWorkproofPdfFileState,
                 resetVersion = workproofResetVersion,
                 onDetailVisibilityChange = onWorkproofDetailVisibilityChange
             )
@@ -234,12 +247,17 @@ fun DonDoneNavGraph(
             MenuScreen(
                 uiModel = uiState.toMenuUiModel(
                     session = authUiState.session,
-                    remittanceRemoteState = remittanceRemoteState
+                    remittanceRemoteState = remittanceRemoteState,
+                    workproofPdfCreateUiState = workproofPdfCreateUiState
                 ),
+                workproofPdfFileUiState = workproofPdfFileUiState,
                 launchRequest = menuLaunchRequest,
                 profileUpdateUiState = profileUpdateUiState,
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
+                onOpenWorkproofPdf = viewModel::openWorkproofPdf,
+                onShareWorkproofPdf = viewModel::shareWorkproofPdf,
+                onClearPdfFileState = viewModel::clearWorkproofPdfFileState,
                 onConsumeLaunchRequest = viewModel::consumeMenuLaunchRequest,
                 onUpdateProfile = viewModel::updateProfile,
                 onClearProfileUpdateMessage = viewModel::clearProfileUpdateMessage,

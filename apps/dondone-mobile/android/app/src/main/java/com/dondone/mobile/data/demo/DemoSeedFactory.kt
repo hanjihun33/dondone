@@ -96,7 +96,7 @@ object DemoSeedFactory {
                 monthlyFeeRevenue = 285_000
             ),
             documents = listOf(
-                DocumentItem("DOC-PROOF-2026-03", "증빙 리포트", "READY", "2026-03-28 14:21"),
+                DocumentItem("DOC-PROOF-2026-03", "근무 기록 문서", "READY", "2026-03-28 14:21"),
                 DocumentItem("DOC-CLAIM-2026-03", "근거 자료 묶음", "NOT_CREATED", null),
                 DocumentItem("DOC-RECEIPT-0007", "송금 영수증", "READY", "2026-03-19 09:12")
             )

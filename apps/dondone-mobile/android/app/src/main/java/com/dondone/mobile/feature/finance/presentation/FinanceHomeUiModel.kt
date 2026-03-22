@@ -229,7 +229,7 @@ fun DemoState.toFinanceHomeUiModel(
     val remoteMode = remoteState?.mode
     val remoteRequests = if (remoteMode == AdvanceRemoteMode.CONTENT) remoteState.requests else emptyList()
     val latestRemoteRequest = remoteRequests.maxByOrNull { it.requestId }
-    val remoteUsedAmount = remoteRequests.sumOf { it.approvedAmount }
+    val remoteUsedAmount = remoteRequests.sumOf { it.approvedAmount ?: 0L }
     val remoteAvailableAmount = if (usesRemoteAdvance) {
         advanceContractState.availableAmountOverride ?: 0L
     } else {
@@ -310,13 +310,15 @@ fun DemoState.toFinanceHomeUiModel(
         else -> formatKrw(advanceSnapshot.requestAmount)
     }
     val detailReceiveAmountText = when {
-        latestRemoteRequest != null -> formatKrw(latestRemoteRequest.approvedAmount.toInt())
+        latestRemoteRequest != null -> latestRemoteRequest.approvedAmount?.toInt()?.let(::formatKrw) ?: "승인 대기"
         usesRemoteAdvance -> "-"
         else -> formatKrw(advanceSnapshot.receiveAmount)
     }
     val detailFeeText = when {
         latestRemoteRequest != null ->
-            formatKrw((latestRemoteRequest.requestedAmount - latestRemoteRequest.approvedAmount).toInt())
+            latestRemoteRequest.approvedAmount?.let { approvedAmount ->
+                formatKrw((latestRemoteRequest.requestedAmount - approvedAmount).toInt())
+            } ?: "-"
 
         usesRemoteAdvance -> "-"
         else -> formatKrw(advanceSnapshot.fee)
@@ -840,7 +842,7 @@ private fun buildRemoteAdvanceHistoryItems(
                 requestId = request.requestId,
                 title = "요청 #${request.requestId}",
                 metaText = "${request.status} · 상환 예정 ${request.repaymentDueDate}",
-                valueText = formatKrw(request.approvedAmount.toInt()),
+                valueText = request.approvedAmount?.toInt()?.let(::formatKrw) ?: "승인 대기",
                 clickable = true
             )
         }
@@ -854,7 +856,7 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
         titleText = detailValue?.let { "요청 #${it.requestId}" } ?: "신청 상세",
         stateText = detailValue?.status ?: "-",
         requestedAmountText = detailValue?.requestedAmount?.toInt()?.let(::formatKrw) ?: "-",
-        approvedAmountText = detailValue?.approvedAmount?.toInt()?.let(::formatKrw) ?: "-",
+        approvedAmountText = detailValue?.approvedAmount?.toInt()?.let(::formatKrw) ?: "승인 대기",
         feeAmountText = detailValue?.feeAmount?.toInt()?.let(::formatKrw) ?: "-",
         repaymentDueText = detailValue?.repaymentDueDate ?: "-",
         createdAtText = detailValue?.createdAt ?: "-",

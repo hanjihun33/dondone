@@ -27,10 +27,6 @@ enum class WorkproofRecordTone {
 data class WorkproofSummaryUiModel(
     val canClockIn: Boolean,
     val canClockOut: Boolean,
-    val verifiedDays: Int,
-    val auditCount: Int,
-    val todayInTime: String?,
-    val todayOutTime: String?,
     val workplaceLatitude: Double,
     val workplaceLongitude: Double,
     val currentLatitude: Double,
@@ -75,7 +71,6 @@ fun DemoState.toWorkproofUiModel(
     actionUiState: WorkproofActionUiState? = null
 ): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
-    val verifiedSnapshot = WorkproofCalculator.verify(this)
     val workplaceRadiusMeters = workproof.allowedRadiusMeters
     val canSubmitAction = actionUiState?.isSubmitting != true
     val isWithinWorkplaceRadius = isWithinWorkplaceRadius(
@@ -112,8 +107,6 @@ fun DemoState.toWorkproofUiModel(
             reasonText = audit.reason
         )
     }
-    val todayDateText = formatDateText(demo.year, demo.month, demo.asOfDay)
-
     return WorkproofUiModel(
         calendarBaseYear = demo.year,
         calendarBaseMonth = demo.month,
@@ -122,10 +115,6 @@ fun DemoState.toWorkproofUiModel(
         summary = WorkproofSummaryUiModel(
             canClockIn = workproof.today.clockIn == null && canSubmitAction,
             canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null && canSubmitAction,
-            verifiedDays = verifiedSnapshot.verifiedDays,
-            auditCount = workproof.audit.size,
-            todayInTime = workproof.today.clockIn?.let { "$todayDateText · $it" },
-            todayOutTime = workproof.today.clockOut?.let { "$todayDateText · $it" },
             workplaceLatitude = workproof.workplaceLatitude,
             workplaceLongitude = workproof.workplaceLongitude,
             currentLatitude = workproof.currentLatitude,

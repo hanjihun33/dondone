@@ -1,5 +1,29 @@
 # Auth And Role Policy
 
+## 2026-03-20 Admin Employer Onboarding MVP
+- admin web now uses the shared `/api/auth/login` flow with an `ADMIN` account and a bearer token-backed session.
+- service admin onboarding flow:
+  - service admin creates `Company`
+  - system auto-creates a placeholder default `Workplace`
+  - the same action issues one employer signup code backed by `EmployerSignupCode`
+  - employer signs up and then completes workplace address/radius in settings
+- employer web signup uses `companyCode/displayName/email/password`
+- security policy:
+  - `Company.companyCode` and employer signup code are different values and must stay separate in UI, DTOs, and docs
+  - employer signup code raw value is shown only in the create response right after issuance
+  - list APIs expose issuance status and latest issued timestamp, not the raw signup code
+- worker company registration remains a separate app lane and is not part of admin/employer web auth.
+
+## 2026-03-20 Employer Signup Code Update
+- employer web signup is now aligned to a `company code` policy that later maps to service-admin issuance.
+- flow:
+  - current temporary step: seed/manual bootstrap prepares a reusable company code bound to `Company + default Workplace`
+  - future target step: service admin prepares `Company + default Workplace` and issues the same kind of company code
+  - employer opens web signup and submits `companyCode/displayName/email/password`
+  - backend creates the `EMPLOYER` account and links `EmployerProfile` to the prepared company/workplace
+- worker company registration stays out of this flow.
+- worker registration code is a separate lane and will be issued by employers later.
+
 ## 목적
 - 웹 전용 로그인/회원가입 흐름을 정의하되, 인증 인프라 중복을 막는다.
 
@@ -11,18 +35,19 @@
 ## 현재 코드 근거
 ### UserRole
 - `apps/dondone-backend/src/main/java/com/workproofpay/backend/auth/model/UserRole.java`
-  - 현재 값은 `USER`, `ADMIN`뿐이다.
-  - `EMPLOYER` 같은 역할 구분이 없다.
+  - 현재 값은 `USER`, `EMPLOYER`, `ADMIN`이다.
+  - employer 전용 보호 경계는 `EMPLOYER` role을 기준으로 분리한다.
 
 ### User
 - `apps/dondone-backend/src/main/java/com/workproofpay/backend/auth/model/User.java`
-  - `register()`가 기본적으로 `UserRole.USER`를 부여한다.
-  - employer 전용 가입 흐름을 그대로 수용하기 어렵다.
+  - `register()`는 worker signup 기본값으로 `UserRole.USER`를 유지한다.
+  - employer 계정 생성은 invitation accept 서비스가 별도 경로로 처리한다.
+  - 이메일은 공통 canonicalization 규칙(`trim + lowercase`)으로 저장/조회한다.
 
 ### SecurityConfig
 - `apps/dondone-backend/src/main/java/com/workproofpay/backend/shared/config/SecurityConfig.java`
-  - 현재는 공개 endpoint만 열고 나머지는 모두 authenticated 처리다.
-  - role 기반 endpoint 분리는 아직 없다.
+  - `/api/employer-auth/**`는 공개, `/api/employer/**`는 `ROLE_EMPLOYER`, 기존 `/api/**`는 `USER/ADMIN`으로 분리했다.
+  - employer token으로 worker endpoint, worker token으로 employer endpoint 접근을 허용하지 않는다.
 
 ## 선택지 비교
 ### 선택지 A. worker/employer auth 시스템 완전 분리
@@ -41,11 +66,10 @@
 - 판단: 유지보수 리스크가 커서 비권장이다.
 
 ## 현재 단계 권장안
-- 선택지 B 채택
-- 공통 auth 인프라는 재사용
-- employer web은 별도 signup/login DTO와 후처리 사용
-- role별 profile과 권한 검사는 endpoint/service 레벨에서 분리
-- 필요하면 role enum 또는 authority 체계를 확장하되, 기존 worker auth contract를 한 번에 뒤엎지 않는다.
+- 선택지 B를 실제 구현 기준으로 채택했다.
+- 공통 auth 인프라는 재사용하고 employer web은 별도 DTO, controller, service로 격리했다.
+- 역할별 profile과 권한 검사는 endpoint/service 레벨에서 분리하고 `EmployerProfile + EmploymentMembership`을 employer authz source of truth로 고정했다.
+- 기존 worker auth contract는 유지하되, 공통 이메일 정책은 worker/employer 모두 같은 canonicalization 규칙으로 통일했다.
 
 ## 분리 기준
 ### 분리 대상
@@ -80,9 +104,9 @@
 
 ## 현재 단계 보수적 권장안
 - employer는 공개 회원가입보다 초대 또는 회사 코드 기반 가입을 우선 고려
-- worker/employer 겸용은 일단 보류
-- 공통 이메일 계정 정책은 최종 확정 전까지 문서로만 열어 둠
-- `SecurityConfig`는 이후 `/api/employer/*`에 대해 명시적 권한 규칙을 추가하는 방향으로 확장한다.
+- worker/employer 겸용은 MVP에서 허용하지 않음
+- 공통 이메일 계정 정책은 `trim + lowercase` canonicalization으로 구현 완료
+- `SecurityConfig`에는 `/api/employer-auth/**`, `/api/employer/**`, 기존 `/api/**` 분리 규칙을 이미 반영했다.
 
 ## MVP 기본 가정
 - employer 가입은 `공개 회원가입`으로 열지 않는다.
@@ -94,8 +118,9 @@
 - employer 초대 토큰은 `1회성`이어야 한다.
 - employer 초대 토큰은 `만료 시각`을 가져야 한다.
 - 운영자 또는 관리자는 아직 사용되지 않은 토큰을 `폐기(revoke)`할 수 있어야 한다.
-- 초대 토큰은 최소한 `invitee email`, `companyId`, `role=EMPLOYER`에 바인딩되어야 한다.
-- 초대 수락 시 요청 email, token 바인딩 정보, target company가 불일치하면 계정을 만들지 않는다.
+- 초대 토큰은 최소한 `invitee email`, `companyId`, `defaultWorkplaceId`, `role=EMPLOYER`에 바인딩되어야 한다.
+- DB row 기반으로 관리하되, 저장 값은 raw bearer token이 아니라 server-side hash여야 한다.
+- 초대 수락 시 요청 email, token 바인딩 정보, target company, target default workplace binding이 불일치하면 계정을 만들지 않는다.
 - 이미 사용된 토큰, 만료된 토큰, 폐기된 토큰은 모두 동일하게 실패 처리한다.
 
 ## 왜 이 가정을 택하는가
@@ -114,11 +139,13 @@
 ## 공개 endpoint 가정
 - 현재 worker용 `/api/auth/signup`, `/api/auth/login`은 유지한다.
 - employer용 공개 endpoint는 별도 경로로 분리한다.
-- 예시
+- 현재 구현
   - `POST /api/employer-auth/invitations/accept`
   - `POST /api/employer-auth/login`
-- employer invitation accept endpoint는 token의 `1회성`, `만료`, `폐기`, `companyId/role/email 바인딩`을 모두 검증해야 한다.
-- employer login endpoint는 단순 authenticated 여부만이 아니라 employer profile 활성 상태와 회사 연결 상태도 함께 확인해야 한다.
+- 보호 endpoint
+  - `GET /api/employer/profile`
+- employer invitation accept endpoint는 token의 `1회성`, `만료`, `폐기`, `companyId/defaultWorkplaceId/role/email 바인딩`을 모두 검증해야 한다.
+- employer login endpoint는 단순 authenticated 여부만이 아니라 employer profile 활성 상태와 회사-사업장 연결 상태도 함께 확인해야 한다.
 
 ## 추후 재검토 조건
 - 실제 요구사항이 self-service employer signup을 요구할 때
@@ -130,7 +157,9 @@
 - 사업주 초대 또는 회사 코드 기반 가입 여부
 - employer가 worker API에 접근하지 못하도록 충분히 막히는지
 - worker가 employer API에 접근하지 못하도록 충분히 막히는지
-- 초대 토큰 재사용, 만료, 폐기, companyId 불일치, email 불일치가 모두 차단되는지
+- 초대 토큰 재사용, 만료, 폐기, companyId/defaultWorkplaceId 불일치, email 불일치가 모두 차단되는지
+- company와 default workplace가 실제로 같은 조직 축에 묶이는지
+- 이메일 canonicalization 때문에 대소문자만 다른 중복 계정이 생기지 않는지
 
 ## 금지할 것
 - 웹용 auth를 별도 JWT 시스템으로 중복 구현
@@ -141,4 +170,7 @@
 ## 문서적으로 이미 확정된 운영 원칙
 - 기존 앱 API contract는 당장 바꾸지 않는다.
 - 웹 요구사항을 맞추기 위해 기존 auth를 전면 리팩터링하지 않는다.
+- employer 기본 scope는 `EmployerProfile.defaultWorkplaceId`에 직접 둔다.
+- invitation token은 DB row 기반으로 관리하되 hash 저장으로 운영한다.
+- employer authz source of truth는 `EmployerProfile + EmploymentMembership`이다.
 - 기존 app auth 변경이 필수처럼 보이면 재스코프 대상으로 본다.

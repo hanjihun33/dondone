@@ -29,8 +29,15 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "You do not have permission to access this resource"),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Token is invalid or expired"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid credentials"),
+    INVALID_EMPLOYER_INVITATION(HttpStatus.UNAUTHORIZED, "Employer invitation is invalid or expired"),
+    INVALID_EMPLOYER_SIGNUP_CODE(HttpStatus.UNAUTHORIZED, "Employer company code is invalid or revoked"),
+    EMPLOYER_PROFILE_INACTIVE(HttpStatus.FORBIDDEN, "Employer profile is inactive"),
+    EMPLOYER_SCOPE_NOT_READY(HttpStatus.CONFLICT, "Employer profile is missing company or workplace linkage"),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
+    COMPANY_NOT_FOUND(HttpStatus.NOT_FOUND, "Company not found"),
+    EMPLOYER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "Employer profile not found"),
+    CORRECTION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Correction request not found"),
     WORKPROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "WorkProof not found"),
     WORKPROOF_EDIT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Only reflected WorkProof can be edited"),
     WORKPLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "Workplace not found"),
@@ -48,6 +55,10 @@ public enum ErrorCode {
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     PHONE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "Phone number already exists"),
+    COMPANY_CODE_ALREADY_EXISTS(HttpStatus.CONFLICT, "Company code already exists"),
+    CORRECTION_REQUEST_PENDING_EXISTS(HttpStatus.CONFLICT, "A pending correction request already exists for this workproof"),
+    CORRECTION_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "Correction request is already processed"),
+    CORRECTION_REQUEST_SCOPE_NOT_READY(HttpStatus.CONFLICT, "Correction request is not available for the current workproof scope"),
     ACTIVE_CONTRACT_REQUIRED(HttpStatus.CONFLICT, "Active contract is required"),
     ACTIVE_CONTRACT_EXISTS(HttpStatus.CONFLICT, "Active contract already exists"),
     ACTIVE_WORKPROOF_EXISTS(HttpStatus.CONFLICT, "Active workproof already exists"),
@@ -57,6 +68,7 @@ public enum ErrorCode {
     DOCUMENT_DUPLICATE_REQUEST(HttpStatus.CONFLICT, "Document request already exists for the given idempotency key"),
     ADVANCE_DUPLICATE_REQUEST(HttpStatus.CONFLICT, "Advance request already exists for the idempotency key"),
     ADVANCE_NOT_ELIGIBLE(HttpStatus.CONFLICT, "Advance is not eligible"),
+    ADVANCE_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "Advance request is already processed"),
     IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD(HttpStatus.CONFLICT, "Idempotency key was reused with a different payload"),
     RECIPIENT_WALLET_ALREADY_EXISTS(HttpStatus.CONFLICT, "Recipient wallet is already registered"),
     RECIPIENT_NOT_ALLOWED(HttpStatus.CONFLICT, "Recipient is not allowed"),
@@ -73,6 +85,7 @@ public enum ErrorCode {
     WALLET_FUNDING_FAILED(HttpStatus.CONFLICT, "Wallet funding failed"),
     RECOVERY_ACTION_NOT_ALLOWED(HttpStatus.CONFLICT, "Recovery action is not allowed for the current state"),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
+    CORRECTION_REQUEST_NO_CHANGES(HttpStatus.BAD_REQUEST, "Requested correction times must differ from the original workproof"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
 

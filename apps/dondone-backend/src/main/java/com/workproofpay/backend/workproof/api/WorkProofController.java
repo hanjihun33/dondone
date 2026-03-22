@@ -5,10 +5,12 @@ import com.workproofpay.backend.shared.security.AuthenticatedUser;
 import com.workproofpay.backend.workproof.api.dto.request.CheckInWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CheckOutWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CreateWorkProofRequest;
+import com.workproofpay.backend.workproof.api.dto.request.CreateWorkProofCorrectionRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CreateContractRequest;
 import com.workproofpay.backend.workproof.api.dto.request.CreateWorkplaceRequest;
 import com.workproofpay.backend.workproof.api.dto.request.UpdateWorkProofRequest;
 import com.workproofpay.backend.workproof.api.dto.response.CurrentContractResponse;
+import com.workproofpay.backend.workproof.api.dto.response.WorkProofCorrectionRequestResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofRecordListResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofRecordResponse;
@@ -16,9 +18,11 @@ import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySumma
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkplaceListResponse;
 import com.workproofpay.backend.workproof.api.dto.response.WorkplaceResponse;
+import com.workproofpay.backend.workproof.service.WorkProofCorrectionRequestService;
 import com.workproofpay.backend.workproof.service.WorkProofLane1Service;
 import com.workproofpay.backend.workproof.service.WorkProofMonthlyMetrics;
 import com.workproofpay.backend.workproof.service.WorkProofService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -40,6 +44,7 @@ import java.util.List;
 public class WorkProofController {
 
     private final WorkProofService workProofService;
+    private final WorkProofCorrectionRequestService workProofCorrectionRequestService;
     private final WorkProofLane1Service workProofLane1Service;
 
     @PostMapping("/workplaces")
@@ -138,12 +143,27 @@ public class WorkProofController {
     }
 
     @PatchMapping("/{workProofId}")
+    @Deprecated
+    @Operation(
+            summary = "Update work proof directly (legacy)",
+            description = "Legacy direct edit endpoint. New clients should submit correction requests instead of calling this endpoint directly.",
+            deprecated = true
+    )
     public ResponseEntity<ApiResponse<WorkProofResponse>> update(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable Long workProofId,
             @Valid @RequestBody UpdateWorkProofRequest request
     ) {
         return ApiResponse.success(workProofService.update(user.userId(), workProofId, request));
+    }
+
+    @PostMapping("/{workProofId}/correction-requests")
+    public ResponseEntity<ApiResponse<WorkProofCorrectionRequestResponse>> createCorrectionRequest(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long workProofId,
+            @Valid @RequestBody CreateWorkProofCorrectionRequest request
+    ) {
+        return ApiResponse.created(workProofCorrectionRequestService.create(user.userId(), workProofId, request));
     }
 
     @GetMapping(value = "/monthly-summary", params = "yearMonth")
