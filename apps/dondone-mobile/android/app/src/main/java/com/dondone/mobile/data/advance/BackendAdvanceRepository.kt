@@ -85,7 +85,7 @@ class BackendAdvanceRepository(
             return@withContext AdvanceCreateResult(
                 requestId = data.getLong("requestId"),
                 status = data.getString("status"),
-                approvedAmount = data.getLong("approvedAmount"),
+                approvedAmount = data.optLongOrNull("approvedAmount"),
                 feeAmount = data.getLong("feeAmount"),
                 repaymentDueDate = data.getString("repaymentDueDate")
             )
@@ -225,7 +225,7 @@ class BackendAdvanceRepository(
                     val payload = AdvanceRequestItemPayload(
                         requestId = item.getLong("requestId"),
                         requestedAmount = item.getLong("requestedAmount"),
-                        approvedAmount = item.getLong("approvedAmount"),
+                        approvedAmount = item.optLongOrNull("approvedAmount"),
                         status = item.getString("status"),
                         repaymentDueDate = item.getString("repaymentDueDate")
                     )
@@ -243,7 +243,7 @@ class BackendAdvanceRepository(
             requestId = data.getLong("requestId"),
             workplaceId = data.getLong("workplaceId"),
             requestedAmount = data.getLong("requestedAmount"),
-            approvedAmount = data.getLong("approvedAmount"),
+            approvedAmount = data.optLongOrNull("approvedAmount"),
             feeAmount = data.getLong("feeAmount"),
             status = data.getString("status"),
             repaymentDueDate = data.getString("repaymentDueDate"),
@@ -263,4 +263,11 @@ class BackendAdvanceRepository(
         val id: Long,
         val name: String
     )
+}
+
+private fun JSONObject.optLongOrNull(key: String): Long? {
+    if (isNull(key)) {
+        return null
+    }
+    return getLong(key)
 }

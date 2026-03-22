@@ -2,6 +2,7 @@ package com.workproofpay.backend.employerauth.api;
 
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerInvitationAcceptRequest;
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerLoginRequest;
+import com.workproofpay.backend.employerauth.api.dto.request.EmployerSignupRequest;
 import com.workproofpay.backend.employerauth.api.dto.response.EmployerAuthResponse;
 import com.workproofpay.backend.employerauth.service.EmployerAuthService;
 import com.workproofpay.backend.shared.api.ApiResponse;
@@ -22,6 +23,28 @@ import org.springframework.web.bind.annotation.*;
 public class EmployerAuthController {
 
     private final EmployerAuthService employerAuthService;
+
+    @PostMapping("/signup")
+    @Operation(
+            summary = "Sign up employer with company code",
+            description = "Creates a new employer account from a reusable employer company code.",
+            security = {}
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Employer signup succeeded"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Company code invalid", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email already exists", content = @Content)
+    })
+    public ResponseEntity<ApiResponse<EmployerAuthResponse>> signup(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Employer signup payload",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = EmployerSignupRequest.class))
+            )
+            @Valid @RequestBody EmployerSignupRequest request) {
+        return ApiResponse.created(employerAuthService.signup(request));
+    }
 
     @PostMapping("/invitations/accept")
     @Operation(

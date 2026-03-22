@@ -86,6 +86,7 @@ pipeline {
         DEPLOY_DIR = '/srv/dondone/app'
         TARGET_BRANCH = 'develop'
         HEALTHCHECK_URL = 'https://dondone.duckdns.org/health'
+        WEB_URL = 'https://dondone.duckdns.org/'
         LOG_FILE = 'jenkins-console.log'
     }
 
@@ -225,8 +226,8 @@ EOF
                 }
                 runLogged('''
                     cd "$DEPLOY_DIR"
-                    docker compose build api-server
-                    docker compose up -d postgres redis api-server
+                    docker compose build api-server web
+                    docker compose up -d postgres redis api-server web
                 ''')
             }
         }
@@ -284,11 +285,57 @@ EOF
                         exit 1
                     fi
 
-                    docker compose up -d nginx
+                    for i in $(seq 1 24); do
+                        WEB_CONTAINER_ID="$(docker compose ps -q web || true)"
+                        WEB_HEALTH="unknown"
+                        WEB_STATUS="unknown"
+
+                        if [ -n "$WEB_CONTAINER_ID" ]; then
+                            WEB_STATUS="$(docker inspect --format '{{.State.Status}}' "$WEB_CONTAINER_ID" || echo unknown)"
+                            WEB_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$WEB_CONTAINER_ID" || echo unknown)"
+                        fi
+
+                        echo "Attempt $i/24: web status=$WEB_STATUS health=$WEB_HEALTH"
+
+                        if [ "$WEB_STATUS" = "exited" ] || [ "$WEB_STATUS" = "dead" ]; then
+                            docker compose ps || true
+                            docker compose logs --tail=200 web || true
+                            echo "web is not running"
+                            exit 1
+                        fi
+
+                        if [ "$WEB_HEALTH" = "unhealthy" ]; then
+                            docker compose ps || true
+                            docker compose logs --tail=200 web || true
+                            echo "web became unhealthy"
+                            exit 1
+                        fi
+
+                        if [ "$WEB_HEALTH" = "healthy" ]; then
+                            echo "web is healthy"
+                            break
+                        fi
+
+                        echo "Attempt $i/24 failed, retrying in 5s..."
+                        sleep 5
+                    done
+
+                    WEB_CONTAINER_ID="$(docker compose ps -q web || true)"
+                    WEB_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$WEB_CONTAINER_ID" || echo unknown)"
+
+                    if [ "$WEB_HEALTH" != "healthy" ]; then
+                        docker compose ps || true
+                        docker compose logs --tail=200 web || true
+                        echo "web did not become healthy after 120s"
+                        exit 1
+                    fi
+
+                    docker compose up -d --force-recreate nginx
 
                     for i in $(seq 1 12); do
-                        if curl -fsS --max-time 5 "$HEALTHCHECK_URL"; then
-                            echo "External health check passed"
+                        if curl -fsS --max-time 5 "$HEALTHCHECK_URL" >/dev/null && \
+                           curl -fsS --max-time 5 "$WEB_URL" >/dev/null; then
+                            echo "External api and web checks passed"
                             exit 0
                         fi
                         echo "External attempt $i/12 failed, retrying in 5s..."
@@ -296,7 +343,7 @@ EOF
                     done
 
                     docker compose ps || true
-                    docker compose logs --tail=200 api-server nginx || true
+                    docker compose logs --tail=200 api-server web nginx || true
                     echo "External health check failed after 60s"
                     exit 1
                 ''')

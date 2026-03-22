@@ -71,11 +71,11 @@ const connectivityLines = buildConnectivityLines(cities, connections);
 
 export function RemoteConnectivityPanel() {
   return (
-    <section className="connectivity-panel" aria-label="DonDone 서비스 소개">
+    <section className="connectivity-panel" aria-label="DonDone 원격 근태 연결">
       <div className="connectivity-main">
         <h1 className="connectivity-title">
           <span className="title-remote">DonDone</span>
-          <span className="title-connectivity">송금을 쉽고 간편하게</span>
+          <span className="title-connectivity">사업장 근태를 한 화면에서 점검하세요</span>
         </h1>
 
         <div className="connectivity-map-wrapper">

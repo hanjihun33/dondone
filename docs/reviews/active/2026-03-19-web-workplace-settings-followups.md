@@ -6,6 +6,17 @@
   - `Workplace` settings metadata
   - `WorkProof` workplace snapshot 고정
 
+# 2026-03-20 Slice 6 Classification
+## accepted risk
+- `detailAddress -> mapLabel` 임시 매핑은 유지한다.
+  - 현재 employer/workproof snapshot contract를 깨지 않고 worker/PDF flow도 유지한다.
+  - 독립 필드 승격은 shared workplace contract 재정리 없이 진행하지 않는다.
+- settings 저장 시점과 check-in/check-out 경합은 이번 slice에서 이론 리스크로만 유지한다.
+  - 현재 코드/테스트 기준 실제 회귀 증거는 없고, 동시성 하드닝은 별도 시간 순서 테스트 설계가 필요하다.
+
+## rescope
+- multi-workplace switcher, 예약 효력 시점, 과거 WorkProof 재계산 도구는 계속 별도 execplan 범위다.
+
 # Closed In Slice 3
 - settings authz를 `EmployerAccessScope.defaultWorkplaceId` 기준으로 고정했다.
 - 영향 범위 해석은 `EmploymentMembership.companyId/workplaceId` 기준으로 고정했다.
