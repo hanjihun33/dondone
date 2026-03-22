@@ -355,6 +355,7 @@ private fun JSONObject.toCreateTransferPayload(): RemittanceCreateTransferPayloa
 private fun JSONObject.toTransferDetailPayload(): RemittanceTransferDetailPayload =
     RemittanceTransferDetailPayload(
         transferId = getString("transferId"),
+        direction = getString("direction"),
         status = getString("status"),
         assetSymbol = getString("assetSymbol"),
         amountAtomic = getLong("amountAtomic"),
@@ -403,9 +404,11 @@ private fun JSONArray?.toTransferSummaryPayloads(): List<RemittanceTransferSumma
             add(
                 RemittanceTransferSummaryPayload(
                     transferId = item.getString("transferId"),
+                    direction = item.getString("direction"),
                     status = item.getString("status"),
                     assetSymbol = item.getString("assetSymbol"),
                     amountAtomic = item.getLong("amountAtomic"),
+                    senderAddress = item.getString("senderAddress"),
                     recipientId = item.getString("recipientId"),
                     recipientAlias = item.optNullableString("recipientAlias"),
                     recipientAddress = item.getString("recipientAddress"),

@@ -21,6 +21,14 @@ enum class TransactionHistoryScreenState {
     CONTENT
 }
 
+enum class TransactionLedgerFilter(
+    val label: String
+) {
+    ALL("전체"),
+    INCOME("입금"),
+    EXPENSE("출금")
+}
+
 data class TransactionMonthOptionUiModel(
     val value: YearMonth,
     val label: String
@@ -214,16 +222,21 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
         val category = override?.category ?: inferRemoteCategory(transfer.recipientAlias)
         val memo = override?.memo ?: ""
         val amount = atomicToDisplayAmount(transfer.amountAtomic)
+        val direction = transfer.direction.toTransactionDirection()
+        val counterpartyName = when (direction) {
+            TransactionDirection.INCOME -> transfer.senderAddress.toShortWalletAddress()
+            TransactionDirection.EXPENSE -> transfer.recipientAlias ?: transfer.recipientAddress.toShortWalletAddress()
+        }
         TransactionHistoryItemUiModel(
             id = transfer.transferId,
             walletId = "remote-wallet",
             occurredAt = timestamp,
             day = timestamp.toLocalDate(),
-            counterpartyName = transfer.recipientAlias ?: transfer.recipientAddress.toShortWalletAddress(),
+            counterpartyName = counterpartyName,
             amountValue = amount,
-            amountText = formatMoney(amount, TransactionDirection.EXPENSE, currencyUnit),
+            amountText = formatMoney(amount, direction, currencyUnit),
             feeText = formatFee(0, currencyUnit),
-            direction = TransactionDirection.EXPENSE,
+            direction = direction,
             category = category,
             categoryLabel = category.label,
             memo = memo,
@@ -246,6 +259,9 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
         errorMessage = errorMessage
     )
 }
+
+private fun String.toTransactionDirection(): TransactionDirection =
+    if (equals("INCOME", ignoreCase = true)) TransactionDirection.INCOME else TransactionDirection.EXPENSE
 
 private fun TransactionRecord.toUiModel(
     category: TransactionCategory,

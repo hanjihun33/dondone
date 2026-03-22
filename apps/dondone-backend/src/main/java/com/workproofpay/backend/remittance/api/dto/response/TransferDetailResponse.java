@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public record TransferDetailResponse(
         String transferId,
+        String direction,
         String status,
         String assetSymbol,
         Long amountAtomic,

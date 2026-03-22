@@ -1639,15 +1639,19 @@ class DemoSessionViewModel(
             val updatedTransfers = buildList {
                 add(
                     payload.transfers.firstOrNull { it.transferId == detail.transferId }?.copy(
+                        direction = detail.direction,
                         status = detail.status,
                         amountAtomic = detail.amountAtomic,
+                        senderAddress = detail.senderAddress,
                         txHash = detail.txHash,
                         updatedAt = detail.updatedAt
                     ) ?: com.dondone.mobile.data.remittance.RemittanceTransferSummaryPayload(
                         transferId = detail.transferId,
+                        direction = detail.direction,
                         status = detail.status,
                         assetSymbol = detail.assetSymbol,
                         amountAtomic = detail.amountAtomic,
+                        senderAddress = detail.senderAddress,
                         recipientId = detail.recipientId,
                         recipientAlias = detail.recipientAlias,
                         recipientAddress = detail.recipientAddress,

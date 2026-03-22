@@ -106,6 +106,7 @@ fun TransactionHistoryMainScreen(
         mutableStateOf(uiModel.initialMonth.toString())
     }
     var searchQuery by rememberSaveable(uiModel.walletId) { mutableStateOf("") }
+    var activeFilter by rememberSaveable(uiModel.walletId) { mutableStateOf(TransactionLedgerFilter.ALL.name) }
     var selectedDayValue by rememberSaveable(uiModel.walletId, selectedMonthValue) { mutableStateOf("") }
     var anchorDayValue by rememberSaveable(uiModel.walletId, selectedMonthValue) {
         mutableStateOf(uiModel.initialAnchorDay.toString())
@@ -128,15 +129,21 @@ fun TransactionHistoryMainScreen(
     }
 
     val selectedDay = selectedDayValue.takeIf { it.isNotBlank() }?.let(LocalDate::parse)
+    val selectedFilter = remember(activeFilter) { TransactionLedgerFilter.valueOf(activeFilter) }
     val anchorDay = anchorDayValue.let(LocalDate::parse)
-    val filteredItems = remember(monthItems, searchQuery, selectedDay) {
+    val filteredItems = remember(monthItems, searchQuery, selectedDay, selectedFilter) {
         monthItems.filter { item ->
             val matchesQuery = searchQuery.isBlank() ||
                 item.counterpartyName.contains(searchQuery, ignoreCase = true) ||
                 item.memo.contains(searchQuery, ignoreCase = true) ||
                 item.categoryLabel.contains(searchQuery, ignoreCase = true)
             val matchesDay = selectedDay == null || item.day == selectedDay
-            matchesQuery && matchesDay
+            val matchesFilter = when (selectedFilter) {
+                TransactionLedgerFilter.ALL -> true
+                TransactionLedgerFilter.INCOME -> item.direction == TransactionDirection.INCOME
+                TransactionLedgerFilter.EXPENSE -> item.direction == TransactionDirection.EXPENSE
+            }
+            matchesQuery && matchesDay && matchesFilter
         }
     }
 
@@ -178,6 +185,11 @@ fun TransactionHistoryMainScreen(
                 unfocusedContainerColor = HistoryMutedSurface,
                 focusedContainerColor = Color.White
             )
+        )
+
+        LedgerFilterRow(
+            activeFilter = selectedFilter,
+            onSelect = { activeFilter = it.name }
         )
 
         WeekStrip(
@@ -458,6 +470,35 @@ private fun MonthChip(
             color = DawnPrimary,
             style = MaterialTheme.typography.labelLarge
         )
+    }
+}
+
+@Composable
+private fun LedgerFilterRow(
+    activeFilter: TransactionLedgerFilter,
+    onSelect: (TransactionLedgerFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        TransactionLedgerFilter.values().forEach { filter ->
+            Box(
+                modifier = Modifier
+                    .background(
+                        color = if (filter == activeFilter) DawnPrimary else HistoryMutedSurface,
+                        shape = RoundedCornerShape(999.dp)
+                    )
+                    .clickable { onSelect(filter) }
+                    .padding(horizontal = 16.dp, vertical = 9.dp)
+            ) {
+                Text(
+                    text = filter.label,
+                    color = if (filter == activeFilter) Color.White else DawnTextSubtle,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                )
+            }
+        }
     }
 }
 

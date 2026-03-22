@@ -38,9 +38,11 @@ data class RemittanceRecipientSearchPayload(
 
 data class RemittanceTransferSummaryPayload(
     val transferId: String,
+    val direction: String,
     val status: String,
     val assetSymbol: String,
     val amountAtomic: Long,
+    val senderAddress: String,
     val recipientId: String,
     val recipientAlias: String?,
     val recipientAddress: String,
@@ -50,6 +52,7 @@ data class RemittanceTransferSummaryPayload(
 
 data class RemittanceTransferDetailPayload(
     val transferId: String,
+    val direction: String,
     val status: String,
     val assetSymbol: String,
     val amountAtomic: Long,

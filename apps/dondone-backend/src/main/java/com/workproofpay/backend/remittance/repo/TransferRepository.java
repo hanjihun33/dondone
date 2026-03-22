@@ -11,8 +11,19 @@ import java.util.Optional;
 
 public interface TransferRepository extends JpaRepository<Transfer, String> {
     Optional<Transfer> findByTransferIdAndUserId(String transferId, Long userId);
+    Optional<Transfer> findByTransferIdAndUserIdOrTransferIdAndRecipientTargetUserIdSnapshot(
+            String transferId,
+            Long userId,
+            String recipientTransferId,
+            Long recipientTargetUserIdSnapshot
+    );
     Optional<Transfer> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
     List<Transfer> findByUserIdOrderByCreatedAtDescTransferIdDesc(Long userId, Pageable pageable);
+    List<Transfer> findByUserIdOrRecipientTargetUserIdSnapshotOrderByCreatedAtDescTransferIdDesc(
+            Long userId,
+            Long recipientTargetUserIdSnapshot,
+            Pageable pageable
+    );
     List<Transfer> findByStatusInOrderByUpdatedAtDescTransferIdDesc(Collection<TransferStatus> statuses, Pageable pageable);
     List<Transfer> findByStatusInAndUpdatedAtBeforeOrderByUpdatedAtDescTransferIdDesc(
             Collection<TransferStatus> statuses,
