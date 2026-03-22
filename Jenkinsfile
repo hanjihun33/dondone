@@ -330,7 +330,7 @@ EOF
                         exit 1
                     fi
 
-                    docker compose up -d nginx
+                    docker compose up -d --force-recreate nginx
 
                     for i in $(seq 1 12); do
                         if curl -fsS --max-time 5 "$HEALTHCHECK_URL" >/dev/null && \
