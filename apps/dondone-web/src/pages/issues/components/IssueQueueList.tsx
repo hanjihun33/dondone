@@ -5,7 +5,9 @@ type IssueQueueListProps = {
   requests: IssueQueueItem[];
   onApprove: (requestId: number) => void;
   onReject: (requestId: number) => void;
+  onConfirmReview: (workProofId: number) => void;
   onToggleDetail: (item: IssueQueueItem) => void;
+  submittingWorkProofId: number | null;
 };
 
 const attachmentTypeLabels: Record<string, string> = {
@@ -191,7 +193,14 @@ function renderDetail(item: IssueQueueItem) {
   );
 }
 
-export function IssueQueueList({ requests, onApprove, onReject, onToggleDetail }: IssueQueueListProps) {
+export function IssueQueueList({
+  requests,
+  onApprove,
+  onReject,
+  onConfirmReview,
+  onToggleDetail,
+  submittingWorkProofId
+}: IssueQueueListProps) {
   if (requests.length === 0) {
     return (
       <div className="issue-empty-state">
@@ -206,6 +215,9 @@ export function IssueQueueList({ requests, onApprove, onReject, onToggleDetail }
         const checkInDiff = getTimeDiffInfo(request.originalCheckIn, request.requestedCheckIn);
         const checkOutDiff = getTimeDiffInfo(request.originalCheckOut, request.requestedCheckOut);
         const isPendingCorrection = request.itemType === "CORRECTION_REQUEST" && request.correctionStatus === "PENDING";
+        const isPendingReview =
+          request.itemType === "REVIEW_REQUIRED_RECORD" && request.issueStatus === "NEEDS_REVIEW";
+        const isSubmittingReview = submittingWorkProofId === request.workProofId;
 
         return (
           <article className="issue-request-item" key={request.key}>
@@ -280,6 +292,16 @@ export function IssueQueueList({ requests, onApprove, onReject, onToggleDetail }
                       승인
                     </button>
                   </>
+                ) : null}
+                {isPendingReview ? (
+                  <button
+                    type="button"
+                    className="issue-action-button approve"
+                    onClick={() => onConfirmReview(request.workProofId)}
+                    disabled={isSubmittingReview}
+                  >
+                    {isSubmittingReview ? "처리 중" : "검토 완료"}
+                  </button>
                 ) : null}
               </div>
             </footer>

@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -175,6 +176,38 @@ class EmployerIssueReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.clockOutOutsideAllowedRadius").value(true))
                 .andExpect(jsonPath("$.data.workplace.name").value("Seoul Hub"))
                 .andExpect(jsonPath("$.data.checkOut.locationLabel").value("Office"));
+    }
+
+    @Test
+    void confirmReviewRecordMarksItReflectedAndRemovesItFromQueue() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(post("/api/employer/issues/review-records/{workProofId}/confirm", fixture.reviewWorkProof().getId())
+                        .header("Authorization", bearer(fixture.employerUser())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.workProofId").value(fixture.reviewWorkProof().getId()))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("REFLECTED"));
+
+        mockMvc.perform(get("/api/employer/issues")
+                        .header("Authorization", bearer(fixture.employerUser()))
+                        .queryParam("itemTypes", "REVIEW_REQUIRED_RECORD"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+
+        mockMvc.perform(get("/api/employer/issues/review-records/{workProofId}", fixture.reviewWorkProof().getId())
+                        .header("Authorization", bearer(fixture.employerUser())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WORKPROOF_NOT_FOUND"));
+    }
+
+    @Test
+    void workerTokenCannotConfirmReviewRecord() throws Exception {
+        Fixture fixture = createFixture();
+
+        mockMvc.perform(post("/api/employer/issues/review-records/{workProofId}/confirm", fixture.reviewWorkProof().getId())
+                        .header("Authorization", bearer(fixture.correctionWorker())))
+                .andExpect(status().isForbidden());
     }
 
     @Test
