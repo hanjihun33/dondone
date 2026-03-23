@@ -50,7 +50,7 @@ class BackendAuthRepository(
                 throw BackendApiException(
                     parseBackendErrorMessage(
                         responseBody = responseBody,
-                        fallbackMessage = "?뚯썝媛?낆뿉 ?ㅽ뙣?덉뼱?? ?낅젰???뺣낫瑜??ㅼ떆 ?뺤씤??二쇱꽭??"
+                        fallbackMessage = "회원가입에 실패했어요. 입력한 정보를 다시 확인해 주세요."
                     )
                 )
             }
@@ -75,7 +75,7 @@ class BackendAuthRepository(
                 throw BackendApiException(
                     parseBackendErrorMessage(
                         responseBody = responseBody,
-                        fallbackMessage = "濡쒓렇?몄뿉 ?ㅽ뙣?덉뼱?? ?대찓?쇨낵 鍮꾨?踰덊샇瑜??ㅼ떆 ?뺤씤??二쇱꽭??"
+                        fallbackMessage = "로그인에 실패했어요. 이메일과 비밀번호를 다시 확인해 주세요."
                     )
                 )
             }
@@ -119,7 +119,7 @@ class BackendAuthRepository(
             if (!response.isSuccessful) {
                 val message = parseBackendErrorMessage(
                     responseBody = responseBody,
-                    fallbackMessage = "???뺣낫瑜??섏젙?섏? 紐삵뻽?댁슂. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??"
+                    fallbackMessage = "내 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요."
                 )
                 if (response.code == 401 || response.code == 403) {
                     throw AuthUnauthorizedException(message)

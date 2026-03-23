@@ -179,8 +179,8 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.latestRecord.workplaceName").value("Seoul Hub"))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("212 Teheran-ro, Gangnam-gu, Seoul"))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceMapLabel").doesNotExist())
-                .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("?類ｆ뻼"))
-                .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("?袁ⓩ뻼"))
+                .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("정문"))
+                .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("후문"))
                 .andExpect(jsonPath("$.data.recentDays.length()").value(7))
                 .andExpect(jsonPath("$.data.recentDays[6].date").value(fixture.today().toString()))
                 .andExpect(jsonPath("$.data.recentDays[6].attendanceStatus").value("NEEDS_REVIEW"))
@@ -311,7 +311,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 LocalDateTime.now(),
                 37.501274,
                 127.039585,
-                "?類ｆ뻼"
+                "정문"
         ));
 
         workProofRepository.save(completedRecord(
@@ -387,14 +387,14 @@ class EmployerWorkerReadModelIntegrationTest {
                 LocalDateTime.now(),
                 37.501274,
                 127.039585,
-                "?類ｆ뻼"
+                "정문"
         );
         record.completeCheckOut(
                 workDate.atTime(checkOutHour, checkOutMinute),
                 LocalDateTime.now(),
                 outsideAllowedRadius ? 37.506000 : 37.501274,
                 outsideAllowedRadius ? 127.050000 : 127.039585,
-                outsideAllowedRadius ? "?袁ⓩ뻼" : "?類ｆ뻼",
+                outsideAllowedRadius ? "후문" : "정문",
                 outsideAllowedRadius
         );
         return record;
@@ -455,4 +455,3 @@ class EmployerWorkerReadModelIntegrationTest {
         }
     }
 }
-
