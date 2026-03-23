@@ -65,7 +65,7 @@ private fun resolveTransferHeaderTitle(
     }
 
     return when (transferStep) {
-        TransferFlowStep.ACCOUNT -> "Select Account"
+        TransferFlowStep.ACCOUNT -> "계좌 선택"
         TransferFlowStep.RECIPIENT -> null
         TransferFlowStep.AMOUNT -> null
     }

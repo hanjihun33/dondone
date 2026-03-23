@@ -40,7 +40,7 @@ class MenuUiModelTest {
 
         assertEquals(MenuReceiptStatus.Pending, receipt.status)
         assertEquals("확인 중", receipt.statusText)
-        assertEquals("Sepolia", receipt.networkLabel)
+        assertEquals("세폴리아", receipt.networkLabel)
         assertEquals(seed.remittance.txHash, receipt.txHashFullText)
         assertEquals(
             "네트워크 확인이 끝나면 영수증 상태가 자동으로 완료로 바뀝니다.",

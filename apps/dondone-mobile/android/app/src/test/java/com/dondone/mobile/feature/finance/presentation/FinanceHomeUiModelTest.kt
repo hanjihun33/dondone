@@ -87,6 +87,39 @@ class FinanceHomeUiModelTest {
     }
 
     @Test
+    fun `confirmed remote vault withdraw uses short completion copy`() {
+        val uiModel = DemoSeedFactory.create().toFinanceHomeUiModel(
+            vaultRemoteState = remoteVaultState(
+                storedAmountAtomic = "100000000",
+                availableToStoreAmountAtomic = "400000000",
+                monthlyEstimatedYieldAtomic = "416666",
+                dailyEstimatedYieldAtomic = "13888",
+                latestTransaction = VaultTransactionDetailPayload(
+                    requestId = "vtx-1w",
+                    txType = "WITHDRAW",
+                    status = "CONFIRMED",
+                    walletAddress = "0x1111111111111111111111111111111111111111",
+                    vaultAddress = "0x2222222222222222222222222222222222222222",
+                    assetSymbol = "dUSDC",
+                    amountAtomic = "50000000",
+                    shareDelta = "-50000000",
+                    txHash = "0xdef",
+                    failureCode = null,
+                    createdAt = LocalDateTime.parse("2026-03-23T10:02:00"),
+                    updatedAt = LocalDateTime.parse("2026-03-23T10:03:00"),
+                    confirmedAt = LocalDateTime.parse("2026-03-23T10:03:00")
+                )
+            ),
+            selectedVaultAmount = 25,
+            selectedVaultActionType = VaultActionType.WITHDRAW,
+            vaultActionUiState = VaultActionUiState()
+        )
+
+        assertEquals("출금 완료", uiModel.vault.latestStatusText)
+        assertEquals("지갑 잔액으로 돌아왔어요.", uiModel.vault.detail.statusBodyText)
+    }
+
+    @Test
     fun `failed remote vault transaction exposes failure banner copy`() {
         val uiModel = DemoSeedFactory.create().toFinanceHomeUiModel(
             vaultRemoteState = remoteVaultState(

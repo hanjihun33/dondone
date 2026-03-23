@@ -303,33 +303,15 @@ fun DonDoneNoticeBanner(
         BadgeTone.Warning -> Icons.Default.Close
         BadgeTone.Info -> Icons.Default.Description
     }
-    val background = when (tone) {
-        BadgeTone.Info -> DawnSurface
-        BadgeTone.Success -> Color(0xFFF2F6F0)
-        BadgeTone.Warning -> Color(0xFFFAF4EC)
-    }
-    val bodyForeground = when (tone) {
-        BadgeTone.Info -> DawnTextSubtle
-        BadgeTone.Success -> Color(0xFF4D6456)
-        BadgeTone.Warning -> Color(0xFF8B6B43)
-    }
-    val border = when (tone) {
-        BadgeTone.Info -> DawnBorder
-        BadgeTone.Success -> Color(0xFFD8E5DB)
-        BadgeTone.Warning -> Color(0xFFE9D9C2)
-    }
-    val iconTint = when (tone) {
-        BadgeTone.Info -> DawnPrimaryDeep
-        BadgeTone.Success -> DawnSuccess
-        BadgeTone.Warning -> DawnWarning
-    }
+    val background = Color(0xFFF5F6FA)
+    val bodyForeground = DawnTextSubtle
+    val iconTint = DawnPrimary
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(background)
-            .border(BorderStroke(1.dp, border), RoundedCornerShape(18.dp))
             .padding(horizontal = 18.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically

@@ -930,7 +930,7 @@ private fun VaultTransactionDetailPayload.toVaultStatusMessage(): FinanceVaultSt
         "CONFIRMED" -> FinanceVaultStatusMessage(
             title = "${actionLabel} 완료",
             body = if (txType == "WITHDRAW") {
-                "예치 잔액이 지갑 사용 가능 금액으로 돌아왔어요."
+                "지갑 잔액으로 돌아왔어요."
             } else {
                 "지갑 잔액이 예치 잔액으로 반영됐어요."
             },

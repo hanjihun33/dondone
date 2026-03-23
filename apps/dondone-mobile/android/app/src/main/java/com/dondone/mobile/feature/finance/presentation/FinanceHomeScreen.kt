@@ -267,9 +267,6 @@ private fun FinanceVaultSection(
             FinanceVaultStatusBanner(
                 title = uiModel.latestStatusText,
                 body = uiModel.detail.statusBodyText ?: uiModel.helperText,
-                supportText = uiModel.helperText.takeUnless {
-                    it.isBlank() || it == uiModel.detail.statusBodyText
-                },
                 tone = when {
                     uiModel.latestStatusIsError -> BadgeTone.Warning
                     uiModel.latestStatusText.contains("완료") -> BadgeTone.Success
@@ -418,14 +415,12 @@ private fun FinanceKeyValueRow(
 private fun FinanceVaultStatusBanner(
     title: String,
     body: String,
-    supportText: String?,
     tone: BadgeTone,
     onDismiss: () -> Unit
 ) {
     DonDoneNoticeBanner(
         title = title,
         message = body,
-        supportText = supportText,
         tone = tone,
         onDismiss = onDismiss
     )
