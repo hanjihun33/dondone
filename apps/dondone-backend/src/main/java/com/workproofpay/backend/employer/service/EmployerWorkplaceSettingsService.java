@@ -2,8 +2,13 @@ package com.workproofpay.backend.employer.service;
 
 import com.workproofpay.backend.employer.api.dto.request.UpdateEmployerWorkplaceSettingsRequest;
 import com.workproofpay.backend.employer.api.dto.response.EmployerWorkplaceSettingsResponse;
+import com.workproofpay.backend.employer.model.AttendanceOvertimeRoundingUnit;
+import com.workproofpay.backend.employer.model.Company;
 import com.workproofpay.backend.employer.model.EmploymentMembership;
+import com.workproofpay.backend.employer.repo.CompanyRepository;
 import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
+import com.workproofpay.backend.shared.exception.ApiException;
+import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.model.Workplace;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Service
 @RequiredArgsConstructor
 public class EmployerWorkplaceSettingsService {
 
     private final EmployerAccessScopeService employerAccessScopeService;
+    private final CompanyRepository companyRepository;
     private final EmploymentMembershipRepository employmentMembershipRepository;
     private final WorkplaceRepository workplaceRepository;
 
@@ -32,9 +39,10 @@ public class EmployerWorkplaceSettingsService {
     public EmployerWorkplaceSettingsResponse updateSettings(Long accountId,
                                                             UpdateEmployerWorkplaceSettingsRequest request) {
         EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(accountId);
+        Company company = companyRepository.findById(scope.companyId())
+                .orElseThrow(() -> new ApiException(ErrorCode.COMPANY_NOT_FOUND));
         Workplace workplace = employerAccessScopeService.getRequiredScopedWorkplace(scope);
 
-        // MVP 정책: 변경 효력은 저장 완료 시점부터 미래 check-in/check-out에만 적용한다.
         workplace.updateEmployerSettings(
                 request.address(),
                 request.detailAddress(),
@@ -44,9 +52,45 @@ public class EmployerWorkplaceSettingsService {
                 LocalDateTime.now(),
                 accountId
         );
+        company.updateAttendancePolicy(
+                resolveScheduledClockInTime(request, company),
+                resolveScheduledClockOutTime(request, company),
+                resolveOvertimeRoundingUnit(request, company)
+        );
+        validateAttendancePolicy(company.getScheduledClockInTime(), company.getScheduledClockOutTime());
 
         Workplace saved = workplaceRepository.saveAndFlush(workplace);
-        return toResponse(scope, saved);
+        companyRepository.saveAndFlush(company);
+        EmployerAccessScope refreshedScope = employerAccessScopeService.getRequiredScope(accountId);
+        return toResponse(refreshedScope, saved);
+    }
+
+    private LocalTime resolveScheduledClockInTime(UpdateEmployerWorkplaceSettingsRequest request, Company company) {
+        return request.scheduledClockInTime() != null
+                ? request.scheduledClockInTime()
+                : company.getScheduledClockInTime();
+    }
+
+    private LocalTime resolveScheduledClockOutTime(UpdateEmployerWorkplaceSettingsRequest request, Company company) {
+        return request.scheduledClockOutTime() != null
+                ? request.scheduledClockOutTime()
+                : company.getScheduledClockOutTime();
+    }
+
+    private AttendanceOvertimeRoundingUnit resolveOvertimeRoundingUnit(UpdateEmployerWorkplaceSettingsRequest request,
+                                                                       Company company) {
+        return request.overtimeRoundingUnit() != null
+                ? request.overtimeRoundingUnit()
+                : company.getOvertimeRoundingUnit();
+    }
+
+    private void validateAttendancePolicy(LocalTime scheduledClockInTime, LocalTime scheduledClockOutTime) {
+        if (!scheduledClockOutTime.isAfter(scheduledClockInTime)) {
+            throw new ApiException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "scheduledClockOutTime must be after scheduledClockInTime"
+            );
+        }
     }
 
     private EmployerWorkplaceSettingsResponse toResponse(EmployerAccessScope scope, Workplace workplace) {

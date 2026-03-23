@@ -1,5 +1,7 @@
 package com.workproofpay.backend.employer.api.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.workproofpay.backend.employer.model.AttendanceOvertimeRoundingUnit;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -7,6 +9,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.time.LocalTime;
 
 public record UpdateEmployerWorkplaceSettingsRequest(
         @NotBlank(message = "address is required")
@@ -29,6 +33,14 @@ public record UpdateEmployerWorkplaceSettingsRequest(
         @NotNull(message = "allowedRadiusMeters is required")
         @Min(value = 50, message = "allowedRadiusMeters must be 50 or greater")
         @Max(value = 5000, message = "allowedRadiusMeters must be 5000 or less")
-        Integer allowedRadiusMeters
+        Integer allowedRadiusMeters,
+
+        @JsonFormat(pattern = "HH:mm")
+        LocalTime scheduledClockInTime,
+
+        @JsonFormat(pattern = "HH:mm")
+        LocalTime scheduledClockOutTime,
+
+        AttendanceOvertimeRoundingUnit overtimeRoundingUnit
 ) {
 }
