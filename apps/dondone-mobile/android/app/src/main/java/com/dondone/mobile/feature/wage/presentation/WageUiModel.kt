@@ -97,11 +97,18 @@ fun DemoState.toWageUiModel(
     val overtimeHours = ((summary?.overtimeMinutes ?: wage.overtimeHours.toLong() * 60L) / 60L).toInt()
     val nightHours = ((summary?.nightMinutes ?: wage.nightHours.toLong() * 60L) / 60L).toInt()
     val modifiedCount = summary?.modifiedRecordCount ?: workproof.audit.size
-    val statusTone = when {
-        !isRecorded -> BadgeTone.Warning
-        differenceAmount > 0 -> BadgeTone.Warning
-        differenceAmount < 0 -> BadgeTone.Info
-        else -> BadgeTone.Success
+    val differenceStatusText = when {
+        !isRecorded -> "입금 대기"
+        differenceAmount == 0 -> "거의 일치"
+        differenceAmount > 0 -> "부족"
+        else -> "초과"
+    }
+    // Keep tone mapping aligned with the user-facing status text.
+    val statusTone = when (differenceStatusText) {
+        "부족" -> BadgeTone.Warning
+        "초과" -> BadgeTone.Info
+        "거의 일치" -> BadgeTone.Success
+        else -> BadgeTone.Warning
     }
     val evidenceLines = buildEvidenceLines(
         state = this,
@@ -174,12 +181,7 @@ fun DemoState.toWageUiModel(
                 else -> "추가 지급이나 공제 차이로 이런 결과가 나올 수 있습니다."
             },
             locked = !isRecorded,
-            statusText = when {
-                !isRecorded -> "입금 대기"
-                differenceAmount == 0 -> "거의 일치"
-                differenceAmount > 0 -> "부족"
-                else -> "초과"
-            },
+            statusText = differenceStatusText,
             statusTone = statusTone,
             summaryItems = listOf(
                 WageMetricItemUiModel("추정 급여", formatKrw(estimatedTotal)),

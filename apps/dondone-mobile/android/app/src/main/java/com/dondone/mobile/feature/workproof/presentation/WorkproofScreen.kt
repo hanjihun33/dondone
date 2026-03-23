@@ -279,7 +279,7 @@ fun WorkproofScreen(
         onClearPdfFileState()
     }
 
-    LaunchedEffect(launchRequest?.requestId) {
+    LaunchedEffect(launchRequest) {
         val request = launchRequest ?: return@LaunchedEffect
         when (request.target) {
             WorkproofLaunchTarget.PDF_CREATION -> {
