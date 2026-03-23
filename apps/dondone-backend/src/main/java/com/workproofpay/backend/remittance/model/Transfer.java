@@ -98,6 +98,9 @@ public class Transfer {
     @Column(name = "failure_code", length = 40)
     private TransferFailureCode failureCode;
 
+    @Column(name = "network_fee_wei", length = 80)
+    private String networkFeeWei;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -194,17 +197,27 @@ public class Transfer {
     }
 
     public void markConfirmed() {
+        markConfirmed(null);
+    }
+
+    public void markConfirmed(String networkFeeWei) {
         requireStatus(TransferStatus.BROADCASTED);
         this.status = TransferStatus.CONFIRMED;
         this.signedTransaction = null;
         this.failureCode = null;
+        this.networkFeeWei = networkFeeWei;
     }
 
     public void markFailed(TransferFailureCode failureCode) {
+        markFailed(failureCode, null);
+    }
+
+    public void markFailed(TransferFailureCode failureCode, String networkFeeWei) {
         requireStatus(TransferStatus.REQUESTED, TransferStatus.SIGNED, TransferStatus.BROADCASTED);
         this.status = TransferStatus.FAILED;
         this.signedTransaction = null;
         this.failureCode = failureCode;
+        this.networkFeeWei = networkFeeWei;
     }
 
     public void markTimedOut(TransferFailureCode failureCode) {

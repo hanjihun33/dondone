@@ -37,6 +37,25 @@ class RouteTest {
     }
 
     @Test
+    fun `transaction history routes are treated as child routes`() {
+        assertTrue(isTransactionHistoryRoute(Route.TRANSACTION_HISTORY))
+        assertTrue(isTransactionHistoryRoute(Route.TRANSACTION_HISTORY_DETAIL))
+        assertTrue(isTransactionHistoryRoute(Route.TRANSACTION_HISTORY_EDIT))
+
+        val rootCalls = mutableListOf<String>()
+        val directCalls = mutableListOf<String>()
+
+        navigateWithinApp(
+            route = Route.transactionHistory("A-001"),
+            navigateToRootTab = rootCalls::add,
+            navigateDirect = directCalls::add
+        )
+
+        assertTrue(rootCalls.isEmpty())
+        assertEquals(listOf(Route.transactionHistory("A-001")), directCalls)
+    }
+
+    @Test
     fun `leaving workproof root route requests transient state reset`() {
         assertTrue(
             shouldResetWorkproofUiState(

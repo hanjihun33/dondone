@@ -5,9 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record UpdateCompanyCodeRequest(
-        @Schema(description = "Current company code without hyphens", example = "DONDONE2026")
+        @Schema(description = "Current company code", example = "DN-SEOUL-4101")
         @NotBlank(message = "Company code is required")
-        @Pattern(regexp = "^[A-Za-z0-9]{6,12}$", message = "Company code format is invalid")
+        @Pattern(regexp = "^[A-Za-z0-9-]{6,50}$", message = "Company code format is invalid")
         String companyCode
 ) {
 }

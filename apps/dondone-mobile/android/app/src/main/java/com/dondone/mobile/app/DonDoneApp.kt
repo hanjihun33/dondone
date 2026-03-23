@@ -4,14 +4,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -35,14 +35,14 @@ import com.dondone.mobile.app.navigation.Route
 import com.dondone.mobile.app.navigation.navigateToRootTab
 import com.dondone.mobile.app.navigation.resolveAppBackAction
 import com.dondone.mobile.app.navigation.resolveScreenChrome
-import com.dondone.mobile.app.navigation.showTransferStep
 import com.dondone.mobile.app.navigation.shouldResetWorkproofUiState
+import com.dondone.mobile.app.navigation.showTransferStep
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.BadgeTone
-import com.dondone.mobile.core.designsystem.DonDoneToastHost
 import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DawnWarning
+import com.dondone.mobile.core.designsystem.DonDoneToastHost
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.rememberDonDoneToastState
@@ -50,8 +50,8 @@ import com.dondone.mobile.domain.model.DemoInfo
 import com.dondone.mobile.feature.auth.presentation.LoginLoadingScreen
 import com.dondone.mobile.feature.auth.presentation.LoginScreen
 
-private const val COMPANY_CODE_MAX_LENGTH = 12
-private const val COMPANY_CODE_MIN_LENGTH = 6
+private const val WORKER_REGISTRATION_CODE_MAX_LENGTH = 32
+private const val WORKER_REGISTRATION_CODE_MIN_LENGTH = 8
 
 @Composable
 fun DonDoneApp(
@@ -85,18 +85,20 @@ private fun AuthenticatedDonDoneAppShell(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
-    val companyCodeUpdateUiState by viewModel.companyCodeUpdateUiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val workerRegistrationCodeUiState by viewModel.workerRegistrationCodeUiState.collectAsStateWithLifecycle()
     val toastState = rememberDonDoneToastState()
     val navController = rememberNavController()
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
     val currentRoute = currentDestination?.route.orEmpty()
     val remittance = uiState.remittance
     val workproofShellState = rememberWorkproofShellState(currentRoute)
-    var isCompanyCodeSheetVisible by rememberSaveable { mutableStateOf(false) }
-    var companyCodeInput by rememberSaveable { mutableStateOf("") }
-    val companyCodeValidationMessage = companyCodeValidationMessage(companyCodeInput)
-    val isCompanyCodeSavable = companyCodeInput.isNotBlank() && companyCodeValidationMessage == null
+    var isWorkerRegistrationSheetVisible by rememberSaveable { mutableStateOf(false) }
+    var workerRegistrationCodeInput by rememberSaveable { mutableStateOf("") }
+    val workerRegistrationCodeValidationMessage =
+        workerRegistrationCodeValidationMessage(workerRegistrationCodeInput)
+    val isWorkerRegistrationSavable =
+        workerRegistrationCodeInput.isNotBlank() && workerRegistrationCodeValidationMessage == null
 
     val chrome = resolveScreenChrome(
         route = currentRoute,
@@ -126,6 +128,7 @@ private fun AuthenticatedDonDoneAppShell(
             AppBackAction.DismissTransferConfirmation -> {
                 viewModel.dismissTransferConfirmation()
             }
+
             AppBackAction.Ignore -> Unit
 
             is AppBackAction.ShowTransferStep -> {
@@ -150,18 +153,17 @@ private fun AuthenticatedDonDoneAppShell(
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
-
-    LaunchedEffect(companyCodeUpdateUiState.message, companyCodeUpdateUiState.isError) {
-        val message = companyCodeUpdateUiState.message ?: return@LaunchedEffect
+    LaunchedEffect(workerRegistrationCodeUiState.message, workerRegistrationCodeUiState.isError) {
+        val message = workerRegistrationCodeUiState.message ?: return@LaunchedEffect
         toastState.show(
             message = message,
-            tone = if (companyCodeUpdateUiState.isError) BadgeTone.Warning else BadgeTone.Success
+            tone = if (workerRegistrationCodeUiState.isError) BadgeTone.Warning else BadgeTone.Success
         )
-        if (!companyCodeUpdateUiState.isError) {
-            companyCodeInput = authUiState.session?.companyCode.orEmpty()
-            isCompanyCodeSheetVisible = false
+        if (!workerRegistrationCodeUiState.isError) {
+            workerRegistrationCodeInput = ""
+            isWorkerRegistrationSheetVisible = false
         }
-        viewModel.clearCompanyCodeUpdateMessage()
+        viewModel.clearWorkerRegistrationCodeMessage()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -173,8 +175,8 @@ private fun AuthenticatedDonDoneAppShell(
                     state = topBarState,
                     onBack = ::handleBack,
                     onMenuClick = {
-                        companyCodeInput = authUiState.session?.companyCode.orEmpty()
-                        isCompanyCodeSheetVisible = true
+                        workerRegistrationCodeInput = ""
+                        isWorkerRegistrationSheetVisible = true
                     }
                 )
             },
@@ -209,21 +211,23 @@ private fun AuthenticatedDonDoneAppShell(
                 .padding(horizontal = 20.dp, vertical = 28.dp)
         )
 
-        if (isCompanyCodeSheetVisible) {
-            CompanyCodeSheet(
-                companyCode = companyCodeInput,
-                validationMessage = companyCodeValidationMessage,
-                onCompanyCodeChange = { nextValue -> companyCodeInput = normalizeCompanyCodeInput(nextValue) },
-                isSubmitting = companyCodeUpdateUiState.isSubmitting,
-                isSaveEnabled = isCompanyCodeSavable,
+        if (isWorkerRegistrationSheetVisible) {
+            WorkerRegistrationCodeSheet(
+                registrationCode = workerRegistrationCodeInput,
+                validationMessage = workerRegistrationCodeValidationMessage,
+                onRegistrationCodeChange = { nextValue ->
+                    workerRegistrationCodeInput = normalizeWorkerRegistrationCodeInput(nextValue)
+                },
+                isSubmitting = workerRegistrationCodeUiState.isSubmitting,
+                isSaveEnabled = isWorkerRegistrationSavable,
                 onDismiss = {
-                    if (!companyCodeUpdateUiState.isSubmitting) {
-                        isCompanyCodeSheetVisible = false
-                        viewModel.clearCompanyCodeUpdateMessage()
+                    if (!workerRegistrationCodeUiState.isSubmitting) {
+                        isWorkerRegistrationSheetVisible = false
+                        viewModel.clearWorkerRegistrationCodeMessage()
                     }
                 },
                 onSave = {
-                    viewModel.updateCompanyCode(companyCodeInput)
+                    viewModel.redeemWorkerRegistrationCode(workerRegistrationCodeInput)
                 }
             )
         }
@@ -232,10 +236,10 @@ private fun AuthenticatedDonDoneAppShell(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CompanyCodeSheet(
-    companyCode: String,
+private fun WorkerRegistrationCodeSheet(
+    registrationCode: String,
     validationMessage: String?,
-    onCompanyCodeChange: (String) -> Unit,
+    onRegistrationCodeChange: (String) -> Unit,
     isSubmitting: Boolean,
     isSaveEnabled: Boolean,
     onDismiss: () -> Unit,
@@ -251,22 +255,22 @@ private fun CompanyCodeSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             Text(
-                text = "회사코드 입력",
+                text = "근로자 등록 코드 입력",
                 style = MaterialTheme.typography.headlineSmall
             )
             OutlinedTextField(
-                value = companyCode,
-                onValueChange = onCompanyCodeChange,
+                value = registrationCode,
+                onValueChange = onRegistrationCodeChange,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 20.dp),
                 singleLine = true,
                 isError = validationMessage != null,
-                label = { Text("회사코드") },
-                placeholder = { Text("예: DONDONE2026") },
+                label = { Text("등록 코드") },
+                placeholder = { Text("예: WORKER-AB12-CD34") },
                 supportingText = {
                     Text(
-                        text = validationMessage ?: "영문 대문자와 숫자만 입력할 수 있어요.",
+                        text = validationMessage ?: "영문 대문자, 숫자, 하이픈(-)만 입력할 수 있어요.",
                         color = if (validationMessage != null) DawnWarning else DawnTextSubtle
                     )
                 }
@@ -283,7 +287,7 @@ private fun CompanyCodeSheet(
                     modifier = Modifier.weight(1f)
                 )
                 PrimaryActionButton(
-                    text = if (isSubmitting) "저장 중..." else "저장",
+                    text = if (isSubmitting) "등록 중.." else "등록",
                     onClick = onSave,
                     enabled = !isSubmitting && isSaveEnabled,
                     modifier = Modifier
@@ -295,28 +299,28 @@ private fun CompanyCodeSheet(
     }
 }
 
-internal fun normalizeCompanyCodeInput(
+internal fun normalizeWorkerRegistrationCodeInput(
     rawValue: String
 ): String {
     return rawValue
         .uppercase()
-        .take(COMPANY_CODE_MAX_LENGTH)
+        .take(WORKER_REGISTRATION_CODE_MAX_LENGTH)
 }
 
-internal fun companyCodeValidationMessage(
-    companyCode: String
+internal fun workerRegistrationCodeValidationMessage(
+    registrationCode: String
 ): String? {
-    if (companyCode.isBlank()) {
+    if (registrationCode.isBlank()) {
         return null
     }
-    if (companyCode.any { !it.isDigit() && it !in 'A'..'Z' }) {
-        return "영문 대문자와 숫자만 입력할 수 있어요."
+    if (registrationCode.any { !it.isDigit() && it !in 'A'..'Z' && it != '-' }) {
+        return "영문 대문자, 숫자, 하이픈(-)만 입력할 수 있어요."
     }
-    if (companyCode.length < COMPANY_CODE_MIN_LENGTH) {
-        return "회사코드는 6자 이상이어야 해요."
+    if (registrationCode.length < WORKER_REGISTRATION_CODE_MIN_LENGTH) {
+        return "등록 코드는 8자 이상이어야 해요."
     }
-    if (companyCode.length > COMPANY_CODE_MAX_LENGTH) {
-        return "회사코드는 12자 이하여야 해요."
+    if (registrationCode.length > WORKER_REGISTRATION_CODE_MAX_LENGTH) {
+        return "등록 코드는 32자 이하여야 해요."
     }
     return null
 }

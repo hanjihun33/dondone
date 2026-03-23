@@ -205,14 +205,17 @@ public class RemittanceJobWorker {
         }
 
         if (receiptResult.get().success()) {
-            transfer.markConfirmed();
+            transfer.markConfirmed(receiptResult.get().networkFeeWei());
             remittanceMetrics.recordTransferLifecycle(Duration.between(transfer.getCreatedAt(), LocalDateTime.now()), transfer.getStatus().name());
             remittanceMetrics.recordBroadcastToTerminal(Duration.between(broadcastedAt, LocalDateTime.now()), transfer.getStatus().name());
             job.markDone();
             return "confirmed";
         }
 
-        transfer.markFailed(receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode());
+        transfer.markFailed(
+                receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode(),
+                receiptResult.get().networkFeeWei()
+        );
         remittanceMetrics.recordTransferLifecycle(Duration.between(transfer.getCreatedAt(), LocalDateTime.now()), transfer.getStatus().name());
         remittanceMetrics.recordBroadcastToTerminal(Duration.between(broadcastedAt, LocalDateTime.now()), transfer.getStatus().name());
         job.markDone();
@@ -289,7 +292,7 @@ public class RemittanceJobWorker {
         if (transfer.getStatus() == TransferStatus.REQUESTED
                 || transfer.getStatus() == TransferStatus.SIGNED
                 || transfer.getStatus() == TransferStatus.BROADCASTED) {
-            transfer.markFailed(failureCode);
+            transfer.markFailed(failureCode, null);
             remittanceMetrics.recordTransferLifecycle(Duration.between(transfer.getCreatedAt(), LocalDateTime.now()), transfer.getStatus().name());
             if (previousStatus == TransferStatus.BROADCASTED) {
                 remittanceMetrics.recordBroadcastToTerminal(Duration.between(previousUpdatedAt, LocalDateTime.now()), transfer.getStatus().name());

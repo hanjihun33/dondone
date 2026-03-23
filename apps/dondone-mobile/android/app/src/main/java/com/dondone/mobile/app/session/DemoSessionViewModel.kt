@@ -1,6 +1,7 @@
 package com.dondone.mobile.app.session
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -54,6 +55,7 @@ import com.dondone.mobile.data.workproof.WorkproofUnauthorizedException
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.TodayWork
+import com.dondone.mobile.domain.model.TransactionCategory
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
@@ -65,6 +67,7 @@ import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiSt
 import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.remittanceRelationCodeToLabel
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,8 +81,7 @@ import java.time.format.DateTimeFormatter
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 private const val REMITTANCE_STATUS_POLL_DELAY_MS = 1500L
-// Sepolia confirmation can exceed 20s, so keep polling long enough to surface the terminal state in-app.
-private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 60
+private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 120
 private const val VAULT_STATUS_POLL_DELAY_MS = 1500L
 private const val VAULT_STATUS_POLL_ATTEMPTS = 16
 private const val REMITTANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 송금 실연동 데이터를 불러옵니다."
@@ -92,6 +94,7 @@ private const val DOCUMENT_STATUS_READY = "READY"
 private const val DOCUMENT_STATUS_NOT_CREATED = "NOT_CREATED"
 private const val DOCUMENT_ID_PROOF = "PROOF"
 private const val DOCUMENT_ID_CLAIM = "CLAIM"
+private const val DEMO_SESSION_VIEW_MODEL_TAG = "DemoSessionViewModel"
 
 private enum class RemittanceRemoteLoadMode {
     INITIAL,
@@ -125,8 +128,8 @@ class DemoSessionViewModel(
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
     private val _profileUpdateUiState = MutableStateFlow(ProfileUpdateUiState())
     val profileUpdateUiState: StateFlow<ProfileUpdateUiState> = _profileUpdateUiState.asStateFlow()
-    private val _companyCodeUpdateUiState = MutableStateFlow(CompanyCodeUpdateUiState())
-    val companyCodeUpdateUiState: StateFlow<CompanyCodeUpdateUiState> = _companyCodeUpdateUiState.asStateFlow()
+    private val _workerRegistrationCodeUiState = MutableStateFlow(WorkerRegistrationCodeUiState())
+    val workerRegistrationCodeUiState: StateFlow<WorkerRegistrationCodeUiState> = _workerRegistrationCodeUiState.asStateFlow()
     private val _recipientPhoneSearchUiState = MutableStateFlow(RecipientPhoneSearchUiState())
     val recipientPhoneSearchUiState: StateFlow<RecipientPhoneSearchUiState> = _recipientPhoneSearchUiState.asStateFlow()
     private val _advanceRemoteState =
@@ -160,6 +163,9 @@ class DemoSessionViewModel(
         _remittanceCompletionNoticeUiState.asStateFlow()
     private val _vaultActionUiState = MutableStateFlow(VaultActionUiState())
     val vaultActionUiState: StateFlow<VaultActionUiState> = _vaultActionUiState.asStateFlow()
+    private val _transactionMetadataOverrides = MutableStateFlow<Map<String, TransactionMetadataOverride>>(emptyMap())
+    val transactionMetadataOverrides: StateFlow<Map<String, TransactionMetadataOverride>> =
+        _transactionMetadataOverrides.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
     private val _selectedVaultAmount = MutableStateFlow<Int?>(null)
@@ -203,7 +209,6 @@ class DemoSessionViewModel(
             )
             return false
         }
-
         cancelTransferCompletion()
         _uiState.update { state -> DemoSessionReducer.openTransferFlow(state) }
         val session = _authUiState.value.session ?: return true
@@ -259,6 +264,36 @@ class DemoSessionViewModel(
         _uiState.update { state -> DemoSessionReducer.updateTransferAmount(state, nextAmount) }
     }
 
+    fun updateTransactionMetadata(
+        transactionId: String,
+        category: TransactionCategory,
+        memo: String
+    ) {
+        _transactionMetadataOverrides.update { current ->
+            current + (transactionId to TransactionMetadataOverride(category = category, memo = memo.trim()))
+        }
+    }
+
+    fun createRemittanceRecipient(
+        alias: String,
+        relation: String,
+        walletAddress: String
+    ) {
+        val session = _authUiState.value.session ?: run {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        submitRemoteRemittanceRecipientCreation(
+            session = session,
+            alias = alias,
+            relation = relation,
+            walletAddress = walletAddress
+        )
+    }
     fun addRecipientFromAccountManage(
         alias: String,
         relation: String,
@@ -1029,50 +1064,54 @@ class DemoSessionViewModel(
         }
     }
 
-    fun updateCompanyCode(companyCode: String) {
+    fun redeemWorkerRegistrationCode(registrationCode: String) {
         val session = _authUiState.value.session ?: run {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
                 message = "로그인 후 다시 시도해 주세요.",
                 isError = true
             )
             return
         }
-        val normalizedCompanyCode = companyCode.trim().uppercase()
-        if (normalizedCompanyCode.isBlank()) {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
-                message = "회사코드를 입력해 주세요.",
+        val normalizedRegistrationCode = registrationCode.trim().uppercase()
+        if (normalizedRegistrationCode.isBlank()) {
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
+                message = "등록 코드를 입력해 주세요.",
                 isError = true
             )
             return
         }
 
         viewModelScope.launch {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(isSubmitting = true)
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(isSubmitting = true)
             try {
-                val updatedSession = authRepository.updateCompanyCode(
+                val updatedSession = authRepository.redeemWorkerRegistrationCode(
                     session = session,
-                    companyCode = normalizedCompanyCode
+                    registrationCode = normalizedRegistrationCode
                 )
                 _authUiState.value = AuthUiState.authenticated(updatedSession)
-                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(message = "회사코드를 저장했어요.")
+                val companyLabel = updatedSession.companyName ?: "회사"
+                val workplaceLabel = updatedSession.workplaceName?.let { " / $it" }.orEmpty()
+                _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
+                    message = "$companyLabel$workplaceLabel 등록이 완료됐어요."
+                )
             } catch (error: AuthUnauthorizedException) {
                 expireSession(error.message)
-                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+                _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
                     message = error.message,
                     isError = true
                 )
             } catch (error: Exception) {
-                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
-                    message = error.message ?: "회사코드를 저장하지 못했어요.",
+                _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
+                    message = error.message ?: "회사 등록을 완료하지 못했어요.",
                     isError = true
                 )
             }
         }
     }
 
-    fun clearCompanyCodeUpdateMessage() {
-        if (!_companyCodeUpdateUiState.value.isSubmitting && _companyCodeUpdateUiState.value.message != null) {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState()
+    fun clearWorkerRegistrationCodeMessage() {
+        if (!_workerRegistrationCodeUiState.value.isSubmitting && _workerRegistrationCodeUiState.value.message != null) {
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState()
         }
     }
 
@@ -1091,6 +1130,7 @@ class DemoSessionViewModel(
     fun logout() {
         cancelTransferCompletion()
         cancelRemittanceStatusPolling()
+        _transactionMetadataOverrides.value = emptyMap()
         viewModelScope.launch {
             clearAuthenticatedState(AuthUiState.unauthenticated())
         }
@@ -1489,6 +1529,7 @@ class DemoSessionViewModel(
             return
         }
         applyRemittanceRemoteState(remoteState)
+        syncRemittanceStatusPolling(session, remoteState)
     }
 
     private suspend fun updateVaultRemoteState(
@@ -1552,7 +1593,12 @@ class DemoSessionViewModel(
                     )
                 )
                 return
-            } catch (_: Exception) {
+            } catch (error: IOException) {
+                Log.w(
+                    DEMO_SESSION_VIEW_MODEL_TAG,
+                    "Failed to refresh wage verification detail. Keeping previous payload.",
+                    error
+                )
                 remoteState.payload.latestVerification
             }
         } else {
@@ -1715,7 +1761,7 @@ class DemoSessionViewModel(
         _remittanceCompletionNoticeUiState.value = RemittanceCompletionNoticeUiState()
         _vaultActionUiState.value = VaultActionUiState()
         _profileUpdateUiState.value = ProfileUpdateUiState()
-        _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState()
+        _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState()
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
         _menuLaunchRequest.value = null
         _remittanceLaunchRequest.value = null
@@ -1902,6 +1948,13 @@ class DemoSessionViewModel(
                     } catch (error: RemittanceUnauthorizedException) {
                         expireSession(error.message)
                         return@launch
+                    } catch (error: IOException) {
+                        Log.w(
+                            DEMO_SESSION_VIEW_MODEL_TAG,
+                            "Failed to poll remittance transfer detail for $transferId.",
+                            error
+                        )
+                        return@repeat
                     } catch (_: Exception) {
                         // Keep polling so a single network failure does not freeze the tracker UI.
                     }
@@ -1961,25 +2014,44 @@ class DemoSessionViewModel(
         activeVaultPollingRequestId = null
     }
 
+    private fun syncRemittanceStatusPolling(session: AuthSession, remoteState: RemittanceRemoteState) {
+        val activeTransfer = remoteState.payload?.activeTransfer
+        if (activeTransfer != null && !activeTransfer.isTerminalStatus()) {
+            startRemittanceStatusPolling(session, activeTransfer.transferId)
+            return
+        }
+        cancelRemittanceStatusPolling()
+    }
+
     private fun mergeRemoteTransferDetail(detail: RemittanceTransferDetailPayload) {
         _remittanceRemoteState.update { current ->
             val payload = current.payload ?: return@update current
             val updatedTransfers = buildList {
                 add(
                     payload.transfers.firstOrNull { it.transferId == detail.transferId }?.copy(
+                        direction = detail.direction,
                         status = detail.status,
                         amountAtomic = detail.amountAtomic,
+                        senderAddress = detail.senderAddress,
+                        senderName = detail.senderName,
                         txHash = detail.txHash,
+                        networkFeeWei = detail.networkFeeWei,
+                        networkFeeAssetSymbol = detail.networkFeeAssetSymbol,
                         updatedAt = detail.updatedAt
                     ) ?: com.dondone.mobile.data.remittance.RemittanceTransferSummaryPayload(
                         transferId = detail.transferId,
+                        direction = detail.direction,
                         status = detail.status,
                         assetSymbol = detail.assetSymbol,
                         amountAtomic = detail.amountAtomic,
+                        senderAddress = detail.senderAddress,
+                        senderName = detail.senderName,
                         recipientId = detail.recipientId,
                         recipientAlias = detail.recipientAlias,
                         recipientAddress = detail.recipientAddress,
                         txHash = detail.txHash,
+                        networkFeeWei = detail.networkFeeWei,
+                        networkFeeAssetSymbol = detail.networkFeeAssetSymbol,
                         updatedAt = detail.updatedAt
                     )
                 )

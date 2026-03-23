@@ -5,6 +5,6 @@ interface AuthRepository {
     suspend fun signup(name: String, email: String, password: String, phoneNumber: String): AuthSession
     suspend fun login(email: String, password: String): AuthSession
     suspend fun updateProfile(session: AuthSession, name: String, phoneNumber: String): AuthSession
-    suspend fun updateCompanyCode(session: AuthSession, companyCode: String): AuthSession
+    suspend fun redeemWorkerRegistrationCode(session: AuthSession, registrationCode: String): AuthSession
     suspend fun logout()
 }

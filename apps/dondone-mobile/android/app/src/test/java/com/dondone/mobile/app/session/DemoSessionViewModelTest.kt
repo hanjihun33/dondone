@@ -1493,7 +1493,7 @@ class DemoSessionViewModelTest {
         private val loginSession: AuthSession? = null,
         private val signupSession: AuthSession? = null,
         private val updateProfileSession: AuthSession? = null,
-        private val updateCompanyCodeSession: AuthSession? = null,
+        private val redeemWorkerRegistrationCodeSession: AuthSession? = null,
         private val updateProfileError: Exception? = null
     ) : AuthRepository {
         val loginCalls = mutableListOf<Pair<String, String>>()
@@ -1519,8 +1519,11 @@ class DemoSessionViewModelTest {
             return updateProfileSession ?: error("updateProfile should not be called without a prepared session")
         }
 
-        override suspend fun updateCompanyCode(session: AuthSession, companyCode: String): AuthSession {
-            return updateCompanyCodeSession ?: session.copy(companyCode = companyCode)
+        override suspend fun redeemWorkerRegistrationCode(
+            session: AuthSession,
+            registrationCode: String
+        ): AuthSession {
+            return redeemWorkerRegistrationCodeSession ?: session.copy(companyCode = registrationCode)
         }
 
         override suspend fun logout() {

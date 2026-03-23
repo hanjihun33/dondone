@@ -48,7 +48,7 @@ class ScreenChromeTest {
             isWorkproofDetailVisible = false
         )
 
-        assertEquals("계좌 선택", chrome.headerTitle)
+        assertEquals("Select Account", chrome.headerTitle)
         assertFalse(chrome.showRootTabs)
         assertFalse(chrome.showSettingsAction)
         assertFalse(chrome.showDate)
@@ -77,7 +77,7 @@ class ScreenChromeTest {
             isWorkproofDetailVisible = false
         )
 
-        assertEquals("계좌·지갑 관리", chrome.headerTitle)
+        assertEquals("Accounts", chrome.headerTitle)
         assertFalse(chrome.showRootTabs)
         assertFalse(chrome.showSettingsAction)
         assertFalse(chrome.showDate)

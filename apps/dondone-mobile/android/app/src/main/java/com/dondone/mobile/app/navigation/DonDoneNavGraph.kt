@@ -15,8 +15,14 @@ import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.feature.finance.presentation.AccountManageScreen
 import com.dondone.mobile.feature.finance.presentation.FinanceHomeScreen
+import com.dondone.mobile.feature.finance.presentation.TransactionHistoryDetailScreen
+import com.dondone.mobile.feature.finance.presentation.TransactionHistoryEditScreen
+import com.dondone.mobile.feature.finance.presentation.TransactionHistoryMainScreen
 import com.dondone.mobile.feature.finance.presentation.toAccountManageUiModel
 import com.dondone.mobile.feature.finance.presentation.toFinanceHomeUiModel
+import com.dondone.mobile.feature.finance.presentation.toTransactionHistoryDetailUiModel
+import com.dondone.mobile.feature.finance.presentation.toTransactionHistoryEditUiModel
+import com.dondone.mobile.feature.finance.presentation.toTransactionHistoryMainUiModel
 import com.dondone.mobile.feature.home.presentation.HomeScreen
 import com.dondone.mobile.feature.home.presentation.toHomeUiModel
 import com.dondone.mobile.feature.menu.presentation.MenuScreen
@@ -59,6 +65,7 @@ fun DonDoneNavGraph(
     val advanceRequestDetailUiState by viewModel.advanceRequestDetailUiState.collectAsStateWithLifecycle()
     val profileUpdateUiState by viewModel.profileUpdateUiState.collectAsStateWithLifecycle()
     val recipientPhoneSearchUiState by viewModel.recipientPhoneSearchUiState.collectAsStateWithLifecycle()
+    val transactionMetadataOverrides by viewModel.transactionMetadataOverrides.collectAsStateWithLifecycle()
     val menuLaunchRequest by viewModel.menuLaunchRequest.collectAsStateWithLifecycle()
     val remittanceLaunchRequest by viewModel.remittanceLaunchRequest.collectAsStateWithLifecycle()
 
@@ -263,11 +270,60 @@ fun DonDoneNavGraph(
                     recipientPhoneSearchUiState = recipientPhoneSearchUiState
                 ),
                 actionUiState = remittanceActionUiState,
-                onSelectAccount = viewModel::selectAccount,
+                onOpenTransactionHistory = { accountId ->
+                    navController.navigate(Route.transactionHistory(accountId))
+                },
                 onAddRecipient = viewModel::addRecipientFromAccountManage,
                 onUpdateRecipient = viewModel::updateRecipientFromAccountManage,
                 onSearchRecipientsByPhone = viewModel::searchRecipientsByPhone,
                 onClearPhoneSearch = viewModel::clearRecipientPhoneSearch
+            )
+        }
+        composable(Route.TRANSACTION_HISTORY) { backStackEntry ->
+            val accountId = backStackEntry.arguments?.getString(Route.ARG_ACCOUNT_ID) ?: return@composable
+            TransactionHistoryMainScreen(
+                uiModel = uiState.toTransactionHistoryMainUiModel(
+                    accountId = accountId,
+                    remittanceRemoteState = remittanceRemoteState,
+                    isAuthenticated = authUiState.isAuthenticated,
+                    overrides = transactionMetadataOverrides
+                ),
+                onOpenTransaction = { transactionId ->
+                    navController.navigate(Route.transactionHistoryDetail(accountId, transactionId))
+                }
+            )
+        }
+        composable(Route.TRANSACTION_HISTORY_DETAIL) { backStackEntry ->
+            val accountId = backStackEntry.arguments?.getString(Route.ARG_ACCOUNT_ID) ?: return@composable
+            val transactionId = backStackEntry.arguments?.getString(Route.ARG_TRANSACTION_ID) ?: return@composable
+            TransactionHistoryDetailScreen(
+                uiModel = uiState.toTransactionHistoryDetailUiModel(
+                    accountId = accountId,
+                    transactionId = transactionId,
+                    remittanceRemoteState = remittanceRemoteState,
+                    isAuthenticated = authUiState.isAuthenticated,
+                    overrides = transactionMetadataOverrides
+                ),
+                onEdit = {
+                    navController.navigate(Route.transactionHistoryEdit(accountId, transactionId))
+                }
+            )
+        }
+        composable(Route.TRANSACTION_HISTORY_EDIT) { backStackEntry ->
+            val accountId = backStackEntry.arguments?.getString(Route.ARG_ACCOUNT_ID) ?: return@composable
+            val transactionId = backStackEntry.arguments?.getString(Route.ARG_TRANSACTION_ID) ?: return@composable
+            TransactionHistoryEditScreen(
+                uiModel = uiState.toTransactionHistoryEditUiModel(
+                    accountId = accountId,
+                    transactionId = transactionId,
+                    remittanceRemoteState = remittanceRemoteState,
+                    isAuthenticated = authUiState.isAuthenticated,
+                    overrides = transactionMetadataOverrides
+                ),
+                onSave = { category, memo ->
+                    viewModel.updateTransactionMetadata(transactionId, category, memo)
+                    navController.popBackStack()
+                }
             )
         }
         composable(Route.MENU) {
