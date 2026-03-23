@@ -1,6 +1,6 @@
 package com.dondone.mobile.app.session
 
-data class CompanyCodeUpdateUiState(
+data class WorkerRegistrationCodeUiState(
     val isSubmitting: Boolean = false,
     val message: String? = null,
     val isError: Boolean = false

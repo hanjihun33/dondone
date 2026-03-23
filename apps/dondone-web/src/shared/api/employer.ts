@@ -56,6 +56,22 @@ export type EmployerWorkplaceSettingsResponse = {
   activeMembershipCount: number;
 };
 
+export type EmployerWorkerRegistrationCodeResponse = {
+  codeId: number;
+  registrationCode: string;
+  active: boolean;
+  issuedAt: string;
+  revokedAt: string | null;
+};
+
+export type EmployerWorkerRegistrationCodesResponse = {
+  companyId: number;
+  companyName: string;
+  workplaceId: number;
+  workplaceName: string;
+  codes: EmployerWorkerRegistrationCodeResponse[];
+};
+
 export type EmployerDashboardSummaryResponse = {
   activeWorkerCount: number;
   workingCount: number;
@@ -303,6 +319,25 @@ export async function updateEmployerWorkplaceSettings(
     body: request,
     token
   });
+}
+
+export async function getEmployerWorkerRegistrationCodes(token: string) {
+  return apiRequest<EmployerWorkerRegistrationCodesResponse>(
+    "/api/employer/worker-registration-codes",
+    {
+      token
+    }
+  );
+}
+
+export async function issueEmployerWorkerRegistrationCode(token: string) {
+  return apiRequest<EmployerWorkerRegistrationCodeResponse>(
+    "/api/employer/worker-registration-codes",
+    {
+      method: "POST",
+      token
+    }
+  );
 }
 
 export async function getEmployerDashboardSummary(token: string) {

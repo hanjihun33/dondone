@@ -1,5 +1,25 @@
 # Implementation Slices
 
+## 2026-03-23 Worker Company Registration Update
+- worker company registration moved from a profile-level `companyCode` save to a real membership flow.
+- newly wired backend flows:
+  - `POST /api/employer/worker-registration-codes`
+  - `GET /api/employer/worker-registration-codes`
+  - `POST /api/employer/worker-registration-codes/{codeId}/revoke`
+  - `POST /api/auth/me/worker-registration-code`
+- backend behavior:
+  - employer issues one active worker registration code for the scoped default workplace
+  - issuing a new code revokes the previous active code for the same scope
+  - worker redeem creates or reuses an `EmploymentMembership`
+  - redeem returns resolved `companyName/companyCode/workplaceName`
+- mobile behavior:
+  - worker app input is now `worker registration code`
+  - success copy uses the resolved company/workplace names from the backend
+  - the old `companyCode` string save is no longer the active registration path
+- verification:
+  - `cd apps/dondone-backend && .\gradlew.bat test`
+  - `cd apps/dondone-mobile/android && .\gradlew.bat :app:compileDebugKotlin`
+
 ## 2026-03-20 Admin Onboarding MVP Update
 - admin web is no longer a pure mock for onboarding.
 - newly wired flows:

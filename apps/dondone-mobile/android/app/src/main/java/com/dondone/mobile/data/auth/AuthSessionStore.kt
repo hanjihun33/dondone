@@ -14,6 +14,8 @@ private const val KEY_EMAIL = "email"
 private const val KEY_NAME = "name"
 private const val KEY_PHONE_NUMBER = "phone_number"
 private const val KEY_COMPANY_CODE = "company_code"
+private const val KEY_COMPANY_NAME = "company_name"
+private const val KEY_WORKPLACE_NAME = "workplace_name"
 
 class AuthSessionStore(
     context: Context
@@ -46,7 +48,9 @@ class AuthSessionStore(
             email = email,
             name = name,
             phoneNumber = preferences.getString(KEY_PHONE_NUMBER, null),
-            companyCode = preferences.getString(KEY_COMPANY_CODE, null)
+            companyCode = preferences.getString(KEY_COMPANY_CODE, null),
+            companyName = preferences.getString(KEY_COMPANY_NAME, null),
+            workplaceName = preferences.getString(KEY_WORKPLACE_NAME, null)
         )
     }
 
@@ -60,6 +64,8 @@ class AuthSessionStore(
             .putString(KEY_NAME, session.name)
             .putString(KEY_PHONE_NUMBER, session.phoneNumber)
             .putString(KEY_COMPANY_CODE, session.companyCode)
+            .putString(KEY_COMPANY_NAME, session.companyName)
+            .putString(KEY_WORKPLACE_NAME, session.workplaceName)
             .apply()
     }
 

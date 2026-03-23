@@ -1,7 +1,12 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../shared/api/client";
-import { getEmployerProfile } from "../shared/api/employer";
+import {
+  getEmployerProfile,
+  getEmployerWorkerRegistrationCodes,
+  getEmployerWorkplaceSettings,
+  issueEmployerWorkerRegistrationCode
+} from "../shared/api/employer";
 import {
   clearStoredSession,
   getStoredAccessToken,
@@ -33,6 +38,43 @@ const managerNavItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [{ icon: <AdminShieldIcon />, label: "관리자", to: "/admin" }];
 
+type SettingsSummaryState = {
+  activeMembershipCount: number | null;
+  workerRegistrationCode: string | null;
+  workerRegistrationIssuedAt: string | null;
+  loading: boolean;
+  issuing: boolean;
+  errorMessage: string | null;
+};
+
+const INITIAL_SETTINGS_SUMMARY_STATE: SettingsSummaryState = {
+  activeMembershipCount: null,
+  workerRegistrationCode: null,
+  workerRegistrationIssuedAt: null,
+  loading: false,
+  issuing: false,
+  errorMessage: null
+};
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -43,6 +85,9 @@ export function AppShell() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [settingsSummary, setSettingsSummary] = useState<SettingsSummaryState>(
+    INITIAL_SETTINGS_SUMMARY_STATE
+  );
 
   useEffect(() => {
     return subscribeUserRoleChange(() => {
@@ -91,6 +136,69 @@ export function AppShell() {
     };
   }, [navigate, refreshTick, session?.role]);
 
+  useEffect(() => {
+    if (session?.role !== "manager") {
+      setSettingsSummary(INITIAL_SETTINGS_SUMMARY_STATE);
+      return;
+    }
+
+    const token = getStoredAccessToken();
+    if (!token) {
+      return;
+    }
+
+    let isDisposed = false;
+    setSettingsSummary((prev) => ({
+      ...prev,
+      loading: true,
+      errorMessage: null
+    }));
+
+    void Promise.all([
+      getEmployerWorkplaceSettings(token),
+      getEmployerWorkerRegistrationCodes(token)
+    ])
+      .then(([workplaceSettings, registrationCodes]) => {
+        if (isDisposed) {
+          return;
+        }
+
+        const activeCode = registrationCodes.codes.find((code) => code.active) ?? null;
+
+        setSettingsSummary({
+          activeMembershipCount: workplaceSettings.activeMembershipCount,
+          workerRegistrationCode: activeCode?.registrationCode ?? null,
+          workerRegistrationIssuedAt: activeCode?.issuedAt ?? null,
+          loading: false,
+          issuing: false,
+          errorMessage: null
+        });
+      })
+      .catch((error: unknown) => {
+        if (isDisposed) {
+          return;
+        }
+
+        if (error instanceof ApiError && error.status === 401) {
+          clearStoredSession();
+          navigate("/", { replace: true });
+          return;
+        }
+
+        setSettingsSummary((prev) => ({
+          ...prev,
+          loading: false,
+          issuing: false,
+          errorMessage:
+            error instanceof Error ? error.message : "회사 설정 요약을 불러오지 못했습니다."
+        }));
+      });
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [navigate, refreshTick, session?.role]);
+
   if (session === null) {
     return <Navigate to="/" replace />;
   }
@@ -107,6 +215,19 @@ export function AppShell() {
   const displayName = employerSession?.profile?.displayName ?? "운영 담당자";
   const email = employerSession?.profile?.email ?? "-";
   const status = employerSession?.profile?.status ?? "ACTIVE";
+  const activeMembershipLabel =
+    settingsSummary.activeMembershipCount == null
+      ? settingsSummary.loading
+        ? "불러오는 중"
+        : "-"
+      : `${settingsSummary.activeMembershipCount}명`;
+  const workerRegistrationCodeLabel =
+    settingsSummary.workerRegistrationCode ??
+    (settingsSummary.loading ? "불러오는 중" : "발급된 코드 없음");
+  const workerRegistrationIssuedLabel = formatDateTime(settingsSummary.workerRegistrationIssuedAt);
+  const workerRegistrationActionLabel = settingsSummary.workerRegistrationCode
+    ? "코드 재발급"
+    : "코드 발급";
 
   const handleLogoutClick = () => {
     clearStoredSession();
@@ -114,6 +235,45 @@ export function AppShell() {
     setIsSettingsOpen(false);
     setIsProfileOpen(false);
     navigate("/", { replace: true });
+  };
+
+  const handleIssueWorkerRegistrationCode = async () => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      clearStoredSession();
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setSettingsSummary((prev) => ({
+      ...prev,
+      issuing: true,
+      errorMessage: null
+    }));
+
+    try {
+      const response = await issueEmployerWorkerRegistrationCode(token);
+      setSettingsSummary((prev) => ({
+        ...prev,
+        workerRegistrationCode: response.registrationCode,
+        workerRegistrationIssuedAt: response.issuedAt,
+        issuing: false,
+        errorMessage: null
+      }));
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearStoredSession();
+        navigate("/", { replace: true });
+        return;
+      }
+
+      setSettingsSummary((prev) => ({
+        ...prev,
+        issuing: false,
+        errorMessage:
+          error instanceof Error ? error.message : "근로자 등록 코드를 발급하지 못했습니다."
+      }));
+    }
   };
 
   return (
@@ -266,11 +426,38 @@ export function AppShell() {
                 </div>
                 <div className="popover-setting-card">
                   <span>연결 근로자</span>
-                  <strong>-</strong>
+                  <strong>{activeMembershipLabel}</strong>
                 </div>
                 <div className="popover-setting-card">
                   <span>기본 사업장</span>
                   <strong>{workplaceName}</strong>
+                </div>
+                <div className="popover-setting-card">
+                  <div className="popover-setting-card-header">
+                    <div>
+                      <span>근로자 등록 코드</span>
+                      <strong>{workerRegistrationCodeLabel}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="popover-action-btn"
+                      onClick={handleIssueWorkerRegistrationCode}
+                      disabled={settingsSummary.loading || settingsSummary.issuing}
+                    >
+                      {settingsSummary.issuing ? "처리 중" : workerRegistrationActionLabel}
+                    </button>
+                  </div>
+                  <p className="popover-setting-note">
+                    {workerRegistrationIssuedLabel
+                      ? `발급 시각 ${workerRegistrationIssuedLabel}`
+                      : "활성 코드가 없습니다."}
+                  </p>
+                  <p className="popover-setting-note">
+                    재발급 시 기존 코드는 즉시 사용할 수 없습니다.
+                  </p>
+                  {settingsSummary.errorMessage ? (
+                    <p className="popover-setting-feedback error">{settingsSummary.errorMessage}</p>
+                  ) : null}
                 </div>
               </>
             ) : null}

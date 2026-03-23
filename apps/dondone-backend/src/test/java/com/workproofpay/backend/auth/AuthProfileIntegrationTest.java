@@ -140,8 +140,8 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void updateCompanyCodeRejectsHyphenatedCode() throws Exception {
-        User user = userRepository.save(User.register("invalid-company@test.com", "hashed", "Invalid", "01022223333"));
+    void updateCompanyCodeAcceptsHyphenatedCode() throws Exception {
+        User user = userRepository.save(User.register("hyphen-company@test.com", "hashed", "Hyphen", "01022223333"));
 
         mockMvc.perform(put("/api/auth/me/company-code")
                         .header("Authorization", bearer(tokenFor(user)))
@@ -151,8 +151,8 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                                   "companyCode": "DON-DONE-2026"
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyCode").value("DON-DONE-2026"));
     }
 
     @Test
