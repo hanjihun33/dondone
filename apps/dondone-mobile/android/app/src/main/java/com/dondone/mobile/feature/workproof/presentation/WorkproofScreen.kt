@@ -493,9 +493,9 @@ private fun WorkproofPunchCard(
 ) {
     val context = LocalContext.current
     val canClockIn = uiModel.canClockIn && uiModel.isWithinWorkplaceRadius
-    val canClockOut = uiModel.canClockOut && uiModel.isWithinWorkplaceRadius
+    val canClockOut = uiModel.canClockOut
     val showClockInRadiusFeedback = uiModel.canClockIn && !uiModel.isWithinWorkplaceRadius
-    val showClockOutRadiusFeedback = uiModel.canClockOut && !uiModel.isWithinWorkplaceRadius
+    val showClockOutRadiusFeedback = false
 
     WorkproofSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

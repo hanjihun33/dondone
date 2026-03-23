@@ -374,7 +374,7 @@ private fun HomeWorkSection(
             HomeSoftButton(
                 text = "퇴근",
                 onClick = onClockOut,
-                enabled = uiModel.work.canClockOut && uiModel.work.isWithinWorkplaceRadius,
+                enabled = uiModel.work.canClockOut,
                 modifier = Modifier.weight(1f)
             )
         }
