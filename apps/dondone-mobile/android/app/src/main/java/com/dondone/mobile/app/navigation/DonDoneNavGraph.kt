@@ -156,7 +156,12 @@ fun DonDoneNavGraph(
                 onRequestAdvance = viewModel::requestAdvance,
                 onClearAdvanceMessage = viewModel::clearAdvanceRequestMessage,
                 onOpenAdvanceRequestDetail = viewModel::openAdvanceRequestDetail,
-                onCloseAdvanceRequestDetail = viewModel::closeAdvanceRequestDetail
+                onCloseAdvanceRequestDetail = viewModel::closeAdvanceRequestDetail,
+                onOpenWorkproof = {
+                    navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target ->
+                        navController.navigate(target)
+                    }
+                }
             )
         }
         composable(Route.WAGE) {

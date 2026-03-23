@@ -73,6 +73,8 @@ data class FinanceAdvanceDetailUiModel(
     val subtitleText: String,
     val stateTitleText: String,
     val stateBodyText: String,
+    val noticeTitleText: String?,
+    val noticeBodyText: String?,
     val availableText: String,
     val usedText: String,
     val repaymentDueText: String,
@@ -90,6 +92,7 @@ data class FinanceAdvanceDetailUiModel(
     val disclaimerText: String,
     val canRequest: Boolean,
     val requestButtonText: String,
+    val secondaryActionText: String?,
     val requestFeedbackText: String?,
     val requestFeedbackIsError: Boolean,
     val amountOptions: List<FinanceAmountOptionUiModel>,
@@ -103,10 +106,14 @@ data class FinanceAdvanceUiModel(
     val repaymentDueText: String,
     val statusText: String,
     val sourceLabelText: String,
+    val stateTitleText: String,
     val stateBodyText: String,
+    val noticeTitleText: String?,
+    val noticeBodyText: String?,
     val progress: Float,
     val progressHintText: String,
     val actionText: String,
+    val secondaryActionText: String?,
     val detail: FinanceAdvanceDetailUiModel,
     val requestDetail: FinanceAdvanceRequestDetailUiModel
 )
@@ -224,7 +231,11 @@ fun DemoState.toFinanceHomeUiModel(
         advanceSnapshot.verifiedDays / advanceSnapshot.progressTargetDays.toFloat()
     }
     val effectiveProgressHintText = if (usesRemoteAdvance) {
-        advanceContractState.stateBodyText
+        if (advanceContractState.noticeTitleText != null) {
+            "반영 완료 기록 기준으로 다음 구간 진행도를 계산했어요."
+        } else {
+            "반영된 근무 기준으로 다음 구간까지 보여줘요."
+        }
     } else {
         advanceProgressHintText
     }
@@ -352,17 +363,23 @@ fun DemoState.toFinanceHomeUiModel(
             surfaceState = advanceContractState.surfaceState,
             availableText = formatKrw(remoteAvailableAmount.toInt()),
             repaymentDueText = remoteRepaymentDueText,
-            statusText = "${advanceContractState.stateTitleText} · ${advanceContractState.repaymentTier}",
+            statusText = advanceContractState.repaymentTier,
             sourceLabelText = advanceContractState.sourceLabelText,
+            stateTitleText = advanceContractState.stateTitleText,
             stateBodyText = advanceContractState.stateBodyText,
+            noticeTitleText = advanceContractState.noticeTitleText,
+            noticeBodyText = advanceContractState.noticeBodyText,
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
             actionText = advanceContractState.actionText,
+            secondaryActionText = advanceContractState.secondaryActionText,
             detail = FinanceAdvanceDetailUiModel(
                 surfaceState = advanceContractState.surfaceState,
                 subtitleText = "근무 기록 기반 한도로 급여일 전에 일부를 먼저 받습니다.",
                 stateTitleText = advanceContractState.stateTitleText,
                 stateBodyText = advanceContractState.stateBodyText,
+                noticeTitleText = advanceContractState.noticeTitleText,
+                noticeBodyText = advanceContractState.noticeBodyText,
                 availableText = formatKrw(remoteAvailableAmount.toInt()),
                 usedText = formatKrw(remoteUsedAmount.toInt()),
                 repaymentDueText = remoteRepaymentDueText,
@@ -384,6 +401,7 @@ fun DemoState.toFinanceHomeUiModel(
                     advanceContractState.canRequest -> "미리받기 신청"
                     else -> advanceContractState.actionText
                 },
+                secondaryActionText = advanceContractState.secondaryActionText,
                 requestFeedbackText = advanceRequestUiState.message,
                 requestFeedbackIsError = advanceRequestUiState.isError,
                 amountOptions = if (usesRemoteAdvance) {

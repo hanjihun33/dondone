@@ -125,19 +125,19 @@ class AdvanceContractStateTest {
         val state = DemoSeedFactory.create().toAdvanceContractState(remoteState)
 
         assertEquals(AdvanceSurfaceState.SUCCESS, state.surfaceState)
-        assertEquals("다음 달 급여 회차 기준으로 확인했어요", state.stateTitleText)
+        assertEquals("미리받기를 신청할 수 있어요", state.stateTitleText)
         assertEquals("다음 달 급여 회차 기준으로 신청 가능 금액을 불러왔어요.", state.stateBodyText)
         assertEquals("다음 회차 보기", state.actionText)
         assertTrue(state.canRequest)
     }
 
     @Test
-    fun `remote pending review lock shows review guidance copy`() {
+    fun `remote pending review shows notice while keeping request enabled`() {
         val remoteState = AdvanceRemoteState.content(
             workplaceName = "실연동 · SSAFY",
             eligibility = AdvanceEligibilityPayload(
                 workplaceId = 1L,
-                availableAmount = 0L,
+                availableAmount = 50_000L,
                 repaymentTier = "C",
                 blockReasonCodes = emptyList(),
                 noticeReasonCodes = listOf("PENDING_WORKPROOF_REVIEW"),
@@ -150,10 +150,16 @@ class AdvanceContractStateTest {
 
         val state = DemoSeedFactory.create().toAdvanceContractState(remoteState)
 
-        assertEquals(AdvanceSurfaceState.BLOCKED, state.surfaceState)
-        assertEquals("확인 후 신청이 가능해요", state.stateTitleText)
-        assertEquals("확인 필요한 기록이 정리되면 바로 신청 가능 금액을 다시 확인할 수 있어요.", state.stateBodyText)
-        assertEquals("기록 확인", state.actionText)
-        assertFalse(state.canRequest)
+        assertEquals(AdvanceSurfaceState.SUCCESS, state.surfaceState)
+        assertEquals("미리받기를 신청할 수 있어요", state.stateTitleText)
+        assertEquals("현재 가능 금액을 확인하고 신청할 수 있어요.", state.stateBodyText)
+        assertEquals("확인 필요한 기록이 남아 있어요", state.noticeTitleText)
+        assertEquals(
+            "확인 필요한 기록 1건이 남아 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요.",
+            state.noticeBodyText
+        )
+        assertEquals("미리받기 보기", state.actionText)
+        assertEquals("기록 확인", state.secondaryActionText)
+        assertTrue(state.canRequest)
     }
 }

@@ -71,7 +71,8 @@ fun FinanceHomeScreen(
     onRequestAdvance: () -> Unit,
     onClearAdvanceMessage: () -> Unit,
     onOpenAdvanceRequestDetail: (Long) -> Unit,
-    onCloseAdvanceRequestDetail: () -> Unit
+    onCloseAdvanceRequestDetail: () -> Unit,
+    onOpenWorkproof: () -> Unit
 ) {
     val advanceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val advanceRequestDetailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -94,7 +95,8 @@ fun FinanceHomeScreen(
         ) {
             FinanceAdvanceSection(
                 uiModel = uiModel.advance,
-                onOpenSheet = { showAdvanceSheet = true }
+                onOpenSheet = { showAdvanceSheet = true },
+                onOpenWorkproof = onOpenWorkproof
             )
             FinanceSectionDivider()
             FinanceVaultSection(
@@ -125,6 +127,11 @@ fun FinanceHomeScreen(
                 onSelectAmount = onSelectAdvanceAmount,
                 onRequestAdvance = onRequestAdvance,
                 onClearRequestMessage = onClearAdvanceMessage,
+                onOpenWorkproof = {
+                    onClearAdvanceMessage()
+                    showAdvanceSheet = false
+                    onOpenWorkproof()
+                },
                 onOpenHistoryDetail = { requestId ->
                     onOpenAdvanceRequestDetail(requestId)
                     showAdvanceRequestDetailSheet = true
@@ -174,7 +181,8 @@ fun FinanceHomeScreen(
 @Composable
 private fun FinanceAdvanceSection(
     uiModel: FinanceAdvanceUiModel,
-    onOpenSheet: () -> Unit
+    onOpenSheet: () -> Unit,
+    onOpenWorkproof: () -> Unit
 ) {
     FinanceBlockSection(
         title = "미리받기",
@@ -211,9 +219,15 @@ private fun FinanceAdvanceSection(
         }
         FinanceAdvanceStatePanel(
             surfaceState = uiModel.surfaceState,
-            title = uiModel.statusText,
+            title = uiModel.stateTitleText,
             body = uiModel.stateBodyText
         )
+        if (uiModel.noticeTitleText != null && uiModel.noticeBodyText != null) {
+            FinanceAdvanceNoticePanel(
+                title = uiModel.noticeTitleText,
+                body = uiModel.noticeBodyText
+            )
+        }
         FinanceKeyValueRow(label = "지금 가능 금액", value = uiModel.availableText)
         FinanceKeyValueRow(label = "상환 예정일", value = uiModel.repaymentDueText)
         FinancePrimaryButton(
@@ -221,6 +235,13 @@ private fun FinanceAdvanceSection(
             modifier = Modifier.fillMaxWidth(),
             onClick = onOpenSheet
         )
+        if (uiModel.secondaryActionText != null) {
+            FinanceSoftButton(
+                text = uiModel.secondaryActionText,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenWorkproof
+            )
+        }
     }
 }
 
@@ -385,6 +406,7 @@ private fun FinanceAdvanceBottomSheet(
     onSelectAmount: (Int) -> Unit,
     onRequestAdvance: () -> Unit,
     onClearRequestMessage: () -> Unit,
+    onOpenWorkproof: () -> Unit,
     onOpenHistoryDetail: (Long) -> Unit
 ) {
     Column(
@@ -425,6 +447,12 @@ private fun FinanceAdvanceBottomSheet(
                 title = uiModel.stateTitleText,
                 body = uiModel.stateBodyText
             )
+            if (uiModel.noticeTitleText != null && uiModel.noticeBodyText != null) {
+                FinanceAdvanceNoticePanel(
+                    title = uiModel.noticeTitleText,
+                    body = uiModel.noticeBodyText
+                )
+            }
         }
 
         FinanceBottomSheetDivider()
@@ -589,6 +617,13 @@ private fun FinanceAdvanceBottomSheet(
                 enabled = uiModel.canRequest,
                 onClick = onRequestAdvance
             )
+            if (uiModel.secondaryActionText != null) {
+                FinanceSoftButton(
+                    text = uiModel.secondaryActionText,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onOpenWorkproof
+                )
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -691,6 +726,28 @@ private fun FinanceAdvanceStatePanel(
     FinanceSheetPanel(
         backgroundColor = backgroundColor,
         borderColor = borderColor
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary
+        )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodySmall,
+            color = FinanceTextMuted
+        )
+    }
+}
+
+@Composable
+private fun FinanceAdvanceNoticePanel(
+    title: String,
+    body: String
+) {
+    FinanceSheetPanel(
+        backgroundColor = FinanceSurfaceMuted,
+        borderColor = FinanceDivider
     ) {
         Text(
             text = title,
