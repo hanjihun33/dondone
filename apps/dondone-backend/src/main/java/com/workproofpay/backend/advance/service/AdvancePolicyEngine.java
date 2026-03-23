@@ -49,7 +49,8 @@ public class AdvancePolicyEngine {
                 .longValue();
 
         int daysUntilRepayment = daysUntilRepayment(today, targetMonth);
-        long paydayCap = daysUntilRepayment <= 3 ? 0L : daysUntilRepayment <= 7 ? REDUCED_PAYDAY_CAP : DEMO_MAX_CAP;
+        boolean isRepaymentDate = daysUntilRepayment == 0;
+        long paydayCap = isRepaymentDate ? 0L : daysUntilRepayment <= 7 ? REDUCED_PAYDAY_CAP : DEMO_MAX_CAP;
 
         List<String> blockReasonCodes = new ArrayList<>();
         boolean hardBlocked = false;
@@ -61,7 +62,7 @@ public class AdvancePolicyEngine {
             blockReasonCodes.add(AdvanceBlockReasonCode.EXISTING_OUTSTANDING_ADVANCE.name());
             hardBlocked = true;
         }
-        if (daysUntilRepayment <= 3) {
+        if (isRepaymentDate) {
             blockReasonCodes.add(AdvanceBlockReasonCode.PAYDAY_TOO_CLOSE.name());
             hardBlocked = true;
         }
@@ -97,6 +98,17 @@ public class AdvancePolicyEngine {
         );
     }
 
+    public YearMonth resolveTargetMonth(LocalDate today, YearMonth latestWorkedMonth) {
+        YearMonth cycleMonth = YearMonth.from(today);
+        if (today.getDayOfMonth() > DEFAULT_PAYDAY_DAY) {
+            cycleMonth = cycleMonth.plusMonths(1);
+        }
+        if (latestWorkedMonth == null || latestWorkedMonth.isBefore(cycleMonth)) {
+            return cycleMonth;
+        }
+        return latestWorkedMonth;
+    }
+
     public boolean isHardBlocked(AdvanceEligibilityResponse response) {
         return response.blockReasonCodes().stream().anyMatch(code ->
                 code.equals(AdvanceBlockReasonCode.INSUFFICIENT_VERIFIED_WORK.name())
@@ -111,8 +123,7 @@ public class AdvancePolicyEngine {
     }
 
     private LocalDate repaymentDate(LocalDate today, YearMonth targetMonth) {
-        YearMonth baseMonth = targetMonth.isBefore(YearMonth.from(today)) ? YearMonth.from(today) : targetMonth;
-        YearMonth repaymentMonth = today.getDayOfMonth() <= DEFAULT_PAYDAY_DAY ? baseMonth : baseMonth.plusMonths(1);
+        YearMonth repaymentMonth = targetMonth.isBefore(YearMonth.from(today)) ? YearMonth.from(today) : targetMonth;
         return repaymentMonth.atDay(Math.min(DEFAULT_PAYDAY_DAY, repaymentMonth.lengthOfMonth()));
     }
 }

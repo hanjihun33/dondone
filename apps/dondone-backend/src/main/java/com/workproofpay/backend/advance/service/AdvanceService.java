@@ -140,9 +140,10 @@ public class AdvanceService {
     }
 
     private YearMonth resolveTargetMonth(Long userId, Long workplaceId) {
-        return workProofRepository.findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(userId, workplaceId)
+        YearMonth latestWorkedMonth = workProofRepository.findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(userId, workplaceId)
                 .map(workProof -> YearMonth.from(workProof.getWorkDate()))
-                .orElse(YearMonth.now());
+                .orElse(null);
+        return advancePolicyEngine.resolveTargetMonth(java.time.LocalDate.now(), latestWorkedMonth);
     }
 
     private User findUser(Long userId) {

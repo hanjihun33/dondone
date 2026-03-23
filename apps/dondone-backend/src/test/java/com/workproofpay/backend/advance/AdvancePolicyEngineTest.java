@@ -68,6 +68,58 @@ class AdvancePolicyEngineTest {
         assertThat(engine.isHardBlocked(response)).isTrue();
     }
 
+    @Test
+    void blocksEligibilityOnlyOnRepaymentDate() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 0, 0),
+                false,
+                LocalDate.of(2026, 3, 25),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.availableAmount()).isZero();
+        assertThat(response.blockReasonCodes()).contains("PAYDAY_TOO_CLOSE");
+        assertThat(engine.isHardBlocked(response)).isTrue();
+    }
+
+    @Test
+    void doesNotBlockDayBeforeRepaymentDate() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 0, 0),
+                false,
+                LocalDate.of(2026, 3, 24),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.availableAmount()).isEqualTo(50_000L);
+        assertThat(response.blockReasonCodes()).doesNotContain("PAYDAY_TOO_CLOSE");
+        assertThat(engine.isHardBlocked(response)).isFalse();
+    }
+
+    @Test
+    void rollsTargetMonthForwardAfterPayday() {
+        YearMonth targetMonth = engine.resolveTargetMonth(
+                LocalDate.of(2026, 3, 26),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(targetMonth).isEqualTo(YearMonth.of(2026, 4));
+    }
+
+    @Test
+    void keepsFutureWorkedMonthWhenItIsAlreadyNextCycle() {
+        YearMonth targetMonth = engine.resolveTargetMonth(
+                LocalDate.of(2026, 3, 26),
+                YearMonth.of(2026, 4)
+        );
+
+        assertThat(targetMonth).isEqualTo(YearMonth.of(2026, 4));
+    }
+
     private WorkContract contractWithHourlyWage(long hourlyWage) {
         WorkContract contract = mock(WorkContract.class);
         when(contract.getNormalizedHourlyWage()).thenReturn(BigDecimal.valueOf(hourlyWage));
