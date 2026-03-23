@@ -17,15 +17,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +49,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class EmployerWorkerReadModelIntegrationTest {
+
+    private static final LocalDate FIXED_TODAY = LocalDate.of(2026, 3, 18);
+    private static final LocalDate FIXED_WEEK_START = FIXED_TODAY.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+    private static final int FIXED_TODAY_INDEX =
+            (int) java.time.temporal.ChronoUnit.DAYS.between(FIXED_WEEK_START, FIXED_TODAY);
+    private static final int FIXED_PREVIOUS_DAY_INDEX = FIXED_TODAY_INDEX - 1;
+    private static final int FIXED_NO_RECORD_DAY_INDEX = FIXED_TODAY_INDEX - 2;
 
     @Autowired
     private MockMvc mockMvc;
@@ -102,7 +114,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.workers[0].recordStatus").value("CHECKED_OUT"))
                 .andExpect(jsonPath("$.data.workers[0].reflectionStatus").value("NEEDS_REVIEW"))
                 .andExpect(jsonPath("$.data.workers[0].attendanceStatus").value("NEEDS_REVIEW"))
-                .andExpect(jsonPath("$.data.workers[0].latestWorkDate").value(LocalDate.now().toString()));
+                .andExpect(jsonPath("$.data.workers[0].latestWorkDate").value(fixture.today().toString()));
 
         mockMvc.perform(get("/api/employer/workers")
                         .header("Authorization", bearer(fixture.employerUser()))
@@ -137,13 +149,12 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.completedCount").value(1))
                 .andExpect(jsonPath("$.data.needsReviewCount").value(1))
                 .andExpect(jsonPath("$.data.noRecordCount").value(1))
-                .andExpect(jsonPath("$.data.asOf").value(LocalDate.now().toString()));
+                .andExpect(jsonPath("$.data.asOf").value(fixture.today().toString()));
     }
 
     @Test
     void getWorkerDetailReturnsScopedLatestRecordAndRecentDays() throws Exception {
         Fixture fixture = createFixture();
-        LocalDate today = LocalDate.now();
 
         mockMvc.perform(get("/api/employer/workers/{workerId}", fixture.reviewWorker().getId())
                         .header("Authorization", bearer(fixture.employerUser())))
@@ -152,12 +163,12 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.workerId").value(fixture.reviewWorker().getId()))
                 .andExpect(jsonPath("$.data.name").value("Review Worker"))
                 .andExpect(jsonPath("$.data.email").value("review-worker@acme.test"))
-                .andExpect(jsonPath("$.data.membershipEffectiveFrom").value(today.minusDays(1).toString()))
+                .andExpect(jsonPath("$.data.membershipEffectiveFrom").value(fixture.today().minusDays(1).toString()))
                 .andExpect(jsonPath("$.data.recordStatus").value("CHECKED_OUT"))
                 .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
                 .andExpect(jsonPath("$.data.attendanceStatus").value("NEEDS_REVIEW"))
-                .andExpect(jsonPath("$.data.latestWorkDate").value(today.toString()))
-                .andExpect(jsonPath("$.data.latestRecord.workDate").value(today.toString()))
+                .andExpect(jsonPath("$.data.latestWorkDate").value(fixture.today().toString()))
+                .andExpect(jsonPath("$.data.latestRecord.workDate").value(fixture.today().toString()))
                 .andExpect(jsonPath("$.data.latestRecord.recordStatus").value("CHECKED_OUT"))
                 .andExpect(jsonPath("$.data.latestRecord.reflectionStatus").value("NEEDS_REVIEW"))
                 .andExpect(jsonPath("$.data.latestRecord.attendanceStatus").value("NEEDS_REVIEW"))
@@ -171,7 +182,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("정문"))
                 .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("후문"))
                 .andExpect(jsonPath("$.data.recentDays.length()").value(7))
-                .andExpect(jsonPath("$.data.recentDays[6].date").value(today.toString()))
+                .andExpect(jsonPath("$.data.recentDays[6].date").value(fixture.today().toString()))
                 .andExpect(jsonPath("$.data.recentDays[6].attendanceStatus").value("NEEDS_REVIEW"))
                 .andExpect(jsonPath("$.data.recentDays[6].workedMinutes").value(550));
     }
@@ -190,7 +201,7 @@ class EmployerWorkerReadModelIntegrationTest {
     void getAttendanceBoardReturnsWeeklyScopedSnapshots() throws Exception {
         Fixture fixture = createFixture();
 
-        ResultActions result = mockMvc.perform(get("/api/employer/dashboard/attendance-board")
+        mockMvc.perform(get("/api/employer/dashboard/attendance-board")
                         .header("Authorization", bearer(fixture.employerUser()))
                         .queryParam("weekStart", fixture.weekStart().toString())
                         .queryParam("query", "worker")
@@ -203,26 +214,18 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.weekEnd").value(fixture.weekStart().plusDays(6).toString()))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.rows[0].workerId").value(fixture.workingWorker().getId()))
+                .andExpect(jsonPath("$.data.rows[0].days[%s].date".formatted(fixture.previousDayIndex()))
+                        .value(fixture.today().minusDays(1).toString()))
+                .andExpect(jsonPath("$.data.rows[0].days[%s].attendanceStatus".formatted(fixture.previousDayIndex())).value("COMPLETED"))
+                .andExpect(jsonPath("$.data.rows[0].days[%s].recordStatus".formatted(fixture.previousDayIndex())).value("CHECKED_OUT"))
+                .andExpect(jsonPath("$.data.rows[0].days[%s].reflectionStatus".formatted(fixture.previousDayIndex())).value("REFLECTED"))
+                .andExpect(jsonPath("$.data.rows[0].days[%s].workedMinutes".formatted(fixture.previousDayIndex())).value(480))
+                .andExpect(jsonPath("$.data.rows[0].days[%s].attendanceStatus".formatted(fixture.noRecordDayIndex())).value("NO_RECORD"))
+                .andExpect(jsonPath("$.data.rows[0].days[%s].recordStatus".formatted(fixture.noRecordDayIndex())).doesNotExist())
                 .andExpect(jsonPath("$.data.rows[0].days[%s].attendanceStatus".formatted(fixture.todayIndex())).value("WORKING"))
                 .andExpect(jsonPath("$.data.rows[0].days[%s].recordStatus".formatted(fixture.todayIndex())).value("CHECKED_IN"))
                 .andExpect(jsonPath("$.data.rows[0].days[%s].reflectionStatus".formatted(fixture.todayIndex())).value("PENDING"))
                 .andExpect(jsonPath("$.data.rows[0].days[%s].workedMinutes".formatted(fixture.todayIndex())).doesNotExist());
-
-        if (fixture.previousDayIndex() != null) {
-            int previousDayIndex = fixture.previousDayIndex();
-            result.andExpect(jsonPath("$.data.rows[0].days[%s].date".formatted(previousDayIndex))
-                            .value(fixture.today().minusDays(1).toString()))
-                    .andExpect(jsonPath("$.data.rows[0].days[%s].attendanceStatus".formatted(previousDayIndex)).value("COMPLETED"))
-                    .andExpect(jsonPath("$.data.rows[0].days[%s].recordStatus".formatted(previousDayIndex)).value("CHECKED_OUT"))
-                    .andExpect(jsonPath("$.data.rows[0].days[%s].reflectionStatus".formatted(previousDayIndex)).value("REFLECTED"))
-                    .andExpect(jsonPath("$.data.rows[0].days[%s].workedMinutes".formatted(previousDayIndex)).value(480));
-        }
-
-        if (fixture.noRecordDayIndex() != null) {
-            int noRecordDayIndex = fixture.noRecordDayIndex();
-            result.andExpect(jsonPath("$.data.rows[0].days[%s].attendanceStatus".formatted(noRecordDayIndex)).value("NO_RECORD"))
-                    .andExpect(jsonPath("$.data.rows[0].days[%s].recordStatus".formatted(noRecordDayIndex)).doesNotExist());
-        }
     }
 
     @Test
@@ -239,12 +242,8 @@ class EmployerWorkerReadModelIntegrationTest {
     }
 
     private Fixture createFixture() {
-        LocalDate today = LocalDate.now();
-        LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
-        Integer previousDayIndex = today.isAfter(weekStart)
-                ? (int) java.time.temporal.ChronoUnit.DAYS.between(weekStart, today.minusDays(1))
-                : null;
-        Integer noRecordDayIndex = previousDayIndex != null && previousDayIndex > 0 ? previousDayIndex - 1 : null;
+        LocalDate today = FIXED_TODAY;
+        LocalDate weekStart = FIXED_WEEK_START;
 
         Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
         Company otherCompany = companyRepository.save(Company.create("Other Logistics", "OTHER-SEOUL"));
@@ -290,13 +289,13 @@ class EmployerWorkerReadModelIntegrationTest {
         User completedWorker = createScopedWorker("completed-worker@acme.test", "Completed Worker", company.getId(), workplace.getId());
         User reviewWorker = createScopedWorker("review-worker@acme.test", "Review Worker", company.getId(), workplace.getId());
         User noRecordWorker = createScopedWorker("no-record-worker@acme.test", "No Record Worker", company.getId(), workplace.getId());
-        createScopedWorker("future-worker@acme.test", "Future Worker", company.getId(), workplace.getId(), LocalDate.now().plusDays(1));
+        createScopedWorker("future-worker@acme.test", "Future Worker", company.getId(), workplace.getId(), FIXED_TODAY.plusDays(1));
         User otherScopeWorker = createScopedWorker("other-scope-worker@acme.test", "Other Scope Worker", otherCompany.getId(), otherWorkplace.getId());
 
         workProofRepository.save(completedRecord(
                 workingWorker,
                 workplace,
-                previousDayIndex == null ? today.minusDays(7) : today.minusDays(1),
+                today.minusDays(1),
                 9,
                 0,
                 17,
@@ -357,7 +356,6 @@ class EmployerWorkerReadModelIntegrationTest {
                 true
         ));
 
-        int todayIndex = (int) java.time.temporal.ChronoUnit.DAYS.between(weekStart, today);
         return new Fixture(
                 employerUser,
                 workingWorker,
@@ -367,9 +365,9 @@ class EmployerWorkerReadModelIntegrationTest {
                 otherScopeWorker,
                 weekStart,
                 today,
-                todayIndex,
-                previousDayIndex,
-                noRecordDayIndex
+                FIXED_TODAY_INDEX,
+                FIXED_PREVIOUS_DAY_INDEX,
+                FIXED_NO_RECORD_DAY_INDEX
         );
     }
 
@@ -403,7 +401,7 @@ class EmployerWorkerReadModelIntegrationTest {
     }
 
     private User createScopedWorker(String email, String name, Long companyId, Long workplaceId) {
-        return createScopedWorker(email, name, companyId, workplaceId, LocalDate.now().minusDays(1));
+        return createScopedWorker(email, name, companyId, workplaceId, FIXED_TODAY.minusDays(1));
     }
 
     private User createScopedWorker(String email,
@@ -439,8 +437,21 @@ class EmployerWorkerReadModelIntegrationTest {
             LocalDate weekStart,
             LocalDate today,
             int todayIndex,
-            Integer previousDayIndex,
-            Integer noRecordDayIndex
+            int previousDayIndex,
+            int noRecordDayIndex
     ) {
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(
+                    Instant.parse("2026-03-17T15:00:00Z"),
+                    ZoneId.of("Asia/Seoul")
+            );
+        }
     }
 }
