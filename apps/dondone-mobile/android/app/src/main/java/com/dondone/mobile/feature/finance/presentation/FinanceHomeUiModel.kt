@@ -21,11 +21,15 @@ import com.dondone.mobile.domain.advance.AdvanceSurfaceState
 import com.dondone.mobile.domain.advance.toAdvanceContractState
 import com.dondone.mobile.domain.model.DemoState
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.math.RoundingMode
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
+
+private const val DEFAULT_VAULT_DISCLAIMER =
+    "예상 이자는 테스트넷 기준 데모 추정치이며 실제 수익을 보장하지 않습니다."
 
 data class FinanceAccountUiModel(
     val balanceText: String,
@@ -143,13 +147,11 @@ data class FinanceVaultDetailUiModel(
     val statusTitleText: String?,
     val statusBodyText: String?,
     val statusIsError: Boolean,
-    val noteText: String,
+    val statusIsTerminal: Boolean,
     val disclaimerText: String,
     val actionText: String,
     val actionEnabled: Boolean,
     val actionInFlight: Boolean,
-    val requestFeedbackText: String?,
-    val requestFeedbackIsError: Boolean,
     val amountOptions: List<FinanceAmountOptionUiModel>
 )
 
@@ -170,6 +172,7 @@ data class MoneySplitUiModel(
 )
 
 data class FinanceVaultUiModel(
+    val latestStatusKey: String?,
     val depositStatusText: String,
     val accruedInterestText: String,
     val aprText: String,
@@ -458,6 +461,38 @@ fun DemoState.toFinanceHomeUiModel(
     } else {
         floor(vault.monthlyFeeRevenue * (userDepositForBreakdown / max(1, vault.totalPool).toDouble())).toInt()
     }
+    val remoteProjectedPrincipalAtomic = if (usesRemoteVault) {
+        val currentPrincipalAtomic = remoteVaultSummary!!.storedAmountAtomic.toBigIntegerSafe()
+        val selectedAmountAtomic = effectiveVaultSelectedAmount.toAtomicBigInteger(remoteVaultDecimals)
+        when (effectiveVaultActionType) {
+            VaultActionType.DEPOSIT -> currentPrincipalAtomic.add(selectedAmountAtomic)
+            VaultActionType.WITHDRAW -> currentPrincipalAtomic.subtract(selectedAmountAtomic).max(BigInteger.ZERO)
+        }
+    } else {
+        BigInteger.ZERO
+    }
+    val remoteProjectedMonthlyYieldAtomic = if (usesRemoteVault) {
+        projectVaultYieldAtomic(
+            projectedPrincipalAtomic = remoteProjectedPrincipalAtomic,
+            currentPrincipalAtomic = remoteVaultSummary!!.storedAmountAtomic.toBigIntegerSafe(),
+            currentPreviewAtomic = remoteVaultSummary.interestPreview.monthlyEstimatedYieldAtomic,
+            apyBps = remoteVaultSummary.interestPreview.apyBps,
+            period = VaultYieldPeriod.MONTHLY
+        )
+    } else {
+        BigInteger.ZERO
+    }
+    val remoteProjectedDailyYieldAtomic = if (usesRemoteVault) {
+        projectVaultYieldAtomic(
+            projectedPrincipalAtomic = remoteProjectedPrincipalAtomic,
+            currentPrincipalAtomic = remoteVaultSummary!!.storedAmountAtomic.toBigIntegerSafe(),
+            currentPreviewAtomic = remoteVaultSummary.interestPreview.dailyEstimatedYieldAtomic,
+            apyBps = remoteVaultSummary.interestPreview.apyBps,
+            period = VaultYieldPeriod.DAILY
+        )
+    } else {
+        BigInteger.ZERO
+    }
 
     return FinanceHomeUiModel(
         account = FinanceAccountUiModel(
@@ -561,6 +596,7 @@ fun DemoState.toFinanceHomeUiModel(
             null
         },
         vault = FinanceVaultUiModel(
+            latestStatusKey = remoteLatestVaultTransaction?.let { "${it.requestId}:${it.status}" },
             depositStatusText = when {
                 usesRemoteVault && remoteStoredUnits > 0 ->
                     formatTokenAmount(
@@ -588,7 +624,6 @@ fun DemoState.toFinanceHomeUiModel(
                 String.format(Locale.US, "%.1f%%", vault.apr * 100)
             },
             helperText = when {
-                vaultStatusMessage != null -> vaultStatusMessage.body
                 usesRemoteVault && remoteStoredUnits > 0 -> "예치 잔액과 예상 이자를 바로 확인할 수 있어요."
                 usesRemoteVault -> "예치 가능 금액과 예상 이자를 먼저 확인할 수 있어요."
                 vault.enabled && vault.userDeposit > 0 -> "예치 중인 금액과 누적 이자를 확인할 수 있어요."
@@ -662,8 +697,8 @@ fun DemoState.toFinanceHomeUiModel(
                     formatKrw(vault.accruedInterest)
                 },
                 monthlyInterestText = if (usesRemoteVault) {
-                    formatTokenAmount(
-                        atomic = remoteVaultSummary!!.interestPreview.monthlyEstimatedYieldAtomic,
+                    formatYieldTokenAmount(
+                        atomic = remoteProjectedMonthlyYieldAtomic.toString(),
                         decimals = remoteVaultDecimals,
                         symbol = remoteVaultAssetSymbol
                     )
@@ -671,8 +706,8 @@ fun DemoState.toFinanceHomeUiModel(
                     formatKrw(vaultSnapshot.monthlyInterest)
                 },
                 dailyInterestText = if (usesRemoteVault) {
-                    formatTokenAmount(
-                        atomic = remoteVaultSummary!!.interestPreview.dailyEstimatedYieldAtomic,
+                    formatYieldTokenAmount(
+                        atomic = remoteProjectedDailyYieldAtomic.toString(),
                         decimals = remoteVaultDecimals,
                         symbol = remoteVaultAssetSymbol
                     )
@@ -680,8 +715,8 @@ fun DemoState.toFinanceHomeUiModel(
                     formatKrw(vaultSnapshot.dailyInterest)
                 },
                 defiMonthlyText = if (usesRemoteVault) {
-                    formatTokenAmount(
-                        atomic = remoteVaultSummary!!.interestPreview.monthlyEstimatedYieldAtomic,
+                    formatYieldTokenAmount(
+                        atomic = remoteProjectedMonthlyYieldAtomic.toString(),
                         decimals = remoteVaultDecimals,
                         symbol = remoteVaultAssetSymbol
                     )
@@ -694,8 +729,8 @@ fun DemoState.toFinanceHomeUiModel(
                     formatKrw(feeShare)
                 },
                 totalMonthlyText = if (usesRemoteVault) {
-                    formatTokenAmount(
-                        atomic = remoteVaultSummary!!.interestPreview.monthlyEstimatedYieldAtomic,
+                    formatYieldTokenAmount(
+                        atomic = remoteProjectedMonthlyYieldAtomic.toString(),
                         decimals = remoteVaultDecimals,
                         symbol = remoteVaultAssetSymbol
                     )
@@ -708,17 +743,11 @@ fun DemoState.toFinanceHomeUiModel(
                 statusTitleText = vaultStatusMessage?.title,
                 statusBodyText = vaultStatusMessage?.body,
                 statusIsError = vaultStatusMessage?.isError == true,
-                noteText = if (usesRemoteVault) {
-                    "예치/출금은 비동기 처리라 요청 후 잠시 상태 확인이 필요합니다."
-                } else if (vault.enabled && vault.userDeposit > 0) {
-                    "이자 수치는 데모용 추정값이며 실제 수익을 보장하지 않습니다."
-                } else {
-                    "예치금은 Vault 풀에 들어가며, DeFi 운용 수익 + 가불 수수료 기여분으로 이자가 적립됩니다."
-                },
+                statusIsTerminal = remoteLatestVaultTransaction?.isTerminalStatus() == true,
                 disclaimerText = if (usesRemoteVault) {
-                    remoteVaultSummary!!.disclaimer
+                    normalizeVaultDisclaimer(remoteVaultSummary!!.disclaimer)
                 } else {
-                    "예상 이자는 데모용 추정값이며 실제 수익을 보장하지 않습니다."
+                    DEFAULT_VAULT_DISCLAIMER
                 },
                 actionText = when {
                     vaultActionUiState.isSubmitting && effectiveVaultActionType == VaultActionType.WITHDRAW -> "출금 요청 중..."
@@ -731,8 +760,6 @@ fun DemoState.toFinanceHomeUiModel(
                     effectiveVaultSelectedAmount > 0 &&
                     vaultAmountOptions.isNotEmpty(),
                 actionInFlight = vaultActionUiState.isSubmitting,
-                requestFeedbackText = vaultActionUiState.message,
-                requestFeedbackIsError = vaultActionUiState.isError,
                 amountOptions = vaultAmountOptions
             )
         )
@@ -876,12 +903,37 @@ private data class FinanceVaultStatusMessage(
     val isError: Boolean
 )
 
+private fun VaultTransactionDetailPayload.isTerminalStatus(): Boolean =
+    status == "CONFIRMED" || status == "FAILED" || status == "TIMED_OUT"
+
+private fun normalizeVaultDisclaimer(raw: String): String {
+    val normalized = raw.trim()
+    if (normalized.isBlank()) {
+        return DEFAULT_VAULT_DISCLAIMER
+    }
+
+    val lower = normalized.lowercase(Locale.ROOT)
+    return if (
+        lower.startsWith("vault ") ||
+        lower.startsWith("valut ") ||
+        (lower.contains("demo") && lower.contains("profit"))
+    ) {
+        DEFAULT_VAULT_DISCLAIMER
+    } else {
+        normalized
+    }
+}
+
 private fun VaultTransactionDetailPayload.toVaultStatusMessage(): FinanceVaultStatusMessage {
     val actionLabel = if (txType == "WITHDRAW") "출금" else "예치"
     return when (status) {
         "CONFIRMED" -> FinanceVaultStatusMessage(
             title = "${actionLabel} 완료",
-            body = "${actionLabel}가 확정됐어요.",
+            body = if (txType == "WITHDRAW") {
+                "예치 잔액이 지갑 사용 가능 금액으로 돌아왔어요."
+            } else {
+                "지갑 잔액이 예치 잔액으로 반영됐어요."
+            },
             isError = false
         )
 
@@ -925,6 +977,17 @@ private fun formatTokenAmount(
     return "$text $symbol"
 }
 
+private fun formatYieldTokenAmount(
+    atomic: String,
+    decimals: Int,
+    symbol: String
+): String = formatTokenAmount(
+    atomic = atomic,
+    decimals = decimals,
+    symbol = symbol,
+    fractionDigits = 4
+)
+
 private fun String.toWholeAssetUnits(decimals: Int): Int {
     val sanitized = trim().ifBlank { return 0 }
     if (sanitized == "0") return 0
@@ -954,3 +1017,60 @@ private fun formatTenThousandUnit(amount: Int): String {
     val man = amount / 10_000
     return "${man}만"
 }
+
+private enum class VaultYieldPeriod {
+    DAILY,
+    MONTHLY
+}
+
+private fun projectVaultYieldAtomic(
+    projectedPrincipalAtomic: BigInteger,
+    currentPrincipalAtomic: BigInteger,
+    currentPreviewAtomic: String,
+    apyBps: Int,
+    period: VaultYieldPeriod
+): BigInteger {
+    if (projectedPrincipalAtomic.signum() <= 0 || apyBps <= 0) {
+        return BigInteger.ZERO
+    }
+    if (currentPrincipalAtomic.signum() > 0) {
+        val basePreviewAtomic = currentPreviewAtomic.toBigIntegerSafe()
+        if (basePreviewAtomic.signum() > 0) {
+            return basePreviewAtomic
+                .multiply(projectedPrincipalAtomic)
+                .divide(currentPrincipalAtomic)
+        }
+    }
+    return estimateVaultYieldAtomic(
+        principalAtomic = projectedPrincipalAtomic,
+        apyBps = apyBps,
+        period = period
+    )
+}
+
+private fun estimateVaultYieldAtomic(
+    principalAtomic: BigInteger,
+    apyBps: Int,
+    period: VaultYieldPeriod
+): BigInteger {
+    if (principalAtomic.signum() <= 0 || apyBps <= 0) {
+        return BigInteger.ZERO
+    }
+    val yearlyYield = principalAtomic
+        .multiply(BigInteger.valueOf(apyBps.toLong()))
+        .divide(BigInteger.valueOf(10_000L))
+    return when (period) {
+        VaultYieldPeriod.DAILY -> yearlyYield.divide(BigInteger.valueOf(360L))
+        VaultYieldPeriod.MONTHLY -> yearlyYield.divide(BigInteger.valueOf(12L))
+    }
+}
+
+private fun Int.toAtomicBigInteger(decimals: Int): BigInteger {
+    if (this <= 0) {
+        return BigInteger.ZERO
+    }
+    return BigInteger.valueOf(toLong())
+        .multiply(BigInteger.TEN.pow(decimals.coerceAtLeast(0)))
+}
+
+private fun String.toBigIntegerSafe(): BigInteger = toBigIntegerOrNull() ?: BigInteger.ZERO

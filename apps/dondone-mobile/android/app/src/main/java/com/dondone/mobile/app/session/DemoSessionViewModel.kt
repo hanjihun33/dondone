@@ -21,12 +21,15 @@ import com.dondone.mobile.data.documents.WorkproofDocumentPreviewPayload
 import com.dondone.mobile.data.documents.WorkproofDocumentRepository
 import com.dondone.mobile.data.documents.WorkproofDocumentUnauthorizedException
 import com.dondone.mobile.data.remittance.BackendRemittanceRepository
+import com.dondone.mobile.data.remittance.InMemoryRemittanceCompletionNoticeStore
+import com.dondone.mobile.data.remittance.RemittanceCompletionNoticeStore
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
 import com.dondone.mobile.data.remittance.RemittanceRemotePayload
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.remittance.RemittanceRepository
 import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
 import com.dondone.mobile.data.remittance.RemittanceUnauthorizedException
+import com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload
 import com.dondone.mobile.data.vault.BackendVaultRepository
 import com.dondone.mobile.data.vault.VaultActionType
 import com.dondone.mobile.data.vault.VaultCreateTransactionPayload
@@ -75,7 +78,8 @@ import java.time.format.DateTimeFormatter
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 private const val REMITTANCE_STATUS_POLL_DELAY_MS = 1500L
-private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 12
+// Sepolia confirmation can exceed 20s, so keep polling long enough to surface the terminal state in-app.
+private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 60
 private const val VAULT_STATUS_POLL_DELAY_MS = 1500L
 private const val VAULT_STATUS_POLL_ATTEMPTS = 16
 private const val REMITTANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 송금 실연동 데이터를 불러옵니다."
@@ -100,12 +104,13 @@ private enum class VaultRemoteLoadMode {
 }
 
 class DemoSessionViewModel(
-    private val appContext: Context,
+    private val appContext: Context? = null,
     private val authRepository: AuthRepository,
     private val advanceRepository: AdvanceRepository = BackendAdvanceRepository(),
     private val workproofRepository: WorkproofRepository = BackendWorkproofRepository(),
     private val workproofDocumentRepository: WorkproofDocumentRepository = BackendWorkproofDocumentRepository(),
     private val remittanceRepository: RemittanceRepository = BackendRemittanceRepository(),
+    private val remittanceCompletionNoticeStore: RemittanceCompletionNoticeStore = InMemoryRemittanceCompletionNoticeStore(),
     private val vaultRepository: VaultRepository = BackendVaultRepository(),
     private val wageRepository: WageRepository = BackendWageRepository()
 ) : ViewModel() {
@@ -150,6 +155,9 @@ class DemoSessionViewModel(
     val wageActionUiState: StateFlow<WageActionUiState> = _wageActionUiState.asStateFlow()
     private val _remittanceActionUiState = MutableStateFlow(RemittanceActionUiState())
     val remittanceActionUiState: StateFlow<RemittanceActionUiState> = _remittanceActionUiState.asStateFlow()
+    private val _remittanceCompletionNoticeUiState = MutableStateFlow(RemittanceCompletionNoticeUiState())
+    val remittanceCompletionNoticeUiState: StateFlow<RemittanceCompletionNoticeUiState> =
+        _remittanceCompletionNoticeUiState.asStateFlow()
     private val _vaultActionUiState = MutableStateFlow(VaultActionUiState())
     val vaultActionUiState: StateFlow<VaultActionUiState> = _vaultActionUiState.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
@@ -160,11 +168,14 @@ class DemoSessionViewModel(
     val selectedVaultActionType: StateFlow<VaultActionType> = _selectedVaultActionType.asStateFlow()
     private val _menuLaunchRequest = MutableStateFlow<MenuLaunchRequest?>(null)
     val menuLaunchRequest: StateFlow<MenuLaunchRequest?> = _menuLaunchRequest.asStateFlow()
+    private val _remittanceLaunchRequest = MutableStateFlow<RemittanceLaunchRequest?>(null)
+    val remittanceLaunchRequest: StateFlow<RemittanceLaunchRequest?> = _remittanceLaunchRequest.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
     val advanceRequestUiState: StateFlow<AdvanceRequestUiState> = _advanceRequestUiState.asStateFlow()
     private val _advanceRequestDetailUiState = MutableStateFlow(AdvanceRequestDetailUiState())
     val advanceRequestDetailUiState: StateFlow<AdvanceRequestDetailUiState> = _advanceRequestDetailUiState.asStateFlow()
     private var nextMenuLaunchRequestId = 1L
+    private var nextRemittanceLaunchRequestId = 1L
 
     init {
         restoreAuthSession()
@@ -184,17 +195,22 @@ class DemoSessionViewModel(
         _uiState.update { state -> DemoSessionReducer.selectAccount(state, accountId) }
     }
 
-    fun openTransferFlow() {
-        if (_uiState.value.remittance.status == TransferStatus.SUBMITTED) {
-            return
+    fun openTransferFlow(): Boolean {
+        if (hasPendingRemittanceTransfer()) {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "이전 송금 결과를 확인하고 있어요.",
+                isError = true
+            )
+            return false
         }
 
         cancelTransferCompletion()
         _uiState.update { state -> DemoSessionReducer.openTransferFlow(state) }
-        val session = _authUiState.value.session ?: return
+        val session = _authUiState.value.session ?: return true
         viewModelScope.launch {
             loadRemittanceRemoteState(session)
         }
+        return true
     }
 
     fun showAccountStep() {
@@ -243,27 +259,6 @@ class DemoSessionViewModel(
         _uiState.update { state -> DemoSessionReducer.updateTransferAmount(state, nextAmount) }
     }
 
-    fun createRemittanceRecipient(
-        alias: String,
-        relation: String,
-        walletAddress: String
-    ) {
-        val session = _authUiState.value.session ?: run {
-            _remittanceActionUiState.value = RemittanceActionUiState(
-                message = "로그인 후 다시 시도해 주세요.",
-                isError = true
-            )
-            return
-        }
-
-        submitRemoteRemittanceRecipientCreation(
-            session = session,
-            alias = alias,
-            relation = relation,
-            walletAddress = walletAddress
-        )
-    }
-
     fun addRecipientFromAccountManage(
         alias: String,
         relation: String,
@@ -290,6 +285,37 @@ class DemoSessionViewModel(
             }
             _remittanceActionUiState.value = RemittanceActionUiState(
                 message = "수신 지갑을 추가했어요."
+            )
+            return
+        }
+
+        submitRemoteRemittanceRecipientCreation(
+            session = session,
+            alias = alias,
+            relation = relation,
+            walletAddress = walletAddress,
+            targetUserId = targetUserId
+        )
+    }
+
+    fun addRecipientFromTransfer(
+        alias: String,
+        relation: String,
+        walletAddress: String,
+        targetUserId: Long?
+    ) {
+        val session = _authUiState.value.session ?: run {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "로그인 후 다시 시도해 주세요.",
+                isError = true
+            )
+            return
+        }
+
+        if (targetUserId == null && hasRecipientWallet(walletAddress)) {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = "이미 등록된 지갑이에요.",
+                isError = true
             )
             return
         }
@@ -551,8 +577,13 @@ class DemoSessionViewModel(
                     recentRecipientConfirmed = precheck?.recentRecipientConfirmationRequired == true
                 )
                 _uiState.update { state -> DemoSessionReducer.confirmTransfer(state) }
+                _remittanceLaunchRequest.value = RemittanceLaunchRequest(
+                    requestId = nextRemittanceLaunchRequestId++
+                )
+                _remittanceActionUiState.value = RemittanceActionUiState(
+                    message = "송금 요청을 접수했어요."
+                )
                 refreshRemittanceRemoteStateSilently(session)
-                _remittanceActionUiState.value = RemittanceActionUiState()
                 startRemittanceStatusPolling(session, result.transferId)
             } catch (error: RemittanceUnauthorizedException) {
                 expireSession(error.message)
@@ -575,6 +606,19 @@ class DemoSessionViewModel(
         cancelRemittanceStatusPolling()
         _remittanceActionUiState.value = RemittanceActionUiState()
         _uiState.update { state -> DemoSessionReducer.resetTransfer(state) }
+    }
+
+    fun dismissRemittanceCompletionNotice() {
+        val transferId = _remittanceCompletionNoticeUiState.value.transferId
+        val userId = _authUiState.value.session?.userId
+        if (transferId != null && userId != null) {
+            remittanceCompletionNoticeStore.saveDismissedTransferId(userId, transferId)
+        }
+        _remittanceCompletionNoticeUiState.value = RemittanceCompletionNoticeUiState()
+    }
+
+    fun consumeRemittanceLaunchRequest() {
+        _remittanceLaunchRequest.value = null
     }
 
     fun recordActualDeposit() {
@@ -1211,6 +1255,13 @@ class DemoSessionViewModel(
         }
     }
 
+    fun refreshRemittanceRemoteStateSilentlyIfAuthenticated() {
+        val session = _authUiState.value.session ?: return
+        viewModelScope.launch {
+            refreshRemittanceRemoteStateSilently(session)
+        }
+    }
+
     fun refreshVaultRemoteState() {
         val session = _authUiState.value.session
         if (session == null) {
@@ -1534,6 +1585,7 @@ class DemoSessionViewModel(
         _remittanceRemoteState.value = remoteState
         val payload = remoteState.payload ?: return
         _uiState.update { current -> current.syncRemoteRemittance(payload) }
+        syncRemittanceCompletionNotice(detail = payload.activeTransfer, shouldAnnounce = false)
     }
 
     private suspend fun applyVaultRemoteState(remoteState: VaultRemoteState) {
@@ -1547,6 +1599,7 @@ class DemoSessionViewModel(
         }
 
         _vaultRemoteState.value = remoteState
+        syncRemittanceBalanceFromVaultSummary(remoteState.payload?.summary)
         syncSelectedVaultAmount(remoteState)
 
         val session = _authUiState.value.session
@@ -1629,6 +1682,7 @@ class DemoSessionViewModel(
 
     private suspend fun clearAuthenticatedState(unauthenticatedState: AuthUiState) {
         cancelRemittanceStatusPolling()
+        _authUiState.value.session?.userId?.let(remittanceCompletionNoticeStore::clear)
         authRepository.logout()
         _uiState.value = initialState
         _authUiState.value = unauthenticatedState
@@ -1658,13 +1712,23 @@ class DemoSessionViewModel(
         _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
         _wageActionUiState.value = WageActionUiState()
         _remittanceActionUiState.value = RemittanceActionUiState()
+        _remittanceCompletionNoticeUiState.value = RemittanceCompletionNoticeUiState()
         _vaultActionUiState.value = VaultActionUiState()
         _profileUpdateUiState.value = ProfileUpdateUiState()
         _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState()
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
         _menuLaunchRequest.value = null
+        _remittanceLaunchRequest.value = null
         cancelRemittanceStatusPolling()
         cancelVaultStatusPolling()
+    }
+
+    private fun hasPendingRemittanceTransfer(): Boolean {
+        if (_uiState.value.remittance.status == TransferStatus.SUBMITTED) {
+            return true
+        }
+        val remoteActiveTransfer = _remittanceRemoteState.value.payload?.activeTransfer
+        return remoteActiveTransfer != null && !remoteActiveTransfer.isTerminalStatus()
     }
 
     private fun submitRemoteRemittanceRecipientCreation(
@@ -1775,6 +1839,7 @@ class DemoSessionViewModel(
         documentId: Long,
         action: WorkproofPdfFileAction
     ) {
+        val context = requireNotNull(appContext) { "Workproof PDF download requires appContext" }
         val session = _authUiState.value.session ?: run {
             _workproofPdfFileUiState.value = WorkproofPdfFileUiState(
                 errorMessage = "로그인 후 문서를 내려받을 수 있어요."
@@ -1791,8 +1856,8 @@ class DemoSessionViewModel(
                 val payload = workproofDocumentRepository.download(session.accessToken, documentId)
                 val file = writeWorkproofPdfFile(payload.fileName, payload.bytes)
                 val uri = FileProvider.getUriForFile(
-                    appContext,
-                    "${appContext.packageName}.fileprovider",
+                    context,
+                    "${context.packageName}.fileprovider",
                     file
                 )
                 _workproofPdfFileUiState.value = WorkproofPdfFileUiState(
@@ -1814,7 +1879,8 @@ class DemoSessionViewModel(
     }
 
     private fun writeWorkproofPdfFile(fileName: String, bytes: ByteArray): File {
-        val documentsDir = File(appContext.cacheDir, "documents").apply { mkdirs() }
+        val context = requireNotNull(appContext) { "Workproof PDF download requires appContext" }
+        val documentsDir = File(context.cacheDir, "documents").apply { mkdirs() }
         return File(documentsDir, fileName).apply {
             writeBytes(bytes)
         }
@@ -1866,7 +1932,10 @@ class DemoSessionViewModel(
                         val detail = vaultRepository.getTransactionDetail(session.accessToken, requestId)
                         mergeVaultTransactionDetail(detail)
                         if (detail.isTerminalStatus()) {
-                            refreshVaultRemoteStateSilently(session)
+                            refreshRemittanceRemoteStateSilently(session)
+                            if (_authUiState.value.isAuthenticated) {
+                                refreshVaultRemoteStateSilently(session)
+                            }
                             _vaultActionUiState.value = detail.toCompletionUiState()
                             return@launch
                         }
@@ -1924,6 +1993,34 @@ class DemoSessionViewModel(
             )
         }
         _uiState.update { current -> current.syncTransferStatus(detail) }
+        syncRemittanceCompletionNotice(detail = detail, shouldAnnounce = detail.isTerminalStatus())
+    }
+
+    private fun syncRemittanceCompletionNotice(
+        detail: RemittanceTransferDetailPayload?,
+        shouldAnnounce: Boolean
+    ) {
+        val session = _authUiState.value.session ?: return
+        if (detail == null || !detail.isTerminalStatus()) {
+            return
+        }
+
+        val dismissedTransferId = remittanceCompletionNoticeStore.readDismissedTransferId(session.userId)
+        if (dismissedTransferId == detail.transferId) {
+            if (_remittanceCompletionNoticeUiState.value.transferId == detail.transferId) {
+                _remittanceCompletionNoticeUiState.value = RemittanceCompletionNoticeUiState()
+            }
+            return
+        }
+
+        val currentNoticeTransferId = _remittanceCompletionNoticeUiState.value.transferId
+        _remittanceCompletionNoticeUiState.value = detail.toCompletionNoticeUiState()
+        if (shouldAnnounce && currentNoticeTransferId != detail.transferId) {
+            _remittanceActionUiState.value = RemittanceActionUiState(
+                message = detail.toCompletionToastMessage(),
+                isError = detail.toUiTransferStatus() == TransferStatus.FAILED
+            )
+        }
     }
 
     private fun mergeVaultCreateResult(
@@ -1962,6 +2059,28 @@ class DemoSessionViewModel(
             current.copy(
                 mode = VaultRemoteMode.CONTENT,
                 payload = payload.copy(latestTransaction = detail)
+            )
+        }
+    }
+
+    private fun syncRemittanceBalanceFromVaultSummary(summary: VaultSummaryPayload?) {
+        if (summary == null) {
+            return
+        }
+        _remittanceRemoteState.update { current ->
+            val payload = current.payload ?: return@update current
+            val currentBalance = payload.balance
+            current.copy(
+                mode = RemittanceRemoteMode.CONTENT,
+                payload = payload.copy(
+                    balance = RemittanceWalletBalancePayload(
+                        walletAddress = summary.walletAddress,
+                        assetSymbol = summary.assetSymbol,
+                        assetDecimals = summary.assetDecimals,
+                        tokenBalanceAtomic = summary.walletTokenBalanceAtomic,
+                        nativeBalanceWei = currentBalance?.nativeBalanceWei ?: "0"
+                    )
+                )
             )
         }
     }
@@ -2053,7 +2172,15 @@ class DemoSessionViewModel(
     }
 
     private fun DemoState.syncRemoteRemittance(payload: RemittanceRemotePayload): DemoState {
-        val inFlightTransfer = payload.activeTransfer?.takeUnless { it.isTerminalStatus() }
+        val latestTransfer = payload.activeTransfer
+        val inFlightTransfer = latestTransfer?.takeUnless { it.isTerminalStatus() }
+        val shouldShowTerminalTracker =
+            latestTransfer?.isTerminalStatus() == true &&
+                remittance.status in setOf(
+                    TransferStatus.SUBMITTED,
+                    TransferStatus.CONFIRMED,
+                    TransferStatus.FAILED
+                )
         val nextRecipients = payload.recipients.map { recipient ->
             Recipient(
                 id = recipient.recipientId,
@@ -2073,8 +2200,16 @@ class DemoSessionViewModel(
                 recipients = nextRecipients,
                 selectedRecipientId = selectedRecipientId,
                 destinationMode = TransferDestinationMode.WALLET,
-                txHash = inFlightTransfer?.txHash ?: remittance.txHash,
-                status = inFlightTransfer?.toUiTransferStatus() ?: remittance.status
+                txHash = when {
+                    inFlightTransfer != null -> inFlightTransfer.txHash ?: remittance.txHash
+                    shouldShowTerminalTracker -> latestTransfer?.txHash ?: remittance.txHash
+                    else -> remittance.txHash
+                },
+                status = when {
+                    inFlightTransfer != null -> inFlightTransfer.toUiTransferStatus()
+                    shouldShowTerminalTracker -> latestTransfer?.toUiTransferStatus() ?: remittance.status
+                    else -> remittance.status
+                }
             )
         )
     }
@@ -2135,6 +2270,23 @@ private fun RemittanceTransferDetailPayload.toUiTransferStatus(): TransferStatus
 
 private fun RemittanceTransferDetailPayload.isTerminalStatus(): Boolean =
     status == "CONFIRMED" || status == "FAILED" || status == "TIMED_OUT"
+
+private fun RemittanceTransferDetailPayload.toCompletionNoticeUiState(): RemittanceCompletionNoticeUiState =
+    RemittanceCompletionNoticeUiState(
+        transferId = transferId,
+        status = toUiTransferStatus(),
+        recipientName = recipientAlias,
+        amountAtomic = amountAtomic,
+        assetSymbol = assetSymbol,
+        txHash = txHash
+    )
+
+private fun RemittanceTransferDetailPayload.toCompletionToastMessage(): String =
+    when (toUiTransferStatus()) {
+        TransferStatus.CONFIRMED -> "송금이 완료됐어요."
+        TransferStatus.FAILED -> "송금이 실패했어요."
+        else -> "송금 상태를 확인하고 있어요."
+    }
 
 private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload?.requiresHighAmountConfirmation(): Boolean =
     this?.policyCode == "HIGH_AMOUNT_CONFIRMATION_REQUIRED"
@@ -2210,7 +2362,8 @@ private fun VaultTransactionDetailPayload.isTerminalStatus(): Boolean =
 private fun VaultTransactionDetailPayload.toCompletionUiState(): VaultActionUiState {
     return when (status) {
         "CONFIRMED" -> VaultActionUiState(
-            message = if (txType == "WITHDRAW") "출금이 완료됐어요." else "예치가 완료됐어요."
+            message = if (txType == "WITHDRAW") "출금이 완료됐어요." else "예치가 완료됐어요.",
+            messagePresentation = VaultMessagePresentation.TOAST_ONLY
         )
 
         else -> VaultActionUiState(
@@ -2219,7 +2372,8 @@ private fun VaultTransactionDetailPayload.toCompletionUiState(): VaultActionUiSt
             } else {
                 "예치가 완료되지 않았어요. 상태를 다시 확인해 주세요."
             },
-            isError = true
+            isError = true,
+            messagePresentation = VaultMessagePresentation.TOAST_ONLY
         )
     }
 }

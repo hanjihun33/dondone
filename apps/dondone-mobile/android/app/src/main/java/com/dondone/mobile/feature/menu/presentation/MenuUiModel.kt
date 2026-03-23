@@ -93,7 +93,9 @@ fun DemoState.toMenuUiModel(
     workproofPdfCreateUiState: WorkproofPdfCreateUiState
 ): MenuUiModel {
     val receiptDocument = documents.firstOrNull(DocumentItem::isReceiptDocument)
-    val baseDocuments = documents.map(DocumentItem::toMenuDocumentUiModel)
+    val baseDocuments = documents
+        .filterNot(DocumentItem::isReceiptDocument)
+        .map(DocumentItem::toMenuDocumentUiModel)
     val liveProofDocument = workproofPdfCreateUiState.toLiveProofDocument()
     val mergedDocuments = if (liveProofDocument != null) {
         listOf(liveProofDocument) + baseDocuments.filterNot { it.accent == MenuDocumentAccent.Proof }

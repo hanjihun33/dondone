@@ -1,7 +1,9 @@
 package com.dondone.mobile.feature.remittance.presentation
 
 import com.dondone.mobile.app.session.RemittanceActionUiState
+import com.dondone.mobile.app.session.RecipientPhoneSearchUiState
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.remittance.RemittanceRecipientSearchPayload
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.TransferDestinationMode
@@ -169,6 +171,66 @@ class TransferUiModelTest {
             )
 
         assertEquals(TransferScreenMode.TRACKER, resolveTransferScreenMode(uiModel))
+    }
+
+    @Test
+    fun `authenticated transfer exposes phone search recipient add state`() {
+        val uiModel = DemoSeedFactory.create().toTransferUiModel(
+            remoteState = RemittanceRemoteState.content(
+                com.dondone.mobile.data.remittance.RemittanceRemotePayload(
+                    wallet = com.dondone.mobile.data.remittance.RemittanceWalletPayload(
+                        walletAddress = "0x1111111111111111111111111111111111111111",
+                        fundingStatus = "FUNDED",
+                        fundingFailureReason = null,
+                        fundedAt = null,
+                        createdAt = null
+                    ),
+                    balance = null,
+                    recipients = emptyList(),
+                    transfers = emptyList(),
+                    activeTransfer = null
+                )
+            ),
+            actionUiState = RemittanceActionUiState(),
+            isAuthenticated = true,
+            recipientPhoneSearchUiState = RecipientPhoneSearchUiState(
+                isLoading = true,
+                results = listOf(
+                    RemittanceRecipientSearchPayload(
+                        candidateUserId = 7L,
+                        displayName = "차민수",
+                        maskedPhoneNumber = "010-****-1234",
+                        walletAddressMasked = "0x111111...222222",
+                        alreadyRegistered = false
+                    )
+                ),
+                errorMessage = "검색 중"
+            )
+        )
+
+        assertTrue(uiModel.showAddRecipientAction)
+        assertTrue(uiModel.addRecipientSupportsRemotePhoneSearch)
+        assertTrue(uiModel.addRecipientPhoneDirectory.isEmpty())
+        assertTrue(uiModel.addRecipientPhoneSearchLoading)
+        assertEquals("검색 중", uiModel.addRecipientPhoneSearchErrorMessage)
+        assertEquals(1, uiModel.addRecipientPhoneSearchResults.size)
+        assertEquals("차민수", uiModel.addRecipientPhoneSearchResults.single().name)
+        assertEquals(7L, uiModel.addRecipientPhoneSearchResults.single().candidateUserId)
+    }
+
+    @Test
+    fun `unauthenticated transfer exposes demo recipient add directory`() {
+        val uiModel = DemoSeedFactory.create().toTransferUiModel(
+            remoteState = defaultRemoteState(),
+            actionUiState = RemittanceActionUiState(),
+            isAuthenticated = false
+        )
+
+        assertFalse(uiModel.showAddRecipientAction)
+        assertFalse(uiModel.addRecipientSupportsRemotePhoneSearch)
+        assertTrue(uiModel.addRecipientPhoneSearchResults.isEmpty())
+        assertEquals(4, uiModel.addRecipientPhoneDirectory.size)
+        assertEquals("010-****-1183", uiModel.addRecipientPhoneDirectory.first().maskedPhoneNumber)
     }
 }
 

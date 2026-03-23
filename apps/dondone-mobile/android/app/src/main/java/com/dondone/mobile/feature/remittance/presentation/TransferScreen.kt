@@ -63,15 +63,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.widget.Toast
+import androidx.compose.runtime.LaunchedEffect
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.app.session.RemittanceActionUiState
+import com.dondone.mobile.app.session.RemittanceSubmittingAction
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.recipient.presentation.RecipientWalletAddBottomSheet
+import com.dondone.mobile.feature.recipient.presentation.resolveRecipientSheetErrorMessage
+import com.dondone.mobile.feature.recipient.presentation.shouldCloseRecipientSheetAfterResult
 
 private val TransferMutedCardBackground = Color(0xFFF8FAFC)
 private val TransferMutedCardBorder = Color(0xFFE2E8F0)
@@ -109,17 +115,6 @@ private val TransferNumberPadRows = listOf(
 )
 private const val TransferAmountMaxDigits = 9
 private const val TransferKrwPerUsdc = 1_450.0
-private val TransferRecipientRelationOptions = listOf(
-    "FAMILY" to "가족",
-    "SPOUSE" to "배우자",
-    "PARENT" to "부모",
-    "CHILD" to "자녀",
-    "SIBLING" to "형제자매",
-    "RELATIVE" to "친척",
-    "FRIEND" to "친구",
-    "OTHER" to "기타"
-)
-
 private data class TransferDestinationSummary(
     val title: String,
     val subtitle: String
@@ -179,12 +174,15 @@ internal fun resolveTransferScreenMode(uiModel: TransferUiModel): TransferScreen
 @Composable
 fun TransferScreen(
     uiModel: TransferUiModel,
+    actionUiState: RemittanceActionUiState,
     onSelectAccount: (String) -> Unit,
     onSelectDestinationMode: (TransferDestinationMode) -> Unit,
     onSelectRecipient: (String) -> Unit,
     onUpdateRecipientDisplayName: (String) -> Unit,
     onUpdateAmount: (Int) -> Unit,
-    onCreateRecipient: (String, String, String) -> Unit,
+    onAddRecipient: (String, String, String, Long?) -> Unit,
+    onSearchRecipientsByPhone: (String) -> Unit,
+    onClearPhoneSearch: () -> Unit,
     onRefreshRemittance: () -> Unit,
     onChangeRecipient: () -> Unit,
     onChangeAccountFromAmount: () -> Unit,
@@ -234,9 +232,12 @@ fun TransferScreen(
             } else {
                 RecipientStepCard(
                     uiModel = uiModel,
+                    actionUiState = actionUiState,
                     onSelectDestinationMode = onSelectDestinationMode,
                     onSelectRecipient = onSelectRecipient,
-                    onCreateRecipient = onCreateRecipient
+                    onAddRecipient = onAddRecipient,
+                    onSearchRecipientsByPhone = onSearchRecipientsByPhone,
+                    onClearPhoneSearch = onClearPhoneSearch
                 )
             }
         }
@@ -273,19 +274,43 @@ private fun AccountStepCard(
 @Composable
 private fun RecipientStepCard(
     uiModel: TransferUiModel,
+    actionUiState: RemittanceActionUiState,
     onSelectDestinationMode: (TransferDestinationMode) -> Unit,
     onSelectRecipient: (String) -> Unit,
-    onCreateRecipient: (String, String, String) -> Unit
+    onAddRecipient: (String, String, String, Long?) -> Unit,
+    onSearchRecipientsByPhone: (String) -> Unit,
+    onClearPhoneSearch: () -> Unit
 ) {
     val selectedTab = uiModel.destinationMode.toRecipientPickerTab()
     var query by remember { mutableStateOf("") }
     var showCreateRecipientSheet by remember { mutableStateOf(false) }
+    var awaitingRecipientCreation by remember { mutableStateOf(false) }
     val filteredSections = remember(uiModel.recipientSections, query, selectedTab) {
         filterRecipientSections(
             sections = uiModel.recipientSections,
             query = query,
             selectedTab = selectedTab
         )
+    }
+    val isRecipientSubmitting = actionUiState.isSubmitting &&
+        actionUiState.submittingAction == RemittanceSubmittingAction.RECIPIENT_CREATE
+    val submitErrorMessage = resolveRecipientSheetErrorMessage(
+        isAwaitingResult = awaitingRecipientCreation,
+        actionUiState = actionUiState
+    )
+
+    LaunchedEffect(
+        awaitingRecipientCreation,
+        actionUiState.isSubmitting,
+        actionUiState.message,
+        actionUiState.isError
+    ) {
+        if (!shouldCloseRecipientSheetAfterResult(awaitingRecipientCreation, actionUiState)) {
+            return@LaunchedEffect
+        }
+        onClearPhoneSearch()
+        showCreateRecipientSheet = false
+        awaitingRecipientCreation = false
     }
 
     Column(
@@ -392,12 +417,27 @@ private fun RecipientStepCard(
     }
 
     if (showCreateRecipientSheet) {
-        CreateRecipientBottomSheet(
-            onDismiss = { showCreateRecipientSheet = false },
-            onCreateRecipient = { alias, relation, walletAddress ->
-                onCreateRecipient(alias, relation, walletAddress)
-                showCreateRecipientSheet = false
-            }
+        RecipientWalletAddBottomSheet(
+            phoneDirectory = uiModel.addRecipientPhoneDirectory,
+            supportsRemotePhoneSearch = uiModel.addRecipientSupportsRemotePhoneSearch,
+            phoneSearchResults = uiModel.addRecipientPhoneSearchResults,
+            isPhoneSearchLoading = uiModel.addRecipientPhoneSearchLoading,
+            phoneSearchErrorMessage = uiModel.addRecipientPhoneSearchErrorMessage,
+            isSubmitting = isRecipientSubmitting,
+            submitErrorMessage = submitErrorMessage,
+            onDismiss = {
+                if (!isRecipientSubmitting) {
+                    onClearPhoneSearch()
+                    showCreateRecipientSheet = false
+                    awaitingRecipientCreation = false
+                }
+            },
+            onSubmit = { alias, relation, walletAddress, targetUserId ->
+                awaitingRecipientCreation = true
+                onAddRecipient(alias, relation, walletAddress, targetUserId)
+            },
+            onSearchByPhone = onSearchRecipientsByPhone,
+            onClearPhoneSearch = onClearPhoneSearch
         )
     }
 }
@@ -688,116 +728,6 @@ private fun TransferRemoteGateScreen(
                     )
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CreateRecipientBottomSheet(
-    onDismiss: () -> Unit,
-    onCreateRecipient: (String, String, String) -> Unit
-) {
-    var alias by remember { mutableStateOf("") }
-    var walletAddress by remember { mutableStateOf("") }
-    var relation by remember { mutableStateOf("FAMILY") }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color.White,
-        scrimColor = TransferReviewSheetScrim
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "허용 목록 수신자 추가",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                color = DawnText
-            )
-            Text(
-                text = "테스트넷 지갑 주소만 등록할 수 있어요.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-            OutlinedTextField(
-                value = alias,
-                onValueChange = { alias = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("별칭") },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp)
-            )
-            OutlinedTextField(
-                value = walletAddress,
-                onValueChange = { walletAddress = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("지갑 주소") },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp)
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "관계",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                    color = DawnText
-                )
-                TransferRecipientRelationOptions.chunked(2).forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        row.forEach { (code, label) ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(
-                                        if (relation == code) TransferRecipientSelectedBackground else Color.White,
-                                        RoundedCornerShape(14.dp)
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (relation == code) TransferRecipientSelectedBorder else TransferRecipientRowBorder,
-                                        RoundedCornerShape(14.dp)
-                                    )
-                                    .clickable { relation = code }
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                                    color = if (relation == code) DawnPrimary else DawnTextSubtle
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(DawnPrimary, RoundedCornerShape(18.dp))
-                    .clickable(
-                        enabled = alias.isNotBlank() && walletAddress.isNotBlank()
-                    ) {
-                        onCreateRecipient(alias.trim(), relation, walletAddress.trim())
-                    }
-                    .padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "등록하기",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                    color = Color.White.copy(alpha = if (alias.isNotBlank() && walletAddress.isNotBlank()) 1f else 0.52f)
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }

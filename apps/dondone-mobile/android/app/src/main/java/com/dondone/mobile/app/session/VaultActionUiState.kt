@@ -5,9 +5,15 @@ enum class VaultSubmittingAction {
     WITHDRAW_CREATE
 }
 
+enum class VaultMessagePresentation {
+    INLINE,
+    TOAST_ONLY
+}
+
 data class VaultActionUiState(
     val isSubmitting: Boolean = false,
     val submittingAction: VaultSubmittingAction? = null,
     val message: String? = null,
-    val isError: Boolean = false
+    val isError: Boolean = false,
+    val messagePresentation: VaultMessagePresentation = VaultMessagePresentation.INLINE
 )

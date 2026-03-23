@@ -3,6 +3,7 @@ package com.dondone.mobile.core.designsystem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.LocalIndication
@@ -17,11 +18,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -255,20 +261,133 @@ fun DonDoneToastHost(
         contentAlignment = Alignment.BottomCenter
     ) {
         val background = when (current.tone) {
-            BadgeTone.Info -> DawnPrimaryDeep
-            BadgeTone.Success -> DawnSuccess
-            BadgeTone.Warning -> DawnWarning
+            BadgeTone.Info -> DawnSurface
+            BadgeTone.Success -> Color(0xFFF2F6F0)
+            BadgeTone.Warning -> Color(0xFFFAF4EC)
+        }
+        val foreground = when (current.tone) {
+            BadgeTone.Info -> DawnText
+            BadgeTone.Success -> Color(0xFF4D6456)
+            BadgeTone.Warning -> Color(0xFF8B6B43)
+        }
+        val border = when (current.tone) {
+            BadgeTone.Info -> DawnBorder
+            BadgeTone.Success -> Color(0xFFD8E5DB)
+            BadgeTone.Warning -> Color(0xFFE9D9C2)
         }
 
         Text(
             text = current.message,
             modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(18.dp))
                 .background(background)
+                .border(BorderStroke(1.dp, border), RoundedCornerShape(18.dp))
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            color = Color.White,
+            color = foreground,
             style = MaterialTheme.typography.bodyMedium
         )
+    }
+}
+
+@Composable
+fun DonDoneNoticeBanner(
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+    tone: BadgeTone = BadgeTone.Info,
+    supportText: String? = null,
+    onDismiss: (() -> Unit)? = null
+) {
+    val leadingIcon = when (tone) {
+        BadgeTone.Success -> Icons.Default.CheckCircle
+        BadgeTone.Warning -> Icons.Default.Close
+        BadgeTone.Info -> Icons.Default.Description
+    }
+    val background = when (tone) {
+        BadgeTone.Info -> DawnSurface
+        BadgeTone.Success -> Color(0xFFF2F6F0)
+        BadgeTone.Warning -> Color(0xFFFAF4EC)
+    }
+    val bodyForeground = when (tone) {
+        BadgeTone.Info -> DawnTextSubtle
+        BadgeTone.Success -> Color(0xFF4D6456)
+        BadgeTone.Warning -> Color(0xFF8B6B43)
+    }
+    val border = when (tone) {
+        BadgeTone.Info -> DawnBorder
+        BadgeTone.Success -> Color(0xFFD8E5DB)
+        BadgeTone.Warning -> Color(0xFFE9D9C2)
+    }
+    val iconTint = when (tone) {
+        BadgeTone.Info -> DawnPrimaryDeep
+        BadgeTone.Success -> DawnSuccess
+        BadgeTone.Warning -> DawnWarning
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(background)
+            .border(BorderStroke(1.dp, border), RoundedCornerShape(18.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = leadingIcon,
+                contentDescription = null,
+                tint = iconTint
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                color = DawnText
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = bodyForeground,
+                maxLines = if (tone == BadgeTone.Warning) 3 else 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            supportText?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DawnTextSubtle,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        onDismiss?.let { dismiss ->
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "알림 닫기",
+                tint = DawnTextSubtle,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.74f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = rememberDonDoneGrayRipple()
+                    ) { dismiss() }
+                    .padding(5.dp)
+            )
+        }
     }
 }
 

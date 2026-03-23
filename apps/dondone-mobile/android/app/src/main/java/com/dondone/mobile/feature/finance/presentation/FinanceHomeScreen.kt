@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,10 +42,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.DonDoneProgressBar
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
@@ -242,10 +245,15 @@ private fun FinanceVaultSection(
     uiModel: FinanceVaultUiModel,
     onOpenSheet: () -> Unit
 ) {
-    val description = if (uiModel.depositStatusText == "미신청" || uiModel.depositStatusText == "미예치") {
-        ""
-    } else {
-        uiModel.helperText
+    var dismissedStatusKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val showStatusBanner =
+        uiModel.latestStatusText != null &&
+            uiModel.latestStatusKey != null &&
+            uiModel.latestStatusKey != dismissedStatusKey
+    val description = when {
+        showStatusBanner -> ""
+        uiModel.depositStatusText == "미신청" || uiModel.depositStatusText == "미예치" -> ""
+        else -> uiModel.helperText
     }
 
     FinanceBlockSection(
@@ -255,22 +263,20 @@ private fun FinanceVaultSection(
         FinanceKeyValueRow(label = "예치 잔액", value = uiModel.depositStatusText)
         FinanceKeyValueRow(label = "누적 이자(추정)", value = uiModel.accruedInterestText)
         FinanceKeyValueRow(label = "예상 연이율", value = uiModel.aprText)
-        if (uiModel.latestStatusText != null) {
-            FinanceSheetPanel(
-                backgroundColor = if (uiModel.latestStatusIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
-                borderColor = if (uiModel.latestStatusIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
-            ) {
-                Text(
-                    text = uiModel.latestStatusText,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-                    color = FinanceTextPrimary
-                )
-                Text(
-                    text = uiModel.helperText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = FinanceTextMuted
-                )
-            }
+        if (showStatusBanner) {
+            FinanceVaultStatusBanner(
+                title = uiModel.latestStatusText,
+                body = uiModel.detail.statusBodyText ?: uiModel.helperText,
+                supportText = uiModel.helperText.takeUnless {
+                    it.isBlank() || it == uiModel.detail.statusBodyText
+                },
+                tone = when {
+                    uiModel.latestStatusIsError -> BadgeTone.Warning
+                    uiModel.latestStatusText.contains("완료") -> BadgeTone.Success
+                    else -> BadgeTone.Info
+                },
+                onDismiss = { dismissedStatusKey = uiModel.latestStatusKey }
+            )
         }
         FinancePrimaryButton(
             text = uiModel.actionText,
@@ -406,6 +412,23 @@ private fun FinanceKeyValueRow(
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+@Composable
+private fun FinanceVaultStatusBanner(
+    title: String,
+    body: String,
+    supportText: String?,
+    tone: BadgeTone,
+    onDismiss: () -> Unit
+) {
+    DonDoneNoticeBanner(
+        title = title,
+        message = body,
+        supportText = supportText,
+        tone = tone,
+        onDismiss = onDismiss
+    )
 }
 
 @Composable
@@ -772,24 +795,6 @@ private fun FinanceVaultBottomSheet(
             FinanceKeyValueRow(label = "내 지갑 잔액", value = uiModel.walletBalanceText)
             FinanceKeyValueRow(label = "현재 예치 잔액", value = uiModel.balanceText)
             FinanceKeyValueRow(label = "예상 연이율", value = uiModel.aprText)
-            if (uiModel.statusTitleText != null && uiModel.statusBodyText != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                FinanceSheetPanel(
-                    backgroundColor = if (uiModel.statusIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
-                    borderColor = if (uiModel.statusIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
-                ) {
-                    Text(
-                        text = uiModel.statusTitleText,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-                        color = FinanceTextPrimary
-                    )
-                    Text(
-                        text = uiModel.statusBodyText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = FinanceTextMuted
-                    )
-                }
-            }
         }
 
         FinanceBottomSheetDivider()
@@ -828,19 +833,6 @@ private fun FinanceVaultBottomSheet(
                 options = uiModel.amountOptions,
                 onSelect = onSelectAmount
             )
-            if (uiModel.requestFeedbackText != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                FinanceSheetPanel(
-                    backgroundColor = if (uiModel.requestFeedbackIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
-                    borderColor = if (uiModel.requestFeedbackIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
-                ) {
-                    Text(
-                        text = uiModel.requestFeedbackText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = FinanceTextPrimary
-                    )
-                }
-            }
         }
 
         FinanceBottomSheetDivider()
@@ -849,22 +841,6 @@ private fun FinanceVaultBottomSheet(
             FinanceKeyValueRow(label = "월 예상 이자", value = uiModel.monthlyInterestText)
             FinanceKeyValueRow(label = "일 예상 이자", value = uiModel.dailyInterestText)
             FinanceKeyValueRow(label = "누적 이자(추정)", value = uiModel.accruedInterestText)
-        }
-
-        FinanceBottomSheetDivider()
-        FinanceBottomSheetSection {
-            FinanceBottomSheetHeader(title = "안내")
-            Text(
-                text = uiModel.noteText,
-                style = MaterialTheme.typography.bodySmall,
-                color = FinanceTextMuted
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = uiModel.disclaimerText,
-                style = MaterialTheme.typography.bodySmall,
-                color = FinanceTextMuted
-            )
         }
 
         FinanceBottomSheetDivider()
