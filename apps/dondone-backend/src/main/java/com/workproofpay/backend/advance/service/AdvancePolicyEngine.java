@@ -63,7 +63,7 @@ public class AdvancePolicyEngine {
             hardBlocked = true;
         }
         if (isRepaymentDate) {
-            blockReasonCodes.add(AdvanceBlockReasonCode.PAYDAY_TOO_CLOSE.name());
+            blockReasonCodes.add(AdvanceBlockReasonCode.ADVANCE_WINDOW_CLOSED_TODAY.name());
             hardBlocked = true;
         }
         if (needsReviewRecordCount > 0 || pendingMinutes > 0) {
@@ -113,7 +113,7 @@ public class AdvancePolicyEngine {
         return response.blockReasonCodes().stream().anyMatch(code ->
                 code.equals(AdvanceBlockReasonCode.INSUFFICIENT_VERIFIED_WORK.name())
                         || code.equals(AdvanceBlockReasonCode.EXISTING_OUTSTANDING_ADVANCE.name())
-                        || code.equals(AdvanceBlockReasonCode.PAYDAY_TOO_CLOSE.name())
+                        || code.equals(AdvanceBlockReasonCode.ADVANCE_WINDOW_CLOSED_TODAY.name())
         );
     }
 

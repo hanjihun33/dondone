@@ -1,5 +1,6 @@
 package com.dondone.mobile.domain.advance
 
+import com.dondone.mobile.data.advance.AdvanceEligibilityPayload
 import com.dondone.mobile.data.advance.AdvanceRemoteState
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import org.junit.Assert.assertEquals
@@ -73,6 +74,38 @@ class AdvanceContractStateTest {
 
         assertEquals(AdvanceSurfaceState.EMPTY, state.surfaceState)
         assertEquals("실연동", state.sourceLabelText)
+        assertFalse(state.canRequest)
+    }
+
+    @Test
+    fun `remote payday closure uses closing title and message`() {
+        val remoteState = AdvanceRemoteState.content(
+            workplaceName = "실연동 · SSAFY",
+            eligibility = AdvanceEligibilityPayload(
+                workplaceId = 1L,
+                availableAmount = 0L,
+                maxCap = 500_000L,
+                policyRate = 0.1,
+                repaymentTier = "C",
+                reflectedWorkDays = 5,
+                reflectedWorkMinutes = 2_400,
+                verifiedWorkMinutes = 2_400,
+                pendingWorkMinutes = 0,
+                needsReviewRecordCount = 0,
+                blockReasonCodes = listOf("ADVANCE_WINDOW_CLOSED_TODAY"),
+                nextTierRemainingMinutes = 2_400,
+                estimatedFee = 0L,
+                estimatedRepaymentDate = "2026-03-25",
+                disclaimer = "demo"
+            ),
+            requests = emptyList()
+        )
+
+        val state = DemoSeedFactory.create().toAdvanceContractState(remoteState)
+
+        assertEquals(AdvanceSurfaceState.BLOCKED, state.surfaceState)
+        assertEquals("오늘은 신청이 마감됐어요", state.stateTitleText)
+        assertTrue(state.blockReasonTexts.contains("오늘은 신청이 마감됐어요"))
         assertFalse(state.canRequest)
     }
 }

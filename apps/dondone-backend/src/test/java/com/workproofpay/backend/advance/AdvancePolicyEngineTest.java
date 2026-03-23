@@ -80,7 +80,7 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.availableAmount()).isZero();
-        assertThat(response.blockReasonCodes()).contains("PAYDAY_TOO_CLOSE");
+        assertThat(response.blockReasonCodes()).contains("ADVANCE_WINDOW_CLOSED_TODAY");
         assertThat(engine.isHardBlocked(response)).isTrue();
     }
 
@@ -96,7 +96,7 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.availableAmount()).isEqualTo(50_000L);
-        assertThat(response.blockReasonCodes()).doesNotContain("PAYDAY_TOO_CLOSE");
+        assertThat(response.blockReasonCodes()).doesNotContain("ADVANCE_WINDOW_CLOSED_TODAY");
         assertThat(engine.isHardBlocked(response)).isFalse();
     }
 

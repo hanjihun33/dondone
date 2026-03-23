@@ -112,6 +112,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     )
                 val blockReasonTexts = remoteEligibility.blockReasonCodes.map(::toReasonText)
                 val isBlocked = remoteEligibility.availableAmount <= 0
+                val isClosedToday = remoteEligibility.blockReasonCodes.contains("ADVANCE_WINDOW_CLOSED_TODAY")
                 return AdvanceContractState(
                     surfaceState = if (isBlocked) AdvanceSurfaceState.BLOCKED else AdvanceSurfaceState.SUCCESS,
                     sourceLabelText = if (remoteState.workplaceName != null) {
@@ -125,7 +126,11 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     blockReasonCodes = remoteEligibility.blockReasonCodes,
                     blockReasonTexts = blockReasonTexts,
                     disclaimerText = remoteEligibility.disclaimer,
-                    stateTitleText = if (isBlocked) "실제 계정 기준으로 지금은 신청이 잠겨 있어요" else "실제 계정 기준으로 신청 가능한 상태예요",
+                    stateTitleText = when {
+                        isBlocked && isClosedToday -> "오늘은 신청이 마감됐어요"
+                        isBlocked -> "실제 계정 기준으로 지금은 신청이 잠겨 있어요"
+                        else -> "실제 계정 기준으로 신청 가능한 상태예요"
+                    },
                     stateBodyText = when {
                         blockReasonTexts.isNotEmpty() -> blockReasonTexts.joinToString(" · ")
                         else -> "백엔드 응답 기준으로 현재 미리받기 한도를 불러왔어요."
@@ -219,6 +224,8 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
 
 private fun toReasonText(code: String): String = when (code) {
     "INSUFFICIENT_VERIFIED_WORK" -> "반영된 근무가 더 필요해요"
+    "EXISTING_OUTSTANDING_ADVANCE" -> "이미 진행 중인 미리받기가 있어요"
+    "ADVANCE_WINDOW_CLOSED_TODAY" -> "오늘은 신청이 마감됐어요"
     "PENDING_WORKPROOF_REVIEW" -> "확인 필요한 기록이 남아 있어요"
     else -> "추가 확인이 필요해요"
 }
