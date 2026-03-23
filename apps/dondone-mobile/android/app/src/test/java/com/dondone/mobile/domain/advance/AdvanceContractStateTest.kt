@@ -105,6 +105,34 @@ class AdvanceContractStateTest {
     }
 
     @Test
+    fun `remote outstanding advance stays blocked without review notice`() {
+        val remoteState = AdvanceRemoteState.content(
+            workplaceName = "실연동 · SSAFY",
+            eligibility = AdvanceEligibilityPayload(
+                workplaceId = 1L,
+                availableAmount = 0L,
+                repaymentTier = "C",
+                blockReasonCodes = listOf("EXISTING_OUTSTANDING_ADVANCE"),
+                noticeReasonCodes = emptyList(),
+                estimatedRepaymentDate = YearMonth.now().atDay(25).toString(),
+                disclaimer = "demo",
+                needsReviewRecordCount = 0
+            ),
+            requests = emptyList()
+        )
+
+        val state = DemoSeedFactory.create().toAdvanceContractState(remoteState)
+
+        assertEquals(AdvanceSurfaceState.BLOCKED, state.surfaceState)
+        assertEquals("지금은 미리받기를 신청할 수 없어요", state.stateTitleText)
+        assertEquals("이미 진행 중인 미리받기가 있어요", state.stateBodyText)
+        assertEquals("신청 조건 보기", state.actionText)
+        assertEquals(null, state.noticeTitleText)
+        assertEquals(null, state.noticeBodyText)
+        assertFalse(state.canRequest)
+    }
+
+    @Test
     fun `remote next cycle guidance shows next cycle copy`() {
         val nextCycleDate = YearMonth.now().plusMonths(1).atDay(25).toString()
         val remoteState = AdvanceRemoteState.content(

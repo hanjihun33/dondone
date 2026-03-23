@@ -83,6 +83,7 @@ class AdvancePolicyEngineTest {
 
         assertThat(response.availableAmount()).isZero();
         assertThat(response.blockReasonCodes()).contains("EXISTING_OUTSTANDING_ADVANCE");
+        assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isTrue();
     }
 
@@ -99,6 +100,7 @@ class AdvancePolicyEngineTest {
 
         assertThat(response.availableAmount()).isZero();
         assertThat(response.blockReasonCodes()).contains("ADVANCE_WINDOW_CLOSED_TODAY");
+        assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isTrue();
     }
 

@@ -252,7 +252,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.availableAmount").value(0))
-                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("EXISTING_OUTSTANDING_ADVANCE"));
+                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("EXISTING_OUTSTANDING_ADVANCE"))
+                .andExpect(jsonPath("$.data.noticeReasonCodes").isEmpty());
     }
 
     @Test
