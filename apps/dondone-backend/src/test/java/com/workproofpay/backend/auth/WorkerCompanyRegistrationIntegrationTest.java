@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -177,6 +178,33 @@ class WorkerCompanyRegistrationIntegrationTest {
                         .content(objectMapper.writeValueAsString(new RedeemWorkerRegistrationCodeRequest(code))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_WORKER_REGISTRATION_CODE"));
+    }
+
+    @Test
+    void lowercaseWorkerRegistrationCodeIsRejectedByValidation() throws Exception {
+        String adminToken = createAdminAndLogin();
+        CreatedCompanyFixture fixture = createCompanyAndEmployer(adminToken, "Delta Logistics", "DN-SEOUL-4104");
+        String employerToken = fixture.employerToken();
+        String workerToken = createWorkerAndLogin("worker4@dondone.test", "01077778888");
+
+        MvcResult issueResult = mockMvc.perform(post("/api/employer/worker-registration-codes")
+                        .header("Authorization", bearer(employerToken)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = objectMapper.readTree(issueResult.getResponse().getContentAsString())
+                .path("data")
+                .path("registrationCode")
+                .asText()
+                .toLowerCase(Locale.ROOT);
+
+        mockMvc.perform(post("/api/auth/me/worker-registration-code")
+                        .header("Authorization", bearer(workerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RedeemWorkerRegistrationCodeRequest(code))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.details[0].field").value("registrationCode"));
     }
 
     @Test
