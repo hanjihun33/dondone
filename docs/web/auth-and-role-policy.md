@@ -1,5 +1,20 @@
 # Auth And Role Policy
 
+## 2026-03-23 Worker Company Registration Update
+- worker app company registration now uses an employer-issued worker registration code instead of the legacy free-form company-code save flow.
+- flow:
+  - employer issues a worker registration code scoped to the employer default workplace
+  - worker app submits the code to `POST /api/auth/me/worker-registration-code`
+  - backend validates the code and creates or reuses an `EmploymentMembership`
+  - backend response returns `companyName/companyCode/workplaceName` for app display
+- current role split:
+  - admin: creates companies and issues employer signup codes
+  - employer: issues worker registration codes
+  - worker: redeems worker registration codes from the app
+- compatibility note:
+  - `PUT /api/auth/me/company-code` still exists as a legacy profile update endpoint
+  - it is no longer the source-of-truth flow for worker company registration
+
 ## 2026-03-20 Admin Employer Onboarding MVP
 - admin web now uses the shared `/api/auth/login` flow with an `ADMIN` account and a bearer token-backed session.
 - service admin onboarding flow:
