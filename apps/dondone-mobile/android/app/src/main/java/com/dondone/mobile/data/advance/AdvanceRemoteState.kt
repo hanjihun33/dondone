@@ -5,6 +5,7 @@ data class AdvanceEligibilityPayload(
     val availableAmount: Long,
     val repaymentTier: String,
     val blockReasonCodes: List<String>,
+    val noticeReasonCodes: List<String>,
     val estimatedRepaymentDate: String,
     val disclaimer: String,
     val needsReviewRecordCount: Int

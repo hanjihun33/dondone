@@ -53,6 +53,7 @@ public class AdvancePolicyEngine {
         long paydayCap = isRepaymentDate ? 0L : daysUntilRepayment <= 7 ? REDUCED_PAYDAY_CAP : DEMO_MAX_CAP;
 
         List<String> blockReasonCodes = new ArrayList<>();
+        List<String> noticeReasonCodes = new ArrayList<>();
         boolean hardBlocked = false;
         if (reflectedWorkDays == 0 || verifiedMinutes == 0) {
             blockReasonCodes.add(AdvanceBlockReasonCode.INSUFFICIENT_VERIFIED_WORK.name());
@@ -67,7 +68,7 @@ public class AdvancePolicyEngine {
             hardBlocked = true;
         }
         if (needsReviewRecordCount > 0 || pendingMinutes > 0) {
-            blockReasonCodes.add(AdvanceBlockReasonCode.PENDING_WORKPROOF_REVIEW.name());
+            noticeReasonCodes.add(AdvanceBlockReasonCode.PENDING_WORKPROOF_REVIEW.name());
         }
 
         long availableAmount = hardBlocked
@@ -91,6 +92,7 @@ public class AdvancePolicyEngine {
                 pendingMinutes,
                 needsReviewRecordCount,
                 List.copyOf(blockReasonCodes),
+                List.copyOf(noticeReasonCodes),
                 nextTierRemainingMinutes,
                 availableAmount > 0 ? FLAT_FEE_AMOUNT : 0L,
                 repaymentDate(today, targetMonth),

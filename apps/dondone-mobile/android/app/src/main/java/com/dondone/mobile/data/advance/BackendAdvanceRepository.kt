@@ -182,11 +182,20 @@ class BackendAdvanceRepository(
                     add(blockReasonsJson.getString(index))
                 }
             }
+            val noticeReasons = buildList {
+                val noticeReasonsJson = data.optJSONArray("noticeReasonCodes")
+                if (noticeReasonsJson != null) {
+                    for (index in 0 until noticeReasonsJson.length()) {
+                        add(noticeReasonsJson.getString(index))
+                    }
+                }
+            }
             return AdvanceEligibilityPayload(
                 workplaceId = data.getLong("workplaceId"),
                 availableAmount = data.getLong("availableAmount"),
                 repaymentTier = data.getString("repaymentTier"),
                 blockReasonCodes = blockReasons,
+                noticeReasonCodes = noticeReasons,
                 estimatedRepaymentDate = data.getString("estimatedRepaymentDate"),
                 disclaimer = data.getString("disclaimer"),
                 needsReviewRecordCount = data.getInt("needsReviewRecordCount")

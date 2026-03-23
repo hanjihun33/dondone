@@ -88,7 +88,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
                 .andExpect(jsonPath("$.data.availableAmount").value(150000))
                 .andExpect(jsonPath("$.data.repaymentTier").value("B"))
-                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
+                .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty())
+                .andExpect(jsonPath("$.data.noticeReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
                 .andExpect(jsonPath("$.data.needsReviewRecordCount").value(1))
                 .andExpect(jsonPath("$.data.estimatedRepaymentDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
 

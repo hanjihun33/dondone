@@ -113,9 +113,10 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                         availableAmountOverride = 0L
                     )
                 val blockReasonTexts = remoteEligibility.blockReasonCodes.map(::toReasonText)
+                val noticeReasonTexts = remoteEligibility.noticeReasonCodes.map(::toReasonText)
                 val isBlocked = remoteEligibility.availableAmount <= 0
                 val isClosedToday = remoteEligibility.blockReasonCodes.contains("ADVANCE_WINDOW_CLOSED_TODAY")
-                val hasPendingReview = remoteEligibility.blockReasonCodes.contains("PENDING_WORKPROOF_REVIEW")
+                val hasPendingReview = remoteEligibility.noticeReasonCodes.contains("PENDING_WORKPROOF_REVIEW")
                 val isNextCycle = isNextRepaymentCycle(remoteEligibility.estimatedRepaymentDate)
                 val stateTitleText = when {
                     isBlocked && isClosedToday -> "오늘은 신청이 마감됐어요"
@@ -129,10 +130,12 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                         "오늘 회차는 마감됐어요. 내일부터 다음 달 급여 회차 기준으로 확인할 수 있어요."
                     isBlocked && isClosedToday ->
                         "오늘은 신청이 마감됐어요. 다음 회차는 마감 이후 기준으로 확인해 주세요."
-                    isBlocked && hasPendingReview && blockReasonTexts.size == 1 ->
+                    isBlocked && hasPendingReview && blockReasonTexts.isEmpty() && noticeReasonTexts.isNotEmpty() ->
                         "확인 필요한 기록이 정리되면 바로 신청 가능 금액을 다시 확인할 수 있어요."
                     blockReasonTexts.isNotEmpty() ->
                         blockReasonTexts.joinToString(" · ")
+                    noticeReasonTexts.isNotEmpty() ->
+                        noticeReasonTexts.joinToString(" · ")
                     isNextCycle ->
                         "다음 달 급여 회차 기준으로 신청 가능 금액을 불러왔어요."
                     else ->

@@ -49,6 +49,24 @@ class AdvancePolicyEngineTest {
         assertThat(response.repaymentTier()).isEqualTo("B");
         assertThat(response.availableAmount()).isEqualTo(150_000L);
         assertThat(response.blockReasonCodes()).isEmpty();
+        assertThat(response.noticeReasonCodes()).isEmpty();
+        assertThat(engine.isHardBlocked(response)).isFalse();
+    }
+
+    @Test
+    void exposesPendingReviewAsNoticeInsteadOfBlockReason() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 120, 1),
+                false,
+                LocalDate.of(2026, 3, 16),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.availableAmount()).isEqualTo(150_000L);
+        assertThat(response.blockReasonCodes()).isEmpty();
+        assertThat(response.noticeReasonCodes()).contains("PENDING_WORKPROOF_REVIEW");
         assertThat(engine.isHardBlocked(response)).isFalse();
     }
 

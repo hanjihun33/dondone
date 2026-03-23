@@ -16,6 +16,7 @@ public record AdvanceEligibilityResponse(
         Long pendingMinutes,
         Integer needsReviewRecordCount,
         List<String> blockReasonCodes,
+        List<String> noticeReasonCodes,
         Long nextTierRemainingMinutes,
         Long estimatedFee,
         LocalDate estimatedRepaymentDate,

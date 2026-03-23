@@ -16,7 +16,7 @@ class AdvanceContractStateTest {
         val state = DemoSeedFactory.create().toAdvanceContractState()
 
         assertEquals(AdvanceSurfaceState.SUCCESS, state.surfaceState)
-        assertTrue(state.blockReasonCodes.contains("PENDING_WORKPROOF_REVIEW"))
+        assertTrue(state.blockReasonCodes.isEmpty())
         assertTrue(state.canRequest)
         assertTrue(state.disclaimerText.contains("데모 시뮬레이션"))
     }
@@ -87,6 +87,7 @@ class AdvanceContractStateTest {
                 availableAmount = 0L,
                 repaymentTier = "C",
                 blockReasonCodes = listOf("ADVANCE_WINDOW_CLOSED_TODAY"),
+                noticeReasonCodes = emptyList(),
                 estimatedRepaymentDate = "2026-03-25",
                 disclaimer = "demo",
                 needsReviewRecordCount = 0
@@ -113,6 +114,7 @@ class AdvanceContractStateTest {
                 availableAmount = 50_000L,
                 repaymentTier = "C",
                 blockReasonCodes = emptyList(),
+                noticeReasonCodes = emptyList(),
                 estimatedRepaymentDate = nextCycleDate,
                 disclaimer = "demo",
                 needsReviewRecordCount = 0
@@ -137,7 +139,8 @@ class AdvanceContractStateTest {
                 workplaceId = 1L,
                 availableAmount = 0L,
                 repaymentTier = "C",
-                blockReasonCodes = listOf("PENDING_WORKPROOF_REVIEW"),
+                blockReasonCodes = emptyList(),
+                noticeReasonCodes = listOf("PENDING_WORKPROOF_REVIEW"),
                 estimatedRepaymentDate = YearMonth.now().atDay(25).toString(),
                 disclaimer = "demo",
                 needsReviewRecordCount = 1
