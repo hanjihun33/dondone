@@ -175,7 +175,7 @@ class WorkerCompanyRegistrationIntegrationTest {
                         .header("Authorization", bearer(workerToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new RedeemWorkerRegistrationCodeRequest(code))))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_WORKER_REGISTRATION_CODE"));
     }
 
