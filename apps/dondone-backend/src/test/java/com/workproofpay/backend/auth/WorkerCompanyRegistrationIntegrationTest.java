@@ -140,9 +140,6 @@ class WorkerCompanyRegistrationIntegrationTest {
         assertThat(memberships).hasSize(1);
         assertThat(memberships.get(0).getCompanyId()).isEqualTo(fixture.companyId());
         assertThat(memberships.get(0).getWorkplaceId()).isEqualTo(fixture.workplaceId());
-        assertThat(userRepository.findByEmailIgnoreCase("worker1@dondone.test").orElseThrow().getCompanyCode())
-                .isEqualTo("DN-SEOUL-4101");
-
         mockMvc.perform(post("/api/auth/me/worker-registration-code")
                         .header("Authorization", bearer(workerToken))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -209,6 +206,25 @@ class WorkerCompanyRegistrationIntegrationTest {
                         .content(objectMapper.writeValueAsString(new RedeemWorkerRegistrationCodeRequest(code))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void adminRejectsInvalidCompanyCodeBeforeWorkerRedeemFlow() throws Exception {
+        String adminToken = createAdminAndLogin();
+
+        AdminCreateEmployerCompanyRequest createRequest = new AdminCreateEmployerCompanyRequest(
+                "Invalid Logistics",
+                "돈던 서울"
+        );
+
+        mockMvc.perform(post("/api/admin/employers/companies")
+                        .header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.details[0].field").value("companyCode"))
+                .andExpect(jsonPath("$.details[0].message").value("companyCode format is invalid"));
     }
 
     private String createAdminAndLogin() throws Exception {

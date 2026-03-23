@@ -79,8 +79,6 @@ public class WorkerCompanyRegistrationService {
                         today
                 )));
 
-        user.updateCompanyCode(company.getCompanyCode());
-
         return new WorkerCompanyRegistrationResponse(
                 company.getId(),
                 company.getName(),

@@ -19,6 +19,7 @@ import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
 import com.workproofpay.backend.employerauth.service.EmployerSignupCodeCryptoService;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
+import com.workproofpay.backend.shared.util.CompanyCodeUtils;
 import com.workproofpay.backend.workproof.model.Workplace;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -236,7 +236,7 @@ public class AdminEmployerCompanyService {
     }
 
     private String normalizeCompanyCode(String companyCode) {
-        return companyCode.trim().toUpperCase(Locale.ROOT);
+        return CompanyCodeUtils.normalizeOrThrow(companyCode);
     }
 
     private String normalizeOptional(String value) {

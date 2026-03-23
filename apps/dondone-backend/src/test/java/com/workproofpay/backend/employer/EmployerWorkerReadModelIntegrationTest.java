@@ -177,10 +177,10 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.latestRecord.clockOutOutsideAllowedRadius").value(true))
                 .andExpect(jsonPath("$.data.latestRecord.edited").value(false))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceName").value("Seoul Hub"))
-                .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("?쒖슱?밸퀎??媛뺣궓援??뚰뿤?濡?212"))
+                .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("212 Teheran-ro, Gangnam-gu, Seoul"))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceMapLabel").doesNotExist())
-                .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("?뺣Ц"))
-                .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("?꾨文"))
+                .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("?類ｆ뻼"))
+                .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("?袁ⓩ뻼"))
                 .andExpect(jsonPath("$.data.recentDays.length()").value(7))
                 .andExpect(jsonPath("$.data.recentDays[6].date").value(fixture.today().toString()))
                 .andExpect(jsonPath("$.data.recentDays[6].attendanceStatus").value("NEEDS_REVIEW"))
@@ -256,7 +256,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 workplaceOwner,
                 company.getId(),
                 "Seoul Hub",
-                "?쒖슱?밸퀎??媛뺣궓援??뚰뿤?濡?212",
+                "212 Teheran-ro, Gangnam-gu, Seoul",
                 null,
                 37.501274,
                 127.039585,
@@ -266,7 +266,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 workplaceOwner,
                 otherCompany.getId(),
                 "Busan Hub",
-                "遺?곌킅??떆 ?댁슫?援??쇳?以묒븰濡?48",
+                "48 Suyeong-ro, Nam-gu, Busan",
                 null,
                 35.171,
                 129.131,
@@ -311,7 +311,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 LocalDateTime.now(),
                 37.501274,
                 127.039585,
-                "?뺣文"
+                "?類ｆ뻼"
         ));
 
         workProofRepository.save(completedRecord(
@@ -387,14 +387,14 @@ class EmployerWorkerReadModelIntegrationTest {
                 LocalDateTime.now(),
                 37.501274,
                 127.039585,
-                "?뺣文"
+                "?類ｆ뻼"
         );
         record.completeCheckOut(
                 workDate.atTime(checkOutHour, checkOutMinute),
                 LocalDateTime.now(),
                 outsideAllowedRadius ? 37.506000 : 37.501274,
                 outsideAllowedRadius ? 127.050000 : 127.039585,
-                outsideAllowedRadius ? "?꾨文" : "?뺣文",
+                outsideAllowedRadius ? "?袁ⓩ뻼" : "?類ｆ뻼",
                 outsideAllowedRadius
         );
         return record;
@@ -455,3 +455,4 @@ class EmployerWorkerReadModelIntegrationTest {
         }
     }
 }
+
