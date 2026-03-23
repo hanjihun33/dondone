@@ -355,14 +355,18 @@ private fun JSONObject.toCreateTransferPayload(): RemittanceCreateTransferPayloa
 private fun JSONObject.toTransferDetailPayload(): RemittanceTransferDetailPayload =
     RemittanceTransferDetailPayload(
         transferId = getString("transferId"),
+        direction = getString("direction"),
         status = getString("status"),
         assetSymbol = getString("assetSymbol"),
         amountAtomic = getLong("amountAtomic"),
         senderAddress = getString("senderAddress"),
+        senderName = optNullableString("senderName"),
         recipientId = getString("recipientId"),
         recipientAlias = optNullableString("recipientAlias"),
         recipientAddress = getString("recipientAddress"),
         txHash = optNullableString("txHash"),
+        networkFeeWei = optNullableString("networkFeeWei"),
+        networkFeeAssetSymbol = optNullableString("networkFeeAssetSymbol"),
         failureCode = optNullableString("failureCode"),
         createdAt = optDateTime("createdAt"),
         updatedAt = optDateTime("updatedAt")
@@ -403,13 +407,18 @@ private fun JSONArray?.toTransferSummaryPayloads(): List<RemittanceTransferSumma
             add(
                 RemittanceTransferSummaryPayload(
                     transferId = item.getString("transferId"),
+                    direction = item.getString("direction"),
                     status = item.getString("status"),
                     assetSymbol = item.getString("assetSymbol"),
                     amountAtomic = item.getLong("amountAtomic"),
+                    senderAddress = item.getString("senderAddress"),
+                    senderName = item.optNullableString("senderName"),
                     recipientId = item.getString("recipientId"),
                     recipientAlias = item.optNullableString("recipientAlias"),
                     recipientAddress = item.getString("recipientAddress"),
                     txHash = item.optNullableString("txHash"),
+                    networkFeeWei = item.optNullableString("networkFeeWei"),
+                    networkFeeAssetSymbol = item.optNullableString("networkFeeAssetSymbol"),
                     updatedAt = item.optDateTime("updatedAt")
                 )
             )

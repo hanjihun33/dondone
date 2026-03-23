@@ -20,6 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @ConditionalOnProperty(name = "remittance.chain.mode", havingValue = "demo")
 public class DemoRemittanceBlockchainGateway implements RemittanceBlockchainGateway {
 
+    private static final BigInteger DEMO_NETWORK_FEE_WEI = BigInteger.valueOf(21_000L)
+            .multiply(BigInteger.valueOf(1_000_000_000L));
+
     private final RemittanceProperties properties;
     private final RemittanceMetrics remittanceMetrics;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -122,7 +125,7 @@ public class DemoRemittanceBlockchainGateway implements RemittanceBlockchainGate
                     throw new IllegalStateException("insufficient demo balance");
                 }
                 tokenBalances.put(state.senderAddress(), senderToken.subtract(state.amountAtomic()));
-                nativeBalances.put(state.senderAddress(), senderNative.subtract(BigInteger.ONE));
+                nativeBalances.put(state.senderAddress(), senderNative.subtract(DEMO_NETWORK_FEE_WEI));
                 tokenBalances.merge(state.recipientAddress(), state.amountAtomic(), BigInteger::add);
             }
 
@@ -162,10 +165,10 @@ public class DemoRemittanceBlockchainGateway implements RemittanceBlockchainGate
             }
             if (state.fail()) {
                 outcome = "failed";
-                return Optional.of(new ChainReceiptResult(false, TransferFailureCode.NETWORK_ERROR));
+                return Optional.of(new ChainReceiptResult(false, TransferFailureCode.NETWORK_ERROR, DEMO_NETWORK_FEE_WEI.toString()));
             }
             outcome = "success";
-            return Optional.of(new ChainReceiptResult(true, null));
+            return Optional.of(new ChainReceiptResult(true, null, DEMO_NETWORK_FEE_WEI.toString()));
         } finally {
             remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "get_receipt", outcome);
         }

@@ -4,6 +4,7 @@ import com.workproofpay.backend.remittance.model.TransferFailureCode;
 
 public record ChainReceiptResult(
         boolean success,
-        TransferFailureCode failureCode
+        TransferFailureCode failureCode,
+        String networkFeeWei
 ) {
 }

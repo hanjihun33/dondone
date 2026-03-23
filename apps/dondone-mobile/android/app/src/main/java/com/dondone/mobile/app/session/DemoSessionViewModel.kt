@@ -1,6 +1,7 @@
 package com.dondone.mobile.app.session
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -41,6 +42,7 @@ import com.dondone.mobile.data.workproof.WorkproofUnauthorizedException
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.TodayWork
+import com.dondone.mobile.domain.model.TransactionCategory
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
@@ -52,6 +54,7 @@ import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiSt
 import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.remittanceRelationCodeToLabel
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,7 +68,7 @@ import java.time.format.DateTimeFormatter
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 private const val REMITTANCE_STATUS_POLL_DELAY_MS = 1500L
-private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 12
+private const val REMITTANCE_STATUS_POLL_ATTEMPTS = 120
 private const val REMITTANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 송금 실연동 데이터를 불러옵니다."
 private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 실연동 데이터를 불러옵니다."
 private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
@@ -75,6 +78,7 @@ private const val DOCUMENT_STATUS_READY = "READY"
 private const val DOCUMENT_STATUS_NOT_CREATED = "NOT_CREATED"
 private const val DOCUMENT_ID_PROOF = "PROOF"
 private const val DOCUMENT_ID_CLAIM = "CLAIM"
+private const val DEMO_SESSION_VIEW_MODEL_TAG = "DemoSessionViewModel"
 
 class DemoSessionViewModel(
     private val appContext: Context,
@@ -121,6 +125,9 @@ class DemoSessionViewModel(
     val wageActionUiState: StateFlow<WageActionUiState> = _wageActionUiState.asStateFlow()
     private val _remittanceActionUiState = MutableStateFlow(RemittanceActionUiState())
     val remittanceActionUiState: StateFlow<RemittanceActionUiState> = _remittanceActionUiState.asStateFlow()
+    private val _transactionMetadataOverrides = MutableStateFlow<Map<String, TransactionMetadataOverride>>(emptyMap())
+    val transactionMetadataOverrides: StateFlow<Map<String, TransactionMetadataOverride>> =
+        _transactionMetadataOverrides.asStateFlow()
     private val _selectedAdvanceAmount = MutableStateFlow<Int?>(null)
     val selectedAdvanceAmount: StateFlow<Int?> = _selectedAdvanceAmount.asStateFlow()
     private val _menuLaunchRequest = MutableStateFlow<MenuLaunchRequest?>(null)
@@ -150,10 +157,6 @@ class DemoSessionViewModel(
     }
 
     fun openTransferFlow() {
-        if (_uiState.value.remittance.status == TransferStatus.SUBMITTED) {
-            return
-        }
-
         cancelTransferCompletion()
         _uiState.update { state -> DemoSessionReducer.openTransferFlow(state) }
         val session = _authUiState.value.session ?: return
@@ -206,6 +209,16 @@ class DemoSessionViewModel(
 
     fun updateTransferAmount(nextAmount: Int) {
         _uiState.update { state -> DemoSessionReducer.updateTransferAmount(state, nextAmount) }
+    }
+
+    fun updateTransactionMetadata(
+        transactionId: String,
+        category: TransactionCategory,
+        memo: String
+    ) {
+        _transactionMetadataOverrides.update { current ->
+            current + (transactionId to TransactionMetadataOverride(category = category, memo = memo.trim()))
+        }
     }
 
     fun createRemittanceRecipient(
@@ -1012,6 +1025,7 @@ class DemoSessionViewModel(
     fun logout() {
         cancelTransferCompletion()
         cancelRemittanceStatusPolling()
+        _transactionMetadataOverrides.value = emptyMap()
         viewModelScope.launch {
             clearAuthenticatedState(AuthUiState.unauthenticated())
         }
@@ -1277,6 +1291,7 @@ class DemoSessionViewModel(
             return
         }
         applyRemittanceRemoteState(remoteState)
+        syncRemittanceStatusPolling(session, remoteState)
     }
 
     private suspend fun applyWorkproofRemoteState(remoteState: WorkproofRemoteState) {
@@ -1322,7 +1337,12 @@ class DemoSessionViewModel(
                     )
                 )
                 return
-            } catch (_: Exception) {
+            } catch (error: IOException) {
+                Log.w(
+                    DEMO_SESSION_VIEW_MODEL_TAG,
+                    "Failed to refresh wage verification detail. Keeping previous payload.",
+                    error
+                )
                 remoteState.payload.latestVerification
             }
         } else {
@@ -1604,10 +1624,16 @@ class DemoSessionViewModel(
                 } catch (error: RemittanceUnauthorizedException) {
                     expireSession(error.message)
                     return@launch
-                } catch (_: Exception) {
-                    return@launch
+                } catch (error: IOException) {
+                    Log.w(
+                        DEMO_SESSION_VIEW_MODEL_TAG,
+                        "Failed to poll remittance transfer detail for $transferId.",
+                        error
+                    )
+                    return@repeat
                 }
             }
+            refreshRemittanceRemoteStateSilently(session)
         }
     }
 
@@ -1616,25 +1642,44 @@ class DemoSessionViewModel(
         remittanceStatusPollingJob = null
     }
 
+    private fun syncRemittanceStatusPolling(session: AuthSession, remoteState: RemittanceRemoteState) {
+        val activeTransfer = remoteState.payload?.activeTransfer
+        if (activeTransfer != null && !activeTransfer.isTerminalStatus()) {
+            startRemittanceStatusPolling(session, activeTransfer.transferId)
+            return
+        }
+        cancelRemittanceStatusPolling()
+    }
+
     private fun mergeRemoteTransferDetail(detail: RemittanceTransferDetailPayload) {
         _remittanceRemoteState.update { current ->
             val payload = current.payload ?: return@update current
             val updatedTransfers = buildList {
                 add(
                     payload.transfers.firstOrNull { it.transferId == detail.transferId }?.copy(
+                        direction = detail.direction,
                         status = detail.status,
                         amountAtomic = detail.amountAtomic,
+                        senderAddress = detail.senderAddress,
+                        senderName = detail.senderName,
                         txHash = detail.txHash,
+                        networkFeeWei = detail.networkFeeWei,
+                        networkFeeAssetSymbol = detail.networkFeeAssetSymbol,
                         updatedAt = detail.updatedAt
                     ) ?: com.dondone.mobile.data.remittance.RemittanceTransferSummaryPayload(
                         transferId = detail.transferId,
+                        direction = detail.direction,
                         status = detail.status,
                         assetSymbol = detail.assetSymbol,
                         amountAtomic = detail.amountAtomic,
+                        senderAddress = detail.senderAddress,
+                        senderName = detail.senderName,
                         recipientId = detail.recipientId,
                         recipientAlias = detail.recipientAlias,
                         recipientAddress = detail.recipientAddress,
                         txHash = detail.txHash,
+                        networkFeeWei = detail.networkFeeWei,
+                        networkFeeAssetSymbol = detail.networkFeeAssetSymbol,
                         updatedAt = detail.updatedAt
                     )
                 )
