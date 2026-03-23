@@ -575,36 +575,22 @@ private fun TransferRecipientEmptyState(
             .fillMaxWidth()
             .background(TransferMutedCardBackground, RoundedCornerShape(20.dp))
             .border(1.dp, TransferMutedCardBorder, RoundedCornerShape(20.dp))
-            .padding(horizontal = 16.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = 18.dp, vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "검색 결과가 없습니다",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-            color = DawnText
+            color = DawnText,
+            textAlign = TextAlign.Center
         )
         Text(
             text = description,
             style = MaterialTheme.typography.bodySmall,
-            color = DawnTextSubtle
+            color = DawnTextSubtle,
+            textAlign = TextAlign.Center
         )
-        if (actionText != null && onAction != null) {
-            Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = onAction,
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, TransferRecipientSelectedBorder),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White,
-                    contentColor = DawnPrimary
-                )
-            ) {
-                Text(
-                    text = actionText,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
-                )
-            }
-        }
     }
 }
 

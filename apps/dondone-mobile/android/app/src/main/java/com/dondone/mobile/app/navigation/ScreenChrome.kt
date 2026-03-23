@@ -33,7 +33,9 @@ fun resolveScreenChrome(
             headerTitle = resolveChildHeaderTitle(route, transferStep, transferStatus),
             showRootTabs = false,
             showSettingsAction = false,
-            showDate = route != Route.TRANSFER && route != Route.ACCOUNT
+            showDate = route != Route.TRANSFER &&
+                route != Route.ACCOUNT &&
+                !isTransactionHistoryRoute(route)
         )
     }
 }
@@ -63,7 +65,7 @@ private fun resolveTransferHeaderTitle(
     }
 
     return when (transferStep) {
-        TransferFlowStep.ACCOUNT -> "계좌 선택"
+        TransferFlowStep.ACCOUNT -> "Select Account"
         TransferFlowStep.RECIPIENT -> null
         TransferFlowStep.AMOUNT -> null
     }

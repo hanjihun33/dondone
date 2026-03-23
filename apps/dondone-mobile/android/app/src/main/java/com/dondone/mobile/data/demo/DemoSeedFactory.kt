@@ -8,14 +8,18 @@ import com.dondone.mobile.domain.model.DocumentItem
 import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.RemittanceData
 import com.dondone.mobile.domain.model.TodayWork
-import com.dondone.mobile.domain.model.TransferFlowStep
+import com.dondone.mobile.domain.model.TransactionCategory
+import com.dondone.mobile.domain.model.TransactionDirection
+import com.dondone.mobile.domain.model.TransactionRecord
 import com.dondone.mobile.domain.model.TransferDestinationMode
+import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.VaultData
 import com.dondone.mobile.domain.model.WageData
 import com.dondone.mobile.domain.model.WorkAudit
 import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.WorkproofData
+import java.time.LocalDateTime
 
 object DemoSeedFactory {
     fun create(): DemoState {
@@ -23,7 +27,7 @@ object DemoSeedFactory {
             demo = DemoInfo(year = 2026, month = 3, monthLength = 31, asOfDay = 28),
             workproof = WorkproofData(
                 workplaceName = "Green Farm",
-                workplaceAddress = "경북 구미시",
+                workplaceAddress = "경상북도 구미시 농장로 18",
                 workplaceLatitude = 36.1195,
                 workplaceLongitude = 128.3446,
                 currentLatitude = 36.1211,
@@ -39,7 +43,7 @@ object DemoSeedFactory {
                         id = "WP-0318-01",
                         before = "08:57-18:10",
                         after = "09:10-18:10",
-                        reason = "출근/퇴근 탭을 늦게 눌렀어요",
+                        reason = "출근 기록 수정을 위해 증빙을 첨부했습니다.",
                         attachments = 1,
                         at = "2026-03-18 20:11"
                     )
@@ -60,13 +64,125 @@ object DemoSeedFactory {
             ),
             remittance = RemittanceData(
                 accounts = listOf(
-                    Account("A-001", "주 계좌", "****-3124", 1_740_000),
-                    Account("A-002", "생활비 계좌", "****-8271", 620_000)
+                    Account("A-001", "생활비 계좌", "****-3124", 1_740_000),
+                    Account("A-002", "예비 지갑", "****-8271", 620_000)
                 ),
                 selectedAccountId = "A-001",
                 recipients = listOf(
                     Recipient("R-001", "Minh Family", "가족", "0x2Aa3...17F9"),
                     Recipient("R-002", "Anh Brother", "형제", "0x5bC1...92De")
+                ),
+                transactions = listOf(
+                    TransactionRecord(
+                        id = "TX-A001-0321-1",
+                        walletId = "A-001",
+                        occurredAt = LocalDateTime.of(2026, 3, 21, 9, 12),
+                        amount = 1_740_000,
+                        direction = TransactionDirection.INCOME,
+                        counterpartyName = "DonDone Payroll",
+                        category = TransactionCategory.SALARY,
+                        memo = "3월 급여 입금",
+                        methodLabel = "급여 이체"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A001-0321-2",
+                        walletId = "A-001",
+                        occurredAt = LocalDateTime.of(2026, 3, 21, 12, 28),
+                        amount = 8_500,
+                        direction = TransactionDirection.EXPENSE,
+                        counterpartyName = "샐러드랩",
+                        category = TransactionCategory.FOOD,
+                        memo = "점심",
+                        methodLabel = "계좌 이체"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A001-0320-1",
+                        walletId = "A-001",
+                        occurredAt = LocalDateTime.of(2026, 3, 20, 18, 42),
+                        amount = 4_800,
+                        direction = TransactionDirection.EXPENSE,
+                        counterpartyName = "카페온",
+                        category = TransactionCategory.CAFE,
+                        memo = "퇴근 후 커피",
+                        methodLabel = "카드 결제"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A001-0319-1",
+                        walletId = "A-001",
+                        occurredAt = LocalDateTime.of(2026, 3, 19, 21, 8),
+                        amount = 75_000,
+                        direction = TransactionDirection.INCOME,
+                        counterpartyName = "엄마",
+                        category = TransactionCategory.TRANSFER,
+                        memo = "생활비 보조",
+                        methodLabel = "계좌 이체"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A001-0318-1",
+                        walletId = "A-001",
+                        occurredAt = LocalDateTime.of(2026, 3, 18, 20, 10),
+                        amount = 32_000,
+                        direction = TransactionDirection.EXPENSE,
+                        counterpartyName = "한길마트",
+                        category = TransactionCategory.LIVING,
+                        memo = "생필품",
+                        methodLabel = "카드 결제"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A001-0308-1",
+                        walletId = "A-001",
+                        occurredAt = LocalDateTime.of(2026, 3, 8, 11, 3),
+                        amount = 55_000,
+                        direction = TransactionDirection.EXPENSE,
+                        counterpartyName = "모아스토어",
+                        category = TransactionCategory.SHOPPING,
+                        memo = "작업복 추가 구매",
+                        methodLabel = "간편 결제"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A001-0228-1",
+                        walletId = "A-001",
+                        occurredAt = LocalDateTime.of(2026, 2, 28, 15, 44),
+                        amount = 28_000,
+                        direction = TransactionDirection.EXPENSE,
+                        counterpartyName = "한빛교통",
+                        category = TransactionCategory.TRANSPORT,
+                        memo = "주간 교통비",
+                        methodLabel = "교통 충전"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A002-0322-1",
+                        walletId = "A-002",
+                        occurredAt = LocalDateTime.of(2026, 3, 22, 8, 5),
+                        amount = 120_000,
+                        direction = TransactionDirection.INCOME,
+                        counterpartyName = "엄마",
+                        category = TransactionCategory.TRANSFER,
+                        memo = "생활비",
+                        methodLabel = "계좌 이체"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A002-0320-1",
+                        walletId = "A-002",
+                        occurredAt = LocalDateTime.of(2026, 3, 20, 7, 32),
+                        amount = 3_200,
+                        direction = TransactionDirection.EXPENSE,
+                        counterpartyName = "동네버스",
+                        category = TransactionCategory.TRANSPORT,
+                        memo = "출근",
+                        methodLabel = "교통 결제"
+                    ),
+                    TransactionRecord(
+                        id = "TX-A002-0319-1",
+                        walletId = "A-002",
+                        occurredAt = LocalDateTime.of(2026, 3, 19, 19, 5),
+                        amount = 18_900,
+                        direction = TransactionDirection.EXPENSE,
+                        counterpartyName = "편의점",
+                        category = TransactionCategory.FOOD,
+                        memo = "간식",
+                        methodLabel = "카드 결제"
+                    )
                 ),
                 selectedRecipientId = "R-001",
                 draftAmountUsd = 360,
@@ -96,8 +212,8 @@ object DemoSeedFactory {
                 monthlyFeeRevenue = 285_000
             ),
             documents = listOf(
-                DocumentItem("DOC-PROOF-2026-03", "근무 기록 문서", "READY", "2026-03-28 14:21"),
-                DocumentItem("DOC-CLAIM-2026-03", "근거 자료 묶음", "NOT_CREATED", null),
+                DocumentItem("DOC-PROOF-2026-03", "근로 증빙 묶음", "READY", "2026-03-28 14:21"),
+                DocumentItem("DOC-CLAIM-2026-03", "체불 대응 서류", "NOT_CREATED", null),
                 DocumentItem("DOC-RECEIPT-0007", "송금 영수증", "READY", "2026-03-19 09:12")
             )
         )

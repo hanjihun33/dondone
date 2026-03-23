@@ -109,7 +109,11 @@ public class TransferService {
     @Transactional(readOnly = true)
     public TransferListResponse getTransfers(Long userId, Integer requestedLimit) {
         int limit = requestedLimit == null ? properties.getPolicy().getDefaultListLimit() : Math.min(requestedLimit, 100);
-        var transfers = transferRepository.findByUserIdOrderByCreatedAtDescTransferIdDesc(userId, PageRequest.of(0, limit));
+        var transfers = transferRepository.findByUserIdOrRecipientTargetUserIdSnapshotOrderByCreatedAtDescTransferIdDesc(
+                userId,
+                userId,
+                PageRequest.of(0, limit)
+        );
         if (transfers.isEmpty()) {
             return new TransferListResponse(java.util.List.of());
         }
@@ -117,13 +121,18 @@ public class TransferService {
                 transfers.stream()
                         .map(transfer -> new TransferListItemResponse(
                                 transfer.getTransferId(),
+                                resolveDirection(transfer, userId),
                                 transfer.getStatus().name(),
                                 transfer.getAssetSymbol(),
                                 transfer.getAmountAtomic(),
+                                transfer.getSenderAddress(),
+                                transfer.getUser().getName(),
                                 transfer.getRecipientId(),
                                 transfer.getRecipientAliasSnapshot(),
                                 transfer.getRecipientAddress(),
                                 transfer.getTxHash(),
+                                transfer.getNetworkFeeWei(),
+                                getNetworkFeeAssetSymbol(),
                                 transfer.getUpdatedAt()
                         ))
                         .toList()
@@ -132,23 +141,35 @@ public class TransferService {
 
     @Transactional(readOnly = true)
     public TransferDetailResponse getTransfer(Long userId, String transferId) {
-        Transfer transfer = transferRepository.findByTransferIdAndUserId(transferId, userId)
+        Transfer transfer = transferRepository.findAccessibleTransferByTransferId(transferId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.TRANSFER_NOT_FOUND));
 
         return new TransferDetailResponse(
                 transfer.getTransferId(),
+                resolveDirection(transfer, userId),
                 transfer.getStatus().name(),
                 transfer.getAssetSymbol(),
                 transfer.getAmountAtomic(),
                 transfer.getSenderAddress(),
+                transfer.getUser().getName(),
                 transfer.getRecipientId(),
                 transfer.getRecipientAliasSnapshot(),
                 transfer.getRecipientAddress(),
                 transfer.getTxHash(),
+                transfer.getNetworkFeeWei(),
+                getNetworkFeeAssetSymbol(),
                 transfer.getFailureCode() == null ? null : transfer.getFailureCode().name(),
                 transfer.getCreatedAt(),
                 transfer.getUpdatedAt()
         );
+    }
+
+    private String resolveDirection(Transfer transfer, Long userId) {
+        return userId.equals(transfer.getUserId()) ? "EXPENSE" : "INCOME";
+    }
+
+    private String getNetworkFeeAssetSymbol() {
+        return "ETH";
     }
 
     private CreateTransferResponse toCreateResponse(Transfer transfer) {

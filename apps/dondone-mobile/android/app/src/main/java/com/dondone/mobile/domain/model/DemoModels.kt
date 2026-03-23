@@ -86,6 +86,7 @@ data class RemittanceData(
     val accounts: List<Account>,
     val selectedAccountId: String,
     val recipients: List<Recipient>,
+    val transactions: List<TransactionRecord> = emptyList(),
     val selectedRecipientId: String,
     val recipientDisplayNameOverride: String? = null,
     val draftAmountUsd: Int,

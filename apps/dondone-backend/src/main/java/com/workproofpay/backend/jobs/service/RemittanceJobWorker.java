@@ -196,12 +196,15 @@ public class RemittanceJobWorker {
         }
 
         if (receiptResult.get().success()) {
-            transfer.markConfirmed();
+            transfer.markConfirmed(receiptResult.get().networkFeeWei());
             job.markDone();
             return "confirmed";
         }
 
-        transfer.markFailed(receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode());
+        transfer.markFailed(
+                receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode(),
+                receiptResult.get().networkFeeWei()
+        );
         job.markDone();
         return "failed_" + (receiptResult.get().failureCode() == null
                 ? TransferFailureCode.UNKNOWN.name()
@@ -267,7 +270,7 @@ public class RemittanceJobWorker {
         if (transfer.getStatus() == TransferStatus.REQUESTED
                 || transfer.getStatus() == TransferStatus.SIGNED
                 || transfer.getStatus() == TransferStatus.BROADCASTED) {
-            transfer.markFailed(failureCode);
+            transfer.markFailed(failureCode, null);
         }
     }
 

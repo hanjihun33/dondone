@@ -100,7 +100,7 @@ private enum class RecipientWalletSheetMode {
 fun AccountManageScreen(
     uiModel: AccountManageUiModel,
     actionUiState: RemittanceActionUiState,
-    onSelectAccount: (String) -> Unit,
+    onOpenTransactionHistory: (String) -> Unit,
     onAddRecipient: (String, String, String, Long?) -> Unit,
     onUpdateRecipient: (String, String, String, String) -> Unit,
     onSearchRecipientsByPhone: (String) -> Unit,
@@ -168,7 +168,7 @@ fun AccountManageScreen(
                     valueText = account.balanceText,
                     actionText = if (account.selected) "대표" else "선택",
                     copyText = account.copyNumber,
-                    onClick = { onSelectAccount(account.id) }
+                    onClick = { onOpenTransactionHistory(account.id) }
                 )
                 if (index != uiModel.accounts.lastIndex) {
                     HorizontalDivider(color = AccountManageDivider)

@@ -209,13 +209,15 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
             if (receiptResponse.getTransactionReceipt().isEmpty()) {
                 return Optional.empty();
             }
-            String status = receiptResponse.getResult().getStatus();
+            var receipt = receiptResponse.getResult();
+            String status = receipt.getStatus();
+            String networkFeeWei = calculateNetworkFeeWei(receipt);
             if ("0x1".equalsIgnoreCase(status)) {
                 outcome = "success";
-                return Optional.of(new ChainReceiptResult(true, null));
+                return Optional.of(new ChainReceiptResult(true, null, networkFeeWei));
             }
             outcome = "failed";
-            return Optional.of(new ChainReceiptResult(false, TransferFailureCode.CHAIN_REVERT));
+            return Optional.of(new ChainReceiptResult(false, TransferFailureCode.CHAIN_REVERT, networkFeeWei));
         } catch (IOException e) {
             outcome = "error";
             return Optional.empty();
@@ -236,6 +238,37 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
             throw new IllegalStateException("failed to look up transaction", e);
         } finally {
             remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "is_transaction_known", outcome);
+        }
+    }
+
+    private String calculateNetworkFeeWei(TransactionReceipt receipt) throws IOException {
+        if (receipt.getGasUsed() == null) {
+            return null;
+        }
+
+        BigInteger gasPriceWei = parseRpcQuantity(receipt.getEffectiveGasPrice());
+        if (gasPriceWei == null && receipt.getTransactionHash() != null) {
+            EthTransaction transactionResponse = web3j().ethGetTransactionByHash(receipt.getTransactionHash()).send();
+            gasPriceWei = transactionResponse.getTransaction()
+                    .map(transaction -> parseRpcQuantity(transaction.getGasPriceRaw()))
+                    .orElse(null);
+        }
+        if (gasPriceWei == null) {
+            return null;
+        }
+        return receipt.getGasUsed().multiply(gasPriceWei).toString();
+    }
+
+    private BigInteger parseRpcQuantity(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return value.startsWith("0x") || value.startsWith("0X")
+                    ? Numeric.decodeQuantity(value)
+                    : new BigInteger(value);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
