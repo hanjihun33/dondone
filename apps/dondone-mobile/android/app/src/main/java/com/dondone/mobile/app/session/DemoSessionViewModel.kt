@@ -176,12 +176,15 @@ class DemoSessionViewModel(
     val menuLaunchRequest: StateFlow<MenuLaunchRequest?> = _menuLaunchRequest.asStateFlow()
     private val _remittanceLaunchRequest = MutableStateFlow<RemittanceLaunchRequest?>(null)
     val remittanceLaunchRequest: StateFlow<RemittanceLaunchRequest?> = _remittanceLaunchRequest.asStateFlow()
+    private val _workproofLaunchRequest = MutableStateFlow<WorkproofLaunchRequest?>(null)
+    val workproofLaunchRequest: StateFlow<WorkproofLaunchRequest?> = _workproofLaunchRequest.asStateFlow()
     private val _advanceRequestUiState = MutableStateFlow(AdvanceRequestUiState())
     val advanceRequestUiState: StateFlow<AdvanceRequestUiState> = _advanceRequestUiState.asStateFlow()
     private val _advanceRequestDetailUiState = MutableStateFlow(AdvanceRequestDetailUiState())
     val advanceRequestDetailUiState: StateFlow<AdvanceRequestDetailUiState> = _advanceRequestDetailUiState.asStateFlow()
     private var nextMenuLaunchRequestId = 1L
     private var nextRemittanceLaunchRequestId = 1L
+    private var nextWorkproofLaunchRequestId = 1L
 
     init {
         restoreAuthSession()
@@ -791,6 +794,7 @@ class DemoSessionViewModel(
         _wageActionUiState.value = WageActionUiState()
         _remittanceActionUiState.value = RemittanceActionUiState()
         _menuLaunchRequest.value = null
+        _workproofLaunchRequest.value = null
         refreshAdvanceRemoteState()
         refreshWorkproofRemoteState()
         refreshWageRemoteState()
@@ -941,6 +945,17 @@ class DemoSessionViewModel(
 
     fun consumeMenuLaunchRequest() {
         _menuLaunchRequest.value = null
+    }
+
+    fun openWorkproofPdfCreation() {
+        _workproofLaunchRequest.value = WorkproofLaunchRequest(
+            target = WorkproofLaunchTarget.PDF_CREATION,
+            requestId = nextWorkproofLaunchRequestId++
+        )
+    }
+
+    fun consumeWorkproofLaunchRequest() {
+        _workproofLaunchRequest.value = null
     }
 
     fun clearRemittanceActionMessage() {
@@ -1765,6 +1780,7 @@ class DemoSessionViewModel(
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
         _menuLaunchRequest.value = null
         _remittanceLaunchRequest.value = null
+        _workproofLaunchRequest.value = null
         cancelRemittanceStatusPolling()
         cancelVaultStatusPolling()
     }
