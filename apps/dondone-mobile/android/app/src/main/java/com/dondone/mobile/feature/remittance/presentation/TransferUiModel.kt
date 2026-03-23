@@ -97,7 +97,7 @@ fun DemoState.toTransferUiModel(
     val remoteAccount = if (isRemoteMode && remotePayload != null) {
         TransferAccountUiModel(
             id = REMITTANCE_WALLET_ID,
-            name = "DonDone Wallet",
+            name = "DonDone 지갑",
             number = shortenWalletAddress(remotePayload.wallet.walletAddress),
             balanceText = remotePayload.balance?.formatTokenBalance() ?: "잔액 확인 중",
             selected = true
