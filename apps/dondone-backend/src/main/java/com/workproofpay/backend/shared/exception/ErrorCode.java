@@ -30,6 +30,7 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid credentials"),
     INVALID_EMPLOYER_INVITATION(HttpStatus.UNAUTHORIZED, "Employer invitation is invalid or expired"),
     INVALID_EMPLOYER_SIGNUP_CODE(HttpStatus.UNAUTHORIZED, "Employer company code is invalid or revoked"),
+    INVALID_WORKER_REGISTRATION_CODE(HttpStatus.UNAUTHORIZED, "Worker registration code is invalid or revoked"),
     EMPLOYER_PROFILE_INACTIVE(HttpStatus.FORBIDDEN, "Employer profile is inactive"),
     EMPLOYER_SCOPE_NOT_READY(HttpStatus.CONFLICT, "Employer profile is missing company or workplace linkage"),
 
