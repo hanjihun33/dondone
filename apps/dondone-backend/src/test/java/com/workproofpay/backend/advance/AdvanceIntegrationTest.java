@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -88,7 +89,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.availableAmount").value(150000))
                 .andExpect(jsonPath("$.data.repaymentTier").value("B"))
                 .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
-                .andExpect(jsonPath("$.data.needsReviewRecordCount").value(1));
+                .andExpect(jsonPath("$.data.needsReviewRecordCount").value(1))
+                .andExpect(jsonPath("$.data.estimatedRepaymentDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
 
         String requestJson = """
                 {
@@ -125,7 +127,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
 
         mockMvc.perform(get("/api/advance/requests")
                         .header("Authorization", bearer(token))
-                        .param("month", nextMonth().toString()))
+                        .param("month", currentAdvanceCycleMonth().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requests.length()").value(1))
                 .andExpect(jsonPath("$.data.requests[0].requestId").value(requestId))
@@ -249,7 +251,43 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.availableAmount").value(0))
-                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("OUTSTANDING_ADVANCE_EXISTS"));
+                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("EXISTING_OUTSTANDING_ADVANCE"));
+    }
+
+    @Test
+    void listsRequestsUnderResolvedAdvanceCycleMonth() throws Exception {
+        User user = userRepository.save(User.register("advance-cycle@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long workplaceId = seedAdvanceEligibleScenario(user, 10, false);
+
+        String requestJson = """
+                {
+                  "workplaceId": %d,
+                  "requestedAmount": 50000,
+                  "requestedAt": "2030-01-10T09:00:00"
+                }
+                """.formatted(workplaceId);
+
+        mockMvc.perform(post("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "advance-req-cycle-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .param("month", currentAdvanceCycleMonth().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.month").value(currentAdvanceCycleMonth().toString()))
+                .andExpect(jsonPath("$.data.requests.length()").value(1));
+
+        mockMvc.perform(get("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .param("month", currentAdvanceCycleMonth().minusMonths(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.month").value(currentAdvanceCycleMonth().minusMonths(1).toString()))
+                .andExpect(jsonPath("$.data.requests.length()").value(0));
     }
 
     private Long seedAdvanceEligibleScenario(User user, int reflectedDayCount, boolean addPendingRecord) {
@@ -269,11 +307,11 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 null,
                 null,
                 BigDecimal.valueOf(10_000),
-                nextMonth().atDay(1)
+                currentAdvanceCycleMonth().atDay(1)
         ));
 
         for (int day = 1; day <= reflectedDayCount; day++) {
-            LocalDateTime checkIn = nextMonth().atDay(day).atTime(9, 0);
+            LocalDateTime checkIn = currentAdvanceCycleMonth().atDay(day).atTime(9, 0);
             WorkProof record = WorkProof.checkIn(
                     user,
                     workplace,
@@ -296,7 +334,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         }
 
         if (addPendingRecord) {
-            LocalDateTime pendingCheckIn = nextMonth().atDay(reflectedDayCount + 1).atTime(9, 0);
+            LocalDateTime pendingCheckIn = currentAdvanceCycleMonth().atDay(reflectedDayCount + 1).atTime(9, 0);
             workProofRepository.save(WorkProof.checkIn(
                     user,
                     workplace,
@@ -317,8 +355,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         return root.path("data").path(fieldName).asLong();
     }
 
-    private java.time.YearMonth nextMonth() {
-        return java.time.YearMonth.now().plusMonths(1);
+    private YearMonth currentAdvanceCycleMonth() {
+        LocalDate today = LocalDate.now();
+        YearMonth cycleMonth = YearMonth.from(today);
+        return today.getDayOfMonth() > 25 ? cycleMonth.plusMonths(1) : cycleMonth;
     }
 
     private String tokenFor(User user) {
