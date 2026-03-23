@@ -321,14 +321,6 @@ fun DemoState.toFinanceHomeUiModel(
     } else {
         detailFeeText
     }
-    val advanceCardActionText = when (advanceContractState.surfaceState) {
-        AdvanceSurfaceState.SUCCESS -> "상세 보기"
-        AdvanceSurfaceState.BLOCKED,
-        AdvanceSurfaceState.EMPTY,
-        AdvanceSurfaceState.ERROR,
-        AdvanceSurfaceState.LOADING -> "근거 보기"
-    }
-
     val vaultAvailable = selectedAccount.balance
     val vaultAmountPresets = listOf(100_000, 300_000, 500_000, 1_000_000)
     val vaultSelectedAmount = if (vault.userDeposit > 0) {
@@ -365,7 +357,7 @@ fun DemoState.toFinanceHomeUiModel(
             stateBodyText = advanceContractState.stateBodyText,
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
-            actionText = advanceCardActionText,
+            actionText = advanceContractState.actionText,
             detail = FinanceAdvanceDetailUiModel(
                 surfaceState = advanceContractState.surfaceState,
                 subtitleText = "근무 기록 기반 한도로 급여일 전에 일부를 먼저 받습니다.",
@@ -387,7 +379,11 @@ fun DemoState.toFinanceHomeUiModel(
                 blockReasonTexts = advanceContractState.blockReasonTexts,
                 disclaimerText = advanceContractState.disclaimerText,
                 canRequest = advanceContractState.canRequest && !advanceRequestUiState.isSubmitting,
-                requestButtonText = if (advanceRequestUiState.isSubmitting) "신청 중..." else "미리받기 신청",
+                requestButtonText = when {
+                    advanceRequestUiState.isSubmitting -> "신청 중..."
+                    advanceContractState.canRequest -> "미리받기 신청"
+                    else -> advanceContractState.actionText
+                },
                 requestFeedbackText = advanceRequestUiState.message,
                 requestFeedbackIsError = advanceRequestUiState.isError,
                 amountOptions = if (usesRemoteAdvance) {

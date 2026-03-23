@@ -3,6 +3,7 @@ package com.dondone.mobile.domain.advance
 import com.dondone.mobile.data.advance.AdvanceEligibilityPayload
 import com.dondone.mobile.data.advance.AdvanceRemoteState
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import java.time.YearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -84,19 +85,11 @@ class AdvanceContractStateTest {
             eligibility = AdvanceEligibilityPayload(
                 workplaceId = 1L,
                 availableAmount = 0L,
-                maxCap = 500_000L,
-                policyRate = 0.1,
                 repaymentTier = "C",
-                reflectedWorkDays = 5,
-                reflectedWorkMinutes = 2_400,
-                verifiedWorkMinutes = 2_400,
-                pendingWorkMinutes = 0,
-                needsReviewRecordCount = 0,
                 blockReasonCodes = listOf("ADVANCE_WINDOW_CLOSED_TODAY"),
-                nextTierRemainingMinutes = 2_400,
-                estimatedFee = 0L,
                 estimatedRepaymentDate = "2026-03-25",
-                disclaimer = "demo"
+                disclaimer = "demo",
+                needsReviewRecordCount = 0
             ),
             requests = emptyList()
         )
@@ -106,6 +99,58 @@ class AdvanceContractStateTest {
         assertEquals(AdvanceSurfaceState.BLOCKED, state.surfaceState)
         assertEquals("오늘은 신청이 마감됐어요", state.stateTitleText)
         assertTrue(state.blockReasonTexts.contains("오늘은 신청이 마감됐어요"))
+        assertEquals("마감 이유 보기", state.actionText)
+        assertFalse(state.canRequest)
+    }
+
+    @Test
+    fun `remote next cycle guidance shows next cycle copy`() {
+        val nextCycleDate = YearMonth.now().plusMonths(1).atDay(25).toString()
+        val remoteState = AdvanceRemoteState.content(
+            workplaceName = "실연동 · SSAFY",
+            eligibility = AdvanceEligibilityPayload(
+                workplaceId = 1L,
+                availableAmount = 50_000L,
+                repaymentTier = "C",
+                blockReasonCodes = emptyList(),
+                estimatedRepaymentDate = nextCycleDate,
+                disclaimer = "demo",
+                needsReviewRecordCount = 0
+            ),
+            requests = emptyList()
+        )
+
+        val state = DemoSeedFactory.create().toAdvanceContractState(remoteState)
+
+        assertEquals(AdvanceSurfaceState.SUCCESS, state.surfaceState)
+        assertEquals("다음 달 급여 회차 기준으로 확인했어요", state.stateTitleText)
+        assertEquals("다음 달 급여 회차 기준으로 신청 가능 금액을 불러왔어요.", state.stateBodyText)
+        assertEquals("다음 회차 보기", state.actionText)
+        assertTrue(state.canRequest)
+    }
+
+    @Test
+    fun `remote pending review lock shows review guidance copy`() {
+        val remoteState = AdvanceRemoteState.content(
+            workplaceName = "실연동 · SSAFY",
+            eligibility = AdvanceEligibilityPayload(
+                workplaceId = 1L,
+                availableAmount = 0L,
+                repaymentTier = "C",
+                blockReasonCodes = listOf("PENDING_WORKPROOF_REVIEW"),
+                estimatedRepaymentDate = YearMonth.now().atDay(25).toString(),
+                disclaimer = "demo",
+                needsReviewRecordCount = 1
+            ),
+            requests = emptyList()
+        )
+
+        val state = DemoSeedFactory.create().toAdvanceContractState(remoteState)
+
+        assertEquals(AdvanceSurfaceState.BLOCKED, state.surfaceState)
+        assertEquals("확인 후 신청이 가능해요", state.stateTitleText)
+        assertEquals("확인 필요한 기록이 정리되면 바로 신청 가능 금액을 다시 확인할 수 있어요.", state.stateBodyText)
+        assertEquals("기록 확인", state.actionText)
         assertFalse(state.canRequest)
     }
 }

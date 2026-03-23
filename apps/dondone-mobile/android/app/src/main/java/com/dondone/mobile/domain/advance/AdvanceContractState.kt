@@ -4,6 +4,8 @@ import com.dondone.mobile.data.advance.AdvanceRemoteState
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
 import com.dondone.mobile.domain.calculator.AdvanceCalculator
 import com.dondone.mobile.domain.model.DemoState
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
 import kotlin.math.max
 
 private const val STANDARD_WORKDAY_MINUTES = 480
@@ -113,6 +115,36 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                 val blockReasonTexts = remoteEligibility.blockReasonCodes.map(::toReasonText)
                 val isBlocked = remoteEligibility.availableAmount <= 0
                 val isClosedToday = remoteEligibility.blockReasonCodes.contains("ADVANCE_WINDOW_CLOSED_TODAY")
+                val hasPendingReview = remoteEligibility.blockReasonCodes.contains("PENDING_WORKPROOF_REVIEW")
+                val isNextCycle = isNextRepaymentCycle(remoteEligibility.estimatedRepaymentDate)
+                val stateTitleText = when {
+                    isBlocked && isClosedToday -> "오늘은 신청이 마감됐어요"
+                    isBlocked && hasPendingReview -> "확인 후 신청이 가능해요"
+                    isBlocked -> "실제 계정 기준으로 지금은 신청이 잠겨 있어요"
+                    isNextCycle -> "다음 달 급여 회차 기준으로 확인했어요"
+                    else -> "실제 계정 기준으로 신청 가능한 상태예요"
+                }
+                val stateBodyText = when {
+                    isBlocked && isClosedToday && isNextCycle ->
+                        "오늘 회차는 마감됐어요. 내일부터 다음 달 급여 회차 기준으로 확인할 수 있어요."
+                    isBlocked && isClosedToday ->
+                        "오늘은 신청이 마감됐어요. 다음 회차는 마감 이후 기준으로 확인해 주세요."
+                    isBlocked && hasPendingReview && blockReasonTexts.size == 1 ->
+                        "확인 필요한 기록이 정리되면 바로 신청 가능 금액을 다시 확인할 수 있어요."
+                    blockReasonTexts.isNotEmpty() ->
+                        blockReasonTexts.joinToString(" · ")
+                    isNextCycle ->
+                        "다음 달 급여 회차 기준으로 신청 가능 금액을 불러왔어요."
+                    else ->
+                        "백엔드 응답 기준으로 현재 미리받기 한도를 불러왔어요."
+                }
+                val actionText = when {
+                    isBlocked && isClosedToday -> "마감 이유 보기"
+                    isBlocked && hasPendingReview -> "기록 확인"
+                    isBlocked -> "신청 조건 보기"
+                    isNextCycle -> "다음 회차 보기"
+                    else -> "미리받기 보기"
+                }
                 return AdvanceContractState(
                     surfaceState = if (isBlocked) AdvanceSurfaceState.BLOCKED else AdvanceSurfaceState.SUCCESS,
                     sourceLabelText = if (remoteState.workplaceName != null) {
@@ -126,16 +158,9 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     blockReasonCodes = remoteEligibility.blockReasonCodes,
                     blockReasonTexts = blockReasonTexts,
                     disclaimerText = remoteEligibility.disclaimer,
-                    stateTitleText = when {
-                        isBlocked && isClosedToday -> "오늘은 신청이 마감됐어요"
-                        isBlocked -> "실제 계정 기준으로 지금은 신청이 잠겨 있어요"
-                        else -> "실제 계정 기준으로 신청 가능한 상태예요"
-                    },
-                    stateBodyText = when {
-                        blockReasonTexts.isNotEmpty() -> blockReasonTexts.joinToString(" · ")
-                        else -> "백엔드 응답 기준으로 현재 미리받기 한도를 불러왔어요."
-                    },
-                    actionText = if (isBlocked) "근거 보기" else "미리받기 보기",
+                    stateTitleText = stateTitleText,
+                    stateBodyText = stateBodyText,
+                    actionText = actionText,
                     canRequest = !isBlocked,
                     availableAmountOverride = remoteEligibility.availableAmount,
                     repaymentDateOverride = remoteEligibility.estimatedRepaymentDate
@@ -228,4 +253,15 @@ private fun toReasonText(code: String): String = when (code) {
     "ADVANCE_WINDOW_CLOSED_TODAY" -> "오늘은 신청이 마감됐어요"
     "PENDING_WORKPROOF_REVIEW" -> "확인 필요한 기록이 남아 있어요"
     else -> "추가 확인이 필요해요"
+}
+
+private fun isNextRepaymentCycle(repaymentDate: String?): Boolean {
+    if (repaymentDate == null) return false
+    return try {
+        val parsed = LocalDate.parse(repaymentDate)
+        val today = LocalDate.now()
+        parsed.year > today.year || parsed.monthValue > today.monthValue
+    } catch (_: DateTimeParseException) {
+        false
+    }
 }
