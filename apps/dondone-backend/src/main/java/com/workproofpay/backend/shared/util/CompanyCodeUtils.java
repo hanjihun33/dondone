@@ -14,7 +14,7 @@ public final class CompanyCodeUtils {
     }
 
     public static String normalizeNullableOrThrow(String companyCode) {
-        if (companyCode == null || companyCode.trim().isEmpty()) {
+        if (companyCode == null) {
             return null;
         }
         return normalizeOrThrow(companyCode);
