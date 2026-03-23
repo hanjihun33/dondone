@@ -80,7 +80,7 @@ public class User extends BaseTimeEntity {
                 encodedPassword,
                 name,
                 phoneNumber,
-                CompanyCodeUtils.normalizeOrThrow(companyCode),
+                CompanyCodeUtils.normalizeNullableOrThrow(companyCode),
                 UserRole.USER
         );
     }

@@ -13,6 +13,13 @@ public final class CompanyCodeUtils {
     private CompanyCodeUtils() {
     }
 
+    public static String normalizeNullableOrThrow(String companyCode) {
+        if (companyCode == null) {
+            return null;
+        }
+        return normalizeOrThrow(companyCode);
+    }
+
     public static String normalizeOrThrow(String companyCode) {
         String normalized = companyCode == null ? "" : companyCode.trim().toUpperCase();
         if (!COMPANY_CODE_PATTERN.matcher(normalized).matches()) {
