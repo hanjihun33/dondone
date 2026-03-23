@@ -27,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
@@ -54,11 +55,12 @@ public class EmployerWorkerReadModelService {
     private final EmploymentMembershipRepository employmentMembershipRepository;
     private final UserRepository userRepository;
     private final WorkProofRepository workProofRepository;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public EmployerWorkersResponse getWorkers(Long accountId, EmployerWorkersQuery query) {
         EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(accountId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<ScopedWorkerSnapshot> scopedWorkers = loadTodaySnapshots(scope, today);
         List<ScopedWorkerSnapshot> filteredWorkers = applyWorkerFilters(scopedWorkers, query);
         Pagination pagination = paginate(filteredWorkers.size(), query.getPage(), query.getSize());
@@ -79,7 +81,7 @@ public class EmployerWorkerReadModelService {
     @Transactional(readOnly = true)
     public EmployerDashboardSummaryResponse getDashboardSummary(Long accountId) {
         EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(accountId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<ScopedWorkerSnapshot> scopedWorkers = loadTodaySnapshots(scope, today);
 
         long workingCount = scopedWorkers.stream()
@@ -108,7 +110,7 @@ public class EmployerWorkerReadModelService {
     @Transactional(readOnly = true)
     public EmployerWorkerDetailResponse getWorkerDetail(Long accountId, Long workerId) {
         EmployerAccessScope scope = employerAccessScopeService.getRequiredScope(accountId);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         User worker = userRepository.findById(workerId)
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
         EmploymentMembership membership = getRequiredAccessibleMembership(scope, workerId, today);
@@ -521,7 +523,7 @@ public class EmployerWorkerReadModelService {
     }
 
     private WeekRange resolveWeekRange(LocalDate requestedWeekStart) {
-        LocalDate anchor = requestedWeekStart == null ? LocalDate.now() : requestedWeekStart;
+        LocalDate anchor = requestedWeekStart == null ? LocalDate.now(clock) : requestedWeekStart;
         LocalDate start = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
         return new WeekRange(start, start.plusDays(BOARD_DAYS - 1));
     }
