@@ -43,10 +43,13 @@ data class RemittanceTransferSummaryPayload(
     val assetSymbol: String,
     val amountAtomic: Long,
     val senderAddress: String,
+    val senderName: String?,
     val recipientId: String,
     val recipientAlias: String?,
     val recipientAddress: String,
     val txHash: String?,
+    val networkFeeWei: String?,
+    val networkFeeAssetSymbol: String?,
     val updatedAt: LocalDateTime?
 )
 
@@ -57,10 +60,13 @@ data class RemittanceTransferDetailPayload(
     val assetSymbol: String,
     val amountAtomic: Long,
     val senderAddress: String,
+    val senderName: String?,
     val recipientId: String,
     val recipientAlias: String?,
     val recipientAddress: String,
     val txHash: String?,
+    val networkFeeWei: String?,
+    val networkFeeAssetSymbol: String?,
     val failureCode: String?,
     val createdAt: LocalDateTime?,
     val updatedAt: LocalDateTime?

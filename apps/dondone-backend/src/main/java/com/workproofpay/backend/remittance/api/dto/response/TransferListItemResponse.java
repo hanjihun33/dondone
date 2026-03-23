@@ -9,10 +9,13 @@ public record TransferListItemResponse(
         String assetSymbol,
         Long amountAtomic,
         String senderAddress,
+        String senderName,
         String recipientId,
         String recipientAlias,
         String recipientAddress,
         String txHash,
+        String networkFeeWei,
+        String networkFeeAssetSymbol,
         LocalDateTime updatedAt
 ) {
 }

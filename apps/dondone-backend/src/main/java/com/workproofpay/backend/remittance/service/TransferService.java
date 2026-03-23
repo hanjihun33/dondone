@@ -126,10 +126,13 @@ public class TransferService {
                                 transfer.getAssetSymbol(),
                                 transfer.getAmountAtomic(),
                                 transfer.getSenderAddress(),
+                                transfer.getUser().getName(),
                                 transfer.getRecipientId(),
                                 transfer.getRecipientAliasSnapshot(),
                                 transfer.getRecipientAddress(),
                                 transfer.getTxHash(),
+                                transfer.getNetworkFeeWei(),
+                                getNetworkFeeAssetSymbol(),
                                 transfer.getUpdatedAt()
                         ))
                         .toList()
@@ -138,12 +141,7 @@ public class TransferService {
 
     @Transactional(readOnly = true)
     public TransferDetailResponse getTransfer(Long userId, String transferId) {
-        Transfer transfer = transferRepository.findByTransferIdAndUserIdOrTransferIdAndRecipientTargetUserIdSnapshot(
-                        transferId,
-                        userId,
-                        transferId,
-                        userId
-                )
+        Transfer transfer = transferRepository.findAccessibleTransferByTransferId(transferId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.TRANSFER_NOT_FOUND));
 
         return new TransferDetailResponse(
@@ -153,10 +151,13 @@ public class TransferService {
                 transfer.getAssetSymbol(),
                 transfer.getAmountAtomic(),
                 transfer.getSenderAddress(),
+                transfer.getUser().getName(),
                 transfer.getRecipientId(),
                 transfer.getRecipientAliasSnapshot(),
                 transfer.getRecipientAddress(),
                 transfer.getTxHash(),
+                transfer.getNetworkFeeWei(),
+                getNetworkFeeAssetSymbol(),
                 transfer.getFailureCode() == null ? null : transfer.getFailureCode().name(),
                 transfer.getCreatedAt(),
                 transfer.getUpdatedAt()
@@ -165,6 +166,10 @@ public class TransferService {
 
     private String resolveDirection(Transfer transfer, Long userId) {
         return userId.equals(transfer.getUserId()) ? "EXPENSE" : "INCOME";
+    }
+
+    private String getNetworkFeeAssetSymbol() {
+        return "ETH";
     }
 
     private CreateTransferResponse toCreateResponse(Transfer transfer) {

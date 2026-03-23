@@ -7,6 +7,8 @@ import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransactionCategory
 import com.dondone.mobile.domain.model.TransactionDirection
 import com.dondone.mobile.domain.model.TransactionRecord
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -40,6 +42,7 @@ data class TransactionHistoryItemUiModel(
     val occurredAt: LocalDateTime,
     val day: LocalDate,
     val counterpartyName: String,
+    val counterpartyAddress: String?,
     val amountValue: Int,
     val amountText: String,
     val feeText: String,
@@ -70,6 +73,7 @@ data class TransactionHistoryDetailUiModel(
     val walletName: String,
     val transactionId: String,
     val counterpartyName: String,
+    val counterpartyAddress: String?,
     val amountText: String,
     val amountValue: Int,
     val feeText: String,
@@ -126,7 +130,7 @@ fun DemoState.toTransactionHistoryMainUiModel(
         initialMonth = initialMonth,
         initialAnchorDay = LocalDate.of(demo.year, demo.month, demo.asOfDay),
         items = transactions,
-        emptyMessage = "선택한 월에 거래내역이 없어요.",
+        emptyMessage = "이번 기간에 거래내역이 없어요.",
         errorMessage = null
     )
 }
@@ -142,9 +146,14 @@ fun DemoState.toTransactionHistoryDetailUiModel(
     val item = source.items.firstOrNull { it.id == transactionId } ?: return null
     return TransactionHistoryDetailUiModel(
         walletId = source.walletId,
-        walletName = source.walletName,
+        walletName = if (source.walletId == "remote-wallet") {
+            item.counterpartyAddress ?: source.walletName
+        } else {
+            source.walletName
+        },
         transactionId = item.id,
         counterpartyName = item.counterpartyName,
+        counterpartyAddress = item.counterpartyAddress,
         amountText = item.amountText,
         amountValue = item.amountValue,
         feeText = item.feeText,
@@ -194,7 +203,7 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
             initialMonth = currentMonth,
             initialAnchorDay = currentMonth.atDay(LocalDate.now().dayOfMonth.coerceAtMost(currentMonth.lengthOfMonth())),
             items = emptyList(),
-            emptyMessage = "거래내역을 불러오는 중입니다.",
+            emptyMessage = "거래내역을 불러오고 있어요.",
             errorMessage = errorMessage
         )
     }
@@ -209,23 +218,28 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
             initialMonth = currentMonth,
             initialAnchorDay = currentMonth.atDay(LocalDate.now().dayOfMonth.coerceAtMost(currentMonth.lengthOfMonth())),
             items = emptyList(),
-            emptyMessage = "거래내역이 없습니다.",
-            errorMessage = errorMessage ?: "거래내역을 불러오지 못했습니다."
+            emptyMessage = "거래내역이 없어요.",
+            errorMessage = errorMessage ?: "거래내역을 불러오지 못했어요."
         )
     }
 
     val currentMonth = YearMonth.now()
     val currencyUnit = payload.transfers.firstOrNull()?.assetSymbol ?: "USDC"
+    val currencyDecimals = payload.balance?.assetDecimals ?: assetDecimalsFor(currencyUnit)
     val items = payload.transfers.map { transfer ->
         val timestamp = transfer.updatedAt ?: LocalDateTime.now()
         val override = overrides[transfer.transferId]
         val category = override?.category ?: inferRemoteCategory(transfer.recipientAlias)
         val memo = override?.memo ?: ""
-        val amount = atomicToDisplayAmount(transfer.amountAtomic)
+        val amount = atomicToDisplayAmount(transfer.amountAtomic, currencyDecimals)
         val direction = transfer.direction.toTransactionDirection()
         val counterpartyName = when (direction) {
-            TransactionDirection.INCOME -> transfer.senderAddress.toShortWalletAddress()
+            TransactionDirection.INCOME -> transfer.senderName ?: transfer.senderAddress.toShortWalletAddress()
             TransactionDirection.EXPENSE -> transfer.recipientAlias ?: transfer.recipientAddress.toShortWalletAddress()
+        }
+        val counterpartyAddress = when (direction) {
+            TransactionDirection.INCOME -> transfer.senderAddress
+            TransactionDirection.EXPENSE -> transfer.recipientAddress
         }
         TransactionHistoryItemUiModel(
             id = transfer.transferId,
@@ -233,9 +247,10 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
             occurredAt = timestamp,
             day = timestamp.toLocalDate(),
             counterpartyName = counterpartyName,
+            counterpartyAddress = counterpartyAddress,
             amountValue = amount,
-            amountText = formatMoney(amount, direction, currencyUnit),
-            feeText = formatFee(0, currencyUnit),
+            amountText = formatAtomicMoney(transfer.amountAtomic, direction, currencyUnit, currencyDecimals),
+            feeText = formatRemoteFee(transfer.networkFeeWei, transfer.networkFeeAssetSymbol),
             direction = direction,
             category = category,
             categoryLabel = category.label,
@@ -255,7 +270,7 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
         initialMonth = currentMonth,
         initialAnchorDay = currentMonth.atDay(LocalDate.now().dayOfMonth.coerceAtMost(currentMonth.lengthOfMonth())),
         items = items,
-        emptyMessage = "선택한 월에 거래내역이 없어요.",
+        emptyMessage = "이번 기간에 거래내역이 없어요.",
         errorMessage = errorMessage
     )
 }
@@ -274,6 +289,7 @@ private fun TransactionRecord.toUiModel(
         occurredAt = occurredAt,
         day = occurredAt.toLocalDate(),
         counterpartyName = counterpartyName,
+        counterpartyAddress = counterpartyAddress,
         amountValue = amount,
         amountText = formatMoney(amount, direction, currencyUnit),
         feeText = formatFee(feeAmount, currencyUnit),
@@ -304,7 +320,18 @@ private fun buildMonthOptions(center: YearMonth): List<TransactionMonthOptionUiM
         .map { month -> TransactionMonthOptionUiModel(month, month.format(TransactionMonthFormatter)) }
 }
 
-private fun atomicToDisplayAmount(amountAtomic: Long): Int = (amountAtomic / 1_000_000L).toInt()
+private fun atomicToDisplayAmount(amountAtomic: Long, decimals: Int): Int =
+    scaleAtomicAmount(amountAtomic, decimals).toInt()
+
+private fun formatAtomicMoney(
+    amountAtomic: Long,
+    direction: TransactionDirection,
+    unit: String,
+    decimals: Int
+): String {
+    val sign = if (direction == TransactionDirection.INCOME) "+" else "-"
+    return "$sign${formatScaledAmount(amountAtomic, unit, decimals, minimumFractionDigits = 0)}"
+}
 
 private fun formatMoney(
     value: Int,
@@ -314,7 +341,7 @@ private fun formatMoney(
     val sign = if (direction == TransactionDirection.INCOME) "+" else "-"
     val number = NumberFormat.getNumberInstance(Locale.KOREA).format(value)
     return if (unit == "KRW") {
-        "$sign${number}원"
+        "${sign}${number}원"
     } else {
         "$sign$number $unit"
     }
@@ -329,10 +356,64 @@ private fun formatFee(value: Int, unit: String): String {
     }
 }
 
+private fun unavailableFeeText(): String = "-"
+
+private fun formatRemoteFee(networkFeeWei: String?, feeAssetSymbol: String?): String {
+    val parsed = networkFeeWei?.toBigIntegerOrNull() ?: return unavailableFeeText()
+    if (parsed.signum() == 0) return unavailableFeeText()
+    val symbol = feeAssetSymbol ?: "ETH"
+    val ethValue = BigDecimal(parsed).movePointLeft(18)
+    if (ethValue.compareTo(BigDecimal("0.000001")) < 0) {
+        return "< 0.000001 $symbol"
+    }
+    val formatter = NumberFormat.getNumberInstance(Locale.KOREA).apply {
+        minimumFractionDigits = 0
+        maximumFractionDigits = 6
+        roundingMode = RoundingMode.DOWN
+    }
+    return "${formatter.format(ethValue)} $symbol"
+}
+
 private fun String.toShortWalletAddress(): String {
     return if (length <= 14) this else "${take(8)}...${takeLast(6)}"
 }
 
-private val TransactionMonthFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy년 M월", Locale.KOREAN)
+private fun assetDecimalsFor(assetSymbol: String): Int = when (assetSymbol.uppercase(Locale.ROOT)) {
+    "KRW" -> 0
+    "BTC" -> 8
+    "ETH", "SEPOLIA_ETH" -> 18
+    else -> 6
+}
+
+private fun scaleAtomicAmount(amountAtomic: Long, decimals: Int): BigDecimal =
+    BigDecimal.valueOf(amountAtomic).movePointLeft(decimals)
+
+private fun formatScaledAmount(
+    amountAtomic: Long,
+    unit: String,
+    decimals: Int,
+    minimumFractionDigits: Int
+): String {
+    val scaled = scaleAtomicAmount(amountAtomic, decimals)
+    val formatter = NumberFormat.getNumberInstance(Locale.KOREA).apply {
+        this.minimumFractionDigits = minimumFractionDigits
+        maximumFractionDigits = when {
+            unit == "KRW" -> 0
+            scaled.compareTo(BigDecimal.ONE) >= 0 -> minOf(decimals, 2)
+            else -> minOf(decimals, 6)
+        }
+        roundingMode = RoundingMode.DOWN
+    }
+    val number = formatter.format(scaled)
+    return if (unit == "KRW") {
+        "${number}원"
+    } else {
+        "$number $unit"
+    }
+}
+
+private val TransactionMonthFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy년 M월", Locale.KOREAN)
 private val TransactionTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val TransactionDetailDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일 HH:mm", Locale.KOREAN)
+private val TransactionDetailDateFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy년 M월 d일 HH:mm", Locale.KOREAN)

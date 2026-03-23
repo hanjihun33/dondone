@@ -705,24 +705,26 @@ private fun DetailRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
+            modifier = Modifier.width(88.dp),
             style = MaterialTheme.typography.titleMedium,
             color = DawnTextSubtle
         )
-        Spacer(modifier = Modifier.width(14.dp))
         Text(
             text = value,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 20.dp),
             style = if (emphasize) {
                 MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
             } else {
                 MaterialTheme.typography.bodyLarge
             },
             color = DawnText,
-            maxLines = 3,
+            maxLines = 4,
             overflow = TextOverflow.Ellipsis
         )
     }

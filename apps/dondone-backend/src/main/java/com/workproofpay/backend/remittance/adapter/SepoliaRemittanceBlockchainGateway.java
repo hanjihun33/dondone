@@ -209,13 +209,15 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
             if (receiptResponse.getTransactionReceipt().isEmpty()) {
                 return Optional.empty();
             }
-            String status = receiptResponse.getResult().getStatus();
+            var receipt = receiptResponse.getResult();
+            String status = receipt.getStatus();
+            String networkFeeWei = calculateNetworkFeeWei(receipt);
             if ("0x1".equalsIgnoreCase(status)) {
                 outcome = "success";
-                return Optional.of(new ChainReceiptResult(true, null));
+                return Optional.of(new ChainReceiptResult(true, null, networkFeeWei));
             }
             outcome = "failed";
-            return Optional.of(new ChainReceiptResult(false, TransferFailureCode.CHAIN_REVERT));
+            return Optional.of(new ChainReceiptResult(false, TransferFailureCode.CHAIN_REVERT, networkFeeWei));
         } catch (IOException e) {
             outcome = "error";
             return Optional.empty();
@@ -237,6 +239,13 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
         } finally {
             remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "is_transaction_known", outcome);
         }
+    }
+
+    private String calculateNetworkFeeWei(org.web3j.protocol.core.methods.response.TransactionReceipt receipt) {
+        if (receipt.getGasUsed() == null || receipt.getEffectiveGasPrice() == null) {
+            return null;
+        }
+        return receipt.getGasUsed().multiply(new BigInteger(receipt.getEffectiveGasPrice())).toString();
     }
 
     private BigInteger readTokenBalance(String walletAddress) throws IOException {

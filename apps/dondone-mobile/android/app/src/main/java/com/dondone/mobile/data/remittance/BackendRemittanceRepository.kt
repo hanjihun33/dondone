@@ -360,10 +360,13 @@ private fun JSONObject.toTransferDetailPayload(): RemittanceTransferDetailPayloa
         assetSymbol = getString("assetSymbol"),
         amountAtomic = getLong("amountAtomic"),
         senderAddress = getString("senderAddress"),
+        senderName = optNullableString("senderName"),
         recipientId = getString("recipientId"),
         recipientAlias = optNullableString("recipientAlias"),
         recipientAddress = getString("recipientAddress"),
         txHash = optNullableString("txHash"),
+        networkFeeWei = optNullableString("networkFeeWei"),
+        networkFeeAssetSymbol = optNullableString("networkFeeAssetSymbol"),
         failureCode = optNullableString("failureCode"),
         createdAt = optDateTime("createdAt"),
         updatedAt = optDateTime("updatedAt")
@@ -409,10 +412,13 @@ private fun JSONArray?.toTransferSummaryPayloads(): List<RemittanceTransferSumma
                     assetSymbol = item.getString("assetSymbol"),
                     amountAtomic = item.getLong("amountAtomic"),
                     senderAddress = item.getString("senderAddress"),
+                    senderName = item.optNullableString("senderName"),
                     recipientId = item.getString("recipientId"),
                     recipientAlias = item.optNullableString("recipientAlias"),
                     recipientAddress = item.getString("recipientAddress"),
                     txHash = item.optNullableString("txHash"),
+                    networkFeeWei = item.optNullableString("networkFeeWei"),
+                    networkFeeAssetSymbol = item.optNullableString("networkFeeAssetSymbol"),
                     updatedAt = item.optDateTime("updatedAt")
                 )
             )

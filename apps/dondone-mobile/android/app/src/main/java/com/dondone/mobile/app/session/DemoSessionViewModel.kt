@@ -1,6 +1,7 @@
 package com.dondone.mobile.app.session
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -53,6 +54,7 @@ import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiSt
 import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.remittanceRelationCodeToLabel
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +78,7 @@ private const val DOCUMENT_STATUS_READY = "READY"
 private const val DOCUMENT_STATUS_NOT_CREATED = "NOT_CREATED"
 private const val DOCUMENT_ID_PROOF = "PROOF"
 private const val DOCUMENT_ID_CLAIM = "CLAIM"
+private const val DEMO_SESSION_VIEW_MODEL_TAG = "DemoSessionViewModel"
 
 class DemoSessionViewModel(
     private val appContext: Context,
@@ -1334,7 +1337,12 @@ class DemoSessionViewModel(
                     )
                 )
                 return
-            } catch (_: Exception) {
+            } catch (error: IOException) {
+                Log.w(
+                    DEMO_SESSION_VIEW_MODEL_TAG,
+                    "Failed to refresh wage verification detail. Keeping previous payload.",
+                    error
+                )
                 remoteState.payload.latestVerification
             }
         } else {
@@ -1616,7 +1624,12 @@ class DemoSessionViewModel(
                 } catch (error: RemittanceUnauthorizedException) {
                     expireSession(error.message)
                     return@launch
-                } catch (_: Exception) {
+                } catch (error: IOException) {
+                    Log.w(
+                        DEMO_SESSION_VIEW_MODEL_TAG,
+                        "Failed to poll remittance transfer detail for $transferId.",
+                        error
+                    )
                     return@repeat
                 }
             }
@@ -1648,7 +1661,10 @@ class DemoSessionViewModel(
                         status = detail.status,
                         amountAtomic = detail.amountAtomic,
                         senderAddress = detail.senderAddress,
+                        senderName = detail.senderName,
                         txHash = detail.txHash,
+                        networkFeeWei = detail.networkFeeWei,
+                        networkFeeAssetSymbol = detail.networkFeeAssetSymbol,
                         updatedAt = detail.updatedAt
                     ) ?: com.dondone.mobile.data.remittance.RemittanceTransferSummaryPayload(
                         transferId = detail.transferId,
@@ -1657,10 +1673,13 @@ class DemoSessionViewModel(
                         assetSymbol = detail.assetSymbol,
                         amountAtomic = detail.amountAtomic,
                         senderAddress = detail.senderAddress,
+                        senderName = detail.senderName,
                         recipientId = detail.recipientId,
                         recipientAlias = detail.recipientAlias,
                         recipientAddress = detail.recipientAddress,
                         txHash = detail.txHash,
+                        networkFeeWei = detail.networkFeeWei,
+                        networkFeeAssetSymbol = detail.networkFeeAssetSymbol,
                         updatedAt = detail.updatedAt
                     )
                 )

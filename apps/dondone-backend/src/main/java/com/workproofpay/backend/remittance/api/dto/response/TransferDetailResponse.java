@@ -9,10 +9,13 @@ public record TransferDetailResponse(
         String assetSymbol,
         Long amountAtomic,
         String senderAddress,
+        String senderName,
         String recipientId,
         String recipientAlias,
         String recipientAddress,
         String txHash,
+        String networkFeeWei,
+        String networkFeeAssetSymbol,
         String failureCode,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
