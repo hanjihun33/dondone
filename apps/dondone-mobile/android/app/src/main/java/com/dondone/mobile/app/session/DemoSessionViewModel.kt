@@ -98,8 +98,8 @@ class DemoSessionViewModel(
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
     private val _profileUpdateUiState = MutableStateFlow(ProfileUpdateUiState())
     val profileUpdateUiState: StateFlow<ProfileUpdateUiState> = _profileUpdateUiState.asStateFlow()
-    private val _companyCodeUpdateUiState = MutableStateFlow(CompanyCodeUpdateUiState())
-    val companyCodeUpdateUiState: StateFlow<CompanyCodeUpdateUiState> = _companyCodeUpdateUiState.asStateFlow()
+    private val _workerRegistrationCodeUiState = MutableStateFlow(WorkerRegistrationCodeUiState())
+    val workerRegistrationCodeUiState: StateFlow<WorkerRegistrationCodeUiState> = _workerRegistrationCodeUiState.asStateFlow()
     private val _recipientPhoneSearchUiState = MutableStateFlow(RecipientPhoneSearchUiState())
     val recipientPhoneSearchUiState: StateFlow<RecipientPhoneSearchUiState> = _recipientPhoneSearchUiState.asStateFlow()
     private val _advanceRemoteState =
@@ -963,50 +963,54 @@ class DemoSessionViewModel(
         }
     }
 
-    fun updateCompanyCode(companyCode: String) {
+    fun redeemWorkerRegistrationCode(registrationCode: String) {
         val session = _authUiState.value.session ?: run {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
                 message = "로그인 후 다시 시도해 주세요.",
                 isError = true
             )
             return
         }
-        val normalizedCompanyCode = companyCode.trim().uppercase()
-        if (normalizedCompanyCode.isBlank()) {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
-                message = "회사코드를 입력해 주세요.",
+        val normalizedRegistrationCode = registrationCode.trim().uppercase()
+        if (normalizedRegistrationCode.isBlank()) {
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
+                message = "등록 코드를 입력해 주세요.",
                 isError = true
             )
             return
         }
 
         viewModelScope.launch {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(isSubmitting = true)
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(isSubmitting = true)
             try {
-                val updatedSession = authRepository.updateCompanyCode(
+                val updatedSession = authRepository.redeemWorkerRegistrationCode(
                     session = session,
-                    companyCode = normalizedCompanyCode
+                    registrationCode = normalizedRegistrationCode
                 )
                 _authUiState.value = AuthUiState.authenticated(updatedSession)
-                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(message = "회사코드를 저장했어요.")
+                val companyLabel = updatedSession.companyName ?: "회사"
+                val workplaceLabel = updatedSession.workplaceName?.let { " / $it" }.orEmpty()
+                _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
+                    message = "$companyLabel$workplaceLabel 등록이 완료됐어요."
+                )
             } catch (error: AuthUnauthorizedException) {
                 expireSession(error.message)
-                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
+                _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
                     message = error.message,
                     isError = true
                 )
             } catch (error: Exception) {
-                _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState(
-                    message = error.message ?: "회사코드를 저장하지 못했어요.",
+                _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
+                    message = error.message ?: "회사 등록을 완료하지 못했어요.",
                     isError = true
                 )
             }
         }
     }
 
-    fun clearCompanyCodeUpdateMessage() {
-        if (!_companyCodeUpdateUiState.value.isSubmitting && _companyCodeUpdateUiState.value.message != null) {
-            _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState()
+    fun clearWorkerRegistrationCodeMessage() {
+        if (!_workerRegistrationCodeUiState.value.isSubmitting && _workerRegistrationCodeUiState.value.message != null) {
+            _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState()
         }
     }
 
@@ -1451,7 +1455,7 @@ class DemoSessionViewModel(
         _wageActionUiState.value = WageActionUiState()
         _remittanceActionUiState.value = RemittanceActionUiState()
         _profileUpdateUiState.value = ProfileUpdateUiState()
-        _companyCodeUpdateUiState.value = CompanyCodeUpdateUiState()
+        _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState()
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
         _menuLaunchRequest.value = null
     }

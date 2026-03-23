@@ -50,7 +50,7 @@ class BackendAuthRepository(
                 throw BackendApiException(
                     parseBackendErrorMessage(
                         responseBody = responseBody,
-                        fallbackMessage = "회원가입에 실패했어요. 입력한 정보를 다시 확인해 주세요."
+                        fallbackMessage = "?뚯썝媛?낆뿉 ?ㅽ뙣?덉뼱?? ?낅젰???뺣낫瑜??ㅼ떆 ?뺤씤??二쇱꽭??"
                     )
                 )
             }
@@ -75,7 +75,7 @@ class BackendAuthRepository(
                 throw BackendApiException(
                     parseBackendErrorMessage(
                         responseBody = responseBody,
-                        fallbackMessage = "로그인에 실패했어요. 이메일과 비밀번호를 다시 확인해 주세요."
+                        fallbackMessage = "濡쒓렇?몄뿉 ?ㅽ뙣?덉뼱?? ?대찓?쇨낵 鍮꾨?踰덊샇瑜??ㅼ떆 ?뺤씤??二쇱꽭??"
                     )
                 )
             }
@@ -90,7 +90,9 @@ class BackendAuthRepository(
                 email = data.getString("email"),
                 name = data.getString("name"),
                 phoneNumber = data.optNullableString("phoneNumber"),
-                companyCode = data.optNullableString("companyCode")
+                companyCode = data.optNullableString("companyCode"),
+                companyName = null,
+                workplaceName = null
             )
             sessionStore.save(session)
             session
@@ -117,7 +119,7 @@ class BackendAuthRepository(
             if (!response.isSuccessful) {
                 val message = parseBackendErrorMessage(
                     responseBody = responseBody,
-                    fallbackMessage = "내 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요."
+                    fallbackMessage = "???뺣낫瑜??섏젙?섏? 紐삵뻽?댁슂. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??"
                 )
                 if (response.code == 401 || response.code == 403) {
                     throw AuthUnauthorizedException(message)
@@ -137,17 +139,17 @@ class BackendAuthRepository(
         }
     }
 
-    override suspend fun updateCompanyCode(
+    override suspend fun redeemWorkerRegistrationCode(
         session: AuthSession,
-        companyCode: String
+        registrationCode: String
     ): AuthSession = withContext(Dispatchers.IO) {
         val payload = JSONObject()
-            .put("companyCode", companyCode)
+            .put("registrationCode", registrationCode)
             .toString()
         val request = Request.Builder()
-            .url("${BackendApiSupport.baseUrl}/api/auth/me/company-code")
+            .url("${BackendApiSupport.baseUrl}/api/auth/me/worker-registration-code")
             .header("Authorization", "Bearer ${session.accessToken}")
-            .put(payload.toRequestBody(JSON_MEDIA_TYPE))
+            .post(payload.toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -155,7 +157,7 @@ class BackendAuthRepository(
             if (!response.isSuccessful) {
                 val message = parseBackendErrorMessage(
                     responseBody = responseBody,
-                    fallbackMessage = "회사코드를 저장하지 못했어요. 잠시 후 다시 시도해 주세요."
+                    fallbackMessage = "근로자 등록 코드를 확인하지 못했어요. 잠시 후 다시 시도해 주세요."
                 )
                 if (response.code == 401 || response.code == 403) {
                     throw AuthUnauthorizedException(message)
@@ -166,7 +168,9 @@ class BackendAuthRepository(
             val json = JSONObject(responseBody.ifBlank { "{}" })
             val data = json.getJSONObject("data")
             val updatedSession = session.copy(
-                companyCode = data.optNullableString("companyCode")
+                companyCode = data.optNullableString("companyCode"),
+                companyName = data.optNullableString("companyName"),
+                workplaceName = data.optNullableString("workplaceName")
             )
             sessionStore.save(updatedSession)
             updatedSession
