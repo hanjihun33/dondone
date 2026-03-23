@@ -6,7 +6,9 @@ import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -56,8 +58,42 @@ public class RemittanceMetrics {
         );
     }
 
+    public void recordJobQueueDelay(Duration duration, JobType jobType) {
+        Timer.builder("dondone.remittance.job.queue.delay")
+                .tags("job_type", jobType == null ? UNKNOWN : jobType.name().toLowerCase(Locale.ROOT))
+                .register(meterRegistry)
+                .record(toNanos(duration), TimeUnit.NANOSECONDS);
+    }
+
+    public void recordTransferLifecycle(Duration duration, String terminalStatus) {
+        Timer.builder("dondone.remittance.transfer.lifecycle")
+                .tags("terminal_status", sanitize(terminalStatus))
+                .register(meterRegistry)
+                .record(toNanos(duration), TimeUnit.NANOSECONDS);
+    }
+
+    public void recordBroadcastToTerminal(Duration duration, String terminalStatus) {
+        Timer.builder("dondone.remittance.transfer.broadcast_to_terminal")
+                .tags("terminal_status", sanitize(terminalStatus))
+                .register(meterRegistry)
+                .record(toNanos(duration), TimeUnit.NANOSECONDS);
+    }
+
+    public void recordRequestToBroadcast(Duration duration) {
+        Timer.builder("dondone.remittance.transfer.request_to_broadcast")
+                .register(meterRegistry)
+                .record(toNanos(duration), TimeUnit.NANOSECONDS);
+    }
+
     private void stop(Timer.Sample sample, String metricName, String... tags) {
         sample.stop(Timer.builder(metricName).tags(tags).register(meterRegistry));
+    }
+
+    private long toNanos(Duration duration) {
+        if (duration == null || duration.isNegative()) {
+            return 0L;
+        }
+        return duration.toNanos();
     }
 
     private String sanitize(String value) {

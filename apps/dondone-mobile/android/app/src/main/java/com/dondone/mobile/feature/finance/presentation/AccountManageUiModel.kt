@@ -2,12 +2,13 @@ package com.dondone.mobile.feature.finance.presentation
 
 import com.dondone.mobile.app.session.RecipientPhoneSearchUiState
 import com.dondone.mobile.core.ui.formatKrw
-import com.dondone.mobile.core.ui.toMaskedPhoneNumber
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.remittanceRelationCodeToLabel
 import com.dondone.mobile.domain.model.remittanceRelationLabelToCode
+import com.dondone.mobile.feature.recipient.presentation.buildDemoRecipientDirectory
+import com.dondone.mobile.feature.recipient.presentation.RecipientDirectoryContactUiModel
 import java.math.RoundingMode
 
 data class TransferAccountOptionUiModel(
@@ -28,17 +29,6 @@ data class RecipientWalletUiModel(
     val selected: Boolean
 )
 
-data class WalletDirectoryContactUiModel(
-    val id: String,
-    val name: String,
-    val maskedPhoneNumber: String,
-    val searchablePhoneNumber: String,
-    val walletAddress: String?,
-    val walletAddressLabel: String,
-    val candidateUserId: Long? = null,
-    val alreadyRegistered: Boolean = false
-)
-
 data class AccountManageUiModel(
     val totalBalanceLabel: String,
     val totalBalanceText: String,
@@ -50,45 +40,11 @@ data class AccountManageUiModel(
     val recipientSectionTitle: String,
     val recipientActionText: String?,
     val recipientWallets: List<RecipientWalletUiModel>,
-    val phoneDirectory: List<WalletDirectoryContactUiModel>,
+    val phoneDirectory: List<RecipientDirectoryContactUiModel>,
     val supportsRemotePhoneSearch: Boolean,
-    val phoneSearchResults: List<WalletDirectoryContactUiModel>,
+    val phoneSearchResults: List<RecipientDirectoryContactUiModel>,
     val isPhoneSearchLoading: Boolean,
     val phoneSearchErrorMessage: String?
-)
-
-private data class WalletDirectoryContactSeed(
-    val id: String,
-    val name: String,
-    val phoneNumber: String,
-    val walletAddress: String
-)
-
-private val AccountManagePhoneDirectorySeed = listOf(
-    WalletDirectoryContactSeed(
-        id = "contact-minh",
-        name = "Minh Nguyen",
-        phoneNumber = "01028411183",
-        walletAddress = "0x7F4F0b8E8fA0d3B6bA91F5bEEfa2276c9168a20D"
-    ),
-    WalletDirectoryContactSeed(
-        id = "contact-anh",
-        name = "Anh Tran",
-        phoneNumber = "01066139214",
-        walletAddress = "0x50e8E7E74143F6A4F25e8f6b72A8092d18284D4c"
-    ),
-    WalletDirectoryContactSeed(
-        id = "contact-lina",
-        name = "Lina Park",
-        phoneNumber = "01041250871",
-        walletAddress = "0xF2D0C4b8A7E9E14A4A27055A933fA4DCC5cA8eE1"
-    ),
-    WalletDirectoryContactSeed(
-        id = "contact-jose",
-        name = "Jose Rivera",
-        phoneNumber = "01090317724",
-        walletAddress = "0x6b33B4F2ADeDd1F4e84A4c1c041cF236503A17f8"
-    )
 )
 
 fun DemoState.toAccountManageUiModel(
@@ -145,7 +101,7 @@ fun DemoState.toAccountManageUiModel(
             phoneDirectory = emptyList(),
             supportsRemotePhoneSearch = true,
             phoneSearchResults = recipientPhoneSearchUiState.results.map { candidate ->
-                WalletDirectoryContactUiModel(
+                RecipientDirectoryContactUiModel(
                     id = "search-${candidate.candidateUserId}",
                     name = candidate.displayName,
                     maskedPhoneNumber = candidate.maskedPhoneNumber,
@@ -190,29 +146,12 @@ fun DemoState.toAccountManageUiModel(
                 selected = recipient.id == remittance.selectedRecipientId
             )
         },
-        phoneDirectory = buildWalletDirectory(remittance.recipients.map { it.address }),
+        phoneDirectory = buildDemoRecipientDirectory(remittance.recipients.map { it.address }),
         supportsRemotePhoneSearch = false,
         phoneSearchResults = emptyList(),
         isPhoneSearchLoading = false,
         phoneSearchErrorMessage = null
     )
-}
-
-private fun buildWalletDirectory(registeredAddresses: List<String>): List<WalletDirectoryContactUiModel> {
-    val registered = registeredAddresses.toSet()
-    return AccountManagePhoneDirectorySeed
-        .filterNot { it.walletAddress in registered }
-        .map { contact ->
-            WalletDirectoryContactUiModel(
-                id = contact.id,
-                name = contact.name,
-                maskedPhoneNumber = contact.phoneNumber.toMaskedPhoneNumber(),
-                searchablePhoneNumber = contact.phoneNumber,
-                walletAddress = contact.walletAddress,
-                walletAddressLabel = contact.walletAddress.toShortWalletAddress(),
-                alreadyRegistered = false
-            )
-        }
 }
 
 private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenBalanceForManage(): String {

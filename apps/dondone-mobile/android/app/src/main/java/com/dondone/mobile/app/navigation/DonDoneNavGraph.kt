@@ -49,19 +49,25 @@ fun DonDoneNavGraph(
     val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
     val wageRemoteState by viewModel.wageRemoteState.collectAsStateWithLifecycle()
     val remittanceRemoteState by viewModel.remittanceRemoteState.collectAsStateWithLifecycle()
+    val vaultRemoteState by viewModel.vaultRemoteState.collectAsStateWithLifecycle()
     val wageActionUiState by viewModel.wageActionUiState.collectAsStateWithLifecycle()
     val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
+    val remittanceCompletionNoticeUiState by viewModel.remittanceCompletionNoticeUiState.collectAsStateWithLifecycle()
+    val vaultActionUiState by viewModel.vaultActionUiState.collectAsStateWithLifecycle()
     val workproofActionUiState by viewModel.workproofActionUiState.collectAsStateWithLifecycle()
     val workproofPdfPreviewUiState by viewModel.workproofPdfPreviewUiState.collectAsStateWithLifecycle()
     val workproofPdfCreateUiState by viewModel.workproofPdfCreateUiState.collectAsStateWithLifecycle()
     val workproofPdfFileUiState by viewModel.workproofPdfFileUiState.collectAsStateWithLifecycle()
     val selectedAdvanceAmount by viewModel.selectedAdvanceAmount.collectAsStateWithLifecycle()
+    val selectedVaultAmount by viewModel.selectedVaultAmount.collectAsStateWithLifecycle()
+    val selectedVaultActionType by viewModel.selectedVaultActionType.collectAsStateWithLifecycle()
     val advanceRequestUiState by viewModel.advanceRequestUiState.collectAsStateWithLifecycle()
     val advanceRequestDetailUiState by viewModel.advanceRequestDetailUiState.collectAsStateWithLifecycle()
     val profileUpdateUiState by viewModel.profileUpdateUiState.collectAsStateWithLifecycle()
     val recipientPhoneSearchUiState by viewModel.recipientPhoneSearchUiState.collectAsStateWithLifecycle()
     val transactionMetadataOverrides by viewModel.transactionMetadataOverrides.collectAsStateWithLifecycle()
     val menuLaunchRequest by viewModel.menuLaunchRequest.collectAsStateWithLifecycle()
+    val remittanceLaunchRequest by viewModel.remittanceLaunchRequest.collectAsStateWithLifecycle()
 
     LaunchedEffect(workproofActionUiState.message, workproofActionUiState.isError) {
         val message = workproofActionUiState.message ?: return@LaunchedEffect
@@ -90,6 +96,28 @@ fun DonDoneNavGraph(
         viewModel.clearWageActionMessage()
     }
 
+    LaunchedEffect(vaultActionUiState.message, vaultActionUiState.isError) {
+        val message = vaultActionUiState.message ?: return@LaunchedEffect
+        onShowToast(
+            message,
+            if (vaultActionUiState.isError) BadgeTone.Warning else BadgeTone.Success
+        )
+        viewModel.clearVaultActionMessage()
+    }
+
+    LaunchedEffect(remittanceLaunchRequest?.requestId) {
+        remittanceLaunchRequest ?: return@LaunchedEffect
+        navController.navigate(Route.HOME) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                inclusive = false
+                saveState = false
+            }
+            launchSingleTop = true
+            restoreState = false
+        }
+        viewModel.consumeRemittanceLaunchRequest()
+    }
+
     NavHost(
         modifier = modifier,
         navController = navController,
@@ -108,17 +136,22 @@ fun DonDoneNavGraph(
                     workproofActionUiState = workproofActionUiState,
                     wageRemoteState = wageRemoteState,
                     remittanceRemoteState = remittanceRemoteState,
+                    remittanceCompletionNoticeUiState = remittanceCompletionNoticeUiState,
                     isAuthenticated = authUiState.isAuthenticated
                 ),
                 onOpenTransfer = {
-                    viewModel.openTransferFlow()
-                    navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target -> navController.navigate(target) }
+                    if (viewModel.openTransferFlow()) {
+                        navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target ->
+                            navController.navigate(target)
+                        }
+                    }
                 },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenFinance = { navigateWithinApp(Route.FINANCE_HOME, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenMenu = { navigateWithinApp(Route.MENU, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenWorkproof = { navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target -> navController.navigate(target) } },
+                onDismissRemittanceCompletionNotice = viewModel::dismissRemittanceCompletionNotice,
                 onClockIn = viewModel::clockIn,
                 onClockOut = viewModel::clockOut
             )
@@ -148,13 +181,21 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toFinanceHomeUiModel(
                     remoteState = advanceRemoteState,
                     wageRemoteState = wageRemoteState,
+                    vaultRemoteState = vaultRemoteState,
                     selectedAdvanceAmount = selectedAdvanceAmount,
+                    selectedVaultAmount = selectedVaultAmount,
+                    selectedVaultActionType = selectedVaultActionType,
                     advanceRequestUiState = advanceRequestUiState,
-                    advanceRequestDetailUiState = advanceRequestDetailUiState
+                    advanceRequestDetailUiState = advanceRequestDetailUiState,
+                    vaultActionUiState = vaultActionUiState
                 ),
                 onSelectAdvanceAmount = viewModel::selectAdvanceAmount,
                 onRequestAdvance = viewModel::requestAdvance,
                 onClearAdvanceMessage = viewModel::clearAdvanceRequestMessage,
+                onSelectVaultAction = viewModel::selectVaultAction,
+                onSelectVaultAmount = viewModel::selectVaultAmount,
+                onSubmitVaultAction = viewModel::submitVaultAction,
+                onClearVaultMessage = viewModel::clearVaultActionMessage,
                 onOpenAdvanceRequestDetail = viewModel::openAdvanceRequestDetail,
                 onCloseAdvanceRequestDetail = viewModel::closeAdvanceRequestDetail
             )
@@ -169,8 +210,11 @@ fun DonDoneNavGraph(
                 onCreateVerification = viewModel::createWageVerification,
                 onRefresh = viewModel::refreshWageRemoteState,
                 onOpenTransfer = {
-                    viewModel.openTransferFlow()
-                    navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target -> navController.navigate(target) }
+                    if (viewModel.openTransferFlow()) {
+                        navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target ->
+                            navController.navigate(target)
+                        }
+                    }
                 },
                 onOpenWorkproof = { navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenMenu = {
@@ -187,14 +231,18 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toTransferUiModel(
                     remoteState = remittanceRemoteState,
                     actionUiState = remittanceActionUiState,
-                    isAuthenticated = authUiState.isAuthenticated
+                    isAuthenticated = authUiState.isAuthenticated,
+                    recipientPhoneSearchUiState = recipientPhoneSearchUiState
                 ),
+                actionUiState = remittanceActionUiState,
                 onSelectAccount = viewModel::selectAccount,
                 onSelectDestinationMode = viewModel::selectTransferDestinationMode,
                 onSelectRecipient = viewModel::selectRecipient,
                 onUpdateRecipientDisplayName = viewModel::updateRecipientDisplayName,
                 onUpdateAmount = viewModel::updateTransferAmount,
-                onCreateRecipient = viewModel::createRemittanceRecipient,
+                onAddRecipient = viewModel::addRecipientFromTransfer,
+                onSearchRecipientsByPhone = viewModel::searchRecipientsByPhone,
+                onClearPhoneSearch = viewModel::clearRecipientPhoneSearch,
                 onRefreshRemittance = viewModel::refreshRemittanceRemoteState,
                 onChangeRecipient = viewModel::showRecipientStepFromAmount,
                 onChangeAccountFromAmount = viewModel::showAccountStepFromAmount,

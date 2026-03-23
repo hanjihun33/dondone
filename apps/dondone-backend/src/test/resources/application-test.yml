@@ -17,3 +17,18 @@ remittance:
     encryption-key: c29tZXRlc3QtMzItYnl0ZS1lbmNyeXB0aW9uLWtleS0xMjM0NTY=
     funding-receipt-timeout-seconds: 1
     funding-pending-stale-seconds: 1
+
+vault:
+  policy:
+    asset-symbol: dUSDC
+    asset-decimals: 6
+    apy-bps: 500
+    disclaimer: Vault values are demo-only estimates on testnet and do not guarantee real profit.
+  worker:
+    poll-interval-ms: 600000
+    receipt-poll-delay-seconds: 0
+    receipt-timeout-seconds: 2
+  chain:
+    mode: demo
+    token-address: 0x1111111111111111111111111111111111111111
+    vault-address: 0x2222222222222222222222222222222222222222

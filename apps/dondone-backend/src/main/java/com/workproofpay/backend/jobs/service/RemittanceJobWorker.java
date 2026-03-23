@@ -5,6 +5,7 @@ import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.model.JobStatus;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
+import com.workproofpay.backend.remittance.adapter.ChainReceiptLookupException;
 import com.workproofpay.backend.remittance.adapter.ChainReceiptResult;
 import com.workproofpay.backend.remittance.adapter.PreparedTokenTransfer;
 import com.workproofpay.backend.remittance.adapter.RemittanceBlockchainGateway;
@@ -88,6 +89,7 @@ public class RemittanceJobWorker {
             if (job == null || job.getStatus() != JobStatus.QUEUED || job.getRunAt().isAfter(LocalDateTime.now())) {
                 return null;
             }
+            remittanceMetrics.recordJobQueueDelay(Duration.between(job.getRunAt(), LocalDateTime.now()), job.getJobType());
             job.markRunning();
             return new ClaimedJob(job.getId(), job.getJobType(), job.getReferenceId());
         });
@@ -142,6 +144,7 @@ public class RemittanceJobWorker {
         Transfer transfer = requiredTransfer(transferId);
         if (transfer.getStatus() == TransferStatus.SIGNED) {
             transfer.markBroadcasted();
+            remittanceMetrics.recordRequestToBroadcast(Duration.between(transfer.getCreatedAt(), transfer.getUpdatedAt()));
         }
         enqueuePollJobIfAbsent(transferId);
         requiredJob(jobId).markDone();
@@ -168,6 +171,9 @@ public class RemittanceJobWorker {
 
             Optional<ChainReceiptResult> receiptResult = blockchainGateway.getReceipt(pollTarget.txHash());
             outcome = transactionTemplate.execute(status -> applyPollResult(claimedJob.jobId(), pollTarget.transferId(), receiptResult));
+        } catch (ChainReceiptLookupException e) {
+            transactionTemplate.executeWithoutResult(status -> requeueClaimedJob(claimedJob.jobId(), nextPollAt(), e.getMessage()));
+            outcome = "requeued_receipt_lookup_error";
         } finally {
             remittanceMetrics.recordWorkerJob(sample, JobType.POLL_TRANSFER_RECEIPT, outcome);
         }
@@ -180,10 +186,13 @@ public class RemittanceJobWorker {
             job.markDone();
             return "skipped";
         }
+        LocalDateTime broadcastedAt = transfer.getUpdatedAt();
 
         if (receiptResult.isEmpty()) {
             if (isReceiptTimedOut(transfer) && !blockchainGateway.isTransactionKnown(transfer.getTxHash())) {
                 transfer.markTimedOut(TransferFailureCode.NETWORK_ERROR);
+                remittanceMetrics.recordTransferLifecycle(Duration.between(transfer.getCreatedAt(), LocalDateTime.now()), transfer.getStatus().name());
+                remittanceMetrics.recordBroadcastToTerminal(Duration.between(broadcastedAt, LocalDateTime.now()), transfer.getStatus().name());
                 job.markDone();
                 return "timed_out_network_error";
             }
@@ -197,6 +206,8 @@ public class RemittanceJobWorker {
 
         if (receiptResult.get().success()) {
             transfer.markConfirmed(receiptResult.get().networkFeeWei());
+            remittanceMetrics.recordTransferLifecycle(Duration.between(transfer.getCreatedAt(), LocalDateTime.now()), transfer.getStatus().name());
+            remittanceMetrics.recordBroadcastToTerminal(Duration.between(broadcastedAt, LocalDateTime.now()), transfer.getStatus().name());
             job.markDone();
             return "confirmed";
         }
@@ -205,6 +216,8 @@ public class RemittanceJobWorker {
                 receiptResult.get().failureCode() == null ? TransferFailureCode.UNKNOWN : receiptResult.get().failureCode(),
                 receiptResult.get().networkFeeWei()
         );
+        remittanceMetrics.recordTransferLifecycle(Duration.between(transfer.getCreatedAt(), LocalDateTime.now()), transfer.getStatus().name());
+        remittanceMetrics.recordBroadcastToTerminal(Duration.between(broadcastedAt, LocalDateTime.now()), transfer.getStatus().name());
         job.markDone();
         return "failed_" + (receiptResult.get().failureCode() == null
                 ? TransferFailureCode.UNKNOWN.name()
@@ -262,15 +275,28 @@ public class RemittanceJobWorker {
         });
     }
 
+    private void requeueClaimedJob(Long jobId, LocalDateTime nextRunAt, String lastError) {
+        Job job = requiredJob(jobId);
+        if (job.getStatus() == JobStatus.RUNNING) {
+            job.requeue(nextRunAt, lastError);
+        }
+    }
+
     private void markTransferFailed(String transferId, TransferFailureCode failureCode) {
         Transfer transfer = transferRepository.findById(transferId).orElse(null);
         if (transfer == null) {
             return;
         }
+        TransferStatus previousStatus = transfer.getStatus();
+        LocalDateTime previousUpdatedAt = transfer.getUpdatedAt();
         if (transfer.getStatus() == TransferStatus.REQUESTED
                 || transfer.getStatus() == TransferStatus.SIGNED
                 || transfer.getStatus() == TransferStatus.BROADCASTED) {
             transfer.markFailed(failureCode, null);
+            remittanceMetrics.recordTransferLifecycle(Duration.between(transfer.getCreatedAt(), LocalDateTime.now()), transfer.getStatus().name());
+            if (previousStatus == TransferStatus.BROADCASTED) {
+                remittanceMetrics.recordBroadcastToTerminal(Duration.between(previousUpdatedAt, LocalDateTime.now()), transfer.getStatus().name());
+            }
         }
     }
 

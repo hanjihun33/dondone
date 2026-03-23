@@ -545,38 +545,45 @@
 - `P0-확정`
 
 ### 목표
-- 남는 돈을 `보관해본다`는 경험과 예상 이자 미리보기를 제공하되, 실제 수익 상품처럼 보이지 않게 한다.
+- testnet vault에 예치하고 출금하는 경험과 예상 이자 미리보기를 제공하되, 실제 수익 상품처럼 보이지 않게 한다.
 
 ### 범위
 - Vault 요약 조회
-- 보관 금액 설정
-- 보관 금액 해제
+- 예치 요청 생성
+- 출금 요청 생성
+- 거래 상태 조회
 
 ### 범위 제외
 - 목표 저축(P1)
 - 실제 메인넷 연동(P1)
-- 실제 예치/락업/수익 실현
+- 실제 수익 보장 또는 실정산
 
 ### 핵심 흐름
-1. 사용자가 Vault summary에서 stored amount, 사용 가능 금액, 이자 미리보기를 본다.
-2. 사용자가 일부 금액을 `보관 중` 상태로 이동시킨다.
-3. 필요 시 금액을 `SPENDABLE` 또는 `TRANSFERABLE`로 되돌린다.
+1. 사용자가 Vault summary에서 현재 principal, 지갑 잔액, 예상 이자 미리보기를 본다.
+2. 사용자가 `deposit` 요청을 생성한다.
+3. 백엔드는 testnet 트랜잭션을 비동기로 제출하고 상태를 갱신한다.
+4. 사용자는 거래 목록/상세에서 `REQUESTED`, `BROADCASTED`, `CONFIRMED` 상태를 확인한다.
+5. 필요 시 `withdraw` 요청으로 일부 금액을 지갑으로 되돌린다.
 
 ### 주요 규칙
-- Vault는 P0에서 순수 시뮬레이션이다.
-- 실제 온체인 예치나 락업은 수행하지 않는다.
+- Vault는 testnet/demo 범위에서만 동작한다.
+- 서버는 저장된 사용자 지갑 키를 사용해 testnet 예치/출금 트랜잭션을 처리한다.
+- 동일 사용자 기준 active vault transaction은 한 번에 하나만 허용한다.
+- `Idempotency-Key` 헤더로 중복 요청을 제어한다.
 - 이자 미리보기는 예시값이며 수익 보장을 의미하지 않는다.
-- release의 `target`은 화면 해석과 잔액 분기를 위한 값이다.
 
 ### API 매핑
 - `GET /api/vault/summary`
-- `POST /api/vault/allocations`
-- `POST /api/vault/releases`
+- `POST /api/vault/deposits`
+- `POST /api/vault/withdrawals`
+- `GET /api/vault/transactions`
+- `GET /api/vault/transactions/{requestId}`
 
 ### v0 가정
-- `interestPreview.daily`, `monthly`, `apr`는 시뮬레이션 값이다.
-- allocation/release는 시뮬레이션 잔액만 갱신한다.
-- Remittance와 잔액 해석은 연결되지만 실제 자금 이동은 아니다.
+- `interestPreview`는 예시 APY 기반 추정값이다.
+- deposit/withdraw는 testnet 환경에서만 수행한다.
+- Remittance와 Vault는 같은 사용자 서버 지갑을 재사용한다.
+- wallet token balance가 곧 송금 가능 토큰 잔액이다.
 
 ### 열린 질문
 - Vault의 기본 preview yield 수치를 어떤 값으로 둘지 여부

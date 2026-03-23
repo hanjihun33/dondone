@@ -1,6 +1,7 @@
 package com.dondone.mobile.feature.remittance.presentation
 
 import com.dondone.mobile.app.session.RemittanceActionUiState
+import com.dondone.mobile.app.session.RecipientPhoneSearchUiState
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
@@ -8,6 +9,8 @@ import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.recipient.presentation.buildDemoRecipientDirectory
+import com.dondone.mobile.feature.recipient.presentation.RecipientDirectoryContactUiModel
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.Locale
@@ -83,6 +86,11 @@ data class TransferUiModel(
     val recipientScreenTitle: String,
     val recipientSearchPlaceholderText: String,
     val showAddRecipientAction: Boolean,
+    val addRecipientPhoneDirectory: List<RecipientDirectoryContactUiModel>,
+    val addRecipientSupportsRemotePhoneSearch: Boolean,
+    val addRecipientPhoneSearchResults: List<RecipientDirectoryContactUiModel>,
+    val addRecipientPhoneSearchLoading: Boolean,
+    val addRecipientPhoneSearchErrorMessage: String?,
     val accounts: List<TransferAccountUiModel>,
     val recipientSections: List<TransferRecipientSectionUiModel>
 )
@@ -90,7 +98,8 @@ data class TransferUiModel(
 fun DemoState.toTransferUiModel(
     remoteState: RemittanceRemoteState,
     actionUiState: RemittanceActionUiState,
-    isAuthenticated: Boolean
+    isAuthenticated: Boolean,
+    recipientPhoneSearchUiState: RecipientPhoneSearchUiState = RecipientPhoneSearchUiState()
 ): TransferUiModel {
     val isRemoteMode = isAuthenticated
     val remotePayload = remoteState.payload
@@ -192,6 +201,34 @@ fun DemoState.toTransferUiModel(
         recipientScreenTitle = if (isRemoteMode) "받을 지갑을 선택해 주세요" else "받을 계좌를 선택해 주세요",
         recipientSearchPlaceholderText = if (isRemoteMode) "지갑 주소 검색" else "계좌명 입력",
         showAddRecipientAction = isRemoteMode,
+        addRecipientPhoneDirectory = if (isRemoteMode) {
+            emptyList()
+        } else {
+            buildDemoRecipientDirectory(remittance.recipients.map { it.address })
+        },
+        addRecipientSupportsRemotePhoneSearch = isRemoteMode,
+        addRecipientPhoneSearchResults = if (isRemoteMode) {
+            recipientPhoneSearchUiState.results.map { candidate ->
+                RecipientDirectoryContactUiModel(
+                    id = "search-${candidate.candidateUserId}",
+                    name = candidate.displayName,
+                    maskedPhoneNumber = candidate.maskedPhoneNumber,
+                    searchablePhoneNumber = "",
+                    walletAddress = null,
+                    walletAddressLabel = candidate.walletAddressMasked,
+                    candidateUserId = candidate.candidateUserId,
+                    alreadyRegistered = candidate.alreadyRegistered
+                )
+            }
+        } else {
+            emptyList()
+        },
+        addRecipientPhoneSearchLoading = isRemoteMode && recipientPhoneSearchUiState.isLoading,
+        addRecipientPhoneSearchErrorMessage = if (isRemoteMode) {
+            recipientPhoneSearchUiState.errorMessage
+        } else {
+            null
+        },
         accounts = remoteAccount?.let(::listOf) ?: remittance.accounts.map { account ->
             TransferAccountUiModel(
                 id = account.id,

@@ -1,5 +1,6 @@
 package com.dondone.mobile.feature.home.presentation
 
+import com.dondone.mobile.app.session.RemittanceCompletionNoticeUiState
 import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
@@ -51,16 +52,24 @@ data class HomeMoneyUiModel(
     val nextAction: HomeNextActionUiModel
 )
 
+data class HomeCompletionBannerUiModel(
+    val title: String,
+    val message: String,
+    val tone: BadgeTone
+)
+
 data class HomeUiModel(
     val account: HomeAccountUiModel,
     val work: HomeWorkUiModel,
-    val money: HomeMoneyUiModel
+    val money: HomeMoneyUiModel,
+    val completionBanner: HomeCompletionBannerUiModel? = null
 )
 
 fun DemoState.toHomeUiModel(
     workproofActionUiState: WorkproofActionUiState? = null,
     wageRemoteState: WageRemoteState? = null,
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
+    remittanceCompletionNoticeUiState: RemittanceCompletionNoticeUiState = RemittanceCompletionNoticeUiState(),
     isAuthenticated: Boolean = false
 ): HomeUiModel {
     val selectedAccount = remittance.selectedAccount()
@@ -86,7 +95,6 @@ fun DemoState.toHomeUiModel(
     val isDepositRecorded = remoteSummary?.actualDepositAmount != null || wage.actualDepositRecordedDay != null
     val hasDifference = remoteSummary?.differenceAmount?.let { it != 0L } ?: (wageEstimate.difference != 0)
     val isPaydayUpcoming = demo.asOfDay < wage.paydayDay
-    val isTransferConfirmed = remittance.status == TransferStatus.CONFIRMED
 
     val nextAction = when {
         !isDepositRecorded && isPaydayUpcoming -> HomeNextActionUiModel(
@@ -110,13 +118,6 @@ fun DemoState.toHomeUiModel(
             actionTarget = HomeActionTarget.WAGE
         )
 
-        isTransferConfirmed -> HomeNextActionUiModel(
-            title = "다음 행동",
-            message = "흐름이 완료되었습니다. 필요하면 영수증/문서를 다시 확인해볼 수 있어요.",
-            buttonText = "문서",
-            actionTarget = HomeActionTarget.MENU
-        )
-
         else -> HomeNextActionUiModel(
             title = "다음 행동",
             message = "현재는 확인이 필요한 차이가 크지 않아 문서/송금 흐름으로 이동할 수 있어요.",
@@ -124,6 +125,7 @@ fun DemoState.toHomeUiModel(
             actionTarget = HomeActionTarget.FINANCE
         )
     }
+    val completionBanner = remittanceCompletionNoticeUiState.toHomeCompletionBannerUiModel()
 
     return HomeUiModel(
         account = resolveHomeAccountUiModel(
@@ -144,7 +146,8 @@ fun DemoState.toHomeUiModel(
         money = HomeMoneyUiModel(
             showWorkActionCard = isDepositRecorded && hasDifference,
             nextAction = nextAction
-        )
+        ),
+        completionBanner = completionBanner
     )
 }
 
@@ -193,6 +196,29 @@ private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.fo
         ?.setScale(2, RoundingMode.DOWN)
         ?: return "잔액 확인 중"
     return normalized.stripTrailingZeros().toPlainString()
+}
+
+private fun RemittanceCompletionNoticeUiState.toHomeCompletionBannerUiModel(): HomeCompletionBannerUiModel? {
+    if (!isVisible || status == null) {
+        return null
+    }
+
+    val recipientLabel = recipientName ?: "등록한 수신자"
+    return when (status) {
+        TransferStatus.CONFIRMED -> HomeCompletionBannerUiModel(
+            title = "송금 완료",
+            message = "${recipientLabel}에게 송금이 완료됐어요.",
+            tone = BadgeTone.Success
+        )
+
+        TransferStatus.FAILED -> HomeCompletionBannerUiModel(
+            title = "송금 실패",
+            message = "${recipientLabel}에게 송금을 마치지 못했어요. 잠시 후 다시 시도해 주세요.",
+            tone = BadgeTone.Warning
+        )
+
+        else -> null
+    }
 }
 
 private fun com.dondone.mobile.domain.model.WorkproofData.isWithinWorkplaceRadius(): Boolean {

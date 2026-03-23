@@ -23,6 +23,7 @@ public enum ErrorCode {
     REQUEST_AMOUNT_EXCEEDS_LIMIT(HttpStatus.BAD_REQUEST, "Requested amount exceeds the available advance limit"),
     IDEMPOTENCY_KEY_REQUIRED(HttpStatus.BAD_REQUEST, "Idempotency-Key header is required"),
     INVALID_WALLET_ADDRESS(HttpStatus.BAD_REQUEST, "walletAddress must be a valid EVM address"),
+    INVALID_VAULT_AMOUNT(HttpStatus.BAD_REQUEST, "Vault amount must be greater than 0"),
 
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication is required"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "You do not have permission to access this resource"),
@@ -51,6 +52,7 @@ public enum ErrorCode {
     RECIPIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Recipient not found"),
     TRANSFER_NOT_FOUND(HttpStatus.NOT_FOUND, "Transfer not found"),
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "Wallet not found"),
+    VAULT_TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "Vault transaction not found"),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email already exists"),
     PHONE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "Phone number already exists"),
@@ -76,6 +78,11 @@ public enum ErrorCode {
     SELF_TRANSFER_NOT_ALLOWED(HttpStatus.CONFLICT, "Sending to your own wallet is not allowed"),
     INSUFFICIENT_WALLET_BALANCE(HttpStatus.CONFLICT, "Wallet balance is insufficient for this transfer"),
     TRANSFER_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "Another transfer is already in progress"),
+    VAULT_INSUFFICIENT_AVAILABLE_BALANCE(HttpStatus.CONFLICT, "Available balance is insufficient for this vault deposit"),
+    VAULT_INSUFFICIENT_STORED_BALANCE(HttpStatus.CONFLICT, "Stored balance is insufficient for this vault withdrawal"),
+    VAULT_ALLOWANCE_REQUIRED(HttpStatus.CONFLICT, "Vault token approval failed"),
+    VAULT_TRANSACTION_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "Another vault transaction is already in progress"),
+    VAULT_CONFIG_MISSING(HttpStatus.CONFLICT, "Vault configuration is missing"),
     WALLET_FUNDING_FAILED(HttpStatus.CONFLICT, "Wallet funding failed"),
     RECOVERY_ACTION_NOT_ALLOWED(HttpStatus.CONFLICT, "Recovery action is not allowed for the current state"),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),

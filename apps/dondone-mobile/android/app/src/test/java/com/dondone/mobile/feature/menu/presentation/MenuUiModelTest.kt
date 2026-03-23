@@ -4,6 +4,7 @@ import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -15,7 +16,8 @@ class MenuUiModelTest {
     fun `menu documents exclude receipt and keep service receipt entry separate`() {
         val uiModel = DemoSeedFactory.create().toMenuUiModel(
             session = null,
-            remittanceRemoteState = defaultRemoteState()
+            remittanceRemoteState = defaultRemoteState(),
+            workproofPdfCreateUiState = WorkproofPdfCreateUiState()
         )
 
         assertEquals(2, uiModel.documents.size)
@@ -30,7 +32,8 @@ class MenuUiModelTest {
             .copy(remittance = seed.remittance.copy(status = TransferStatus.SUBMITTED))
             .toMenuUiModel(
                 session = null,
-                remittanceRemoteState = defaultRemoteState()
+                remittanceRemoteState = defaultRemoteState(),
+                workproofPdfCreateUiState = WorkproofPdfCreateUiState()
             )
 
         val receipt = requireNotNull(uiModel.receipt)
@@ -51,7 +54,8 @@ class MenuUiModelTest {
     fun `idle state still exposes latest confirmed receipt session`() {
         val uiModel = DemoSeedFactory.create().toMenuUiModel(
             session = null,
-            remittanceRemoteState = defaultRemoteState()
+            remittanceRemoteState = defaultRemoteState(),
+            workproofPdfCreateUiState = WorkproofPdfCreateUiState()
         )
         val receipt = requireNotNull(uiModel.receipt)
 
@@ -73,7 +77,8 @@ class MenuUiModelTest {
             )
             .toMenuUiModel(
                 session = null,
-                remittanceRemoteState = defaultRemoteState()
+                remittanceRemoteState = defaultRemoteState(),
+                workproofPdfCreateUiState = WorkproofPdfCreateUiState()
             )
 
         val receipt = requireNotNull(uiModel.receipt)

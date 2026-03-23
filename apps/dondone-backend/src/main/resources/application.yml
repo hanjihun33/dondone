@@ -40,8 +40,8 @@ remittance:
     max-auto-retry-count: ${REMITTANCE_MAX_AUTO_RETRY_COUNT:2}
     default-list-limit: ${REMITTANCE_DEFAULT_LIST_LIMIT:20}
   worker:
-    poll-interval-ms: ${REMITTANCE_WORKER_POLL_INTERVAL_MS:2000}
-    receipt-poll-delay-seconds: ${REMITTANCE_RECEIPT_POLL_DELAY_SECONDS:2}
+    poll-interval-ms: ${REMITTANCE_WORKER_POLL_INTERVAL_MS:500}
+    receipt-poll-delay-seconds: ${REMITTANCE_RECEIPT_POLL_DELAY_SECONDS:0}
     receipt-timeout-seconds: ${REMITTANCE_RECEIPT_TIMEOUT_SECONDS:300}
   chain:
     mode: ${REMITTANCE_CHAIN_MODE:demo}
@@ -58,6 +58,28 @@ remittance:
     private-key: ${REMITTANCE_TREASURY_PRIVATE_KEY:}
     initial-token-amount-atomic: ${REMITTANCE_INITIAL_TOKEN_AMOUNT_ATOMIC:500000000}
     initial-native-amount-wei: ${REMITTANCE_INITIAL_NATIVE_AMOUNT_WEI:10000000000000000}
+
+vault:
+  policy:
+    asset-symbol: ${VAULT_ASSET_SYMBOL:${REMITTANCE_ASSET_SYMBOL:dUSDC}}
+    asset-decimals: ${VAULT_ASSET_DECIMALS:${REMITTANCE_ASSET_DECIMALS:6}}
+    apy-bps: ${VAULT_APY_BPS:500}
+    default-list-limit: ${VAULT_DEFAULT_LIST_LIMIT:20}
+    disclaimer: ${VAULT_DISCLAIMER:Vault values are demo-only estimates on testnet and do not guarantee real profit.}
+  worker:
+    poll-interval-ms: ${VAULT_WORKER_POLL_INTERVAL_MS:2000}
+    receipt-poll-delay-seconds: ${VAULT_RECEIPT_POLL_DELAY_SECONDS:2}
+    receipt-timeout-seconds: ${VAULT_RECEIPT_TIMEOUT_SECONDS:300}
+  chain:
+    mode: ${VAULT_CHAIN_MODE:${REMITTANCE_CHAIN_MODE:demo}}
+    rpc-url: ${VAULT_CHAIN_RPC_URL:${REMITTANCE_CHAIN_RPC_URL:}}
+    chain-id: ${VAULT_CHAIN_ID:${REMITTANCE_CHAIN_ID:11155111}}
+    token-address: ${VAULT_TOKEN_ADDRESS:${REMITTANCE_TOKEN_ADDRESS:}}
+    vault-address: ${VAULT_ADDRESS:}
+    token-approve-gas-limit: ${VAULT_TOKEN_APPROVE_GAS_LIMIT:100000}
+    vault-gas-limit: ${VAULT_GAS_LIMIT:200000}
+    approval-receipt-timeout-seconds: ${VAULT_APPROVAL_RECEIPT_TIMEOUT_SECONDS:60}
+    network: ${VAULT_NETWORK:sepolia}
 
 springdoc:
   swagger-ui:

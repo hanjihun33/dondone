@@ -3,7 +3,6 @@ package com.dondone.mobile.feature.workproof.presentation
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.YearMonth
@@ -23,7 +22,10 @@ class WorkproofUiModelTest {
 
         val uiModel = state.toWorkproofUiModel()
 
-        assertEquals(WorkproofCalculator.verify(state).verifiedDays, uiModel.summary.verifiedDays)
+        assertEquals(
+            WorkproofCalculator.visibleRecords(state).size,
+            uiModel.recentRecords.size
+        )
     }
 
     @Test
@@ -43,28 +45,28 @@ class WorkproofUiModelTest {
     }
 
     @Test
-    fun `today times stay null until recorded`() {
+    fun `clock in is available until recorded`() {
         val uiModel = DemoSeedFactory.create().toWorkproofUiModel()
 
-        assertNull(uiModel.summary.todayInTime)
-        assertNull(uiModel.summary.todayOutTime)
+        assertTrue(uiModel.summary.canClockIn)
+        assertTrue(!uiModel.summary.canClockOut)
     }
 
     @Test
-    fun `today times include date once recorded`() {
+    fun `clock out becomes available after clock in`() {
         val seed = DemoSeedFactory.create()
         val state = seed.copy(
             workproof = seed.workproof.copy(
                 today = seed.workproof.today.copy(
                     clockIn = "09:00",
-                    clockOut = "18:00"
+                    clockOut = null
                 )
             )
         )
 
         val uiModel = state.toWorkproofUiModel()
 
-        assertEquals("2026.03.28 · 09:00", uiModel.summary.todayInTime)
-        assertEquals("2026.03.28 · 18:00", uiModel.summary.todayOutTime)
+        assertTrue(!uiModel.summary.canClockIn)
+        assertTrue(uiModel.summary.canClockOut)
     }
 }

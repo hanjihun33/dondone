@@ -220,7 +220,7 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
             return Optional.of(new ChainReceiptResult(false, TransferFailureCode.CHAIN_REVERT, networkFeeWei));
         } catch (IOException e) {
             outcome = "error";
-            return Optional.empty();
+            throw new ChainReceiptLookupException("failed to fetch transaction receipt", e);
         } finally {
             remittanceMetrics.recordChainOperation(sample, properties.getChain().getMode(), "get_receipt", outcome);
         }
@@ -294,12 +294,16 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
     private void waitForSuccessfulReceipt(String txHash) {
         Instant deadline = Instant.now().plusSeconds(properties.getWallet().getFundingReceiptTimeoutSeconds());
         while (Instant.now().isBefore(deadline)) {
-            Optional<ChainReceiptResult> receiptResult = getReceipt(txHash);
-            if (receiptResult.isPresent()) {
-                if (!receiptResult.get().success()) {
-                    throw new IllegalStateException("funding transaction reverted: " + txHash);
+            try {
+                Optional<ChainReceiptResult> receiptResult = getReceipt(txHash);
+                if (receiptResult.isPresent()) {
+                    if (!receiptResult.get().success()) {
+                        throw new IllegalStateException("funding transaction reverted: " + txHash);
+                    }
+                    return;
                 }
-                return;
+            } catch (ChainReceiptLookupException ignored) {
+                // Funding should tolerate transient RPC lookup failures and keep polling until timeout.
             }
             try {
                 Thread.sleep(1_000L);
