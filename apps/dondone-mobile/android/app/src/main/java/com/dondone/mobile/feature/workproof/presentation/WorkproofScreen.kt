@@ -495,7 +495,6 @@ private fun WorkproofPunchCard(
     val canClockIn = uiModel.canClockIn && uiModel.isWithinWorkplaceRadius
     val canClockOut = uiModel.canClockOut
     val showClockInRadiusFeedback = uiModel.canClockIn && !uiModel.isWithinWorkplaceRadius
-    val showClockOutRadiusFeedback = false
 
     WorkproofSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -537,7 +536,7 @@ private fun WorkproofPunchCard(
                 }
                 WorkproofActionButtonWithFeedback(
                     enabled = canClockOut,
-                    showDisabledFeedback = showClockOutRadiusFeedback,
+                    showDisabledFeedback = false,
                     onDisabledClick = { showWorkproofRadiusToast(context) },
                     modifier = Modifier.weight(1f)
                 ) {
