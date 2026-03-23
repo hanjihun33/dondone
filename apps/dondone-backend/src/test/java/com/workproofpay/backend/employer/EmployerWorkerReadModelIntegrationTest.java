@@ -17,8 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -177,10 +177,10 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.latestRecord.clockOutOutsideAllowedRadius").value(true))
                 .andExpect(jsonPath("$.data.latestRecord.edited").value(false))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceName").value("Seoul Hub"))
-                .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("서울특별시 강남구 테헤란로 212"))
+                .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("?쒖슱?밸퀎??媛뺣궓援??뚰뿤?濡?212"))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceMapLabel").doesNotExist())
-                .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("정문"))
-                .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("후문"))
+                .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("?뺣Ц"))
+                .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("?꾨文"))
                 .andExpect(jsonPath("$.data.recentDays.length()").value(7))
                 .andExpect(jsonPath("$.data.recentDays[6].date").value(fixture.today().toString()))
                 .andExpect(jsonPath("$.data.recentDays[6].attendanceStatus").value("NEEDS_REVIEW"))
@@ -256,7 +256,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 workplaceOwner,
                 company.getId(),
                 "Seoul Hub",
-                "서울특별시 강남구 테헤란로 212",
+                "?쒖슱?밸퀎??媛뺣궓援??뚰뿤?濡?212",
                 null,
                 37.501274,
                 127.039585,
@@ -266,7 +266,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 workplaceOwner,
                 otherCompany.getId(),
                 "Busan Hub",
-                "부산광역시 해운대구 센텀중앙로 48",
+                "遺?곌킅??떆 ?댁슫?援??쇳?以묒븰濡?48",
                 null,
                 35.171,
                 129.131,
@@ -311,7 +311,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 LocalDateTime.now(),
                 37.501274,
                 127.039585,
-                "정문"
+                "?뺣文"
         ));
 
         workProofRepository.save(completedRecord(
@@ -387,14 +387,14 @@ class EmployerWorkerReadModelIntegrationTest {
                 LocalDateTime.now(),
                 37.501274,
                 127.039585,
-                "정문"
+                "?뺣文"
         );
         record.completeCheckOut(
                 workDate.atTime(checkOutHour, checkOutMinute),
                 LocalDateTime.now(),
                 outsideAllowedRadius ? 37.506000 : 37.501274,
                 outsideAllowedRadius ? 127.050000 : 127.039585,
-                outsideAllowedRadius ? "후문" : "정문",
+                outsideAllowedRadius ? "?꾨文" : "?뺣文",
                 outsideAllowedRadius
         );
         return record;
