@@ -61,6 +61,7 @@ private val FinanceAdvanceSheetHeroBorder = Color(0xFFE9DFFF)
 private val FinanceAdvanceSheetMutedBackground = Color(0xFFF8FAFC)
 private val FinanceAdvanceSheetMutedBorder = Color(0xFFE2E8F0)
 private val FinanceAdvanceSheetWarningBorder = Color(0xFFFDE68A)
+private val FinanceAdvanceSheetWarningBackground = Color(0xFFFFFBEB)
 private val FinanceAdvanceSheetDefaultText = Color(0xFF94A3B8)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -187,20 +188,39 @@ private fun FinanceAdvanceSection(
     FinanceBlockSection(
         title = "미리받기",
         description = "",
-        trailing = { FinanceCapsule(text = uiModel.statusText) }
+        trailing = {
+            if (uiModel.statusText != "-") {
+                FinanceCapsule(text = "상환 ${uiModel.statusText}")
+            } else {
+                Spacer(modifier = Modifier.height(1.dp))
+            }
+        }
     ) {
         Text(
             text = uiModel.sourceLabelText,
             style = MaterialTheme.typography.labelSmall,
             color = FinanceTextMuted
         )
+        FinanceAdvanceHeroCard(
+            surfaceState = uiModel.surfaceState,
+            title = uiModel.stateTitleText,
+            body = uiModel.stateBodyText,
+            availableText = uiModel.availableText,
+            repaymentDueText = uiModel.repaymentDueText
+        )
+        if (uiModel.noticeTitleText != null && uiModel.noticeBodyText != null) {
+            FinanceAdvanceNoticePanel(
+                title = uiModel.noticeTitleText,
+                body = uiModel.noticeBodyText
+            )
+        }
         FinanceInnerPanel {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "다음 구간 진행도",
+                    text = "다음 한도 구간",
                     style = MaterialTheme.typography.labelLarge,
                     color = FinanceTextMuted
                 )
@@ -217,19 +237,6 @@ private fun FinanceAdvanceSection(
                 color = FinanceTextMuted
             )
         }
-        FinanceAdvanceStatePanel(
-            surfaceState = uiModel.surfaceState,
-            title = uiModel.stateTitleText,
-            body = uiModel.stateBodyText
-        )
-        if (uiModel.noticeTitleText != null && uiModel.noticeBodyText != null) {
-            FinanceAdvanceNoticePanel(
-                title = uiModel.noticeTitleText,
-                body = uiModel.noticeBodyText
-            )
-        }
-        FinanceKeyValueRow(label = "지금 가능 금액", value = uiModel.availableText)
-        FinanceKeyValueRow(label = "상환 예정일", value = uiModel.repaymentDueText)
         FinancePrimaryButton(
             text = uiModel.actionText,
             modifier = Modifier.fillMaxWidth(),
@@ -741,17 +748,83 @@ private fun FinanceAdvanceStatePanel(
 }
 
 @Composable
+private fun FinanceAdvanceHeroCard(
+    surfaceState: AdvanceSurfaceState,
+    title: String,
+    body: String,
+    availableText: String,
+    repaymentDueText: String
+) {
+    val borderColor = when (surfaceState) {
+        AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHeroBorder
+        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetWarningBorder
+        else -> FinanceDivider
+    }
+    val backgroundColor = when (surfaceState) {
+        AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHero
+        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetWarningBackground
+        else -> FinanceSurfaceMuted
+    }
+
+    FinanceSheetPanel(
+        backgroundColor = backgroundColor,
+        borderColor = borderColor
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary
+        )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = FinanceTextMuted
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "지금 가능 금액",
+                style = MaterialTheme.typography.labelLarge,
+                color = FinanceTextMuted
+            )
+            Text(
+                text = availableText,
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                color = FinanceTextPrimary
+            )
+        }
+        HorizontalDivider(color = borderColor)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "상환 예정일",
+                style = MaterialTheme.typography.labelLarge,
+                color = FinanceTextMuted
+            )
+            Text(
+                text = repaymentDueText,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+                color = FinanceTextPrimary
+            )
+        }
+    }
+}
+
+@Composable
 private fun FinanceAdvanceNoticePanel(
     title: String,
     body: String
 ) {
     FinanceSheetPanel(
-        backgroundColor = FinanceSurfaceMuted,
-        borderColor = FinanceDivider
+        backgroundColor = FinanceAdvanceSheetWarningBackground,
+        borderColor = FinanceAdvanceSheetWarningBorder
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
             color = FinanceTextPrimary
         )
         Text(
