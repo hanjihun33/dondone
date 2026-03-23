@@ -190,8 +190,33 @@ class AdminEmployerCompanyIntegrationTest {
         mockMvc.perform(post("/api/admin/employers/companies")
                         .header("Authorization", "Bearer " + employerToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
+                .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCreateCompanyRejectsInvalidCompanyCodeFormat() throws Exception {
+        userRepository.save(User.registerAdmin(
+                "admin@dondone.local",
+                passwordEncoder.encode("qweqwe123"),
+                "Service Admin"
+        ));
+
+        String adminToken = loginAndReadAccessToken(new LoginRequest("admin@dondone.local", "qweqwe123"));
+
+        AdminCreateEmployerCompanyRequest createRequest = new AdminCreateEmployerCompanyRequest(
+                "Acme Logistics",
+                "돈던 서울"
+        );
+
+        mockMvc.perform(post("/api/admin/employers/companies")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.details[0].field").value("companyCode"))
+                .andExpect(jsonPath("$.details[0].message").value("companyCode format is invalid"));
     }
 
     private String loginAndReadAccessToken(LoginRequest request) throws Exception {

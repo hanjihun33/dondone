@@ -17,8 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -177,7 +177,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.latestRecord.clockOutOutsideAllowedRadius").value(true))
                 .andExpect(jsonPath("$.data.latestRecord.edited").value(false))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceName").value("Seoul Hub"))
-                .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("서울특별시 강남구 테헤란로 212"))
+                .andExpect(jsonPath("$.data.latestRecord.workplaceAddress").value("212 Teheran-ro, Gangnam-gu, Seoul"))
                 .andExpect(jsonPath("$.data.latestRecord.workplaceMapLabel").doesNotExist())
                 .andExpect(jsonPath("$.data.latestRecord.clockInLocationLabel").value("정문"))
                 .andExpect(jsonPath("$.data.latestRecord.clockOutLocationLabel").value("후문"))
@@ -256,7 +256,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 workplaceOwner,
                 company.getId(),
                 "Seoul Hub",
-                "서울특별시 강남구 테헤란로 212",
+                "212 Teheran-ro, Gangnam-gu, Seoul",
                 null,
                 37.501274,
                 127.039585,
@@ -266,7 +266,7 @@ class EmployerWorkerReadModelIntegrationTest {
                 workplaceOwner,
                 otherCompany.getId(),
                 "Busan Hub",
-                "부산광역시 해운대구 센텀중앙로 48",
+                "48 Suyeong-ro, Nam-gu, Busan",
                 null,
                 35.171,
                 129.131,

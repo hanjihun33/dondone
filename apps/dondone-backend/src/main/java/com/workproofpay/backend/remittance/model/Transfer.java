@@ -196,12 +196,20 @@ public class Transfer {
         this.failureCode = null;
     }
 
+    public void markConfirmed() {
+        markConfirmed(null);
+    }
+
     public void markConfirmed(String networkFeeWei) {
         requireStatus(TransferStatus.BROADCASTED);
         this.status = TransferStatus.CONFIRMED;
         this.signedTransaction = null;
         this.failureCode = null;
         this.networkFeeWei = networkFeeWei;
+    }
+
+    public void markFailed(TransferFailureCode failureCode) {
+        markFailed(failureCode, null);
     }
 
     public void markFailed(TransferFailureCode failureCode, String networkFeeWei) {
