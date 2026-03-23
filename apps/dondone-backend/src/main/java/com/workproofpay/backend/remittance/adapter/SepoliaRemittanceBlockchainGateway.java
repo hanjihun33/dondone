@@ -241,11 +241,35 @@ public class SepoliaRemittanceBlockchainGateway implements RemittanceBlockchainG
         }
     }
 
-    private String calculateNetworkFeeWei(org.web3j.protocol.core.methods.response.TransactionReceipt receipt) {
-        if (receipt.getGasUsed() == null || receipt.getEffectiveGasPrice() == null) {
+    private String calculateNetworkFeeWei(TransactionReceipt receipt) throws IOException {
+        if (receipt.getGasUsed() == null) {
             return null;
         }
-        return receipt.getGasUsed().multiply(new BigInteger(receipt.getEffectiveGasPrice())).toString();
+
+        BigInteger gasPriceWei = parseRpcQuantity(receipt.getEffectiveGasPrice());
+        if (gasPriceWei == null && receipt.getTransactionHash() != null) {
+            EthTransaction transactionResponse = web3j().ethGetTransactionByHash(receipt.getTransactionHash()).send();
+            gasPriceWei = transactionResponse.getTransaction()
+                    .map(transaction -> parseRpcQuantity(transaction.getGasPriceRaw()))
+                    .orElse(null);
+        }
+        if (gasPriceWei == null) {
+            return null;
+        }
+        return receipt.getGasUsed().multiply(gasPriceWei).toString();
+    }
+
+    private BigInteger parseRpcQuantity(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return value.startsWith("0x") || value.startsWith("0X")
+                    ? Numeric.decodeQuantity(value)
+                    : new BigInteger(value);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private BigInteger readTokenBalance(String walletAddress) throws IOException {
