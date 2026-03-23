@@ -71,6 +71,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.dondone.mobile.app.session.WorkproofLaunchRequest
+import com.dondone.mobile.app.session.WorkproofLaunchTarget
 import com.dondone.mobile.BuildConfig
 import com.dondone.mobile.R
 import com.dondone.mobile.core.designsystem.DawnBorder
@@ -146,6 +148,8 @@ fun WorkproofScreen(
     onOpenWorkproofPdf: (Long) -> Unit,
     onShareWorkproofPdf: (Long) -> Unit,
     onClearPdfFileState: () -> Unit,
+    launchRequest: WorkproofLaunchRequest?,
+    onConsumeLaunchRequest: () -> Unit,
     resetVersion: Int,
     onDetailVisibilityChange: (Boolean) -> Unit
 ) {
@@ -273,6 +277,18 @@ fun WorkproofScreen(
         onClearPdfPreview()
         onClearPdfCreateState()
         onClearPdfFileState()
+    }
+
+    LaunchedEffect(launchRequest?.requestId) {
+        val request = launchRequest ?: return@LaunchedEffect
+        when (request.target) {
+            WorkproofLaunchTarget.PDF_CREATION -> {
+                showDetails = true
+                showPdfGenerationResultSheet = false
+                showPdfDateRangeSheet = true
+            }
+        }
+        onConsumeLaunchRequest()
     }
 
     DisposableEffect(Unit) {

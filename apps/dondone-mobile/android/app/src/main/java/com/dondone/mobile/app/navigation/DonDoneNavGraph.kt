@@ -68,6 +68,7 @@ fun DonDoneNavGraph(
     val transactionMetadataOverrides by viewModel.transactionMetadataOverrides.collectAsStateWithLifecycle()
     val menuLaunchRequest by viewModel.menuLaunchRequest.collectAsStateWithLifecycle()
     val remittanceLaunchRequest by viewModel.remittanceLaunchRequest.collectAsStateWithLifecycle()
+    val workproofLaunchRequest by viewModel.workproofLaunchRequest.collectAsStateWithLifecycle()
 
     LaunchedEffect(workproofActionUiState.message, workproofActionUiState.isError) {
         val message = workproofActionUiState.message ?: return@LaunchedEffect
@@ -172,6 +173,8 @@ fun DonDoneNavGraph(
                 onOpenWorkproofPdf = viewModel::openWorkproofPdf,
                 onShareWorkproofPdf = viewModel::shareWorkproofPdf,
                 onClearPdfFileState = viewModel::clearWorkproofPdfFileState,
+                launchRequest = workproofLaunchRequest,
+                onConsumeLaunchRequest = viewModel::consumeWorkproofLaunchRequest,
                 resetVersion = workproofResetVersion,
                 onDetailVisibilityChange = onWorkproofDetailVisibilityChange
             )
@@ -207,22 +210,10 @@ fun DonDoneNavGraph(
                     actionUiState = wageActionUiState
                 ),
                 onApplyActualDeposit = viewModel::submitWageDeposit,
-                onCreateVerification = viewModel::createWageVerification,
                 onRefresh = viewModel::refreshWageRemoteState,
-                onOpenTransfer = {
-                    if (viewModel.openTransferFlow()) {
-                        navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target ->
-                            navController.navigate(target)
-                        }
-                    }
-                },
-                onOpenWorkproof = { navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target -> navController.navigate(target) } },
-                onOpenMenu = {
-                    viewModel.openMenuForWageDocuments()
-                    navController.navigate(Route.MENU) {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                onOpenWorkproofPdfCreation = {
+                    viewModel.openWorkproofPdfCreation()
+                    navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target -> navController.navigate(target) }
                 }
             )
         }
