@@ -228,7 +228,8 @@ private fun FinanceAdvanceSection(
             surfaceState = uiModel.surfaceState,
             title = uiModel.stateTitleText,
             body = uiModel.stateBodyText,
-            availableText = uiModel.availableText,
+            amountLabel = uiModel.heroAmountLabel,
+            amountText = uiModel.heroAmountText,
             repaymentDueText = uiModel.repaymentDueText
         )
         if (uiModel.noticeTitleText != null && uiModel.noticeBodyText != null) {
@@ -237,28 +238,30 @@ private fun FinanceAdvanceSection(
                 body = uiModel.noticeBodyText
             )
         }
-        FinanceInnerPanel {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+        if (uiModel.showProgress) {
+            FinanceInnerPanel {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "다음 한도 구간",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = FinanceTextMuted
+                    )
+                    Text(
+                        text = "${(uiModel.progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                        color = FinanceTextPrimary
+                    )
+                }
+                DonDoneProgressBar(progress = uiModel.progress)
                 Text(
-                    text = "다음 한도 구간",
-                    style = MaterialTheme.typography.labelLarge,
+                    text = uiModel.progressHintText,
+                    style = MaterialTheme.typography.bodySmall,
                     color = FinanceTextMuted
                 )
-                Text(
-                    text = "${(uiModel.progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                    color = FinanceTextPrimary
-                )
             }
-            DonDoneProgressBar(progress = uiModel.progress)
-            Text(
-                text = uiModel.progressHintText,
-                style = MaterialTheme.typography.bodySmall,
-                color = FinanceTextMuted
-            )
         }
         FinancePrimaryButton(
             text = uiModel.actionText,
@@ -501,8 +504,13 @@ private fun FinanceAdvanceBottomSheet(
                 }
                 FinanceLinkButton(text = "닫기", onClick = onDismiss)
             }
-            FinanceKeyValueRow(label = "지금 신청 가능", value = uiModel.availableText)
-            FinanceKeyValueRow(label = "이번 달 사용", value = uiModel.usedText)
+            FinanceKeyValueRow(label = uiModel.summaryAmountLabel, value = uiModel.summaryAmountText)
+            if (uiModel.hasCurrentRequest) {
+                FinanceKeyValueRow(label = "지금 추가 신청 가능 금액", value = uiModel.availableText)
+            } else {
+                FinanceKeyValueRow(label = "지금 신청 가능 금액", value = uiModel.availableText)
+                FinanceKeyValueRow(label = "이번 회차 이미 받은 금액", value = uiModel.usedText)
+            }
             FinanceKeyValueRow(label = "급여 정산 예정일", value = uiModel.repaymentDueText)
             FinanceAdvanceStatePanel(
                 surfaceState = uiModel.surfaceState,
@@ -567,7 +575,7 @@ private fun FinanceAdvanceBottomSheet(
         }
 
         FinanceBottomSheetDivider()
-        if (uiModel.amountOptions.isNotEmpty()) {
+        if (!uiModel.hasCurrentRequest && uiModel.amountOptions.isNotEmpty()) {
             FinanceBottomSheetSection {
                 FinanceBottomSheetHeader(title = "받을 금액")
                 FinanceAmountOptionGrid(
@@ -661,7 +669,7 @@ private fun FinanceAdvanceBottomSheet(
                 style = MaterialTheme.typography.bodySmall,
                 color = FinanceTextMuted
             )
-            if (uiModel.requestFeedbackText != null) {
+            if (!uiModel.hasCurrentRequest && uiModel.requestFeedbackText != null) {
                 FinanceSheetPanel(
                     backgroundColor = if (uiModel.requestFeedbackIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
                     borderColor = if (uiModel.requestFeedbackIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
@@ -673,12 +681,14 @@ private fun FinanceAdvanceBottomSheet(
                     )
                 }
             }
-            FinancePrimaryButton(
-                text = uiModel.requestButtonText,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = uiModel.canRequest,
-                onClick = onRequestAdvance
-            )
+            if (!uiModel.hasCurrentRequest) {
+                FinancePrimaryButton(
+                    text = uiModel.requestButtonText,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = uiModel.canRequest,
+                    onClick = onRequestAdvance
+                )
+            }
             if (uiModel.secondaryActionText != null) {
                 FinanceSoftButton(
                     text = uiModel.secondaryActionText,
@@ -812,7 +822,8 @@ private fun FinanceAdvanceHeroCard(
     surfaceState: AdvanceSurfaceState,
     title: String,
     body: String,
-    availableText: String,
+    amountLabel: String,
+    amountText: String,
     repaymentDueText: String
 ) {
     val borderColor = when (surfaceState) {
@@ -843,12 +854,12 @@ private fun FinanceAdvanceHeroCard(
         Spacer(modifier = Modifier.height(4.dp))
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "지금 가능 금액",
+                text = amountLabel,
                 style = MaterialTheme.typography.labelLarge,
                 color = FinanceTextMuted
             )
             Text(
-                text = availableText,
+                text = amountText,
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
                 color = FinanceTextPrimary
             )
