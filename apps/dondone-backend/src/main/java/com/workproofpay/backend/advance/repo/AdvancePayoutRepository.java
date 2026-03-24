@@ -19,6 +19,11 @@ public interface AdvancePayoutRepository extends JpaRepository<AdvancePayout, St
     List<AdvancePayout> findByAdvanceRequestIdIn(Collection<Long> advanceRequestIds);
     Optional<AdvancePayout> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
     List<AdvancePayout> findByUserIdOrderByCreatedAtDescAdvancePayoutIdDesc(Long userId, Pageable pageable);
+    List<AdvancePayout> findByUserIdAndStatusOrderByUpdatedAtDescAdvancePayoutIdDesc(
+            Long userId,
+            AdvancePayoutStatus status,
+            Pageable pageable
+    );
     List<AdvancePayout> findByStatusInOrderByUpdatedAtDescAdvancePayoutIdDesc(Collection<AdvancePayoutStatus> statuses, Pageable pageable);
     List<AdvancePayout> findByStatusInAndUpdatedAtBeforeOrderByUpdatedAtDescAdvancePayoutIdDesc(
             Collection<AdvancePayoutStatus> statuses,
