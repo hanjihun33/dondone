@@ -53,25 +53,25 @@ public class AdvanceRequest extends BaseCreatedEntity {
     private Integer assetDecimals;
 
     @Column(name = "reference_exchange_rate", nullable = false, precision = 12, scale = 2)
-    private BigDecimal referenceExchangeRate;
+    private BigDecimal exchangeRateSnapshot;
 
     @Column(name = "requested_amount_atomic", nullable = false)
     private Long requestedAmountAtomic;
 
     @Column(name = "requested_reference_krw", nullable = false)
-    private Long requestedReferenceKrw;
+    private Long requestedDisplayKrwAmount;
 
     @Column(name = "approved_amount_atomic")
     private Long approvedAmountAtomic;
 
     @Column(name = "approved_reference_krw")
-    private Long approvedReferenceKrw;
+    private Long approvedDisplayKrwAmount;
 
     @Column(name = "fee_amount_atomic", nullable = false)
     private Long feeAmountAtomic;
 
     @Column(name = "fee_reference_krw", nullable = false)
-    private Long feeReferenceKrw;
+    private Long feeDisplayKrwAmount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -93,13 +93,13 @@ public class AdvanceRequest extends BaseCreatedEntity {
     private Long snapshotAvailableAmountAtomic;
 
     @Column(name = "snapshot_available_reference_krw", nullable = false)
-    private Long snapshotAvailableReferenceKrw;
+    private Long snapshotAvailableDisplayKrwAmount;
 
     @Column(name = "snapshot_max_cap_amount_atomic", nullable = false)
     private Long snapshotMaxCapAmountAtomic;
 
     @Column(name = "snapshot_max_cap_reference_krw", nullable = false)
-    private Long snapshotMaxCapReferenceKrw;
+    private Long snapshotMaxCapDisplayKrwAmount;
 
     @Column(name = "snapshot_policy_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal snapshotPolicyRate;
@@ -121,22 +121,22 @@ public class AdvanceRequest extends BaseCreatedEntity {
             String idempotencyKey,
             String assetSymbol,
             Integer assetDecimals,
-            BigDecimal referenceExchangeRate,
+            BigDecimal exchangeRateSnapshot,
             Long requestedAmountAtomic,
-            Long requestedReferenceKrw,
+            Long requestedDisplayKrwAmount,
             Long approvedAmountAtomic,
-            Long approvedReferenceKrw,
+            Long approvedDisplayKrwAmount,
             Long feeAmountAtomic,
-            Long feeReferenceKrw,
+            Long feeDisplayKrwAmount,
             AdvanceRequestStatus status,
             LocalDate repaymentDueDate,
             LocalDateTime requestedAt,
             Long reviewedByAccountId,
             LocalDateTime reviewedAt,
             Long snapshotAvailableAmountAtomic,
-            Long snapshotAvailableReferenceKrw,
+            Long snapshotAvailableDisplayKrwAmount,
             Long snapshotMaxCapAmountAtomic,
-            Long snapshotMaxCapReferenceKrw,
+            Long snapshotMaxCapDisplayKrwAmount,
             BigDecimal snapshotPolicyRate,
             Integer snapshotReflectedWorkDays,
             Long snapshotReflectedWorkMinutes,
@@ -149,22 +149,22 @@ public class AdvanceRequest extends BaseCreatedEntity {
         this.idempotencyKey = idempotencyKey;
         this.assetSymbol = assetSymbol;
         this.assetDecimals = assetDecimals;
-        this.referenceExchangeRate = referenceExchangeRate;
+        this.exchangeRateSnapshot = exchangeRateSnapshot;
         this.requestedAmountAtomic = requestedAmountAtomic;
-        this.requestedReferenceKrw = requestedReferenceKrw;
+        this.requestedDisplayKrwAmount = requestedDisplayKrwAmount;
         this.approvedAmountAtomic = approvedAmountAtomic;
-        this.approvedReferenceKrw = approvedReferenceKrw;
+        this.approvedDisplayKrwAmount = approvedDisplayKrwAmount;
         this.feeAmountAtomic = feeAmountAtomic;
-        this.feeReferenceKrw = feeReferenceKrw;
+        this.feeDisplayKrwAmount = feeDisplayKrwAmount;
         this.status = status;
         this.repaymentDueDate = repaymentDueDate;
         this.requestedAt = requestedAt;
         this.reviewedByAccountId = reviewedByAccountId;
         this.reviewedAt = reviewedAt;
         this.snapshotAvailableAmountAtomic = snapshotAvailableAmountAtomic;
-        this.snapshotAvailableReferenceKrw = snapshotAvailableReferenceKrw;
+        this.snapshotAvailableDisplayKrwAmount = snapshotAvailableDisplayKrwAmount;
         this.snapshotMaxCapAmountAtomic = snapshotMaxCapAmountAtomic;
-        this.snapshotMaxCapReferenceKrw = snapshotMaxCapReferenceKrw;
+        this.snapshotMaxCapDisplayKrwAmount = snapshotMaxCapDisplayKrwAmount;
         this.snapshotPolicyRate = snapshotPolicyRate;
         this.snapshotReflectedWorkDays = snapshotReflectedWorkDays;
         this.snapshotReflectedWorkMinutes = snapshotReflectedWorkMinutes;
@@ -179,17 +179,17 @@ public class AdvanceRequest extends BaseCreatedEntity {
             String idempotencyKey,
             String assetSymbol,
             Integer assetDecimals,
-            BigDecimal referenceExchangeRate,
+            BigDecimal exchangeRateSnapshot,
             Long requestedAmountAtomic,
-            Long requestedReferenceKrw,
+            Long requestedDisplayKrwAmount,
             Long feeAmountAtomic,
-            Long feeReferenceKrw,
+            Long feeDisplayKrwAmount,
             LocalDate repaymentDueDate,
             LocalDateTime requestedAt,
             Long snapshotAvailableAmountAtomic,
-            Long snapshotAvailableReferenceKrw,
+            Long snapshotAvailableDisplayKrwAmount,
             Long snapshotMaxCapAmountAtomic,
-            Long snapshotMaxCapReferenceKrw,
+            Long snapshotMaxCapDisplayKrwAmount,
             BigDecimal snapshotPolicyRate,
             Integer snapshotReflectedWorkDays,
             Long snapshotReflectedWorkMinutes,
@@ -203,22 +203,22 @@ public class AdvanceRequest extends BaseCreatedEntity {
                 idempotencyKey,
                 assetSymbol,
                 assetDecimals,
-                referenceExchangeRate,
+                exchangeRateSnapshot,
                 requestedAmountAtomic,
-                requestedReferenceKrw,
+                requestedDisplayKrwAmount,
                 null,
                 null,
                 feeAmountAtomic,
-                feeReferenceKrw,
+                feeDisplayKrwAmount,
                 AdvanceRequestStatus.SUBMITTED,
                 repaymentDueDate,
                 requestedAt,
                 null,
                 null,
                 snapshotAvailableAmountAtomic,
-                snapshotAvailableReferenceKrw,
+                snapshotAvailableDisplayKrwAmount,
                 snapshotMaxCapAmountAtomic,
-                snapshotMaxCapReferenceKrw,
+                snapshotMaxCapDisplayKrwAmount,
                 snapshotPolicyRate,
                 snapshotReflectedWorkDays,
                 snapshotReflectedWorkMinutes,
@@ -230,7 +230,7 @@ public class AdvanceRequest extends BaseCreatedEntity {
         ensureSubmitted();
         this.status = AdvanceRequestStatus.APPROVED;
         this.approvedAmountAtomic = this.requestedAmountAtomic;
-        this.approvedReferenceKrw = this.requestedReferenceKrw;
+        this.approvedDisplayKrwAmount = this.requestedDisplayKrwAmount;
         this.reviewedByAccountId = reviewedByAccountId;
         this.reviewedAt = LocalDateTime.now();
     }
@@ -239,7 +239,7 @@ public class AdvanceRequest extends BaseCreatedEntity {
         ensureSubmitted();
         this.status = AdvanceRequestStatus.REJECTED;
         this.approvedAmountAtomic = null;
-        this.approvedReferenceKrw = null;
+        this.approvedDisplayKrwAmount = null;
         this.reviewedByAccountId = reviewedByAccountId;
         this.reviewedAt = LocalDateTime.now();
     }

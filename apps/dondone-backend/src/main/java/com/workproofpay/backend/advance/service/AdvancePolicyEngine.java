@@ -75,11 +75,11 @@ public class AdvancePolicyEngine {
             noticeReasonCodes.add(AdvanceBlockReasonCode.PENDING_WORKPROOF_REVIEW.name());
         }
 
-        long availableReferenceKrw = hardBlocked
+        long availableDisplayKrwAmount = hardBlocked
                 ? 0L
                 : Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCapKrw, DEMO_MAX_CAP_KRW));
-        long maxCapReferenceKrw = DEMO_MAX_CAP_KRW;
-        long estimatedFeeReferenceKrw = availableReferenceKrw > 0 ? FLAT_FEE_AMOUNT_KRW : 0L;
+        long maxCapDisplayKrwAmount = DEMO_MAX_CAP_KRW;
+        long estimatedFeeDisplayKrwAmount = availableDisplayKrwAmount > 0 ? FLAT_FEE_AMOUNT_KRW : 0L;
 
         Integer nextTierDays = tier.nextMinimumDays();
         long nextTierRemainingMinutes = nextTierDays == null
@@ -91,10 +91,10 @@ public class AdvancePolicyEngine {
                 ADVANCE_ASSET_SYMBOL,
                 ADVANCE_ASSET_DECIMALS,
                 REFERENCE_KRW_PER_ASSET,
-                toAtomic(availableReferenceKrw),
-                availableReferenceKrw,
-                toAtomic(maxCapReferenceKrw),
-                maxCapReferenceKrw,
+                toAtomic(availableDisplayKrwAmount),
+                availableDisplayKrwAmount,
+                toAtomic(maxCapDisplayKrwAmount),
+                maxCapDisplayKrwAmount,
                 tier.ratio(),
                 tier.code(),
                 reflectedWorkDays,
@@ -105,8 +105,8 @@ public class AdvancePolicyEngine {
                 List.copyOf(blockReasonCodes),
                 List.copyOf(noticeReasonCodes),
                 nextTierRemainingMinutes,
-                toAtomic(estimatedFeeReferenceKrw),
-                estimatedFeeReferenceKrw,
+                toAtomic(estimatedFeeDisplayKrwAmount),
+                estimatedFeeDisplayKrwAmount,
                 repaymentDate(today, targetMonth),
                 ADVANCE_DISCLAIMER
         );

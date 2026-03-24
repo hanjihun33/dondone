@@ -6,12 +6,12 @@ public record AdvanceRequestResponse(
         Long requestId,
         String assetSymbol,
         Integer assetDecimals,
-        java.math.BigDecimal referenceExchangeRate,
+        java.math.BigDecimal exchangeRateSnapshot,
         String status,
         Long approvedAmountAtomic,
-        Long approvedReferenceKrw,
+        Long approvedDisplayKrwAmount,
         Long feeAmountAtomic,
-        Long feeReferenceKrw,
+        Long feeDisplayKrwAmount,
         LocalDate repaymentDueDate,
         AdvanceEligibilitySnapshotResponse eligibilitySnapshot
 ) {

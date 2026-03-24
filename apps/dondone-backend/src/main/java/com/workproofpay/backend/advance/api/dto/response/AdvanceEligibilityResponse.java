@@ -8,11 +8,11 @@ public record AdvanceEligibilityResponse(
         Long workplaceId,
         String assetSymbol,
         Integer assetDecimals,
-        java.math.BigDecimal referenceExchangeRate,
+        java.math.BigDecimal exchangeRateSnapshot,
         Long availableAmountAtomic,
-        Long availableReferenceKrw,
+        Long availableDisplayKrwAmount,
         Long maxCapAmountAtomic,
-        Long maxCapReferenceKrw,
+        Long maxCapDisplayKrwAmount,
         BigDecimal policyRate,
         String repaymentTier,
         Integer reflectedWorkDays,
@@ -24,7 +24,7 @@ public record AdvanceEligibilityResponse(
         List<String> noticeReasonCodes,
         Long nextTierRemainingMinutes,
         Long estimatedFeeAmountAtomic,
-        Long estimatedFeeReferenceKrw,
+        Long estimatedFeeDisplayKrwAmount,
         LocalDate estimatedRepaymentDate,
         String disclaimer
 ) {
