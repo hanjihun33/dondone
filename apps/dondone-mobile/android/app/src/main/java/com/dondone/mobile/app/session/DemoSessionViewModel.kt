@@ -1462,6 +1462,7 @@ class DemoSessionViewModel(
     }
 
     private suspend fun loadAdvanceRemoteState(session: AuthSession) {
+        val previousState = _advanceRemoteState.value
         _advanceRemoteState.value = AdvanceRemoteState.loading()
         val remoteState = advanceRepository.load(session.accessToken)
         if (!remoteState.isAuthenticated) {
@@ -1474,6 +1475,7 @@ class DemoSessionViewModel(
         }
         _advanceRemoteState.value = remoteState
         syncSelectedAdvanceAmount(remoteState)
+        syncRemittanceBalanceAfterAdvancePayout(previousState = previousState, currentState = remoteState, session = session)
     }
 
     private suspend fun loadWorkproofRemoteState(session: AuthSession) {
@@ -1741,6 +1743,32 @@ class DemoSessionViewModel(
                 requests = mergedRequests,
                 requestDetailsById = current.requestDetailsById + (detail.requestId to detail)
             )
+        }
+    }
+
+    private suspend fun syncRemittanceBalanceAfterAdvancePayout(
+        previousState: AdvanceRemoteState,
+        currentState: AdvanceRemoteState,
+        session: AuthSession
+    ) {
+        if (currentState.mode != AdvanceRemoteMode.CONTENT) {
+            return
+        }
+
+        val previousPaidKeys = previousState.requests
+            .asSequence()
+            .filter { it.status == "PAID" && !it.payoutTxHash.isNullOrBlank() }
+            .map { "${it.requestId}:${it.payoutTxHash}" }
+            .toSet()
+
+        val hasNewPaidPayout = currentState.requests.any { request ->
+            request.status == "PAID" &&
+                !request.payoutTxHash.isNullOrBlank() &&
+                "${request.requestId}:${request.payoutTxHash}" !in previousPaidKeys
+        }
+
+        if (hasNewPaidPayout) {
+            refreshRemittanceRemoteStateSilently(session)
         }
     }
 
