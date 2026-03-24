@@ -103,11 +103,15 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
         );
         reflected.updateTimes(
                 LocalDateTime.of(2026, 3, 10, 9, 10),
-                LocalDateTime.of(2026, 3, 10, 18, 10),
+                LocalDateTime.of(2026, 3, 10, 18, 23),
                 "Correction",
                 "Updated memo",
                 2,
                 "{\"attachments\":[]}"
+        );
+        reflected.updateRecognizedTimes(
+                LocalDateTime.of(2026, 3, 10, 9, 0),
+                LocalDateTime.of(2026, 3, 10, 18, 0)
         );
         reflected = workProofRepository.saveAndFlush(reflected);
 
@@ -177,6 +181,8 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
         assertThat(snapshot.summary().totalWorkedMinutes()).isEqualTo(1_140L);
         assertThat(snapshot.records()).hasSize(2);
         assertThat(snapshot.audits()).hasSize(1);
+        assertThat(snapshot.records())
+                .anyMatch(item -> item.clockInAt().equals("09:00") && item.clockOutAt().equals("18:00"));
         assertThat(snapshot.records())
                 .anyMatch(item -> item.remarks().contains("수정 기록 있음"))
                 .anyMatch(item -> item.remarks().contains("기록 확인 필요"));

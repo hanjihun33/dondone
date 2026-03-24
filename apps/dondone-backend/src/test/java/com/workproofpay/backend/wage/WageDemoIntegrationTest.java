@@ -152,6 +152,47 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void lane1SummaryUsesRecognizedTimesForNightMinutesAndEstimate() throws Exception {
+        User user = userRepository.save(User.register("lane1-recognized@test.com", "hashed", "Tester"));
+        String token = tokenFor(user);
+        Lane1Fixture fixture = createLane1WorkplaceAndContract(token);
+
+        checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 10, 18, 0));
+        Long nightRecordId = checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 12, 21, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 12, 23, 0));
+
+        var nightRecord = workProofRepository.findById(nightRecordId).orElseThrow();
+        nightRecord.updateRecognizedTimes(
+                LocalDateTime.of(2026, 3, 12, 21, 0),
+                LocalDateTime.of(2026, 3, 12, 22, 0)
+        );
+        workProofRepository.saveAndFlush(nightRecord);
+
+        mockMvc.perform(get("/api/wage/monthly-summary")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-03")
+                        .param("workplaceId", fixture.workplaceId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verifiedWorkMinutes").value(600))
+                .andExpect(jsonPath("$.data.overtimeMinutes").value(60))
+                .andExpect(jsonPath("$.data.nightMinutes").value(0));
+
+        mockMvc.perform(get("/api/wage/estimate")
+                        .header("Authorization", bearer(token))
+                        .param("month", "2026-03")
+                        .param("workplaceId", fixture.workplaceId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.summary.verifiedWorkMinutes").value(600))
+                .andExpect(jsonPath("$.data.summary.overtimeMinutes").value(60))
+                .andExpect(jsonPath("$.data.summary.nightMinutes").value(0))
+                .andExpect(jsonPath("$.data.estimate.baseEstimate").value(120000))
+                .andExpect(jsonPath("$.data.estimate.overtimePremium").value(6000))
+                .andExpect(jsonPath("$.data.estimate.nightPremium").value(0))
+                .andExpect(jsonPath("$.data.estimate.estimatedTotal").value(126000));
+    }
+
+    @Test
     void createsVerificationAndReturnsDetailSnapshotFromLane1Inputs() throws Exception {
         // reflected 근무를 기준으로 verification 생성 -> 상세 조회까지 이어지는 worker self-check 흐름을 검증한다.
         User user = userRepository.save(User.register("verification@test.com", "hashed", "Verifier"));
