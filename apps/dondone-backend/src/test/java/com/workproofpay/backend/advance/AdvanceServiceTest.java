@@ -25,13 +25,13 @@ class AdvanceServiceTest {
 
     private static final long REQUEST_ATOMIC = 60_000_000L;
     private static final long APPROVED_ATOMIC = 60_000_000L;
-    private static final long APPROVED_REFERENCE_KRW = 87_000L;
+    private static final long APPROVED_DISPLAY_KRW = 87_000L;
     private static final long FEE_ATOMIC = 3_448_275L;
-    private static final long FEE_REFERENCE_KRW = 5_000L;
+    private static final long FEE_DISPLAY_KRW = 5_000L;
     private static final long SNAPSHOT_AVAILABLE_ATOMIC = 103_448_275L;
-    private static final long SNAPSHOT_AVAILABLE_REFERENCE_KRW = 150_000L;
+    private static final long SNAPSHOT_AVAILABLE_DISPLAY_KRW = 150_000L;
     private static final long SNAPSHOT_MAX_CAP_ATOMIC = 344_827_586L;
-    private static final long SNAPSHOT_MAX_CAP_REFERENCE_KRW = 500_000L;
+    private static final long SNAPSHOT_MAX_CAP_DISPLAY_KRW = 500_000L;
 
     private final com.workproofpay.backend.advance.repo.AdvanceRequestRepository advanceRequestRepository = mock(com.workproofpay.backend.advance.repo.AdvanceRequestRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
@@ -78,17 +78,17 @@ class AdvanceServiceTest {
         when(existing.getId()).thenReturn(9L);
         when(existing.getAssetSymbol()).thenReturn("dUSDC");
         when(existing.getAssetDecimals()).thenReturn(6);
-        when(existing.getReferenceExchangeRate()).thenReturn(java.math.BigDecimal.valueOf(1_450));
+        when(existing.getExchangeRateSnapshot()).thenReturn(java.math.BigDecimal.valueOf(1_450));
         when(existing.getStatus()).thenReturn(com.workproofpay.backend.advance.model.AdvanceRequestStatus.APPROVED);
         when(existing.getApprovedAmountAtomic()).thenReturn(APPROVED_ATOMIC);
-        when(existing.getApprovedReferenceKrw()).thenReturn(APPROVED_REFERENCE_KRW);
+        when(existing.getApprovedDisplayKrwAmount()).thenReturn(APPROVED_DISPLAY_KRW);
         when(existing.getFeeAmountAtomic()).thenReturn(FEE_ATOMIC);
-        when(existing.getFeeReferenceKrw()).thenReturn(FEE_REFERENCE_KRW);
+        when(existing.getFeeDisplayKrwAmount()).thenReturn(FEE_DISPLAY_KRW);
         when(existing.getRepaymentDueDate()).thenReturn(LocalDate.of(2026, 3, 25));
         when(existing.getSnapshotAvailableAmountAtomic()).thenReturn(SNAPSHOT_AVAILABLE_ATOMIC);
-        when(existing.getSnapshotAvailableReferenceKrw()).thenReturn(SNAPSHOT_AVAILABLE_REFERENCE_KRW);
+        when(existing.getSnapshotAvailableDisplayKrwAmount()).thenReturn(SNAPSHOT_AVAILABLE_DISPLAY_KRW);
         when(existing.getSnapshotMaxCapAmountAtomic()).thenReturn(SNAPSHOT_MAX_CAP_ATOMIC);
-        when(existing.getSnapshotMaxCapReferenceKrw()).thenReturn(SNAPSHOT_MAX_CAP_REFERENCE_KRW);
+        when(existing.getSnapshotMaxCapDisplayKrwAmount()).thenReturn(SNAPSHOT_MAX_CAP_DISPLAY_KRW);
         when(existing.getSnapshotPolicyRate()).thenReturn(java.math.BigDecimal.valueOf(0.20));
         when(existing.getSnapshotReflectedWorkDays()).thenReturn(10);
         when(existing.getSnapshotReflectedWorkMinutes()).thenReturn(4_800L);
@@ -101,11 +101,11 @@ class AdvanceServiceTest {
         assertThat(result.replayed()).isTrue();
         assertThat(result.response().requestId()).isEqualTo(9L);
         assertThat(result.response().approvedAmountAtomic()).isEqualTo(APPROVED_ATOMIC);
-        assertThat(result.response().approvedReferenceKrw()).isEqualTo(APPROVED_REFERENCE_KRW);
+        assertThat(result.response().approvedDisplayKrwAmount()).isEqualTo(APPROVED_DISPLAY_KRW);
         assertThat(result.response().feeAmountAtomic()).isEqualTo(FEE_ATOMIC);
-        assertThat(result.response().feeReferenceKrw()).isEqualTo(FEE_REFERENCE_KRW);
+        assertThat(result.response().feeDisplayKrwAmount()).isEqualTo(FEE_DISPLAY_KRW);
         assertThat(result.response().eligibilitySnapshot().availableAmountAtomic()).isEqualTo(SNAPSHOT_AVAILABLE_ATOMIC);
-        assertThat(result.response().eligibilitySnapshot().availableReferenceKrw()).isEqualTo(SNAPSHOT_AVAILABLE_REFERENCE_KRW);
+        assertThat(result.response().eligibilitySnapshot().availableDisplayKrwAmount()).isEqualTo(SNAPSHOT_AVAILABLE_DISPLAY_KRW);
         verify(advanceRequestRepository, never()).save(any());
     }
 

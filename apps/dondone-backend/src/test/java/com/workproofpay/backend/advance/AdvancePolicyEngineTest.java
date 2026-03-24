@@ -39,7 +39,7 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.availableAmountAtomic()).isEqualTo(ZERO_ATOMIC);
-        assertThat(response.availableReferenceKrw()).isZero();
+        assertThat(response.availableDisplayKrwAmount()).isZero();
         assertThat(response.blockReasonCodes()).contains("INSUFFICIENT_VERIFIED_WORK");
         assertThat(engine.isHardBlocked(response)).isTrue();
     }
@@ -58,11 +58,11 @@ class AdvancePolicyEngineTest {
         assertThat(response.repaymentTier()).isEqualTo("B");
         assertThat(response.assetSymbol()).isEqualTo("dUSDC");
         assertThat(response.assetDecimals()).isEqualTo(6);
-        assertThat(response.referenceExchangeRate()).isEqualByComparingTo("1450");
+        assertThat(response.exchangeRateSnapshot()).isEqualByComparingTo("1450");
         assertThat(response.availableAmountAtomic()).isEqualTo(AVAILABLE_B_ATOMIC);
-        assertThat(response.availableReferenceKrw()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
         assertThat(response.estimatedFeeAmountAtomic()).isEqualTo(FEE_ATOMIC);
-        assertThat(response.estimatedFeeReferenceKrw()).isEqualTo(FEE_REFERENCE_KRW);
+        assertThat(response.estimatedFeeDisplayKrwAmount()).isEqualTo(FEE_REFERENCE_KRW);
         assertThat(response.blockReasonCodes()).isEmpty();
         assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isFalse();
@@ -80,7 +80,7 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.availableAmountAtomic()).isEqualTo(AVAILABLE_B_ATOMIC);
-        assertThat(response.availableReferenceKrw()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
         assertThat(response.blockReasonCodes()).isEmpty();
         assertThat(response.noticeReasonCodes()).contains("PENDING_WORKPROOF_REVIEW");
         assertThat(engine.isHardBlocked(response)).isFalse();
@@ -98,7 +98,7 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.availableAmountAtomic()).isEqualTo(ZERO_ATOMIC);
-        assertThat(response.availableReferenceKrw()).isZero();
+        assertThat(response.availableDisplayKrwAmount()).isZero();
         assertThat(response.blockReasonCodes()).contains("EXISTING_OUTSTANDING_ADVANCE");
         assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isTrue();
@@ -116,7 +116,7 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.availableAmountAtomic()).isEqualTo(ZERO_ATOMIC);
-        assertThat(response.availableReferenceKrw()).isZero();
+        assertThat(response.availableDisplayKrwAmount()).isZero();
         assertThat(response.blockReasonCodes()).contains("ADVANCE_WINDOW_CLOSED_TODAY");
         assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isTrue();
@@ -134,7 +134,7 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.availableAmountAtomic()).isEqualTo(REDUCED_CAP_ATOMIC);
-        assertThat(response.availableReferenceKrw()).isEqualTo(REDUCED_CAP_REFERENCE_KRW);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(REDUCED_CAP_REFERENCE_KRW);
         assertThat(response.blockReasonCodes()).doesNotContain("ADVANCE_WINDOW_CLOSED_TODAY");
         assertThat(engine.isHardBlocked(response)).isFalse();
     }

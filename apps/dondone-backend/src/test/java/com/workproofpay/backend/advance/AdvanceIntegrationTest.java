@@ -39,9 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
 
     private static final long ELIGIBLE_AVAILABLE_ATOMIC = 103_448_275L;
-    private static final long ELIGIBLE_AVAILABLE_REFERENCE_KRW = 150_000L;
+    private static final long ELIGIBLE_AVAILABLE_DISPLAY_KRW = 150_000L;
     private static final long REQUEST_ATOMIC = 60_000_000L;
-    private static final long REQUEST_REFERENCE_KRW = 87_000L;
+    private static final long REQUEST_DISPLAY_KRW = 87_000L;
     private static final long REPLAY_MISMATCH_ATOMIC = 61_000_000L;
     private static final long SECOND_WORKPLACE_REQUEST_ATOMIC = 50_000_000L;
     private static final long SAME_WORKPLACE_OPEN_REQUEST_ATOMIC = 70_000_000L;
@@ -97,9 +97,9 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
                 .andExpect(jsonPath("$.data.assetSymbol").value("dUSDC"))
                 .andExpect(jsonPath("$.data.assetDecimals").value(6))
-                .andExpect(jsonPath("$.data.referenceExchangeRate").value(1450))
+                .andExpect(jsonPath("$.data.exchangeRateSnapshot").value(1450))
                 .andExpect(jsonPath("$.data.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
-                .andExpect(jsonPath("$.data.availableReferenceKrw").value(ELIGIBLE_AVAILABLE_REFERENCE_KRW))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.repaymentTier").value("B"))
                 .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty())
                 .andExpect(jsonPath("$.data.noticeReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
@@ -123,13 +123,13 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
                 .andExpect(jsonPath("$.data.assetSymbol").value("dUSDC"))
                 .andExpect(jsonPath("$.data.assetDecimals").value(6))
-                .andExpect(jsonPath("$.data.referenceExchangeRate").value(1450))
+                .andExpect(jsonPath("$.data.exchangeRateSnapshot").value(1450))
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
-                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.feeAmountAtomic").value(3448275))
-                .andExpect(jsonPath("$.data.feeReferenceKrw").value(5000))
+                .andExpect(jsonPath("$.data.feeDisplayKrwAmount").value(5000))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
-                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableReferenceKrw").value(ELIGIBLE_AVAILABLE_REFERENCE_KRW))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -145,7 +145,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
-                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(nullValue()));
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -155,19 +155,21 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requests[0].requestId").value(requestId))
                 .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
                 .andExpect(jsonPath("$.data.requests[0].requestedAmountAtomic").value(REQUEST_ATOMIC))
-                .andExpect(jsonPath("$.data.requests[0].requestedReferenceKrw").value(REQUEST_REFERENCE_KRW))
+                .andExpect(jsonPath("$.data.requests[0].requestedDisplayKrwAmount").value(REQUEST_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
-                .andExpect(jsonPath("$.data.requests[0].approvedReferenceKrw").value(nullValue()));
+                .andExpect(jsonPath("$.data.requests[0].approvedDisplayKrwAmount").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", requestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.exchangeRateSnapshot").value(1450))
                 .andExpect(jsonPath("$.data.requestedAmountAtomic").value(REQUEST_ATOMIC))
-                .andExpect(jsonPath("$.data.requestedReferenceKrw").value(REQUEST_REFERENCE_KRW))
+                .andExpect(jsonPath("$.data.requestedDisplayKrwAmount").value(REQUEST_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
-                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.exchangeRateSnapshot").value(1450))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.needsReviewRecordCount").value(1));
     }
 
@@ -249,7 +251,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workplaceId").value(secondWorkplaceId))
                 .andExpect(jsonPath("$.data.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
-                .andExpect(jsonPath("$.data.availableReferenceKrw").value(ELIGIBLE_AVAILABLE_REFERENCE_KRW))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty());
     }
 
@@ -280,7 +282,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.availableAmountAtomic").value(0))
-                .andExpect(jsonPath("$.data.availableReferenceKrw").value(0))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(0))
                 .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("EXISTING_OUTSTANDING_ADVANCE"))
                 .andExpect(jsonPath("$.data.noticeReasonCodes").isEmpty());
     }
