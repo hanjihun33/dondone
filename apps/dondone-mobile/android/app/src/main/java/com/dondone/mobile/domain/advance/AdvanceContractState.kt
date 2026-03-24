@@ -132,7 +132,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                 val isBlocked = remoteEligibility.availableAmountAtomic <= 0
                 val isClosedToday = remoteEligibility.blockReasonCodes.contains("ADVANCE_WINDOW_CLOSED_TODAY")
                 val hasPendingReview = remoteEligibility.noticeReasonCodes.contains("PENDING_WORKPROOF_REVIEW")
-                val isNextCycle = isNextRepaymentCycle(remoteEligibility.estimatedRepaymentDate)
+                val isNextCycle = isNextRepaymentCycle(remoteEligibility.effectiveSettlementDueDate)
                 val noticeTitleText = if (hasPendingReview) {
                     "확인 필요한 기록이 남아 있어요"
                 } else {
@@ -194,7 +194,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     secondaryActionText = if (hasPendingReview) "기록 확인" else null,
                     canRequest = !isBlocked,
                     availableAmountOverride = remoteEligibility.availableDisplayKrwAmount,
-                    repaymentDateOverride = remoteEligibility.estimatedRepaymentDate
+                    repaymentDateOverride = remoteEligibility.effectiveSettlementDueDate
                 )
             }
 

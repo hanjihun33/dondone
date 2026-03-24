@@ -4,6 +4,8 @@ import com.workproofpay.backend.admin.api.dto.response.AdminAdvanceRequestItemRe
 import com.workproofpay.backend.admin.api.dto.response.AdminAdvanceRequestListResponse;
 import com.workproofpay.backend.advance.model.AdvancePayout;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
+import com.workproofpay.backend.advance.model.AdvanceRequestStatus;
+import com.workproofpay.backend.advance.model.AdvanceSettlementStatus;
 import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.advance.service.AdvancePayoutService;
@@ -124,6 +126,8 @@ public class AdminAdvanceRequestService {
                 viewStatus.payoutStatus(),
                 payout != null ? payout.getTxHash() : null,
                 payout != null ? payout.getFailureReason() : null,
+                toSettlementStatus(request),
+                toSettlementDueDate(request),
                 request.getRepaymentDueDate(),
                 request.getRequestedAt(),
                 request.getSnapshotReflectedWorkDays(),
@@ -131,5 +135,15 @@ public class AdminAdvanceRequestService {
                 request.getSnapshotNeedsReviewRecordCount(),
                 request.getReviewedAt()
         );
+    }
+
+    private AdvanceSettlementStatus toSettlementStatus(AdvanceRequest request) {
+        return request.getStatus() == AdvanceRequestStatus.REJECTED
+                ? null
+                : AdvanceSettlementStatus.SCHEDULED_FOR_PAYDAY;
+    }
+
+    private java.time.LocalDate toSettlementDueDate(AdvanceRequest request) {
+        return toSettlementStatus(request) == null ? null : request.getRepaymentDueDate();
     }
 }

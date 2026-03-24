@@ -38,6 +38,8 @@ data class AdvanceRequestDetailPayload(
     val requestStatus: String,
     val payoutStatus: String?,
     val payoutTxHash: String?,
+    val settlementStatus: String? = null,
+    val settlementDueDate: String? = null,
     val repaymentDueDate: String,
     val eligibilitySnapshot: AdvanceEligibilitySnapshotPayload,
     val createdAt: String
@@ -50,4 +52,7 @@ data class AdvanceRequestDetailPayload(
 
     val feeAmount: Long
         get() = feeDisplayKrwAmount
+
+    val effectiveSettlementDueDate: String
+        get() = settlementDueDate ?: repaymentDueDate
 }

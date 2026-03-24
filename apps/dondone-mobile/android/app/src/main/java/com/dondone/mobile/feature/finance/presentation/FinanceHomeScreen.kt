@@ -213,7 +213,7 @@ private fun FinanceAdvanceSection(
         description = "",
         trailing = {
             if (uiModel.statusText != "-") {
-                FinanceCapsule(text = "상환 ${uiModel.statusText}")
+                FinanceCapsule(text = "구간 ${uiModel.statusText}")
             } else {
                 Spacer(modifier = Modifier.height(1.dp))
             }
@@ -503,7 +503,7 @@ private fun FinanceAdvanceBottomSheet(
             }
             FinanceKeyValueRow(label = "지금 신청 가능", value = uiModel.availableText)
             FinanceKeyValueRow(label = "이번 달 사용", value = uiModel.usedText)
-            FinanceKeyValueRow(label = "정산 예정일", value = uiModel.repaymentDueText)
+            FinanceKeyValueRow(label = "급여 정산 예정일", value = uiModel.repaymentDueText)
             FinanceAdvanceStatePanel(
                 surfaceState = uiModel.surfaceState,
                 title = uiModel.stateTitleText,
@@ -749,7 +749,8 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
                 FinanceKeyValueRow(label = "요청 금액", value = uiModel.requestedAmountText)
                 FinanceKeyValueRow(label = "승인 금액", value = uiModel.approvedAmountText)
                 FinanceKeyValueRow(label = "수수료", value = uiModel.feeAmountText)
-                FinanceKeyValueRow(label = "상환 예정일", value = uiModel.repaymentDueText)
+                FinanceKeyValueRow(label = "정산 상태", value = uiModel.settlementStatusText)
+                FinanceKeyValueRow(label = "급여 정산 예정일", value = uiModel.repaymentDueText)
                 uiModel.payoutTxHashText?.let { txHash ->
                     FinanceKeyValueRow(label = "지급 TX", value = txHash)
                 }
@@ -859,7 +860,7 @@ private fun FinanceAdvanceHeroCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "상환 예정일",
+                text = "급여 정산 예정일",
                 style = MaterialTheme.typography.labelLarge,
                 color = FinanceTextMuted
             )

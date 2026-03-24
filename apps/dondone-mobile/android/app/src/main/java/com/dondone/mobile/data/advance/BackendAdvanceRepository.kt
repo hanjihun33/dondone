@@ -95,6 +95,8 @@ class BackendAdvanceRepository(
                 approvedDisplayKrwAmount = data.optLongOrNull("approvedDisplayKrwAmount"),
                 feeAmountAtomic = data.getLong("feeAmountAtomic"),
                 feeDisplayKrwAmount = data.getLong("feeDisplayKrwAmount"),
+                settlementStatus = data.optStringOrNull("settlementStatus"),
+                settlementDueDate = data.optStringOrNull("settlementDueDate"),
                 repaymentDueDate = data.getString("repaymentDueDate"),
                 eligibilitySnapshot = toEligibilitySnapshotPayload(data.getJSONObject("eligibilitySnapshot"))
             )
@@ -214,6 +216,7 @@ class BackendAdvanceRepository(
                 estimatedFeeAmountAtomic = data.getLong("estimatedFeeAmountAtomic"),
                 estimatedFeeDisplayKrwAmount = data.getLong("estimatedFeeDisplayKrwAmount"),
                 estimatedRepaymentDate = data.getString("estimatedRepaymentDate"),
+                settlementDueDate = data.optStringOrNull("settlementDueDate"),
                 disclaimer = data.getString("disclaimer"),
                 needsReviewRecordCount = data.getInt("needsReviewRecordCount")
             )
@@ -262,6 +265,8 @@ class BackendAdvanceRepository(
                         requestStatus = item.getString("requestStatus"),
                         payoutStatus = item.optStringOrNull("payoutStatus"),
                         payoutTxHash = item.optStringOrNull("payoutTxHash"),
+                        settlementStatus = item.optStringOrNull("settlementStatus"),
+                        settlementDueDate = item.optStringOrNull("settlementDueDate"),
                         repaymentDueDate = item.getString("repaymentDueDate"),
                         requestedAt = item.getString("requestedAt")
                     )
@@ -290,6 +295,8 @@ class BackendAdvanceRepository(
             requestStatus = data.getString("requestStatus"),
             payoutStatus = data.optStringOrNull("payoutStatus"),
             payoutTxHash = data.optStringOrNull("payoutTxHash"),
+            settlementStatus = data.optStringOrNull("settlementStatus"),
+            settlementDueDate = data.optStringOrNull("settlementDueDate"),
             repaymentDueDate = data.getString("repaymentDueDate"),
             eligibilitySnapshot = toEligibilitySnapshotPayload(data.getJSONObject("eligibilitySnapshot")),
             createdAt = data.getString("createdAt")

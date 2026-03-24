@@ -71,6 +71,7 @@ data class FinanceAdvanceRequestDetailUiModel(
     val requestedAmountText: String,
     val approvedAmountText: String,
     val feeAmountText: String,
+    val settlementStatusText: String,
     val repaymentDueText: String,
     val createdAtText: String,
     val snapshotAvailableText: String,
@@ -932,7 +933,7 @@ private fun buildAdvanceHistoryItems(
         items += FinanceAdvanceHistoryUiModel(
             requestId = null,
             title = "${month}월 1차 미리받기",
-            metaText = "상환 예정 $repaymentDueText",
+            metaText = "급여 정산 예정 $repaymentDueText",
             valueText = formatKrw(used),
             clickable = false
         )
@@ -940,9 +941,9 @@ private fun buildAdvanceHistoryItems(
     if (previousRepaymentGood) {
         items += FinanceAdvanceHistoryUiModel(
             requestId = null,
-            title = "이전 회차 상환",
+            title = "이전 회차 정산",
             metaText = "보너스 한도 ${formatKrw(bonusLimit)} 반영",
-            valueText = "정상 상환",
+            valueText = "정산 완료",
             clickable = false
         )
     }
@@ -983,8 +984,8 @@ private fun buildRemoteAdvanceHistoryItems(
                 title = "요청 #${request.requestId}",
                 metaText = buildString {
                     append(formatAdvanceStatusLabel(request.status, request.payoutStatus))
-                    append(" · 상환 예정 ")
-                    append(request.repaymentDueDate)
+                    append(" · 급여 정산 예정 ")
+                    append(request.effectiveSettlementDueDate)
                     request.payoutTxHash?.takeIf { it.isNotBlank() }?.let { txHash ->
                         append("\nTX ")
                         append(txHash.take(10))
@@ -1042,7 +1043,8 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
                 assetSymbol = it.assetSymbol
             )
         } ?: "-",
-        repaymentDueText = detailValue?.repaymentDueDate ?: "-",
+        settlementStatusText = detailValue?.settlementStatus?.let(::formatAdvanceSettlementStatusLabel) ?: "-",
+        repaymentDueText = detailValue?.effectiveSettlementDueDate ?: "-",
         createdAtText = detailValue?.createdAt ?: "-",
         snapshotAvailableText = detailValue?.eligibilitySnapshot?.let {
             formatAdvanceAmount(
@@ -1195,6 +1197,13 @@ private fun formatAdvanceStatusLabel(status: String, payoutStatus: String?): Str
     "PAYOUT_FAILED" -> "지급실패"
     "REJECTED" -> "반려됨"
     "NEEDS_REVIEW" -> "확인 필요"
+    else -> status
+}
+
+private fun formatAdvanceSettlementStatusLabel(status: String): String = when (status) {
+    "SCHEDULED_FOR_PAYDAY" -> "급여일 자동 정산 예정"
+    "SETTLED" -> "정산 완료"
+    "FAILED" -> "정산 실패"
     else -> status
 }
 

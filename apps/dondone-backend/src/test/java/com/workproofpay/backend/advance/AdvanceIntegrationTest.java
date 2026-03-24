@@ -141,6 +141,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.feeAmountAtomic").value(3448275))
                 .andExpect(jsonPath("$.data.feeDisplayKrwAmount").value(5000))
+                .andExpect(jsonPath("$.data.settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
+                .andExpect(jsonPath("$.data.settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andReturn()
@@ -158,7 +160,9 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
-                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()));
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
+                .andExpect(jsonPath("$.data.settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
 
         mockMvc.perform(get("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -170,7 +174,9 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requests[0].requestedAmountAtomic").value(REQUEST_ATOMIC))
                 .andExpect(jsonPath("$.data.requests[0].requestedDisplayKrwAmount").value(REQUEST_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
-                .andExpect(jsonPath("$.data.requests[0].approvedDisplayKrwAmount").value(nullValue()));
+                .andExpect(jsonPath("$.data.requests[0].approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[0].settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
+                .andExpect(jsonPath("$.data.requests[0].settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", requestId)
                         .header("Authorization", bearer(token)))
@@ -182,6 +188,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requestedDisplayKrwAmount").value(REQUEST_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
+                .andExpect(jsonPath("$.data.settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.exchangeRateSnapshot").value(1450))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.needsReviewRecordCount").value(1));
     }

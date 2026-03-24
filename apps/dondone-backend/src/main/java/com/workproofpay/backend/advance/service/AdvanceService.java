@@ -6,6 +6,7 @@ import com.workproofpay.backend.advance.model.AdvancePayout;
 import com.workproofpay.backend.advance.model.AdvancePayoutStatus;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.model.AdvanceRequestStatus;
+import com.workproofpay.backend.advance.model.AdvanceSettlementStatus;
 import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.auth.model.User;
@@ -84,7 +85,7 @@ public class AdvanceService {
                 toDisplayKrwAmount(request.requestedAmountAtomic(), eligibility.response().exchangeRateSnapshot(), eligibility.response().assetDecimals()),
                 eligibility.response().estimatedFeeAmountAtomic(),
                 eligibility.response().estimatedFeeDisplayKrwAmount(),
-                eligibility.response().estimatedRepaymentDate(),
+                eligibility.response().settlementDueDate(),
                 request.requestedAt(),
                 eligibility.response().availableAmountAtomic(),
                 eligibility.response().availableDisplayKrwAmount(),
@@ -242,6 +243,8 @@ public class AdvanceService {
                 request.getApprovedDisplayKrwAmount(),
                 request.getFeeAmountAtomic(),
                 request.getFeeDisplayKrwAmount(),
+                toSettlementStatus(request),
+                toSettlementDueDate(request),
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request)
         );
@@ -263,6 +266,8 @@ public class AdvanceService {
                 viewStatus.requestStatus(),
                 viewStatus.payoutStatus(),
                 payout != null ? payout.getTxHash() : null,
+                toSettlementStatus(request),
+                toSettlementDueDate(request),
                 request.getRepaymentDueDate(),
                 request.getRequestedAt()
         );
@@ -286,10 +291,22 @@ public class AdvanceService {
                 viewStatus.requestStatus(),
                 viewStatus.payoutStatus(),
                 payout != null ? payout.getTxHash() : null,
+                toSettlementStatus(request),
+                toSettlementDueDate(request),
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request),
                 request.getCreatedAt()
         );
+    }
+
+    private AdvanceSettlementStatus toSettlementStatus(AdvanceRequest request) {
+        return request.getStatus() == AdvanceRequestStatus.REJECTED
+                ? null
+                : AdvanceSettlementStatus.SCHEDULED_FOR_PAYDAY;
+    }
+
+    private java.time.LocalDate toSettlementDueDate(AdvanceRequest request) {
+        return toSettlementStatus(request) == null ? null : request.getRepaymentDueDate();
     }
 
     private Map<Long, AdvancePayout> mapPayoutsByRequestId(List<Long> requestIds) {
