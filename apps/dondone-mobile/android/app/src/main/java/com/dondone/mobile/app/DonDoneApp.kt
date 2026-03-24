@@ -188,32 +188,35 @@ private fun AuthenticatedDonDoneAppShell(
                 )
             }
         ) { innerPadding ->
-            DonDoneNavGraph(
-                modifier = Modifier.padding(
-                    top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding()
-                ),
-                navController = navController,
-                viewModel = viewModel,
-                workproofResetVersion = workproofShellState.resetVersion,
-                onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
-                onWorkproofDetailVisibilityChange = workproofShellState.onDetailVisibilityChange,
-                onOpenWorkerRegistrationCode = {
-                    workerRegistrationCodeInput = ""
-                    isWorkerRegistrationSheetVisible = true
-                },
-                onShowToast = { message, tone ->
-                    toastState.show(message = message, tone = tone)
-                }
-            )
-        }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                DonDoneNavGraph(
+                    modifier = Modifier.fillMaxSize(),
+                    navController = navController,
+                    viewModel = viewModel,
+                    workproofResetVersion = workproofShellState.resetVersion,
+                    onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
+                    onWorkproofDetailVisibilityChange = workproofShellState.onDetailVisibilityChange,
+                    onOpenWorkerRegistrationCode = {
+                        workerRegistrationCodeInput = ""
+                        isWorkerRegistrationSheetVisible = true
+                    },
+                    onShowToast = { message, tone ->
+                        toastState.show(message = message, tone = tone)
+                    }
+                )
 
-        DonDoneToastHost(
-            state = toastState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 20.dp, vertical = 28.dp)
-        )
+                DonDoneToastHost(
+                    state = toastState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                )
+            }
+        }
 
         if (isWorkerRegistrationSheetVisible) {
             WorkerRegistrationCodeSheet(
