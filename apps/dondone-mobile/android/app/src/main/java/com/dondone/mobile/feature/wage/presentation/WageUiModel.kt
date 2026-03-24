@@ -21,7 +21,8 @@ enum class WageSurfaceState {
 
 enum class WageSurfaceActionType {
     REFRESH,
-    OPEN_MENU
+    OPEN_MENU,
+    OPEN_MENU_AND_REGISTRATION_CODE
 }
 
 enum class WageMetricIcon {
@@ -147,7 +148,7 @@ fun DemoState.toWageUiModel(
             WageSurfaceState.ERROR,
             WageSurfaceState.EMPTY -> {
                 if (surfaceMessage.isActiveContractMissingMessage()) {
-                    WageSurfaceActionType.OPEN_MENU
+                    WageSurfaceActionType.OPEN_MENU_AND_REGISTRATION_CODE
                 } else {
                     WageSurfaceActionType.REFRESH
                 }

@@ -290,6 +290,14 @@ class BackendWageRepository(
         responseBody: String,
         fallbackMessage: String
     ): String {
+        val rawBody = responseBody.trim()
+        if (
+            rawBody.contains(ACTIVE_CONTRACT_NOT_FOUND_CODE, ignoreCase = true) ||
+            rawBody.contains(ACTIVE_CONTRACT_NOT_FOUND_BACKEND_MESSAGE, ignoreCase = true)
+        ) {
+            return ACTIVE_CONTRACT_NOT_FOUND_USER_MESSAGE
+        }
+
         val json = runCatching { JSONObject(responseBody.ifBlank { "{}" }) }.getOrNull()
         val backendCode = json?.optString("code").orEmpty()
         val backendMessage = json?.optString("message").orEmpty()
@@ -301,7 +309,15 @@ class BackendWageRepository(
             return ACTIVE_CONTRACT_NOT_FOUND_USER_MESSAGE
         }
 
-        return parseBackendErrorMessage(responseBody, fallbackMessage)
+        val parsedMessage = parseBackendErrorMessage(responseBody, fallbackMessage)
+        if (
+            parsedMessage.contains(ACTIVE_CONTRACT_NOT_FOUND_CODE, ignoreCase = true) ||
+            parsedMessage.contains(ACTIVE_CONTRACT_NOT_FOUND_BACKEND_MESSAGE, ignoreCase = true)
+        ) {
+            return ACTIVE_CONTRACT_NOT_FOUND_USER_MESSAGE
+        }
+
+        return parsedMessage
     }
 
     private fun requireAuthorized(accessToken: String) {

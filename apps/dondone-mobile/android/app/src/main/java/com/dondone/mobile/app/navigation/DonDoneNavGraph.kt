@@ -212,9 +212,11 @@ fun DonDoneNavGraph(
                 ),
                 onApplyActualDeposit = viewModel::submitWageDeposit,
                 onRefresh = viewModel::refreshWageRemoteState,
-                onOpenMenu = {
+                onNavigateMenu = { openWorkerRegistrationSheet ->
                     onNavigateToRootTab(Route.MENU)
-                    onOpenWorkerRegistrationCode()
+                    if (openWorkerRegistrationSheet) {
+                        onOpenWorkerRegistrationCode()
+                    }
                 },
                 onOpenWorkproofPdfCreation = {
                     viewModel.openWorkproofPdfCreation()
