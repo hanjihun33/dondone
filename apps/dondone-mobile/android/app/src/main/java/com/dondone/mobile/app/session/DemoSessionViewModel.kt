@@ -1216,8 +1216,9 @@ class DemoSessionViewModel(
             )
             return
         }
-        val requestedAmount = (_selectedAdvanceAmount.value ?: eligibility.availableAmount.toInt())
-            .coerceAtMost(eligibility.availableAmount.toInt())
+        val availableAmount = eligibility.availableAmountInWholeAssetUnits
+        val requestedAmount = (_selectedAdvanceAmount.value ?: availableAmount)
+            .coerceAtMost(availableAmount)
         if (requestedAmount <= 0) {
             _advanceRequestUiState.value = AdvanceRequestUiState(
                 message = "신청 가능한 금액이 없어요.",
@@ -1232,7 +1233,7 @@ class DemoSessionViewModel(
                 val result = advanceRepository.createRequest(
                     accessToken = session.accessToken,
                     workplaceId = eligibility.workplaceId,
-                    requestedAmount = requestedAmount.toLong()
+                    requestedAmountAtomic = requestedAmount.toAtomicAmount(eligibility.assetDecimals)
                 )
                 val detail = advanceRepository.getRequestDetail(session.accessToken, result.requestId)
                 loadAdvanceRemoteState(session)
@@ -1673,7 +1674,7 @@ class DemoSessionViewModel(
     }
 
     private fun syncSelectedAdvanceAmount(remoteState: AdvanceRemoteState) {
-        val availableAmount = remoteState.eligibility?.availableAmount?.toInt() ?: 0
+        val availableAmount = remoteState.eligibility?.availableAmountInWholeAssetUnits ?: 0
         if (availableAmount <= 0) {
             _selectedAdvanceAmount.value = null
             return
@@ -1717,10 +1718,20 @@ class DemoSessionViewModel(
                 add(
                     AdvanceRequestItemPayload(
                         requestId = detail.requestId,
-                        requestedAmount = detail.requestedAmount,
-                        approvedAmount = detail.approvedAmount,
+                        workplaceId = detail.workplaceId,
+                        assetSymbol = detail.assetSymbol,
+                        assetDecimals = detail.assetDecimals,
+                        exchangeRateSnapshot = detail.exchangeRateSnapshot,
+                        requestedAmountAtomic = detail.requestedAmountAtomic,
+                        requestedDisplayKrwAmount = detail.requestedDisplayKrwAmount,
+                        approvedAmountAtomic = detail.approvedAmountAtomic,
+                        approvedDisplayKrwAmount = detail.approvedDisplayKrwAmount,
                         status = detail.status,
-                        repaymentDueDate = detail.repaymentDueDate
+                        requestStatus = detail.requestStatus,
+                        payoutStatus = detail.payoutStatus,
+                        payoutTxHash = detail.payoutTxHash,
+                        repaymentDueDate = detail.repaymentDueDate,
+                        requestedAt = detail.createdAt
                     )
                 )
                 addAll(current.requests.filterNot { it.requestId == detail.requestId })

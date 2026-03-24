@@ -12,7 +12,7 @@ class FallbackAdvanceRepository : AdvanceRepository {
     override suspend fun createRequest(
         accessToken: String,
         workplaceId: Long,
-        requestedAmount: Long
+        requestedAmountAtomic: Long
     ): AdvanceCreateResult {
         error("백엔드 실연동 데이터가 없어 미리받기 신청을 진행할 수 없습니다.")
     }

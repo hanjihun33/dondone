@@ -1,23 +1,56 @@
 package com.dondone.mobile.data.advance
 
+import java.math.BigDecimal
+import java.math.RoundingMode
+
 data class AdvanceEligibilityPayload(
     val workplaceId: Long,
-    val availableAmount: Long,
+    val assetSymbol: String,
+    val assetDecimals: Int,
+    val exchangeRateSnapshot: BigDecimal,
+    val availableAmountAtomic: Long,
+    val availableDisplayKrwAmount: Long,
+    val maxCapAmountAtomic: Long,
+    val maxCapDisplayKrwAmount: Long,
     val repaymentTier: String,
     val blockReasonCodes: List<String>,
     val noticeReasonCodes: List<String>,
+    val estimatedFeeAmountAtomic: Long,
+    val estimatedFeeDisplayKrwAmount: Long,
     val estimatedRepaymentDate: String,
     val disclaimer: String,
     val needsReviewRecordCount: Int
-)
+) {
+    val availableAmount: Long
+        get() = availableDisplayKrwAmount
+
+    val availableAmountInWholeAssetUnits: Int
+        get() = availableAmountAtomic.toWholeAssetUnits(assetDecimals)
+}
 
 data class AdvanceRequestItemPayload(
     val requestId: Long,
-    val requestedAmount: Long,
-    val approvedAmount: Long?,
+    val workplaceId: Long,
+    val assetSymbol: String,
+    val assetDecimals: Int,
+    val exchangeRateSnapshot: BigDecimal,
+    val requestedAmountAtomic: Long,
+    val requestedDisplayKrwAmount: Long,
+    val approvedAmountAtomic: Long?,
+    val approvedDisplayKrwAmount: Long?,
     val status: String,
-    val repaymentDueDate: String
-)
+    val requestStatus: String,
+    val payoutStatus: String?,
+    val payoutTxHash: String?,
+    val repaymentDueDate: String,
+    val requestedAt: String
+) {
+    val requestedAmount: Long
+        get() = requestedDisplayKrwAmount
+
+    val approvedAmount: Long?
+        get() = approvedDisplayKrwAmount
+}
 
 enum class AdvanceRemoteMode {
     LOADING,
@@ -72,4 +105,15 @@ data class AdvanceRemoteState(
             errorMessage = null
         )
     }
+}
+
+private fun Long.toWholeAssetUnits(decimals: Int): Int {
+    if (decimals <= 0) {
+        return coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+    }
+    val wholeAmount = BigDecimal.valueOf(this)
+        .movePointLeft(decimals)
+        .setScale(0, RoundingMode.DOWN)
+        .toLong()
+    return wholeAmount.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
 }

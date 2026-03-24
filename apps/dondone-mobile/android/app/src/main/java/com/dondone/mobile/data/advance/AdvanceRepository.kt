@@ -5,7 +5,7 @@ interface AdvanceRepository {
     suspend fun createRequest(
         accessToken: String,
         workplaceId: Long,
-        requestedAmount: Long
+        requestedAmountAtomic: Long
     ): AdvanceCreateResult
     suspend fun getRequestDetail(
         accessToken: String,

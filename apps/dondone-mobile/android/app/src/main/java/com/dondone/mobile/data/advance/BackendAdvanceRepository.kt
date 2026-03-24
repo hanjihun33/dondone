@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.YearMonth
 import java.util.UUID
@@ -48,7 +49,7 @@ class BackendAdvanceRepository(
     override suspend fun createRequest(
         accessToken: String,
         workplaceId: Long,
-        requestedAmount: Long
+        requestedAmountAtomic: Long
     ): AdvanceCreateResult = withContext(Dispatchers.IO) {
         if (accessToken.isBlank()) {
             throw AdvanceUnauthorizedException()
@@ -56,7 +57,7 @@ class BackendAdvanceRepository(
 
         val body = JSONObject()
             .put("workplaceId", workplaceId)
-            .put("requestedAmount", requestedAmount)
+            .put("requestedAmountAtomic", requestedAmountAtomic)
             .put("requestedAt", LocalDateTime.now().withNano(0).toString())
             .toString()
         val request = Request.Builder()
@@ -84,10 +85,18 @@ class BackendAdvanceRepository(
             val data = json.getJSONObject("data")
             return@withContext AdvanceCreateResult(
                 requestId = data.getLong("requestId"),
+                assetSymbol = data.getString("assetSymbol"),
+                assetDecimals = data.optInt("assetDecimals", 6),
+                exchangeRateSnapshot = data.getBigDecimalCompat("exchangeRateSnapshot"),
                 status = data.getString("status"),
-                approvedAmount = data.optLongOrNull("approvedAmount"),
-                feeAmount = data.getLong("feeAmount"),
-                repaymentDueDate = data.getString("repaymentDueDate")
+                requestStatus = data.getString("requestStatus"),
+                payoutStatus = data.optStringOrNull("payoutStatus"),
+                approvedAmountAtomic = data.optLongOrNull("approvedAmountAtomic"),
+                approvedDisplayKrwAmount = data.optLongOrNull("approvedDisplayKrwAmount"),
+                feeAmountAtomic = data.getLong("feeAmountAtomic"),
+                feeDisplayKrwAmount = data.getLong("feeDisplayKrwAmount"),
+                repaymentDueDate = data.getString("repaymentDueDate"),
+                eligibilitySnapshot = toEligibilitySnapshotPayload(data.getJSONObject("eligibilitySnapshot"))
             )
         }
     }
@@ -192,10 +201,18 @@ class BackendAdvanceRepository(
             }
             return AdvanceEligibilityPayload(
                 workplaceId = data.getLong("workplaceId"),
-                availableAmount = data.getLong("availableAmount"),
+                assetSymbol = data.getString("assetSymbol"),
+                assetDecimals = data.optInt("assetDecimals", 6),
+                exchangeRateSnapshot = data.getBigDecimalCompat("exchangeRateSnapshot"),
+                availableAmountAtomic = data.getLong("availableAmountAtomic"),
+                availableDisplayKrwAmount = data.getLong("availableDisplayKrwAmount"),
+                maxCapAmountAtomic = data.getLong("maxCapAmountAtomic"),
+                maxCapDisplayKrwAmount = data.getLong("maxCapDisplayKrwAmount"),
                 repaymentTier = data.getString("repaymentTier"),
                 blockReasonCodes = blockReasons,
                 noticeReasonCodes = noticeReasons,
+                estimatedFeeAmountAtomic = data.getLong("estimatedFeeAmountAtomic"),
+                estimatedFeeDisplayKrwAmount = data.getLong("estimatedFeeDisplayKrwAmount"),
                 estimatedRepaymentDate = data.getString("estimatedRepaymentDate"),
                 disclaimer = data.getString("disclaimer"),
                 needsReviewRecordCount = data.getInt("needsReviewRecordCount")
@@ -233,10 +250,20 @@ class BackendAdvanceRepository(
                     val item = requests.getJSONObject(index)
                     val payload = AdvanceRequestItemPayload(
                         requestId = item.getLong("requestId"),
-                        requestedAmount = item.getLong("requestedAmount"),
-                        approvedAmount = item.optLongOrNull("approvedAmount"),
+                        workplaceId = item.getLong("workplaceId"),
+                        assetSymbol = item.getString("assetSymbol"),
+                        assetDecimals = item.optInt("assetDecimals", 6),
+                        exchangeRateSnapshot = item.getBigDecimalCompat("exchangeRateSnapshot"),
+                        requestedAmountAtomic = item.getLong("requestedAmountAtomic"),
+                        requestedDisplayKrwAmount = item.getLong("requestedDisplayKrwAmount"),
+                        approvedAmountAtomic = item.optLongOrNull("approvedAmountAtomic"),
+                        approvedDisplayKrwAmount = item.optLongOrNull("approvedDisplayKrwAmount"),
                         status = item.getString("status"),
-                        repaymentDueDate = item.getString("repaymentDueDate")
+                        requestStatus = item.getString("requestStatus"),
+                        payoutStatus = item.optStringOrNull("payoutStatus"),
+                        payoutTxHash = item.optStringOrNull("payoutTxHash"),
+                        repaymentDueDate = item.getString("repaymentDueDate"),
+                        requestedAt = item.getString("requestedAt")
                     )
                     collected[payload.requestId] = payload
                 }
@@ -247,24 +274,41 @@ class BackendAdvanceRepository(
     }
 
     private fun toDetailPayload(data: JSONObject): AdvanceRequestDetailPayload {
-        val snapshot = data.getJSONObject("eligibilitySnapshot")
         return AdvanceRequestDetailPayload(
             requestId = data.getLong("requestId"),
             workplaceId = data.getLong("workplaceId"),
-            requestedAmount = data.getLong("requestedAmount"),
-            approvedAmount = data.optLongOrNull("approvedAmount"),
-            feeAmount = data.getLong("feeAmount"),
+            assetSymbol = data.getString("assetSymbol"),
+            assetDecimals = data.optInt("assetDecimals", 6),
+            exchangeRateSnapshot = data.getBigDecimalCompat("exchangeRateSnapshot"),
+            requestedAmountAtomic = data.getLong("requestedAmountAtomic"),
+            requestedDisplayKrwAmount = data.getLong("requestedDisplayKrwAmount"),
+            approvedAmountAtomic = data.optLongOrNull("approvedAmountAtomic"),
+            approvedDisplayKrwAmount = data.optLongOrNull("approvedDisplayKrwAmount"),
+            feeAmountAtomic = data.getLong("feeAmountAtomic"),
+            feeDisplayKrwAmount = data.getLong("feeDisplayKrwAmount"),
             status = data.getString("status"),
+            requestStatus = data.getString("requestStatus"),
+            payoutStatus = data.optStringOrNull("payoutStatus"),
+            payoutTxHash = data.optStringOrNull("payoutTxHash"),
             repaymentDueDate = data.getString("repaymentDueDate"),
-            eligibilitySnapshot = AdvanceEligibilitySnapshotPayload(
-                availableAmount = snapshot.getLong("availableAmount"),
-                maxCap = snapshot.getLong("maxCap"),
-                policyRate = snapshot.get("policyRate").toString(),
-                reflectedWorkDays = snapshot.getInt("reflectedWorkDays"),
-                reflectedWorkMinutes = snapshot.getLong("reflectedWorkMinutes"),
-                needsReviewRecordCount = snapshot.getInt("needsReviewRecordCount")
-            ),
+            eligibilitySnapshot = toEligibilitySnapshotPayload(data.getJSONObject("eligibilitySnapshot")),
             createdAt = data.getString("createdAt")
+        )
+    }
+
+    private fun toEligibilitySnapshotPayload(snapshot: JSONObject): AdvanceEligibilitySnapshotPayload {
+        return AdvanceEligibilitySnapshotPayload(
+            assetSymbol = snapshot.getString("assetSymbol"),
+            assetDecimals = snapshot.optInt("assetDecimals", 6),
+            exchangeRateSnapshot = snapshot.getBigDecimalCompat("exchangeRateSnapshot"),
+            availableAmountAtomic = snapshot.getLong("availableAmountAtomic"),
+            availableDisplayKrwAmount = snapshot.getLong("availableDisplayKrwAmount"),
+            maxCapAmountAtomic = snapshot.getLong("maxCapAmountAtomic"),
+            maxCapDisplayKrwAmount = snapshot.getLong("maxCapDisplayKrwAmount"),
+            policyRate = snapshot.get("policyRate").toString(),
+            reflectedWorkDays = snapshot.getInt("reflectedWorkDays"),
+            reflectedWorkMinutes = snapshot.getLong("reflectedWorkMinutes"),
+            needsReviewRecordCount = snapshot.getInt("needsReviewRecordCount")
         )
     }
 
@@ -280,3 +324,13 @@ private fun JSONObject.optLongOrNull(key: String): Long? {
     }
     return getLong(key)
 }
+
+private fun JSONObject.optStringOrNull(key: String): String? {
+    if (!has(key) || isNull(key)) {
+        return null
+    }
+    return getString(key)
+}
+
+private fun JSONObject.getBigDecimalCompat(key: String): BigDecimal =
+    BigDecimal(get(key).toString())
