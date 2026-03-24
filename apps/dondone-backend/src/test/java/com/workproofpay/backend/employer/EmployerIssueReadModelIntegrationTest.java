@@ -3,6 +3,8 @@ package com.workproofpay.backend.employer;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.correction.model.CorrectionRequest;
+import com.workproofpay.backend.correction.model.CorrectionRequestReasonCode;
+import com.workproofpay.backend.correction.model.CorrectionReviewReasonCode;
 import com.workproofpay.backend.correction.repo.CorrectionRequestRepository;
 import com.workproofpay.backend.employer.model.Company;
 import com.workproofpay.backend.employer.model.EmployerProfile;
@@ -100,7 +102,9 @@ class EmployerIssueReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.totalElements").value(2))
                 .andExpect(jsonPath("$.data.issues[?(@.itemType == 'CORRECTION_REQUEST')].requestId", hasItem(fixture.pendingRequest().getId().intValue())))
                 .andExpect(jsonPath("$.data.issues[?(@.itemType == 'CORRECTION_REQUEST')].issueStatus", hasItem("PENDING")))
+                .andExpect(jsonPath("$.data.issues[?(@.itemType == 'CORRECTION_REQUEST')].reasonCode", hasItem("LATE_CLOCK_IN")))
                 .andExpect(jsonPath("$.data.issues[?(@.itemType == 'CORRECTION_REQUEST')].reason", hasItem("Fix late subway arrival")))
+                .andExpect(jsonPath("$.data.issues[?(@.itemType == 'CORRECTION_REQUEST')].reviewReasonCode", hasItem("LATE_CLOCK_IN_AFTER_SCHEDULE")))
                 .andExpect(jsonPath("$.data.issues[?(@.itemType == 'REVIEW_REQUIRED_RECORD')].workProofId", hasItem(fixture.reviewWorkProof().getId().intValue())))
                 .andExpect(jsonPath("$.data.issues[?(@.itemType == 'REVIEW_REQUIRED_RECORD')].issueStatus", hasItem("NEEDS_REVIEW")))
                 .andExpect(jsonPath("$.data.issues[?(@.itemType == 'REVIEW_REQUIRED_RECORD')].reviewReasonCode", hasItem("CLOCK_OUT_OUTSIDE_ALLOWED_RADIUS")));
@@ -301,7 +305,7 @@ class EmployerIssueReadModelIntegrationTest {
                 true
         ));
 
-        CorrectionRequest pendingRequest = correctionRequestRepository.save(CorrectionRequest.create(
+        CorrectionRequest pendingRequest = CorrectionRequest.create(
                 correctionWorkProof,
                 correctionWorker.getId(),
                 correctionWorker.getId(),
@@ -312,11 +316,14 @@ class EmployerIssueReadModelIntegrationTest {
                 correctionWorkProof.getClockOutAt(),
                 LocalDateTime.of(2026, 3, 17, 9, 20),
                 LocalDateTime.of(2026, 3, 17, 18, 10),
+                CorrectionRequestReasonCode.LATE_CLOCK_IN,
                 "Fix late subway arrival",
                 "Subway delay memo",
                 0,
                 null
-        ));
+        );
+        pendingRequest.markNeedsReview(CorrectionReviewReasonCode.LATE_CLOCK_IN_AFTER_SCHEDULE);
+        pendingRequest = correctionRequestRepository.save(pendingRequest);
         correctionRequestRepository.save(CorrectionRequest.create(
                 otherScopeWorkProof,
                 otherScopeWorker.getId(),
@@ -328,6 +335,7 @@ class EmployerIssueReadModelIntegrationTest {
                 otherScopeWorkProof.getClockOutAt(),
                 LocalDateTime.of(2026, 3, 18, 9, 25),
                 LocalDateTime.of(2026, 3, 18, 18, 15),
+                CorrectionRequestReasonCode.OTHER,
                 "Out of scope request",
                 null,
                 0,

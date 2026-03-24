@@ -157,8 +157,9 @@ public class EmployerIssueReadModelService {
                 correctionRequest.getOriginalClockOutAt(),
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
+                correctionRequest.getReasonCode(),
                 correctionRequest.getReason(),
-                null,
+                correctionRequest.getReviewReasonCode() == null ? null : correctionRequest.getReviewReasonCode().name(),
                 correctionRequest.getCreatedAt()
         );
     }
@@ -177,6 +178,7 @@ public class EmployerIssueReadModelService {
                 workProof.getWorkDate(),
                 workProof.getClockInAt(),
                 workProof.getClockOutAt(),
+                null,
                 null,
                 null,
                 resolveReviewReasonLabel(workProof),

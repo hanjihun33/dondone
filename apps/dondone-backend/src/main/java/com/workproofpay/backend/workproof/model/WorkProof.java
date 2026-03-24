@@ -321,6 +321,23 @@ public class WorkProof extends BaseTimeEntity {
         this.recognizedClockOutAt = recognizedClockOutAt;
     }
 
+    public void applyApprovedCorrection(LocalDateTime recognizedClockInAt,
+                                        LocalDateTime recognizedClockOutAt,
+                                        String editReason,
+                                        String memo,
+                                        int attachmentCount,
+                                        String attachmentMetadataJson) {
+        this.recognizedClockInAt = recognizedClockInAt;
+        this.recognizedClockOutAt = recognizedClockOutAt;
+        this.editReason = editReason;
+        this.memo = memo;
+        this.attachmentCount = attachmentCount;
+        this.attachmentMetadataJson = attachmentMetadataJson;
+        this.financialStatus = isClockOutOutsideAllowedRadius()
+                ? WorkProofFinancialStatus.NEEDS_REVIEW
+                : WorkProofFinancialStatus.REFLECTED;
+    }
+
     public void completeCheckOut(LocalDateTime deviceAt,
                                  LocalDateTime serverAt,
                                  Double latitude,

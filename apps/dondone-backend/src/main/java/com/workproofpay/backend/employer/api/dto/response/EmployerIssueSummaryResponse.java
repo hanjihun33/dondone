@@ -1,5 +1,7 @@
 package com.workproofpay.backend.employer.api.dto.response;
 
+import com.workproofpay.backend.correction.model.CorrectionRequestReasonCode;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -17,6 +19,7 @@ public record EmployerIssueSummaryResponse(
         LocalDateTime clockOutAt,
         LocalDateTime requestedClockInAt,
         LocalDateTime requestedClockOutAt,
+        CorrectionRequestReasonCode reasonCode,
         String reason,
         String reviewReasonCode,
         LocalDateTime raisedAt
