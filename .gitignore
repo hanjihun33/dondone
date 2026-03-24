@@ -3,7 +3,9 @@ S14P11C205/
 .private/
 mockup-*.png
 .tmp-qa/
+.gradle-home/
 .gradle-user-home/
+.gradle-sandbox/
 .gradle-backend/
 .gradle-cache/
 *.lck
