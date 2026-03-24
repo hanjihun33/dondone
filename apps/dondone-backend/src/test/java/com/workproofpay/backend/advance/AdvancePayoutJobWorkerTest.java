@@ -37,6 +37,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -120,6 +122,12 @@ class AdvancePayoutJobWorkerTest {
         when(jobRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.of(job));
         lenient().when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
         when(advancePayoutRepository.findByIdForUpdate(payout.getAdvancePayoutId())).thenReturn(Optional.of(payout));
+        when(jobRepository.existsByReferenceKindAndReferenceIdAndJobTypeAndStatusIn(
+                JobReferenceKind.ADVANCE_PAYOUT,
+                payout.getAdvancePayoutId(),
+                JobType.POLL_ADVANCE_PAYOUT_RECEIPT,
+                List.of(JobStatus.QUEUED, JobStatus.RUNNING)
+        )).thenReturn(false);
         when(blockchainGateway.prepareTokenTransfer(
                 eq("0xtreasury"),
                 eq(payout.getWalletAddress()),
@@ -135,6 +143,12 @@ class AdvancePayoutJobWorkerTest {
         assertThat(payout.getTxHash()).isEqualTo("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         assertThat(payout.getSignedTransaction()).isEqualTo("enc:signed-payout");
         assertThat(job.getStatus()).isEqualTo(JobStatus.DONE);
+        verify(jobService).enqueue(
+                eq(JobReferenceKind.ADVANCE_PAYOUT),
+                eq(JobType.POLL_ADVANCE_PAYOUT_RECEIPT),
+                eq(payout.getAdvancePayoutId()),
+                any()
+        );
     }
 
     @Test
@@ -216,6 +230,58 @@ class AdvancePayoutJobWorkerTest {
         assertThat(payout.getStatus()).isEqualTo(AdvancePayoutStatus.CONFIRMED);
         assertThat(payout.getSignedTransaction()).isNull();
         assertThat(job.getStatus()).isEqualTo(JobStatus.DONE);
+    }
+
+    @Test
+    void doesNotEnqueueDuplicatePollJobWhenActivePollAlreadyExists() {
+        AdvancePayout payout = AdvancePayout.request(
+                "ap_duplicatepoll001",
+                15L,
+                1L,
+                "0x6666666666666666666666666666666666666666",
+                55_000_000L,
+                "dUSDC",
+                "advance-payout:15"
+        );
+        payout.onCreate();
+
+        Job job = Job.queue(JobReferenceKind.ADVANCE_PAYOUT, JobType.SUBMIT_ADVANCE_PAYOUT, payout.getAdvancePayoutId(), LocalDateTime.now());
+        job.onCreate();
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "id", 6L);
+
+        when(jobRepository.findTop20ByReferenceKindAndStatusAndRunAtLessThanEqualOrderByIdAsc(
+                eq(JobReferenceKind.ADVANCE_PAYOUT),
+                eq(JobStatus.QUEUED),
+                any()
+        )).thenReturn(List.of(job));
+        when(jobRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.of(job));
+        lenient().when(jobRepository.findById(anyLong())).thenReturn(Optional.of(job));
+        when(advancePayoutRepository.findByIdForUpdate(payout.getAdvancePayoutId())).thenReturn(Optional.of(payout));
+        when(jobRepository.existsByReferenceKindAndReferenceIdAndJobTypeAndStatusIn(
+                JobReferenceKind.ADVANCE_PAYOUT,
+                payout.getAdvancePayoutId(),
+                JobType.POLL_ADVANCE_PAYOUT_RECEIPT,
+                List.of(JobStatus.QUEUED, JobStatus.RUNNING)
+        )).thenReturn(true);
+        when(blockchainGateway.prepareTokenTransfer(
+                eq("0xtreasury"),
+                eq(payout.getWalletAddress()),
+                eq(java.math.BigInteger.valueOf(payout.getAmountAtomic()))
+        )).thenReturn(new PreparedTokenTransfer(
+                "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "signed-duplicate-poll"
+        ));
+
+        worker.run();
+
+        assertThat(payout.getStatus()).isEqualTo(AdvancePayoutStatus.BROADCASTED);
+        assertThat(job.getStatus()).isEqualTo(JobStatus.DONE);
+        verify(jobService, never()).enqueue(
+                eq(JobReferenceKind.ADVANCE_PAYOUT),
+                eq(JobType.POLL_ADVANCE_PAYOUT_RECEIPT),
+                eq(payout.getAdvancePayoutId()),
+                any()
+        );
     }
 
     @Test
