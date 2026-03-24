@@ -38,6 +38,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
 
+    private static final long ELIGIBLE_AVAILABLE_ATOMIC = 103_448_275L;
+    private static final long ELIGIBLE_AVAILABLE_REFERENCE_KRW = 150_000L;
+    private static final long REQUEST_ATOMIC = 60_000_000L;
+    private static final long REQUEST_REFERENCE_KRW = 87_000L;
+    private static final long REPLAY_MISMATCH_ATOMIC = 61_000_000L;
+    private static final long SECOND_WORKPLACE_REQUEST_ATOMIC = 50_000_000L;
+    private static final long SAME_WORKPLACE_OPEN_REQUEST_ATOMIC = 70_000_000L;
+    private static final long REDUCED_CAP_ATOMIC = 34_482_758L;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -86,7 +95,11 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
-                .andExpect(jsonPath("$.data.availableAmount").value(150000))
+                .andExpect(jsonPath("$.data.assetSymbol").value("dUSDC"))
+                .andExpect(jsonPath("$.data.assetDecimals").value(6))
+                .andExpect(jsonPath("$.data.referenceExchangeRate").value(1450))
+                .andExpect(jsonPath("$.data.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
+                .andExpect(jsonPath("$.data.availableReferenceKrw").value(ELIGIBLE_AVAILABLE_REFERENCE_KRW))
                 .andExpect(jsonPath("$.data.repaymentTier").value("B"))
                 .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty())
                 .andExpect(jsonPath("$.data.noticeReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
@@ -96,10 +109,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String requestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 100000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, REQUEST_ATOMIC);
 
         String createdBody = mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -108,8 +121,15 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(requestJson))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()))
-                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmount").value(150000))
+                .andExpect(jsonPath("$.data.assetSymbol").value("dUSDC"))
+                .andExpect(jsonPath("$.data.assetDecimals").value(6))
+                .andExpect(jsonPath("$.data.referenceExchangeRate").value(1450))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(nullValue()))
+                .andExpect(jsonPath("$.data.feeAmountAtomic").value(3448275))
+                .andExpect(jsonPath("$.data.feeReferenceKrw").value(5000))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableReferenceKrw").value(ELIGIBLE_AVAILABLE_REFERENCE_KRW))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -124,7 +144,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()));
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -133,14 +154,20 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requests.length()").value(1))
                 .andExpect(jsonPath("$.data.requests[0].requestId").value(requestId))
                 .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.requests[0].approvedAmount").value(nullValue()));
+                .andExpect(jsonPath("$.data.requests[0].requestedAmountAtomic").value(REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.requests[0].requestedReferenceKrw").value(REQUEST_REFERENCE_KRW))
+                .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[0].approvedReferenceKrw").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", requestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.requestedAmountAtomic").value(REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.requestedReferenceKrw").value(REQUEST_REFERENCE_KRW))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(nullValue()))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.needsReviewRecordCount").value(1));
     }
 
@@ -155,10 +182,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String requestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 50000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, SECOND_WORKPLACE_REQUEST_ATOMIC);
 
         String createdBody = mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(ownerToken))
@@ -180,10 +207,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String mismatchedJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 60000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, REPLAY_MISMATCH_ATOMIC);
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(ownerToken))
@@ -204,10 +231,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String firstRequestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 50000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(firstWorkplaceId);
+                """.formatted(firstWorkplaceId, SECOND_WORKPLACE_REQUEST_ATOMIC);
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -221,7 +248,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", secondWorkplaceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workplaceId").value(secondWorkplaceId))
-                .andExpect(jsonPath("$.data.availableAmount").value(150000))
+                .andExpect(jsonPath("$.data.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
+                .andExpect(jsonPath("$.data.availableReferenceKrw").value(ELIGIBLE_AVAILABLE_REFERENCE_KRW))
                 .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty());
     }
 
@@ -234,10 +262,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String firstRequestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 70000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, SAME_WORKPLACE_OPEN_REQUEST_ATOMIC);
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -251,7 +279,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(token))
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.availableAmount").value(0))
+                .andExpect(jsonPath("$.data.availableAmountAtomic").value(0))
+                .andExpect(jsonPath("$.data.availableReferenceKrw").value(0))
                 .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("EXISTING_OUTSTANDING_ADVANCE"))
                 .andExpect(jsonPath("$.data.noticeReasonCodes").isEmpty());
     }
@@ -265,10 +294,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String requestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 50000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, SECOND_WORKPLACE_REQUEST_ATOMIC);
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))

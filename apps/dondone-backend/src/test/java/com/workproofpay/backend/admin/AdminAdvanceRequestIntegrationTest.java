@@ -49,6 +49,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class AdminAdvanceRequestIntegrationTest {
 
+    private static final long APPROVED_REQUEST_ATOMIC = 80_000_000L;
+    private static final long APPROVED_REQUEST_REFERENCE_KRW = 116_000L;
+    private static final long REJECTED_REQUEST_ATOMIC = 65_000_000L;
+    private static final long REJECTED_REQUEST_REFERENCE_KRW = 94_250L;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -114,14 +119,14 @@ class AdminAdvanceRequestIntegrationTest {
         long approvedCandidateId = createAdvanceRequest(
                 workerOneToken,
                 firstWorkplace.getId(),
-                80_000L,
+                APPROVED_REQUEST_ATOMIC,
                 "2030-01-10T09:00:00",
                 "advance-admin-1"
         );
         long rejectedCandidateId = createAdvanceRequest(
                 workerTwoToken,
                 secondWorkplace.getId(),
-                65_000L,
+                REJECTED_REQUEST_ATOMIC,
                 "2030-01-10T10:00:00",
                 "advance-admin-2"
         );
@@ -133,10 +138,16 @@ class AdminAdvanceRequestIntegrationTest {
                 .andExpect(jsonPath("$.data.requests[0].workerName").value("Worker Two"))
                 .andExpect(jsonPath("$.data.requests[0].companyName").value("Beta Logistics"))
                 .andExpect(jsonPath("$.data.requests[0].workplaceName").value("Beta Logistics Site"))
+                .andExpect(jsonPath("$.data.requests[0].assetSymbol").value("dUSDC"))
+                .andExpect(jsonPath("$.data.requests[0].assetDecimals").value(6))
+                .andExpect(jsonPath("$.data.requests[0].requestedAmountAtomic").value(REJECTED_REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.requests[0].requestedReferenceKrw").value(REJECTED_REQUEST_REFERENCE_KRW))
                 .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.requests[0].approvedAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[1].workerName").value("Worker One"))
                 .andExpect(jsonPath("$.data.requests[1].companyName").value("Alpha Logistics"))
+                .andExpect(jsonPath("$.data.requests[1].requestedAmountAtomic").value(APPROVED_REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.requests[1].requestedReferenceKrw").value(APPROVED_REQUEST_REFERENCE_KRW))
                 .andExpect(jsonPath("$.data.requests[1].status").value("SUBMITTED"));
 
         mockMvc.perform(post("/api/admin/advance/requests/{requestId}/approve", approvedCandidateId)
@@ -152,24 +163,27 @@ class AdminAdvanceRequestIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requests[0].requestId").value(rejectedCandidateId))
                 .andExpect(jsonPath("$.data.requests[0].status").value("REJECTED"))
-                .andExpect(jsonPath("$.data.requests[0].approvedAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[0].reviewedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.requests[1].requestId").value(approvedCandidateId))
                 .andExpect(jsonPath("$.data.requests[1].status").value("APPROVED"))
-                .andExpect(jsonPath("$.data.requests[1].approvedAmount").value(80000))
+                .andExpect(jsonPath("$.data.requests[1].approvedAmountAtomic").value(APPROVED_REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.requests[1].approvedReferenceKrw").value(APPROVED_REQUEST_REFERENCE_KRW))
                 .andExpect(jsonPath("$.data.requests[1].reviewedAt").isNotEmpty());
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", approvedCandidateId)
                         .header("Authorization", "Bearer " + workerOneToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("APPROVED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(80000));
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(APPROVED_REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(APPROVED_REQUEST_REFERENCE_KRW));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", rejectedCandidateId)
                         .header("Authorization", "Bearer " + workerTwoToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("REJECTED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()));
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedReferenceKrw").value(nullValue()));
 
         mockMvc.perform(post("/api/admin/advance/requests/{requestId}/approve", approvedCandidateId)
                         .header("Authorization", "Bearer " + adminToken))
@@ -245,17 +259,17 @@ class AdminAdvanceRequestIntegrationTest {
     private long createAdvanceRequest(
             String accessToken,
             Long workplaceId,
-            long requestedAmount,
+            long requestedAmountAtomic,
             String requestedAt,
             String idempotencyKey
     ) throws Exception {
         String requestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": %d,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "%s"
                 }
-                """.formatted(workplaceId, requestedAmount, requestedAt);
+                """.formatted(workplaceId, requestedAmountAtomic, requestedAt);
 
         MvcResult createResult = mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", "Bearer " + accessToken)
