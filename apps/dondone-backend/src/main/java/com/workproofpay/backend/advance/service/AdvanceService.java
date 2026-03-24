@@ -48,7 +48,7 @@ public class AdvanceService {
 
         AdvanceRequest existing = advanceRequestRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey).orElse(null);
         if (existing != null) {
-            if (!existing.matches(idempotencyKey, request.workplaceId(), request.requestedAmount(), request.requestedAt())) {
+            if (!existing.matches(idempotencyKey, request.workplaceId(), request.requestedAmountAtomic(), request.requestedAt())) {
                 throw new ApiException(ErrorCode.IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD);
             }
             return new AdvanceCreateResult(toRequestResponse(existing), true);
@@ -58,7 +58,7 @@ public class AdvanceService {
         if (eligibility.hardBlocked()) {
             throw new ApiException(ErrorCode.ADVANCE_NOT_ELIGIBLE);
         }
-        if (request.requestedAmount() > eligibility.response().availableAmount()) {
+        if (request.requestedAmountAtomic() > eligibility.response().availableAmountAtomic()) {
             throw new ApiException(ErrorCode.REQUEST_AMOUNT_EXCEEDS_LIMIT);
         }
 
@@ -68,12 +68,19 @@ public class AdvanceService {
                 eligibility.contract(),
                 eligibility.yearMonth(),
                 idempotencyKey,
-                request.requestedAmount(),
-                eligibility.response().estimatedFee(),
+                eligibility.response().assetSymbol(),
+                eligibility.response().assetDecimals(),
+                eligibility.response().referenceExchangeRate(),
+                request.requestedAmountAtomic(),
+                toReferenceKrw(request.requestedAmountAtomic(), eligibility.response().referenceExchangeRate(), eligibility.response().assetDecimals()),
+                eligibility.response().estimatedFeeAmountAtomic(),
+                eligibility.response().estimatedFeeReferenceKrw(),
                 eligibility.response().estimatedRepaymentDate(),
                 request.requestedAt(),
-                eligibility.response().availableAmount(),
-                eligibility.response().maxCap(),
+                eligibility.response().availableAmountAtomic(),
+                eligibility.response().availableReferenceKrw(),
+                eligibility.response().maxCapAmountAtomic(),
+                eligibility.response().maxCapReferenceKrw(),
                 eligibility.response().policyRate(),
                 eligibility.response().reflectedWorkDays(),
                 eligibility.response().reflectedWorkMinutes(),
@@ -162,9 +169,14 @@ public class AdvanceService {
     private AdvanceRequestResponse toRequestResponse(AdvanceRequest request) {
         return new AdvanceRequestResponse(
                 request.getId(),
+                request.getAssetSymbol(),
+                request.getAssetDecimals(),
+                request.getReferenceExchangeRate(),
                 request.getStatus().name(),
-                request.getApprovedAmount(),
-                request.getFeeAmount(),
+                request.getApprovedAmountAtomic(),
+                request.getApprovedReferenceKrw(),
+                request.getFeeAmountAtomic(),
+                request.getFeeReferenceKrw(),
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request)
         );
@@ -174,8 +186,13 @@ public class AdvanceService {
         return new AdvanceRequestListItemResponse(
                 request.getId(),
                 request.getWorkplace().getId(),
-                request.getRequestedAmount(),
-                request.getApprovedAmount(),
+                request.getAssetSymbol(),
+                request.getAssetDecimals(),
+                request.getReferenceExchangeRate(),
+                request.getRequestedAmountAtomic(),
+                request.getRequestedReferenceKrw(),
+                request.getApprovedAmountAtomic(),
+                request.getApprovedReferenceKrw(),
                 request.getStatus().name(),
                 request.getRepaymentDueDate(),
                 request.getRequestedAt()
@@ -186,9 +203,15 @@ public class AdvanceService {
         return new AdvanceRequestDetailResponse(
                 request.getId(),
                 request.getWorkplace().getId(),
-                request.getRequestedAmount(),
-                request.getApprovedAmount(),
-                request.getFeeAmount(),
+                request.getAssetSymbol(),
+                request.getAssetDecimals(),
+                request.getReferenceExchangeRate(),
+                request.getRequestedAmountAtomic(),
+                request.getRequestedReferenceKrw(),
+                request.getApprovedAmountAtomic(),
+                request.getApprovedReferenceKrw(),
+                request.getFeeAmountAtomic(),
+                request.getFeeReferenceKrw(),
                 request.getStatus().name(),
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request),
@@ -198,12 +221,27 @@ public class AdvanceService {
 
     private AdvanceEligibilitySnapshotResponse toSnapshotResponse(AdvanceRequest request) {
         return new AdvanceEligibilitySnapshotResponse(
-                request.getSnapshotAvailableAmount(),
-                request.getSnapshotMaxCap(),
+                request.getAssetSymbol(),
+                request.getAssetDecimals(),
+                request.getReferenceExchangeRate(),
+                request.getSnapshotAvailableAmountAtomic(),
+                request.getSnapshotAvailableReferenceKrw(),
+                request.getSnapshotMaxCapAmountAtomic(),
+                request.getSnapshotMaxCapReferenceKrw(),
                 request.getSnapshotPolicyRate(),
                 request.getSnapshotReflectedWorkDays(),
                 request.getSnapshotReflectedWorkMinutes(),
                 request.getSnapshotNeedsReviewRecordCount()
         );
+    }
+
+    private Long toReferenceKrw(Long amountAtomic, java.math.BigDecimal exchangeRate, Integer assetDecimals) {
+        if (amountAtomic == null || amountAtomic <= 0 || exchangeRate == null || assetDecimals == null) {
+            return 0L;
+        }
+        return java.math.BigDecimal.valueOf(amountAtomic)
+                .multiply(exchangeRate)
+                .divide(java.math.BigDecimal.TEN.pow(assetDecimals), 0, java.math.RoundingMode.DOWN)
+                .longValue();
     }
 }

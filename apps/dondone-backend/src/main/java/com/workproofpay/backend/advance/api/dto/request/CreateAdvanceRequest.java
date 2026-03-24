@@ -10,9 +10,9 @@ public record CreateAdvanceRequest(
         @Positive(message = "workplaceId must be greater than 0")
         Long workplaceId,
 
-        @NotNull(message = "requestedAmount is required")
-        @Positive(message = "requestedAmount must be greater than 0")
-        Long requestedAmount,
+        @NotNull(message = "requestedAmountAtomic is required")
+        @Positive(message = "requestedAmountAtomic must be greater than 0")
+        Long requestedAmountAtomic,
 
         @NotNull(message = "requestedAt is required")
         LocalDateTime requestedAt

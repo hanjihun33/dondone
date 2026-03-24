@@ -46,14 +46,32 @@ public class AdvanceRequest extends BaseCreatedEntity {
     @Column(name = "idempotency_key", nullable = false, length = 120)
     private String idempotencyKey;
 
-    @Column(name = "requested_amount", nullable = false)
-    private Long requestedAmount;
+    @Column(name = "asset_symbol", nullable = false, length = 20)
+    private String assetSymbol;
 
-    @Column(name = "approved_amount")
-    private Long approvedAmount;
+    @Column(name = "asset_decimals", nullable = false)
+    private Integer assetDecimals;
 
-    @Column(name = "fee_amount", nullable = false)
-    private Long feeAmount;
+    @Column(name = "reference_exchange_rate", nullable = false, precision = 12, scale = 2)
+    private BigDecimal referenceExchangeRate;
+
+    @Column(name = "requested_amount_atomic", nullable = false)
+    private Long requestedAmountAtomic;
+
+    @Column(name = "requested_reference_krw", nullable = false)
+    private Long requestedReferenceKrw;
+
+    @Column(name = "approved_amount_atomic")
+    private Long approvedAmountAtomic;
+
+    @Column(name = "approved_reference_krw")
+    private Long approvedReferenceKrw;
+
+    @Column(name = "fee_amount_atomic", nullable = false)
+    private Long feeAmountAtomic;
+
+    @Column(name = "fee_reference_krw", nullable = false)
+    private Long feeReferenceKrw;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -71,11 +89,17 @@ public class AdvanceRequest extends BaseCreatedEntity {
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
 
-    @Column(name = "snapshot_available_amount", nullable = false)
-    private Long snapshotAvailableAmount;
+    @Column(name = "snapshot_available_amount_atomic", nullable = false)
+    private Long snapshotAvailableAmountAtomic;
 
-    @Column(name = "snapshot_max_cap", nullable = false)
-    private Long snapshotMaxCap;
+    @Column(name = "snapshot_available_reference_krw", nullable = false)
+    private Long snapshotAvailableReferenceKrw;
+
+    @Column(name = "snapshot_max_cap_amount_atomic", nullable = false)
+    private Long snapshotMaxCapAmountAtomic;
+
+    @Column(name = "snapshot_max_cap_reference_krw", nullable = false)
+    private Long snapshotMaxCapReferenceKrw;
 
     @Column(name = "snapshot_policy_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal snapshotPolicyRate;
@@ -95,16 +119,24 @@ public class AdvanceRequest extends BaseCreatedEntity {
             WorkContract contract,
             String yearMonth,
             String idempotencyKey,
-            Long requestedAmount,
-            Long approvedAmount,
-            Long feeAmount,
+            String assetSymbol,
+            Integer assetDecimals,
+            BigDecimal referenceExchangeRate,
+            Long requestedAmountAtomic,
+            Long requestedReferenceKrw,
+            Long approvedAmountAtomic,
+            Long approvedReferenceKrw,
+            Long feeAmountAtomic,
+            Long feeReferenceKrw,
             AdvanceRequestStatus status,
             LocalDate repaymentDueDate,
             LocalDateTime requestedAt,
             Long reviewedByAccountId,
             LocalDateTime reviewedAt,
-            Long snapshotAvailableAmount,
-            Long snapshotMaxCap,
+            Long snapshotAvailableAmountAtomic,
+            Long snapshotAvailableReferenceKrw,
+            Long snapshotMaxCapAmountAtomic,
+            Long snapshotMaxCapReferenceKrw,
             BigDecimal snapshotPolicyRate,
             Integer snapshotReflectedWorkDays,
             Long snapshotReflectedWorkMinutes,
@@ -115,16 +147,24 @@ public class AdvanceRequest extends BaseCreatedEntity {
         this.contract = contract;
         this.yearMonth = yearMonth;
         this.idempotencyKey = idempotencyKey;
-        this.requestedAmount = requestedAmount;
-        this.approvedAmount = approvedAmount;
-        this.feeAmount = feeAmount;
+        this.assetSymbol = assetSymbol;
+        this.assetDecimals = assetDecimals;
+        this.referenceExchangeRate = referenceExchangeRate;
+        this.requestedAmountAtomic = requestedAmountAtomic;
+        this.requestedReferenceKrw = requestedReferenceKrw;
+        this.approvedAmountAtomic = approvedAmountAtomic;
+        this.approvedReferenceKrw = approvedReferenceKrw;
+        this.feeAmountAtomic = feeAmountAtomic;
+        this.feeReferenceKrw = feeReferenceKrw;
         this.status = status;
         this.repaymentDueDate = repaymentDueDate;
         this.requestedAt = requestedAt;
         this.reviewedByAccountId = reviewedByAccountId;
         this.reviewedAt = reviewedAt;
-        this.snapshotAvailableAmount = snapshotAvailableAmount;
-        this.snapshotMaxCap = snapshotMaxCap;
+        this.snapshotAvailableAmountAtomic = snapshotAvailableAmountAtomic;
+        this.snapshotAvailableReferenceKrw = snapshotAvailableReferenceKrw;
+        this.snapshotMaxCapAmountAtomic = snapshotMaxCapAmountAtomic;
+        this.snapshotMaxCapReferenceKrw = snapshotMaxCapReferenceKrw;
         this.snapshotPolicyRate = snapshotPolicyRate;
         this.snapshotReflectedWorkDays = snapshotReflectedWorkDays;
         this.snapshotReflectedWorkMinutes = snapshotReflectedWorkMinutes;
@@ -137,12 +177,19 @@ public class AdvanceRequest extends BaseCreatedEntity {
             WorkContract contract,
             String yearMonth,
             String idempotencyKey,
-            Long requestedAmount,
-            Long feeAmount,
+            String assetSymbol,
+            Integer assetDecimals,
+            BigDecimal referenceExchangeRate,
+            Long requestedAmountAtomic,
+            Long requestedReferenceKrw,
+            Long feeAmountAtomic,
+            Long feeReferenceKrw,
             LocalDate repaymentDueDate,
             LocalDateTime requestedAt,
-            Long snapshotAvailableAmount,
-            Long snapshotMaxCap,
+            Long snapshotAvailableAmountAtomic,
+            Long snapshotAvailableReferenceKrw,
+            Long snapshotMaxCapAmountAtomic,
+            Long snapshotMaxCapReferenceKrw,
             BigDecimal snapshotPolicyRate,
             Integer snapshotReflectedWorkDays,
             Long snapshotReflectedWorkMinutes,
@@ -154,16 +201,24 @@ public class AdvanceRequest extends BaseCreatedEntity {
                 contract,
                 yearMonth,
                 idempotencyKey,
-                requestedAmount,
+                assetSymbol,
+                assetDecimals,
+                referenceExchangeRate,
+                requestedAmountAtomic,
+                requestedReferenceKrw,
                 null,
-                feeAmount,
+                null,
+                feeAmountAtomic,
+                feeReferenceKrw,
                 AdvanceRequestStatus.SUBMITTED,
                 repaymentDueDate,
                 requestedAt,
                 null,
                 null,
-                snapshotAvailableAmount,
-                snapshotMaxCap,
+                snapshotAvailableAmountAtomic,
+                snapshotAvailableReferenceKrw,
+                snapshotMaxCapAmountAtomic,
+                snapshotMaxCapReferenceKrw,
                 snapshotPolicyRate,
                 snapshotReflectedWorkDays,
                 snapshotReflectedWorkMinutes,
@@ -174,7 +229,8 @@ public class AdvanceRequest extends BaseCreatedEntity {
     public void approve(Long reviewedByAccountId) {
         ensureSubmitted();
         this.status = AdvanceRequestStatus.APPROVED;
-        this.approvedAmount = this.requestedAmount;
+        this.approvedAmountAtomic = this.requestedAmountAtomic;
+        this.approvedReferenceKrw = this.requestedReferenceKrw;
         this.reviewedByAccountId = reviewedByAccountId;
         this.reviewedAt = LocalDateTime.now();
     }
@@ -182,7 +238,8 @@ public class AdvanceRequest extends BaseCreatedEntity {
     public void reject(Long reviewedByAccountId) {
         ensureSubmitted();
         this.status = AdvanceRequestStatus.REJECTED;
-        this.approvedAmount = null;
+        this.approvedAmountAtomic = null;
+        this.approvedReferenceKrw = null;
         this.reviewedByAccountId = reviewedByAccountId;
         this.reviewedAt = LocalDateTime.now();
     }
@@ -191,10 +248,10 @@ public class AdvanceRequest extends BaseCreatedEntity {
         return status == AdvanceRequestStatus.SUBMITTED;
     }
 
-    public boolean matches(String candidateKey, Long workplaceId, Long requestedAmount, LocalDateTime requestedAt) {
+    public boolean matches(String candidateKey, Long workplaceId, Long requestedAmountAtomic, LocalDateTime requestedAt) {
         return idempotencyKey.equals(candidateKey)
                 && workplace.getId().equals(workplaceId)
-                && this.requestedAmount.equals(requestedAmount)
+                && this.requestedAmountAtomic.equals(requestedAmountAtomic)
                 && this.requestedAt.equals(requestedAt);
     }
 

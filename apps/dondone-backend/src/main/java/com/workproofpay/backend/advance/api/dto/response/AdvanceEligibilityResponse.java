@@ -6,8 +6,13 @@ import java.util.List;
 
 public record AdvanceEligibilityResponse(
         Long workplaceId,
-        Long availableAmount,
-        Long maxCap,
+        String assetSymbol,
+        Integer assetDecimals,
+        java.math.BigDecimal referenceExchangeRate,
+        Long availableAmountAtomic,
+        Long availableReferenceKrw,
+        Long maxCapAmountAtomic,
+        Long maxCapReferenceKrw,
         BigDecimal policyRate,
         String repaymentTier,
         Integer reflectedWorkDays,
@@ -18,7 +23,8 @@ public record AdvanceEligibilityResponse(
         List<String> blockReasonCodes,
         List<String> noticeReasonCodes,
         Long nextTierRemainingMinutes,
-        Long estimatedFee,
+        Long estimatedFeeAmountAtomic,
+        Long estimatedFeeReferenceKrw,
         LocalDate estimatedRepaymentDate,
         String disclaimer
 ) {

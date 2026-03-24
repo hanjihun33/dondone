@@ -6,8 +6,13 @@ import java.time.LocalDateTime;
 public record AdvanceRequestListItemResponse(
         Long requestId,
         Long workplaceId,
-        Long requestedAmount,
-        Long approvedAmount,
+        String assetSymbol,
+        Integer assetDecimals,
+        java.math.BigDecimal referenceExchangeRate,
+        Long requestedAmountAtomic,
+        Long requestedReferenceKrw,
+        Long approvedAmountAtomic,
+        Long approvedReferenceKrw,
         String status,
         LocalDate repaymentDueDate,
         LocalDateTime requestedAt

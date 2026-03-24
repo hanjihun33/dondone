@@ -8,6 +8,7 @@ import com.workproofpay.backend.workproof.model.WorkContract;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -19,9 +20,12 @@ public class AdvancePolicyEngine {
 
     static final int DEFAULT_PAYDAY_DAY = 25;
     static final int STANDARD_WORKDAY_MINUTES = 480;
-    static final long DEMO_MAX_CAP = 500_000L;
-    static final long REDUCED_PAYDAY_CAP = 50_000L;
-    static final long FLAT_FEE_AMOUNT = 5_000L;
+    static final String ADVANCE_ASSET_SYMBOL = "dUSDC";
+    static final int ADVANCE_ASSET_DECIMALS = 6;
+    static final BigDecimal REFERENCE_KRW_PER_ASSET = BigDecimal.valueOf(1_450L);
+    static final long DEMO_MAX_CAP_KRW = 500_000L;
+    static final long REDUCED_PAYDAY_CAP_KRW = 50_000L;
+    static final long FLAT_FEE_AMOUNT_KRW = 5_000L;
     static final String ADVANCE_DISCLAIMER = "미리받기 금액은 반영된 근무 기록 기준의 데모 시뮬레이션입니다. 실제 금융 서비스 제공을 의미하지 않습니다.";
 
     public AdvanceEligibilityResponse evaluate(
@@ -50,7 +54,7 @@ public class AdvancePolicyEngine {
 
         int daysUntilRepayment = daysUntilRepayment(today, targetMonth);
         boolean isRepaymentDate = daysUntilRepayment == 0;
-        long paydayCap = isRepaymentDate ? 0L : daysUntilRepayment <= 7 ? REDUCED_PAYDAY_CAP : DEMO_MAX_CAP;
+        long paydayCapKrw = isRepaymentDate ? 0L : daysUntilRepayment <= 7 ? REDUCED_PAYDAY_CAP_KRW : DEMO_MAX_CAP_KRW;
 
         List<String> blockReasonCodes = new ArrayList<>();
         List<String> noticeReasonCodes = new ArrayList<>();
@@ -71,9 +75,11 @@ public class AdvancePolicyEngine {
             noticeReasonCodes.add(AdvanceBlockReasonCode.PENDING_WORKPROOF_REVIEW.name());
         }
 
-        long availableAmount = hardBlocked
+        long availableReferenceKrw = hardBlocked
                 ? 0L
-                : Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCap, DEMO_MAX_CAP));
+                : Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCapKrw, DEMO_MAX_CAP_KRW));
+        long maxCapReferenceKrw = DEMO_MAX_CAP_KRW;
+        long estimatedFeeReferenceKrw = availableReferenceKrw > 0 ? FLAT_FEE_AMOUNT_KRW : 0L;
 
         Integer nextTierDays = tier.nextMinimumDays();
         long nextTierRemainingMinutes = nextTierDays == null
@@ -82,8 +88,13 @@ public class AdvancePolicyEngine {
 
         return new AdvanceEligibilityResponse(
                 workplaceId,
-                availableAmount,
-                DEMO_MAX_CAP,
+                ADVANCE_ASSET_SYMBOL,
+                ADVANCE_ASSET_DECIMALS,
+                REFERENCE_KRW_PER_ASSET,
+                toAtomic(availableReferenceKrw),
+                availableReferenceKrw,
+                toAtomic(maxCapReferenceKrw),
+                maxCapReferenceKrw,
                 tier.ratio(),
                 tier.code(),
                 reflectedWorkDays,
@@ -94,7 +105,8 @@ public class AdvancePolicyEngine {
                 List.copyOf(blockReasonCodes),
                 List.copyOf(noticeReasonCodes),
                 nextTierRemainingMinutes,
-                availableAmount > 0 ? FLAT_FEE_AMOUNT : 0L,
+                toAtomic(estimatedFeeReferenceKrw),
+                estimatedFeeReferenceKrw,
                 repaymentDate(today, targetMonth),
                 ADVANCE_DISCLAIMER
         );
@@ -127,5 +139,15 @@ public class AdvancePolicyEngine {
     private LocalDate repaymentDate(LocalDate today, YearMonth targetMonth) {
         YearMonth repaymentMonth = targetMonth.isBefore(YearMonth.from(today)) ? YearMonth.from(today) : targetMonth;
         return repaymentMonth.atDay(Math.min(DEFAULT_PAYDAY_DAY, repaymentMonth.lengthOfMonth()));
+    }
+
+    private long toAtomic(long referenceKrw) {
+        if (referenceKrw <= 0) {
+            return 0L;
+        }
+        return BigDecimal.valueOf(referenceKrw)
+                .multiply(BigDecimal.TEN.pow(ADVANCE_ASSET_DECIMALS))
+                .divide(REFERENCE_KRW_PER_ASSET, 0, RoundingMode.DOWN)
+                .longValue();
     }
 }
