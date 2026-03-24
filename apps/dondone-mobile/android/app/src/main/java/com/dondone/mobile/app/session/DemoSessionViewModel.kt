@@ -1400,7 +1400,10 @@ class DemoSessionViewModel(
                     amountAtomic = amountAtomic.toString(),
                     result = result
                 )
-                _vaultActionUiState.value = VaultActionUiState()
+                _vaultActionUiState.value = VaultActionUiState(
+                    message = actionType.toCreateSuccessMessage(),
+                    messagePresentation = VaultMessagePresentation.TOAST_ONLY
+                )
                 startVaultStatusPolling(session, result.requestId)
             } catch (error: VaultUnauthorizedException) {
                 expireSession(error.message)
@@ -2402,6 +2405,12 @@ private fun VaultActionType.toCreateFailureMessage(): String =
     when (this) {
         VaultActionType.DEPOSIT -> "예치 요청을 보내지 못했어요."
         VaultActionType.WITHDRAW -> "출금 요청을 보내지 못했어요."
+    }
+
+private fun VaultActionType.toCreateSuccessMessage(): String =
+    when (this) {
+        VaultActionType.DEPOSIT -> "예치 요청을 접수했어요."
+        VaultActionType.WITHDRAW -> "출금 요청을 접수했어요."
     }
 
 private fun VaultSummaryPayload.availableAmountFor(actionType: VaultActionType): Int =

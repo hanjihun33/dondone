@@ -29,6 +29,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +88,12 @@ fun FinanceHomeScreen(
     var showAdvanceSheet by remember { mutableStateOf(false) }
     var showAdvanceRequestDetailSheet by remember { mutableStateOf(false) }
     var showVaultSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiModel.vault.shouldDismissDetailSheet) {
+        if (uiModel.vault.shouldDismissDetailSheet) {
+            showVaultSheet = false
+        }
+    }
 
     Box(
         modifier = Modifier

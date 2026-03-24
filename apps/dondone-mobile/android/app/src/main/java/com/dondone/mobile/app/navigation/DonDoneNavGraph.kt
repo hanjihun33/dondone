@@ -185,6 +185,7 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toFinanceHomeUiModel(
                     remoteState = advanceRemoteState,
                     wageRemoteState = wageRemoteState,
+                    remittanceRemoteState = remittanceRemoteState,
                     vaultRemoteState = vaultRemoteState,
                     selectedAdvanceAmount = selectedAdvanceAmount,
                     selectedVaultAmount = selectedVaultAmount,

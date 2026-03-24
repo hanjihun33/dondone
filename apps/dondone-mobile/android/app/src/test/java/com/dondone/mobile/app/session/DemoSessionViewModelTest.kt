@@ -1434,6 +1434,9 @@ class DemoSessionViewModelTest {
         advanceUntilIdle()
         viewModel.submitVaultAction()
         advanceUntilIdle()
+
+        assertEquals("예치 요청을 접수했어요.", viewModel.vaultActionUiState.value.message)
+
         advanceTimeBy(1_500L)
         advanceUntilIdle()
 
