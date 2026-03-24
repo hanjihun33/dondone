@@ -1,5 +1,9 @@
 package com.dondone.mobile.feature.remittance.presentation
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -54,15 +58,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import android.widget.Toast
 import androidx.compose.runtime.LaunchedEffect
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
@@ -1066,8 +1067,10 @@ private fun TransferReviewScreen(
     }
     val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val reviewCopy = resolveReviewCopy(uiModel)
-    val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val clipboardManager = remember(context) {
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    }
 
     if (activeOverlay == TransferReviewOverlay.RecipientEditor) {
         TransferRecipientDisplayNameEditor(
@@ -1395,8 +1398,8 @@ private fun TransferAccountBottomSheet(
 private fun TransferWalletBottomSheet(
     recipientName: String,
     walletAddress: String,
-    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
-    context: android.content.Context,
+    clipboardManager: ClipboardManager,
+    context: Context,
     onConfirm: () -> Unit
 ) {
     Row(
@@ -1454,7 +1457,7 @@ private fun TransferWalletBottomSheet(
             .padding(horizontal = 20.dp)
             .background(Color(0xFFF3F4F6), RoundedCornerShape(18.dp))
             .clickable {
-                clipboardManager.setText(AnnotatedString(walletAddress))
+                clipboardManager.setPrimaryClip(ClipData.newPlainText("wallet_address", walletAddress))
                 Toast.makeText(context, "지갑 주소를 복사했어요.", Toast.LENGTH_SHORT).show()
             }
             .padding(vertical = 16.dp),
