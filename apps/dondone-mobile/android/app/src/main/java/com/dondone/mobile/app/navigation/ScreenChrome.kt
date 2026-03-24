@@ -24,7 +24,7 @@ fun resolveScreenChrome(
                 else -> routeTitle(route)
             },
             showRootTabs = true,
-            showSettingsAction = route == Route.HOME,
+            showSettingsAction = false,
             showDate = route != Route.HOME && route != Route.MENU &&
                 !(route == Route.WORKPROOF && isWorkproofDetailVisible)
         )

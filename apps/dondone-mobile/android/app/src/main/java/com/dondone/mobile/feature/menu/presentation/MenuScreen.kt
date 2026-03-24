@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
@@ -36,7 +37,6 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -59,7 +59,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -76,7 +75,7 @@ import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
-import com.dondone.mobile.core.designsystem.DonDoneLoadingPanel
+import com.dondone.mobile.core.designsystem.DawnWarning
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
@@ -91,15 +90,14 @@ private data class MenuServiceAction(
     val onClick: () -> Unit
 )
 
-private data class MenuDocumentColors(
-    val iconBackground: Color,
-    val iconColor: Color
+private data class MenuProfileInfoItem(
+    val label: String,
+    val value: String
 )
 
 private enum class MenuOverlaySheet {
     Claim,
     Profile,
-    Receipt,
     Settings
 }
 
@@ -111,8 +109,7 @@ private enum class ClaimSummaryTone {
 
 private val MenuCanvas = Color.White
 private val MenuDivider = Color(0xFFE8EBF0)
-private val MenuReceiptHashBackground = Color(0xFFF1F5F9)
-private val MenuReceiptHashBorder = Color(0xFFE2E8F0)
+private const val MENU_PROFILE_EMPTY_VALUE = "없음"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,17 +120,20 @@ fun MenuScreen(
     profileUpdateUiState: ProfileUpdateUiState,
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit,
+    onOpenWorkproofPdfCreation: () -> Unit,
     onOpenWorkproofPdf: (Long) -> Unit,
     onShareWorkproofPdf: (Long) -> Unit,
     onClearPdfFileState: () -> Unit,
     onConsumeLaunchRequest: () -> Unit,
     onUpdateProfile: (String, String) -> Unit,
     onClearProfileUpdateMessage: () -> Unit,
+    onOpenWorkerRegistrationCode: () -> Unit,
     onLogout: () -> Unit,
     onShowToast: (String, BadgeTone) -> Unit
 ) {
     val context = LocalContext.current
     var activeSheet by rememberSaveable { mutableStateOf<MenuOverlaySheet?>(null) }
+    var isLogoutConfirmVisible by rememberSaveable { mutableStateOf(false) }
     var selectedLanguage by rememberSaveable { mutableStateOf("ko") }
     var selectedDocumentId by remember { mutableStateOf<String?>(null) }
     var awaitingProfileUpdateResult by remember { mutableStateOf(false) }
@@ -141,7 +141,13 @@ fun MenuScreen(
     val selectedDocument = uiModel.documents.firstOrNull { it.id == selectedDocumentId }
     val proofDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Proof }
     val claimDocument = uiModel.documents.firstOrNull { it.accent == MenuDocumentAccent.Claim }
-    val selectedReceipt = if (activeSheet == MenuOverlaySheet.Receipt) uiModel.receipt else null
+    fun dismissProfileSheetIfIdle() {
+        if (!profileUpdateUiState.isSubmitting) {
+            awaitingProfileUpdateResult = false
+            onClearProfileUpdateMessage()
+            activeSheet = null
+        }
+    }
 
     LaunchedEffect(workproofPdfFileUiState.fileUri, workproofPdfFileUiState.pendingAction) {
         val fileUri = workproofPdfFileUiState.fileUri ?: return@LaunchedEffect
@@ -198,8 +204,9 @@ fun MenuScreen(
     }
 
     val serviceActions = buildList {
-        add(MenuServiceAction("급여 점검", Icons.Default.Description, onOpenWage))
+        add(MenuServiceAction("급여 점검", Icons.Default.AttachMoney, onOpenWage))
         add(MenuServiceAction("계좌 지갑 관리", Icons.Default.AccountBalanceWallet, onOpenAccount))
+        add(MenuServiceAction("문서 생성", Icons.Default.Description, onOpenWorkproofPdfCreation))
         add(MenuServiceAction("설정", Icons.Default.Settings) { activeSheet = MenuOverlaySheet.Settings })
     }
 
@@ -218,29 +225,21 @@ fun MenuScreen(
                     awaitingProfileUpdateResult = false
                     onClearProfileUpdateMessage()
                     activeSheet = MenuOverlaySheet.Profile
-                },
-                onLogout = onLogout
+                }
+            )
+            MenuSectionDivider()
+            MenuAccountLinkSection(
+                onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode
             )
             MenuSectionDivider()
         }
         MenuServicesSection(actions = serviceActions)
-        MenuSectionDivider()
-        MenuDocumentsSection(
-            documents = uiModel.documents,
-            onOpenDetail = { document ->
-                when {
-                    document.accent == MenuDocumentAccent.Receipt && uiModel.receipt != null -> {
-                        activeSheet = MenuOverlaySheet.Receipt
-                    }
-                    document.accent == MenuDocumentAccent.Claim && document.statusTone != BadgeTone.Success -> {
-                        activeSheet = MenuOverlaySheet.Claim
-                    }
-                    else -> {
-                        selectedDocumentId = document.id
-                    }
-                }
-            }
-        )
+        if (uiModel.session != null) {
+            MenuSectionDivider()
+            MenuLogoutSection(
+                onLogoutRequest = { isLogoutConfirmVisible = true }
+            )
+        }
         Spacer(modifier = Modifier.height(24.dp))
     }
 
@@ -285,13 +284,7 @@ fun MenuScreen(
 
     if (activeSheet == MenuOverlaySheet.Profile && uiModel.session != null) {
         ModalBottomSheet(
-            onDismissRequest = {
-                if (!profileUpdateUiState.isSubmitting) {
-                    awaitingProfileUpdateResult = false
-                    onClearProfileUpdateMessage()
-                    activeSheet = null
-                }
-            },
+            onDismissRequest = ::dismissProfileSheetIfIdle,
             containerColor = DawnSurface
         ) {
             MenuProfileSheet(
@@ -301,13 +294,7 @@ fun MenuScreen(
                     awaitingProfileUpdateResult = true
                     onUpdateProfile(name, phoneNumber)
                 },
-                onDismiss = {
-                    if (!profileUpdateUiState.isSubmitting) {
-                        awaitingProfileUpdateResult = false
-                        onClearProfileUpdateMessage()
-                        activeSheet = null
-                    }
-                }
+                onDismiss = ::dismissProfileSheetIfIdle
             )
         }
     }
@@ -346,40 +333,48 @@ fun MenuScreen(
         }
     }
 
-    if (selectedReceipt != null) {
+    if (isLogoutConfirmVisible) {
         ModalBottomSheet(
-            onDismissRequest = { activeSheet = null },
+            onDismissRequest = { isLogoutConfirmVisible = false },
             containerColor = DawnSurface
         ) {
-            MenuReceiptSheet(
-                receipt = selectedReceipt,
-                onOpenExplorer = {
-                    if (!openMenuReceiptExplorer(context, selectedReceipt.explorerUrl)) {
-                        onShowToast("블록 탐색기를 열 수 없어요.", BadgeTone.Warning)
-                    }
-                },
-                onShare = {
-                    if (!shareMenuReceipt(context, selectedReceipt.shareText)) {
-                        onShowToast("공유할 수 없어요.", BadgeTone.Warning)
-                    }
-                },
-                onDismiss = { activeSheet = null }
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "로그아웃",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = DawnText
+                )
+                Text(
+                    text = "현재 계정에서 로그아웃할까요?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnTextSubtle
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SecondaryActionButton(
+                        text = "취소",
+                        onClick = { isLogoutConfirmVisible = false },
+                        modifier = Modifier.weight(1f)
+                    )
+                    PrimaryActionButton(
+                        text = "로그아웃",
+                        onClick = {
+                            isLogoutConfirmVisible = false
+                            onLogout()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
     }
-}
-
-private fun openMenuReceiptExplorer(
-    context: Context,
-    url: String
-) : Boolean {
-    return runCatching {
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-    }.isSuccess
 }
 
 private fun openMenuWorkproofPdfFile(
@@ -420,31 +415,13 @@ private fun shareMenuWorkproofPdfFile(
     }.isSuccess
 }
 
-private fun shareMenuReceipt(
-    context: Context,
-    shareText: String
-) : Boolean {
-    return runCatching {
-        context.startActivity(
-            Intent.createChooser(
-                Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, shareText)
-                },
-                "영수증 공유"
-            ).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-    }.isSuccess
-}
-
 @Composable
 private fun MenuSessionSection(
     session: MenuSessionUiModel,
-    onEditProfile: () -> Unit,
-    onLogout: () -> Unit
+    onEditProfile: () -> Unit
 ) {
+    val organizationSummary = session.toOrganizationSummary()
+
     MenuSectionSurface {
         MenuSectionHeader(title = "계정")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -454,28 +431,79 @@ private fun MenuSessionSection(
                 color = DawnText
             )
             Text(
-                text = session.email,
+                text = organizationSummary,
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnTextSubtle
             )
-            session.phoneNumber?.let { phoneNumber ->
-                Text(
-                    text = phoneNumber,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DawnTextSubtle
-                )
-            }
         }
         SecondaryActionButton(
-            text = "내 정보 수정",
+            text = "프로필 수정",
             onClick = onEditProfile,
             modifier = Modifier.fillMaxWidth()
         )
-        SecondaryActionButton(
+    }
+}
+
+@Composable
+private fun MenuLogoutSection(
+    onLogoutRequest: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onLogoutRequest
+            )
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
             text = "로그아웃",
-            onClick = onLogout,
-            modifier = Modifier.fillMaxWidth()
+            style = MaterialTheme.typography.labelLarge,
+            color = DawnWarning
         )
+    }
+}
+
+@Composable
+private fun MenuAccountLinkSection(
+    onOpenWorkerRegistrationCode: () -> Unit
+) {
+    MenuSectionSurface {
+        MenuSectionHeader(title = "계정 연동")
+        MenuSectionListRow(
+            showDivider = false,
+            onClick = onOpenWorkerRegistrationCode
+        ) {
+            MenuServiceLeadingIcon(icon = Icons.Default.CheckCircle)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = "근로자 등록 코드 입력",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DawnText
+                )
+                Text(
+                    text = "소속 연동 코드를 등록할 수 있어요.",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = DawnTextSubtle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = DawnTextSubtle,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 
@@ -488,35 +516,67 @@ private fun MenuProfileSheet(
 ) {
     var name by remember(session.name) { mutableStateOf(session.name) }
     var phoneNumber by remember(session.phoneNumber) { mutableStateOf(session.phoneNumber.orEmpty()) }
+    val readOnlyProfileInfoItems = listOf(
+        MenuProfileInfoItem(
+            label = "이메일 주소",
+            value = session.email.toProfileValue()
+        ),
+        MenuProfileInfoItem(
+            label = "회사",
+            value = session.companyName.toProfileValue()
+        ),
+        MenuProfileInfoItem(
+            label = "근무지",
+            value = session.workplaceName.toProfileValue()
+        )
+    )
     val canSubmit = !uiState.isSubmitting && name.trim().isNotBlank() && phoneNumber.filter(Char::isDigit).length in 10..11
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        MenuSheetHeader(
+            title = "프로필 수정",
+            subtitle = "이름과 휴대폰 번호를 수정할 수 있어요.",
+            onDismiss = onDismiss
+        )
+        MenuSheetSection(title = "수정 가능 정보") {
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                label = { Text("이름") },
+                shape = RoundedCornerShape(16.dp)
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it },
+                singleLine = true,
+                label = { Text("휴대폰 번호") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
+        MenuSheetSection(title = "읽기 전용 정보") {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                readOnlyProfileInfoItems.forEachIndexed { index, item ->
+                    MenuProfileInfoRow(
+                        item = item,
+                        showDivider = index != readOnlyProfileInfoItems.lastIndex
+                    )
+                }
+            }
+        }
         Text(
-            text = "내 정보 수정",
-            style = MaterialTheme.typography.titleLarge,
-            color = DawnText
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = name,
-            onValueChange = { name = it },
-            singleLine = true,
-            label = { Text("이름") },
-            shape = RoundedCornerShape(16.dp)
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = phoneNumber,
-            onValueChange = { phoneNumber = it },
-            singleLine = true,
-            label = { Text("휴대폰 번호") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            shape = RoundedCornerShape(16.dp)
+            text = "이메일/회사/근무지 정보는 계정 연동 정보라 앱에서 직접 변경할 수 없어요.",
+            style = MaterialTheme.typography.bodySmall,
+            color = DawnTextSubtle
         )
         if (uiState.message != null) {
             Text(
@@ -531,12 +591,59 @@ private fun MenuProfileSheet(
             enabled = canSubmit,
             modifier = Modifier.fillMaxWidth()
         )
-        SecondaryActionButton(
-            text = "닫기",
-            onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth()
+    }
+}
+
+@Composable
+private fun MenuProfileInfoRow(
+    item: MenuProfileInfoItem,
+    showDivider: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = item.label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = DawnTextSubtle
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = item.value,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (item.value == MENU_PROFILE_EMPTY_VALUE) DawnTextSubtle else DawnText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
+    if (showDivider) {
+        HorizontalDivider(color = MenuDivider)
+    }
+}
+
+private fun String?.toProfileValue(): String {
+    val value = this?.trim()
+    return if (value.isNullOrBlank()) MENU_PROFILE_EMPTY_VALUE else value
+}
+
+private fun MenuSessionUiModel.toOrganizationSummary(): String {
+    val company = companyName?.trim().orEmpty()
+    val workplace = workplaceName?.trim().orEmpty()
+
+    if (company.isBlank() && workplace.isBlank()) {
+        return "소속 정보 없음"
+    }
+    if (company.isBlank()) {
+        return workplace
+    }
+    if (workplace.isBlank()) {
+        return company
+    }
+    return "$company · $workplace"
 }
 
 @Composable
@@ -636,89 +743,6 @@ private fun MenuSectionListRow(
 }
 
 @Composable
-private fun MenuDocumentsSection(
-    documents: List<MenuDocumentUiModel>,
-    onOpenDetail: (MenuDocumentUiModel) -> Unit
-) {
-    MenuSectionSurface {
-        MenuSectionHeader(title = "문서")
-
-        documents.forEachIndexed { index, document ->
-            MenuDocumentRow(
-                document = document,
-                onOpenDetail = { onOpenDetail(document) },
-                showDivider = index != documents.lastIndex
-            )
-        }
-    }
-}
-
-@Composable
-private fun MenuDocumentRow(
-    document: MenuDocumentUiModel,
-    onOpenDetail: () -> Unit,
-    showDivider: Boolean
-) {
-    val colors = menuDocumentColors(document.accent)
-
-    MenuSectionListRow(
-        showDivider = showDivider,
-        onClick = onOpenDetail,
-        verticalAlignment = Alignment.Top
-    ) {
-        MenuDocumentAccentBox(document.accent, colors)
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = document.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = DawnText
-                    )
-                    Text(
-                        text = document.updatedAtText,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = DawnTextSubtle
-                    )
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StatusBadge(
-                        text = document.statusText,
-                        tone = document.statusTone
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = DawnTextSubtle,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            Text(
-                text = document.summaryText,
-                style = MaterialTheme.typography.labelMedium,
-                color = DawnTextSubtle,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
 private fun MenuDocumentActionButton(
     text: String,
     icon: ImageVector,
@@ -779,32 +803,6 @@ private fun MenuDocumentActionButton(
                 maxLines = 1
             )
         }
-    }
-}
-
-@Composable
-private fun MenuDocumentAccentBox(
-    accent: MenuDocumentAccent,
-    colors: MenuDocumentColors
-) {
-    val icon = when (accent) {
-        MenuDocumentAccent.Proof -> Icons.Default.Description
-        MenuDocumentAccent.Claim -> Icons.Default.Warning
-        MenuDocumentAccent.Receipt -> Icons.Default.AccountBalanceWallet
-    }
-
-    Box(
-        modifier = Modifier
-            .size(38.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.iconBackground),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = colors.iconColor
-        )
     }
 }
 
@@ -903,23 +901,6 @@ private fun MenuSheetSection(
     }
 }
 
-private fun menuDocumentColors(accent: MenuDocumentAccent): MenuDocumentColors {
-    return when (accent) {
-        MenuDocumentAccent.Proof -> MenuDocumentColors(
-            iconBackground = DawnSecondary,
-            iconColor = DawnPrimaryDeep
-        )
-        MenuDocumentAccent.Claim -> MenuDocumentColors(
-            iconBackground = Color(0xFFF1F5F9),
-            iconColor = Color(0xFF475569)
-        )
-        MenuDocumentAccent.Receipt -> MenuDocumentColors(
-            iconBackground = Color(0xFFECFDF3),
-            iconColor = Color(0xFF047857)
-        )
-    }
-}
-
 @Composable
 private fun MenuDocumentSheet(
     document: MenuDocumentUiModel,
@@ -993,119 +974,6 @@ private fun MenuDocumentSheet(
                 text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
                 onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
                 modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
-@Composable
-private fun MenuReceiptSheet(
-    receipt: MenuReceiptUiModel,
-    onOpenExplorer: () -> Unit,
-    onShare: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val statusTone = if (receipt.status == MenuReceiptStatus.Confirmed) {
-        BadgeTone.Success
-    } else {
-        BadgeTone.Warning
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        MenuSheetHeader(
-            title = receipt.title,
-            subtitle = receipt.statusDetailText,
-            onDismiss = onDismiss
-        )
-
-        MenuSheetSection {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "현재 상태", style = MaterialTheme.typography.bodyLarge)
-                StatusBadge(text = receipt.statusText, tone = statusTone)
-            }
-            Text(
-                text = receipt.updatedAtText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = DawnTextSubtle
-            )
-        }
-
-        MenuSheetSection {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(MenuReceiptHashBackground)
-                    .border(1.dp, MenuReceiptHashBorder, RoundedCornerShape(22.dp))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = receipt.txHashSectionTitle,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = DawnTextSubtle
-                    )
-                    Text(
-                        text = receipt.networkLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = DawnPrimaryDeep
-                    )
-                }
-                Text(
-                    text = receipt.txHashLabel,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = DawnText
-                )
-                Text(
-                    text = receipt.txHashFullText,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    color = DawnTextSubtle
-                )
-            }
-            Text(
-                text = receipt.helperText,
-                style = MaterialTheme.typography.bodySmall,
-                color = DawnTextSubtle
-            )
-        }
-
-        receipt.pendingNoticeText?.let { pendingNoticeText ->
-            MenuSheetSection {
-                DonDoneLoadingPanel(
-                    title = "네트워크 확인 중",
-                    message = pendingNoticeText
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            SecondaryActionButton(
-                text = receipt.shareButtonText,
-                onClick = onShare,
-                modifier = Modifier.weight(1f)
-            )
-            PrimaryActionButton(
-                text = receipt.explorerButtonText,
-                onClick = onOpenExplorer,
-                modifier = Modifier.weight(1f)
             )
         }
     }

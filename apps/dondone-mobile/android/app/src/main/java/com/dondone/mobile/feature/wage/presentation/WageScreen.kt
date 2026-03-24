@@ -94,6 +94,7 @@ fun WageScreen(
     uiModel: WageUiModel,
     onApplyActualDeposit: (Int) -> Unit,
     onRefresh: () -> Unit,
+    onNavigateMenu: (openWorkerRegistrationSheet: Boolean) -> Unit,
     onOpenWorkproofPdfCreation: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -120,7 +121,8 @@ fun WageScreen(
         if (uiModel.surfaceState != WageSurfaceState.CONTENT) {
             WageSurfaceStateCard(
                 uiModel = uiModel,
-                onRefresh = onRefresh
+                onRefresh = onRefresh,
+                onNavigateMenu = onNavigateMenu
             )
         } else {
             WageHeader()
@@ -167,7 +169,8 @@ fun WageScreen(
 @Composable
 private fun WageSurfaceStateCard(
     uiModel: WageUiModel,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onNavigateMenu: (openWorkerRegistrationSheet: Boolean) -> Unit
 ) {
     WageSurfaceCard {
         WageSectionHeader(title = "급여 점검")
@@ -179,7 +182,15 @@ private fun WageSurfaceStateCard(
         if (uiModel.surfaceActionText != null && uiModel.surfaceState != WageSurfaceState.LOADING) {
             WagePrimaryButton(
                 text = uiModel.surfaceActionText,
-                onClick = onRefresh,
+                onClick = when (uiModel.surfaceActionType) {
+                    WageSurfaceActionType.OPEN_MENU -> {
+                        { onNavigateMenu(false) }
+                    }
+                    WageSurfaceActionType.OPEN_MENU_AND_REGISTRATION_CODE -> {
+                        { onNavigateMenu(true) }
+                    }
+                    else -> onRefresh
+                },
                 modifier = Modifier.fillMaxWidth()
             )
         }

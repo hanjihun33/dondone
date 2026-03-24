@@ -8,18 +8,18 @@ import org.junit.Test
 
 class AppTopBarStateTest {
     @Test
-    fun `home route keeps root layout and wordmark`() {
+    fun `home route keeps root layout and wordmark without settings action`() {
         val state = resolveAppTopBarState(
             currentRoute = Route.HOME,
             showRootTabs = true,
-            showSettingsAction = true,
+            showSettingsAction = false,
             headerTitle = null,
             headerDateText = null
         )
 
         assertEquals(AppTopBarLayout.ROOT, state.layout)
         assertTrue(state.showWordmark)
-        assertTrue(state.showSettingsAction)
+        assertFalse(state.showSettingsAction)
     }
 
     @Test

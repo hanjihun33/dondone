@@ -42,6 +42,7 @@ fun DonDoneNavGraph(
     workproofResetVersion: Int,
     onNavigateToRootTab: (String) -> Unit,
     onWorkproofDetailVisibilityChange: (Boolean) -> Unit,
+    onOpenWorkerRegistrationCode: () -> Unit,
     onShowToast: (String, BadgeTone) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -211,6 +212,12 @@ fun DonDoneNavGraph(
                 ),
                 onApplyActualDeposit = viewModel::submitWageDeposit,
                 onRefresh = viewModel::refreshWageRemoteState,
+                onNavigateMenu = { openWorkerRegistrationSheet ->
+                    onNavigateToRootTab(Route.MENU)
+                    if (openWorkerRegistrationSheet) {
+                        onOpenWorkerRegistrationCode()
+                    }
+                },
                 onOpenWorkproofPdfCreation = {
                     viewModel.openWorkproofPdfCreation()
                     navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target -> navController.navigate(target) }
@@ -329,12 +336,17 @@ fun DonDoneNavGraph(
                 profileUpdateUiState = profileUpdateUiState,
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
+                onOpenWorkproofPdfCreation = {
+                    viewModel.openWorkproofPdfCreation()
+                    navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target -> navController.navigate(target) }
+                },
                 onOpenWorkproofPdf = viewModel::openWorkproofPdf,
                 onShareWorkproofPdf = viewModel::shareWorkproofPdf,
                 onClearPdfFileState = viewModel::clearWorkproofPdfFileState,
                 onConsumeLaunchRequest = viewModel::consumeMenuLaunchRequest,
                 onUpdateProfile = viewModel::updateProfile,
                 onClearProfileUpdateMessage = viewModel::clearProfileUpdateMessage,
+                onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode,
                 onLogout = viewModel::logout,
                 onShowToast = onShowToast
             )

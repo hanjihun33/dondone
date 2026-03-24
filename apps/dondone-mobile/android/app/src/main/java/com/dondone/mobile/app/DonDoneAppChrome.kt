@@ -103,8 +103,9 @@ internal fun resolveAppTopBarState(
     headerTitle: String?,
     headerDateText: String?
 ): AppTopBarState {
+    val showWordmark = currentRoute == Route.HOME
     val layout = when {
-        showRootTabs && headerTitle == null && headerDateText == null && !showSettingsAction -> {
+        showRootTabs && !showWordmark && headerTitle == null && headerDateText == null && !showSettingsAction -> {
             AppTopBarLayout.COLLAPSED_ROOT
         }
         showRootTabs -> AppTopBarLayout.ROOT
@@ -113,7 +114,7 @@ internal fun resolveAppTopBarState(
 
     return AppTopBarState(
         layout = layout,
-        showWordmark = currentRoute == Route.HOME,
+        showWordmark = showWordmark,
         headerTitle = headerTitle,
         headerDateText = headerDateText,
         showSettingsAction = showSettingsAction
