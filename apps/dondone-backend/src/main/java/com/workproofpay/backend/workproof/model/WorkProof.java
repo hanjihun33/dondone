@@ -315,6 +315,12 @@ public class WorkProof extends BaseTimeEntity {
                 : WorkProofFinancialStatus.REFLECTED;
     }
 
+    public void updateRecognizedTimes(LocalDateTime recognizedClockInAt,
+                                      LocalDateTime recognizedClockOutAt) {
+        this.recognizedClockInAt = recognizedClockInAt;
+        this.recognizedClockOutAt = recognizedClockOutAt;
+    }
+
     public void completeCheckOut(LocalDateTime deviceAt,
                                  LocalDateTime serverAt,
                                  Double latitude,

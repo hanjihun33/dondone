@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.correction.model.CorrectionRequest;
+import com.workproofpay.backend.correction.model.CorrectionRequestReasonCode;
+import com.workproofpay.backend.correction.model.CorrectionReviewReasonCode;
 import com.workproofpay.backend.correction.model.CorrectionRequestStatus;
 import com.workproofpay.backend.correction.repo.CorrectionRequestRepository;
 import com.workproofpay.backend.employer.model.Company;
@@ -292,7 +294,7 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void createCorrectionRequestForEmployerScopedWorkProof() throws Exception {
+    void autoApprovesCorrectionRequestForLateButtonPressWithinGraceWindow() throws Exception {
         User worker = userRepository.save(User.register("correction-worker@test.com", "hashed", "Correction Worker"));
         Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
         Workplace workplace = workplaceRepository.save(Workplace.create(
@@ -323,8 +325,8 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
                 "Front door"
         );
         workProof.completeCheckOut(
-                LocalDateTime.of(2026, 3, 8, 18, 0),
-                LocalDateTime.of(2026, 3, 8, 18, 1),
+                LocalDateTime.of(2026, 3, 8, 18, 10),
+                LocalDateTime.of(2026, 3, 8, 18, 11),
                 37.501274,
                 127.039585,
                 "Front door",
@@ -334,8 +336,9 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
         String token = tokenFor(worker);
 
         CreateWorkProofCorrectionRequest request = new CreateWorkProofCorrectionRequest(
-                LocalDateTime.of(2026, 3, 8, 9, 20),
-                LocalDateTime.of(2026, 3, 8, 18, 10),
+                LocalDateTime.of(2026, 3, 8, 9, 0),
+                LocalDateTime.of(2026, 3, 8, 18, 0),
+                CorrectionRequestReasonCode.LATE_BUTTON_PRESS,
                 "Late subway arrival",
                 "Train delay screenshot attached",
                 null,
@@ -355,17 +358,255 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.workProofId").value(workProof.getId()))
+                .andExpect(jsonPath("$.data.reasonCode").value("LATE_BUTTON_PRESS"))
                 .andExpect(jsonPath("$.data.reason").value("Late subway arrival"))
                 .andExpect(jsonPath("$.data.memo").value("Train delay screenshot attached"))
                 .andExpect(jsonPath("$.data.attachmentCount").value(1))
-                .andExpect(jsonPath("$.data.status").value("PENDING"));
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
 
         CorrectionRequest savedRequest = correctionRequestRepository.findAll().get(0);
+        WorkProof savedWorkProof = workProofRepository.findById(workProof.getId()).orElseThrow();
         Assertions.assertEquals(worker.getId(), savedRequest.getRequestedByAccountId());
         Assertions.assertEquals(company.getId(), savedRequest.getCompanyId());
         Assertions.assertEquals(workplace.getId(), savedRequest.getWorkplaceId());
+        Assertions.assertEquals(CorrectionRequestReasonCode.LATE_BUTTON_PRESS, savedRequest.getReasonCode());
+        Assertions.assertEquals(CorrectionRequestStatus.APPROVED, savedRequest.getStatus());
         Assertions.assertEquals("Train delay screenshot attached", savedRequest.getRequestMemo());
         Assertions.assertTrue(savedRequest.getAttachmentMetadataJson().contains("\"fileRef\":\"storage://corrections/subway.png\""));
+        Assertions.assertEquals(LocalDateTime.of(2026, 3, 8, 18, 10), savedWorkProof.getClockOutAt());
+        Assertions.assertEquals(LocalDateTime.of(2026, 3, 8, 18, 0), savedWorkProof.resolveRecognizedClockOutAt());
+    }
+
+    @Test
+    void createsPendingCorrectionRequestForLateClockInAfterSchedule() throws Exception {
+        User worker = userRepository.save(User.register("late-clock-in@test.com", "hashed", "Late Clock In"));
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-LATE-IN"));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                worker,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul Address 212",
+                null,
+                37.501274,
+                127.039585,
+                300
+        ));
+        employmentMembershipRepository.save(EmploymentMembership.create(
+                worker.getId(),
+                company.getId(),
+                workplace.getId(),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof workProof = WorkProof.checkIn(
+                worker,
+                workplace,
+                null,
+                LocalDateTime.of(2026, 3, 10, 9, 15),
+                LocalDateTime.of(2026, 3, 10, 9, 16),
+                37.501274,
+                127.039585,
+                "Front door"
+        );
+        workProof.completeCheckOut(
+                LocalDateTime.of(2026, 3, 10, 18, 10),
+                LocalDateTime.of(2026, 3, 10, 18, 11),
+                37.501274,
+                127.039585,
+                "Front door",
+                false
+        );
+        workProof = workProofRepository.save(workProof);
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", workProof.getId())
+                        .header("Authorization", bearer(tokenFor(worker)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
+                                LocalDateTime.of(2026, 3, 10, 9, 0),
+                                LocalDateTime.of(2026, 3, 10, 18, 0),
+                                CorrectionRequestReasonCode.LATE_CLOCK_IN,
+                                "Late train arrival",
+                                "Subway issue",
+                                0,
+                                null
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.reviewReasonCode").value("LATE_CLOCK_IN_AFTER_SCHEDULE"));
+
+        CorrectionRequest savedRequest = correctionRequestRepository.findAll().get(0);
+        WorkProof savedWorkProof = workProofRepository.findById(workProof.getId()).orElseThrow();
+        Assertions.assertEquals(CorrectionRequestStatus.PENDING, savedRequest.getStatus());
+        Assertions.assertEquals(CorrectionReviewReasonCode.LATE_CLOCK_IN_AFTER_SCHEDULE, savedRequest.getReviewReasonCode());
+        Assertions.assertEquals(LocalDateTime.of(2026, 3, 10, 9, 15), savedWorkProof.resolveRecognizedClockInAt());
+        Assertions.assertEquals(LocalDateTime.of(2026, 3, 10, 18, 10), savedWorkProof.resolveRecognizedClockOutAt());
+    }
+
+    @Test
+    void requiresMemoAndCreatesPendingReviewForEarlyClockOut() throws Exception {
+        User worker = userRepository.save(User.register("early-clock-out@test.com", "hashed", "Early Clock Out"));
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-EARLY-OUT"));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                worker,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul Address 212",
+                null,
+                37.501274,
+                127.039585,
+                300
+        ));
+        employmentMembershipRepository.save(EmploymentMembership.create(
+                worker.getId(),
+                company.getId(),
+                workplace.getId(),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof workProof = WorkProof.checkIn(
+                worker,
+                workplace,
+                null,
+                LocalDateTime.of(2026, 3, 11, 9, 0),
+                LocalDateTime.of(2026, 3, 11, 9, 1),
+                37.501274,
+                127.039585,
+                "Front door"
+        );
+        workProof.completeCheckOut(
+                LocalDateTime.of(2026, 3, 11, 17, 50),
+                LocalDateTime.of(2026, 3, 11, 17, 51),
+                37.501274,
+                127.039585,
+                "Front door",
+                false
+        );
+        workProof = workProofRepository.save(workProof);
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", workProof.getId())
+                        .header("Authorization", bearer(tokenFor(worker)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
+                                LocalDateTime.of(2026, 3, 11, 9, 0),
+                                LocalDateTime.of(2026, 3, 11, 18, 0),
+                                CorrectionRequestReasonCode.EARLY_CLOCK_OUT,
+                                "Left early for medical visit",
+                                null,
+                                0,
+                                null
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CORRECTION_REQUEST_MEMO_REQUIRED"));
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", workProof.getId())
+                        .header("Authorization", bearer(tokenFor(worker)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
+                                LocalDateTime.of(2026, 3, 11, 9, 0),
+                                LocalDateTime.of(2026, 3, 11, 18, 0),
+                                CorrectionRequestReasonCode.EARLY_CLOCK_OUT,
+                                "Left early for medical visit",
+                                "Clinic visit after lunch",
+                                0,
+                                null
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.reviewReasonCode").value("EARLY_CLOCK_OUT_BEFORE_SCHEDULE"));
+    }
+
+    @Test
+    void keepsReviewPathForOutsideRadiusAndLateClockOutAfterGrace() throws Exception {
+        User worker = userRepository.save(User.register("review-needed@test.com", "hashed", "Review Worker"));
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-REVIEW"));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                worker,
+                company.getId(),
+                "Seoul Hub",
+                "Seoul Address 212",
+                null,
+                37.501274,
+                127.039585,
+                300
+        ));
+        employmentMembershipRepository.save(EmploymentMembership.create(
+                worker.getId(),
+                company.getId(),
+                workplace.getId(),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof lateClockOutWorkProof = WorkProof.checkIn(
+                worker,
+                workplace,
+                null,
+                LocalDateTime.of(2026, 3, 12, 9, 0),
+                LocalDateTime.of(2026, 3, 12, 9, 1),
+                37.501274,
+                127.039585,
+                "Front door"
+        );
+        lateClockOutWorkProof.completeCheckOut(
+                LocalDateTime.of(2026, 3, 12, 18, 40),
+                LocalDateTime.of(2026, 3, 12, 18, 41),
+                37.501274,
+                127.039585,
+                "Front door",
+                false
+        );
+        lateClockOutWorkProof = workProofRepository.save(lateClockOutWorkProof);
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", lateClockOutWorkProof.getId())
+                        .header("Authorization", bearer(tokenFor(worker)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
+                                LocalDateTime.of(2026, 3, 12, 9, 0),
+                                LocalDateTime.of(2026, 3, 12, 18, 0),
+                                CorrectionRequestReasonCode.LATE_BUTTON_PRESS,
+                                "Missed checkout button timing",
+                                "Platform was crowded",
+                                0,
+                                null
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.reviewReasonCode").value("LATE_CLOCK_OUT_AFTER_GRACE"));
+
+        WorkProof outsideRadiusWorkProof = WorkProof.checkIn(
+                worker,
+                workplace,
+                null,
+                LocalDateTime.of(2026, 3, 13, 9, 0),
+                LocalDateTime.of(2026, 3, 13, 9, 1),
+                37.501274,
+                127.039585,
+                "Front door"
+        );
+        outsideRadiusWorkProof.completeCheckOut(
+                LocalDateTime.of(2026, 3, 13, 18, 10),
+                LocalDateTime.of(2026, 3, 13, 18, 11),
+                37.5,
+                127.1,
+                "Outside site",
+                true
+        );
+        outsideRadiusWorkProof = workProofRepository.save(outsideRadiusWorkProof);
+
+        mockMvc.perform(post("/api/workproof/{workProofId}/correction-requests", outsideRadiusWorkProof.getId())
+                        .header("Authorization", bearer(tokenFor(worker)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
+                                LocalDateTime.of(2026, 3, 13, 9, 0),
+                                LocalDateTime.of(2026, 3, 13, 18, 0),
+                                CorrectionRequestReasonCode.LATE_BUTTON_PRESS,
+                                "Pressed checkout late outside workplace",
+                                "Need manager confirmation",
+                                0,
+                                null
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.reviewReasonCode").value("OUTSIDE_ALLOWED_RADIUS"));
     }
 
     @Test
@@ -401,6 +642,7 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
         CreateWorkProofCorrectionRequest correctionRequest = new CreateWorkProofCorrectionRequest(
                 LocalDateTime.of(2026, 3, 12, 9, 10),
                 LocalDateTime.of(2026, 3, 12, 18, 10),
+                CorrectionRequestReasonCode.OTHER,
                 "Need correction",
                 null,
                 0,
@@ -475,6 +717,7 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
                                 LocalDateTime.of(2026, 3, 13, 9, 30),
                                 LocalDateTime.of(2026, 3, 13, 18, 30),
+                                CorrectionRequestReasonCode.OTHER,
                                 "Second correction attempt",
                                 null,
                                 0,
@@ -509,6 +752,7 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(objectMapper.writeValueAsString(new CreateWorkProofCorrectionRequest(
                                 unchangedWorkProof.getClockInAt(),
                                 unchangedWorkProof.getClockOutAt(),
+                                CorrectionRequestReasonCode.OTHER,
                                 "No actual change",
                                 null,
                                 0,

@@ -1,5 +1,6 @@
 package com.workproofpay.backend.workproof.api.dto.request;
 
+import com.workproofpay.backend.correction.model.CorrectionRequestReasonCode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -16,6 +17,9 @@ public record CreateWorkProofCorrectionRequest(
 
         @NotNull(message = "requestedClockOutAt is required")
         LocalDateTime requestedClockOutAt,
+
+        @NotNull(message = "reasonCode is required")
+        CorrectionRequestReasonCode reasonCode,
 
         @NotBlank(message = "reason is required")
         @Size(max = 500, message = "reason must be 500 characters or less")

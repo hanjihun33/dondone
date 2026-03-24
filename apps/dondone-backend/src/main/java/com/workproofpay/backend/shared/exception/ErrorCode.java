@@ -87,6 +87,7 @@ public enum ErrorCode {
     RECOVERY_ACTION_NOT_ALLOWED(HttpStatus.CONFLICT, "Recovery action is not allowed for the current state"),
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large"),
     CORRECTION_REQUEST_NO_CHANGES(HttpStatus.BAD_REQUEST, "Requested correction times must differ from the original workproof"),
+    CORRECTION_REQUEST_MEMO_REQUIRED(HttpStatus.BAD_REQUEST, "memo is required for this correction request"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
 

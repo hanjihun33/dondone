@@ -1,6 +1,8 @@
 package com.workproofpay.backend.workproof.api.dto.response;
 
 import com.workproofpay.backend.correction.model.CorrectionRequest;
+import com.workproofpay.backend.correction.model.CorrectionRequestReasonCode;
+import com.workproofpay.backend.correction.model.CorrectionReviewReasonCode;
 import com.workproofpay.backend.correction.model.CorrectionRequestStatus;
 
 import java.time.LocalDate;
@@ -14,6 +16,8 @@ public record WorkProofCorrectionRequestResponse(
         LocalDateTime originalClockOutAt,
         LocalDateTime requestedClockInAt,
         LocalDateTime requestedClockOutAt,
+        CorrectionRequestReasonCode reasonCode,
+        CorrectionReviewReasonCode reviewReasonCode,
         String reason,
         String memo,
         int attachmentCount,
@@ -29,6 +33,8 @@ public record WorkProofCorrectionRequestResponse(
                 correctionRequest.getOriginalClockOutAt(),
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
+                correctionRequest.getReasonCode(),
+                correctionRequest.getReviewReasonCode(),
                 correctionRequest.getReason(),
                 correctionRequest.getRequestMemo(),
                 correctionRequest.getAttachmentCount(),
