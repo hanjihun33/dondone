@@ -479,6 +479,8 @@ public class WorkProofLane1Service {
                 workProof.isCheckedIn() ? WorkProofRecordStatus.CHECKED_IN : WorkProofRecordStatus.CHECKED_OUT,
                 workProof.getDeviceClockInAt(),
                 workProof.getDeviceClockOutAt(),
+                workProof.resolveRecognizedClockInAt(),
+                workProof.resolveRecognizedClockOutAt(),
                 resolveWorkedMinutes(workProof),
                 workProof.isEdited(),
                 resolveReflectionStatus(workProof),
@@ -517,6 +519,8 @@ public class WorkProofLane1Service {
                         workProof.getClockOutLongitude(),
                         workProof.getClockOutLocationLabel()
                 ),
+                workProof.resolveRecognizedClockInAt(),
+                workProof.resolveRecognizedClockOutAt(),
                 resolveReflectionStatus(workProof),
                 resolveWorkedMinutes(workProof),
                 riskFlags,

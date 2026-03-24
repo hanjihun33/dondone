@@ -16,6 +16,8 @@ public record EmployerReviewRequiredRecordDetailResponse(
         WorkProofReflectionStatus reflectionStatus,
         String reviewReasonCode,
         String reviewReason,
+        LocalDateTime recognizedClockInAt,
+        LocalDateTime recognizedClockOutAt,
         long workedMinutes,
         boolean clockOutOutsideAllowedRadius,
         boolean edited,

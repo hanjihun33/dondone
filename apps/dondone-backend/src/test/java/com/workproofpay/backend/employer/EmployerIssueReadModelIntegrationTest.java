@@ -173,6 +173,8 @@ class EmployerIssueReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.recordStatus").value("CHECKED_OUT"))
                 .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
                 .andExpect(jsonPath("$.data.reviewReasonCode").value("CLOCK_OUT_OUTSIDE_ALLOWED_RADIUS"))
+                .andExpect(jsonPath("$.data.recognizedClockInAt").value("2026-03-18T09:10:00"))
+                .andExpect(jsonPath("$.data.recognizedClockOutAt").value("2026-03-18T18:20:00"))
                 .andExpect(jsonPath("$.data.clockOutOutsideAllowedRadius").value(true))
                 .andExpect(jsonPath("$.data.workplace.name").value("Seoul Hub"))
                 .andExpect(jsonPath("$.data.checkOut.locationLabel").value("Office"));

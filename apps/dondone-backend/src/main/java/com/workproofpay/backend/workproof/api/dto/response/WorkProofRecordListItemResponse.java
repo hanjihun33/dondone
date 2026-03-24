@@ -10,6 +10,8 @@ public record WorkProofRecordListItemResponse(
         WorkProofRecordStatus status,
         LocalDateTime checkInDeviceAt,
         LocalDateTime checkOutDeviceAt,
+        LocalDateTime recognizedClockInAt,
+        LocalDateTime recognizedClockOutAt,
         Long workedMinutes,
         boolean modified,
         WorkProofReflectionStatus reflectionStatus,

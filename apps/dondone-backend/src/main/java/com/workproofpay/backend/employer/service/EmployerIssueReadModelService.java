@@ -108,6 +108,8 @@ public class EmployerIssueReadModelService {
                 workProof.isNeedsReview() ? WorkProofReflectionStatus.NEEDS_REVIEW : WorkProofReflectionStatus.REFLECTED,
                 resolveReviewReasonCode(workProof),
                 resolveReviewReasonLabel(workProof),
+                workProof.resolveRecognizedClockInAt(),
+                workProof.resolveRecognizedClockOutAt(),
                 workProof.workedMinutes(),
                 workProof.isClockOutOutsideAllowedRadius(),
                 workProof.isEdited(),

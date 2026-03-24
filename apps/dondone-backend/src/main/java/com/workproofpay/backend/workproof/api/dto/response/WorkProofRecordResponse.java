@@ -15,6 +15,8 @@ public record WorkProofRecordResponse(
         CurrentContractResponse contract,
         EvidenceCaptureResponse checkIn,
         EvidenceCaptureResponse checkOut,
+        LocalDateTime recognizedClockInAt,
+        LocalDateTime recognizedClockOutAt,
         WorkProofReflectionStatus reflectionStatus,
         Long workedMinutes,
         List<String> riskFlags,
