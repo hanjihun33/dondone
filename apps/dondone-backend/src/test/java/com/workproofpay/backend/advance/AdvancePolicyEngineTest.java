@@ -1,6 +1,7 @@
 package com.workproofpay.backend.advance;
 
 import com.workproofpay.backend.advance.api.dto.response.AdvanceEligibilityResponse;
+import com.workproofpay.backend.advance.service.AdvancePolicyDefaults;
 import com.workproofpay.backend.advance.service.AdvancePolicyEngine;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
 import com.workproofpay.backend.workproof.model.WorkContract;
@@ -26,10 +27,12 @@ class AdvancePolicyEngineTest {
     private static final long FEE_REFERENCE_KRW = 5_000L;
 
     private final AdvancePolicyEngine engine = new AdvancePolicyEngine();
+    private final com.workproofpay.backend.advance.model.AdvancePolicy policy = AdvancePolicyDefaults.createDefault();
 
     @Test
     void blocksEligibilityWhenVerifiedWorkIsMissing() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(12_000),
                 summary(0, 0, 0, 0, 0),
@@ -47,6 +50,7 @@ class AdvancePolicyEngineTest {
     @Test
     void calculatesAvailableAmountFromTierRatioAndCap() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
@@ -71,6 +75,7 @@ class AdvancePolicyEngineTest {
     @Test
     void exposesPendingReviewAsNoticeInsteadOfBlockReason() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 120, 1),
@@ -89,6 +94,7 @@ class AdvancePolicyEngineTest {
     @Test
     void blocksEligibilityWhenOutstandingAdvanceExists() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
@@ -107,6 +113,7 @@ class AdvancePolicyEngineTest {
     @Test
     void blocksEligibilityOnlyOnRepaymentDate() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
@@ -125,6 +132,7 @@ class AdvancePolicyEngineTest {
     @Test
     void doesNotBlockDayBeforeRepaymentDate() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
@@ -142,6 +150,7 @@ class AdvancePolicyEngineTest {
     @Test
     void rollsTargetMonthForwardAfterPayday() {
         YearMonth targetMonth = engine.resolveTargetMonth(
+                policy,
                 LocalDate.of(2026, 3, 26),
                 YearMonth.of(2026, 3)
         );
@@ -152,6 +161,7 @@ class AdvancePolicyEngineTest {
     @Test
     void keepsFutureWorkedMonthWhenItIsAlreadyNextCycle() {
         YearMonth targetMonth = engine.resolveTargetMonth(
+                policy,
                 LocalDate.of(2026, 3, 26),
                 YearMonth.of(2026, 4)
         );

@@ -39,6 +39,7 @@ public class AdvanceService {
     private final WorkContractRepository workContractRepository;
     private final WorkProofRepository workProofRepository;
     private final WorkProofLane1Service workProofLane1Service;
+    private final AdvancePolicyResolver advancePolicyResolver;
     private final AdvancePolicyEngine advancePolicyEngine;
     private final AdvanceRequestViewStatusResolver advanceRequestViewStatusResolver;
 
@@ -126,7 +127,8 @@ public class AdvanceService {
                 .findFirstByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_CONTRACT_REQUIRED));
 
-        YearMonth targetMonth = resolveTargetMonth(userId, workplaceId);
+        var policy = advancePolicyResolver.resolve();
+        YearMonth targetMonth = resolveTargetMonth(userId, workplaceId, policy);
         WorkProofMonthlySummaryContractResponse summary = toMonthlySummary(userId, workplaceId, targetMonth);
         boolean hasOpenAdvanceRequest = advanceRequestRepository.existsByUserIdAndWorkplaceIdAndYearMonthAndStatusIn(
                 userId,
@@ -136,6 +138,7 @@ public class AdvanceService {
         );
 
         AdvanceEligibilityResponse response = advancePolicyEngine.evaluate(
+                policy,
                 workplaceId,
                 contract,
                 summary,
@@ -157,11 +160,11 @@ public class AdvanceService {
         return workProofLane1Service.getMonthlySummary(userId, targetMonth.toString(), workplaceId);
     }
 
-    private YearMonth resolveTargetMonth(Long userId, Long workplaceId) {
+    private YearMonth resolveTargetMonth(Long userId, Long workplaceId, com.workproofpay.backend.advance.model.AdvancePolicy policy) {
         YearMonth latestWorkedMonth = workProofRepository.findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(userId, workplaceId)
                 .map(workProof -> YearMonth.from(workProof.getWorkDate()))
                 .orElse(null);
-        return advancePolicyEngine.resolveTargetMonth(java.time.LocalDate.now(), latestWorkedMonth);
+        return advancePolicyEngine.resolveTargetMonth(policy, java.time.LocalDate.now(), latestWorkedMonth);
     }
 
     private User findUser(Long userId) {

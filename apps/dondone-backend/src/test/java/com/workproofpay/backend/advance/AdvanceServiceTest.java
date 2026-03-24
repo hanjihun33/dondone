@@ -2,7 +2,9 @@ package com.workproofpay.backend.advance;
 
 import com.workproofpay.backend.advance.api.dto.request.CreateAdvanceRequest;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
+import com.workproofpay.backend.advance.service.AdvancePolicyDefaults;
 import com.workproofpay.backend.advance.service.AdvancePolicyEngine;
+import com.workproofpay.backend.advance.service.AdvancePolicyResolver;
 import com.workproofpay.backend.advance.service.AdvanceCreateResult;
 import com.workproofpay.backend.advance.service.AdvanceRequestViewStatusResolver;
 import com.workproofpay.backend.advance.service.AdvanceService;
@@ -41,6 +43,7 @@ class AdvanceServiceTest {
     private final WorkContractRepository workContractRepository = mock(WorkContractRepository.class);
     private final WorkProofRepository workProofRepository = mock(WorkProofRepository.class);
     private final WorkProofLane1Service workProofLane1Service = mock(WorkProofLane1Service.class);
+    private final AdvancePolicyResolver advancePolicyResolver = mock(AdvancePolicyResolver.class);
     private final AdvancePolicyEngine advancePolicyEngine = new AdvancePolicyEngine();
     private final AdvanceRequestViewStatusResolver advanceRequestViewStatusResolver = new AdvanceRequestViewStatusResolver();
 
@@ -52,9 +55,14 @@ class AdvanceServiceTest {
             workContractRepository,
             workProofRepository,
             workProofLane1Service,
+            advancePolicyResolver,
             advancePolicyEngine,
             advanceRequestViewStatusResolver
     );
+
+    AdvanceServiceTest() {
+        when(advancePolicyResolver.resolve()).thenReturn(AdvancePolicyDefaults.createDefault());
+    }
 
     @Test
     void rejectsMissingIdempotencyKey() {

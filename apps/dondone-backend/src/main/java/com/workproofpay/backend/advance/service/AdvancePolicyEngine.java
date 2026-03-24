@@ -2,6 +2,8 @@ package com.workproofpay.backend.advance.service;
 
 import com.workproofpay.backend.advance.api.dto.response.AdvanceEligibilityResponse;
 import com.workproofpay.backend.advance.model.AdvanceBlockReasonCode;
+import com.workproofpay.backend.advance.model.AdvanceFeeType;
+import com.workproofpay.backend.advance.model.AdvancePolicy;
 import com.workproofpay.backend.advance.model.AdvanceRepaymentTier;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
 import com.workproofpay.backend.workproof.model.WorkContract;
@@ -18,17 +20,10 @@ import java.util.List;
 @Component
 public class AdvancePolicyEngine {
 
-    static final int DEFAULT_PAYDAY_DAY = 25;
     static final int STANDARD_WORKDAY_MINUTES = 480;
-    static final String ADVANCE_ASSET_SYMBOL = "dUSDC";
-    static final int ADVANCE_ASSET_DECIMALS = 6;
-    static final BigDecimal REFERENCE_KRW_PER_ASSET = BigDecimal.valueOf(1_450L);
-    static final long DEMO_MAX_CAP_KRW = 500_000L;
-    static final long REDUCED_PAYDAY_CAP_KRW = 50_000L;
-    static final long FLAT_FEE_AMOUNT_KRW = 5_000L;
-    static final String ADVANCE_DISCLAIMER = "미리받기 금액은 반영된 근무 기록 기준의 데모 시뮬레이션입니다. 실제 금융 서비스 제공을 의미하지 않습니다.";
 
     public AdvanceEligibilityResponse evaluate(
+            AdvancePolicy policy,
             Long workplaceId,
             WorkContract contract,
             WorkProofMonthlySummaryContractResponse summary,
@@ -52,9 +47,13 @@ public class AdvancePolicyEngine {
                 .setScale(0, RoundingMode.DOWN)
                 .longValue();
 
-        int daysUntilRepayment = daysUntilRepayment(today, targetMonth);
+        int daysUntilRepayment = daysUntilRepayment(policy, today, targetMonth);
         boolean isRepaymentDate = daysUntilRepayment == 0;
-        long paydayCapKrw = isRepaymentDate ? 0L : daysUntilRepayment <= 7 ? REDUCED_PAYDAY_CAP_KRW : DEMO_MAX_CAP_KRW;
+        long paydayCapKrw = isRepaymentDate
+                ? 0L
+                : daysUntilRepayment <= policy.getReducedCapDaysBeforePayday()
+                ? policy.getNearPaydayMaxCapDisplayKrwAmount()
+                : policy.getMaxCapDisplayKrwAmount();
 
         List<String> blockReasonCodes = new ArrayList<>();
         List<String> noticeReasonCodes = new ArrayList<>();
@@ -77,9 +76,9 @@ public class AdvancePolicyEngine {
 
         long availableDisplayKrwAmount = hardBlocked
                 ? 0L
-                : Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCapKrw, DEMO_MAX_CAP_KRW));
-        long maxCapDisplayKrwAmount = DEMO_MAX_CAP_KRW;
-        long estimatedFeeDisplayKrwAmount = availableDisplayKrwAmount > 0 ? FLAT_FEE_AMOUNT_KRW : 0L;
+                : Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCapKrw, policy.getMaxCapDisplayKrwAmount()));
+        long maxCapDisplayKrwAmount = policy.getMaxCapDisplayKrwAmount();
+        long estimatedFeeDisplayKrwAmount = estimateFeeDisplayKrwAmount(policy, availableDisplayKrwAmount);
 
         Integer nextTierDays = tier.nextMinimumDays();
         long nextTierRemainingMinutes = nextTierDays == null
@@ -88,12 +87,12 @@ public class AdvancePolicyEngine {
 
         return new AdvanceEligibilityResponse(
                 workplaceId,
-                ADVANCE_ASSET_SYMBOL,
-                ADVANCE_ASSET_DECIMALS,
-                REFERENCE_KRW_PER_ASSET,
-                toAtomic(availableDisplayKrwAmount),
+                policy.getAssetSymbol(),
+                policy.getAssetDecimals(),
+                policy.getReferenceKrwPerAsset(),
+                toAtomic(policy, availableDisplayKrwAmount),
                 availableDisplayKrwAmount,
-                toAtomic(maxCapDisplayKrwAmount),
+                toAtomic(policy, maxCapDisplayKrwAmount),
                 maxCapDisplayKrwAmount,
                 tier.ratio(),
                 tier.code(),
@@ -105,16 +104,16 @@ public class AdvancePolicyEngine {
                 List.copyOf(blockReasonCodes),
                 List.copyOf(noticeReasonCodes),
                 nextTierRemainingMinutes,
-                toAtomic(estimatedFeeDisplayKrwAmount),
+                toAtomic(policy, estimatedFeeDisplayKrwAmount),
                 estimatedFeeDisplayKrwAmount,
-                repaymentDate(today, targetMonth),
-                ADVANCE_DISCLAIMER
+                repaymentDate(policy, today, targetMonth),
+                policy.getDisclaimer()
         );
     }
 
-    public YearMonth resolveTargetMonth(LocalDate today, YearMonth latestWorkedMonth) {
+    public YearMonth resolveTargetMonth(AdvancePolicy policy, LocalDate today, YearMonth latestWorkedMonth) {
         YearMonth cycleMonth = YearMonth.from(today);
-        if (today.getDayOfMonth() > DEFAULT_PAYDAY_DAY) {
+        if (today.getDayOfMonth() > policy.getPaydayDay()) {
             cycleMonth = cycleMonth.plusMonths(1);
         }
         if (latestWorkedMonth == null || latestWorkedMonth.isBefore(cycleMonth)) {
@@ -131,23 +130,33 @@ public class AdvancePolicyEngine {
         );
     }
 
-    private int daysUntilRepayment(LocalDate today, YearMonth targetMonth) {
-        LocalDate repaymentDate = repaymentDate(today, targetMonth);
+    private int daysUntilRepayment(AdvancePolicy policy, LocalDate today, YearMonth targetMonth) {
+        LocalDate repaymentDate = repaymentDate(policy, today, targetMonth);
         return (int) (repaymentDate.toEpochDay() - today.toEpochDay());
     }
 
-    private LocalDate repaymentDate(LocalDate today, YearMonth targetMonth) {
+    private LocalDate repaymentDate(AdvancePolicy policy, LocalDate today, YearMonth targetMonth) {
         YearMonth repaymentMonth = targetMonth.isBefore(YearMonth.from(today)) ? YearMonth.from(today) : targetMonth;
-        return repaymentMonth.atDay(Math.min(DEFAULT_PAYDAY_DAY, repaymentMonth.lengthOfMonth()));
+        return repaymentMonth.atDay(Math.min(policy.getPaydayDay(), repaymentMonth.lengthOfMonth()));
     }
 
-    private long toAtomic(long referenceKrw) {
+    private long estimateFeeDisplayKrwAmount(AdvancePolicy policy, long availableDisplayKrwAmount) {
+        if (availableDisplayKrwAmount <= 0) {
+            return 0L;
+        }
+        if (policy.getFeeType() == AdvanceFeeType.FLAT) {
+            return policy.getFlatFeeDisplayKrwAmount();
+        }
+        return 0L;
+    }
+
+    private long toAtomic(AdvancePolicy policy, long referenceKrw) {
         if (referenceKrw <= 0) {
             return 0L;
         }
         return BigDecimal.valueOf(referenceKrw)
-                .multiply(BigDecimal.TEN.pow(ADVANCE_ASSET_DECIMALS))
-                .divide(REFERENCE_KRW_PER_ASSET, 0, RoundingMode.DOWN)
+                .multiply(BigDecimal.TEN.pow(policy.getAssetDecimals()))
+                .divide(policy.getReferenceKrwPerAsset(), 0, RoundingMode.DOWN)
                 .longValue();
     }
 }
