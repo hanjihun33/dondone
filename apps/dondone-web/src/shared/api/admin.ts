@@ -78,10 +78,34 @@ export type AdminAdvanceRequestItemResponse = {
   workerEmail: string;
   companyName: string | null;
   workplaceName: string;
-  requestedAmount: number;
-  approvedAmount: number | null;
-  feeAmount: number;
-  status: "SUBMITTED" | "APPROVED" | "REJECTED" | "NEEDS_REVIEW";
+  assetSymbol: string;
+  assetDecimals: number;
+  exchangeRateSnapshot: number;
+  requestedAmountAtomic: number;
+  requestedDisplayKrwAmount: number;
+  approvedAmountAtomic: number | null;
+  approvedDisplayKrwAmount: number | null;
+  feeAmountAtomic: number;
+  feeDisplayKrwAmount: number;
+  status:
+    | "SUBMITTED"
+    | "APPROVED"
+    | "PAYING"
+    | "PAID"
+    | "PAYOUT_FAILED"
+    | "REJECTED"
+    | "NEEDS_REVIEW";
+  requestStatus: "SUBMITTED" | "APPROVED" | "REJECTED" | "NEEDS_REVIEW";
+  payoutStatus:
+    | "REQUESTED"
+    | "SIGNED"
+    | "BROADCASTED"
+    | "CONFIRMED"
+    | "FAILED"
+    | "TIMED_OUT"
+    | null;
+  payoutTxHash: string | null;
+  payoutFailureReason: string | null;
   repaymentDueDate: string;
   requestedAt: string;
   reflectedWorkDays: number;
