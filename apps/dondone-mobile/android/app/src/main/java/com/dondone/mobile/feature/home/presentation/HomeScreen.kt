@@ -1,6 +1,7 @@
 package com.dondone.mobile.feature.home.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -15,11 +16,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +45,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSecondary
 import com.dondone.mobile.core.designsystem.pressableScale
@@ -54,10 +59,10 @@ private val HomeTextPrimary = Color(0xFF1F2430)
 private val HomeTextMuted = Color(0xFF8B95A1)
 private val HomeAccent = DawnPrimary
 private val HomeAccentSoft = DawnSecondary.copy(alpha = 0.62f)
-private val HomeSuccessMuted = Color(0xFFF3F5F8)
-private val HomeWarningMuted = Color(0xFFF9F4EC)
-private val HomeWarningText = Color(0xFFB67D39)
-private val HomeSuccessText = Color(0xFF7E8896)
+private val HomeSuccessMuted = Color(0xFFF4F7FB)
+private val HomeWarningMuted = Color(0xFFFBF6EE)
+private val HomeWarningText = Color(0xFF8C6B44)
+private val HomeSuccessText = Color(0xFF667487)
 private val HomeDisabledPrimary = Color(0xFFD8DDE6)
 private val HomeDisabledSoft = Color(0xFFEDEFF3)
 private val HomeDisabledText = Color(0xFF9EA7B3)
@@ -71,6 +76,7 @@ fun HomeScreen(
     onOpenWage: () -> Unit,
     onOpenMenu: () -> Unit,
     onOpenWorkproof: () -> Unit,
+    onDismissRemittanceCompletionNotice: () -> Unit,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit
 ) {
@@ -91,6 +97,13 @@ fun HomeScreen(
                 onOpenAccount = onOpenAccount,
                 onOpenTransfer = onOpenTransfer
             )
+            uiModel.completionBanner?.let { banner ->
+                Spacer(modifier = Modifier.height(14.dp))
+                HomeCompletionBanner(
+                    uiModel = banner,
+                    onDismiss = onDismissRemittanceCompletionNotice
+                )
+            }
             HomeSectionDivider()
             HomeWorkSection(
                 uiModel = uiModel,
@@ -183,6 +196,19 @@ private fun HomeAccountHero(
             modifier = Modifier.fillMaxWidth()
         )
     }
+}
+
+@Composable
+private fun HomeCompletionBanner(
+    uiModel: HomeCompletionBannerUiModel,
+    onDismiss: () -> Unit
+) {
+    DonDoneNoticeBanner(
+        title = uiModel.title,
+        message = uiModel.message,
+        tone = uiModel.tone,
+        onDismiss = onDismiss
+    )
 }
 
 @Composable
@@ -348,7 +374,7 @@ private fun HomeWorkSection(
             HomeSoftButton(
                 text = "퇴근",
                 onClick = onClockOut,
-                enabled = uiModel.work.canClockOut && uiModel.work.isWithinWorkplaceRadius,
+                enabled = uiModel.work.canClockOut,
                 modifier = Modifier.weight(1f)
             )
         }

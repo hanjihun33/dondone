@@ -315,6 +315,10 @@ public class WorkProof extends BaseTimeEntity {
                 : WorkProofFinancialStatus.REFLECTED;
     }
 
+    public void confirmReview() {
+        this.financialStatus = WorkProofFinancialStatus.REFLECTED;
+    }
+
     public String resolveWorkplaceName() {
         if (workplaceNameSnapshot != null) {
             return workplaceNameSnapshot;

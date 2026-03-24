@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,7 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dondone.mobile.app.navigation.AppBackAction
@@ -81,6 +85,7 @@ private fun AuthenticatedDonDoneAppShell(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val remittanceActionUiState by viewModel.remittanceActionUiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val workerRegistrationCodeUiState by viewModel.workerRegistrationCodeUiState.collectAsStateWithLifecycle()
     val toastState = rememberDonDoneToastState()
     val navController = rememberNavController()
@@ -137,6 +142,17 @@ private fun AuthenticatedDonDoneAppShell(
         onBack = ::handleBack
     )
 
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshRemittanceRemoteStateSilentlyIfAuthenticated()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     LaunchedEffect(workerRegistrationCodeUiState.message, workerRegistrationCodeUiState.isError) {
         val message = workerRegistrationCodeUiState.message ?: return@LaunchedEffect
         toastState.show(

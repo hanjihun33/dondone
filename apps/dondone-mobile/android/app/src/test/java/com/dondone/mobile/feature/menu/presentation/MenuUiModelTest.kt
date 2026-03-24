@@ -4,6 +4,7 @@ import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -15,7 +16,8 @@ class MenuUiModelTest {
     fun `menu documents exclude receipt and keep service receipt entry separate`() {
         val uiModel = DemoSeedFactory.create().toMenuUiModel(
             session = null,
-            remittanceRemoteState = defaultRemoteState()
+            remittanceRemoteState = defaultRemoteState(),
+            workproofPdfCreateUiState = WorkproofPdfCreateUiState()
         )
 
         assertEquals(2, uiModel.documents.size)
@@ -30,14 +32,15 @@ class MenuUiModelTest {
             .copy(remittance = seed.remittance.copy(status = TransferStatus.SUBMITTED))
             .toMenuUiModel(
                 session = null,
-                remittanceRemoteState = defaultRemoteState()
+                remittanceRemoteState = defaultRemoteState(),
+                workproofPdfCreateUiState = WorkproofPdfCreateUiState()
             )
 
         val receipt = requireNotNull(uiModel.receipt)
 
         assertEquals(MenuReceiptStatus.Pending, receipt.status)
         assertEquals("확인 중", receipt.statusText)
-        assertEquals("Sepolia", receipt.networkLabel)
+        assertEquals("세폴리아", receipt.networkLabel)
         assertEquals(seed.remittance.txHash, receipt.txHashFullText)
         assertEquals(
             "네트워크 확인이 끝나면 영수증 상태가 자동으로 완료로 바뀝니다.",
@@ -51,7 +54,8 @@ class MenuUiModelTest {
     fun `idle state still exposes latest confirmed receipt session`() {
         val uiModel = DemoSeedFactory.create().toMenuUiModel(
             session = null,
-            remittanceRemoteState = defaultRemoteState()
+            remittanceRemoteState = defaultRemoteState(),
+            workproofPdfCreateUiState = WorkproofPdfCreateUiState()
         )
         val receipt = requireNotNull(uiModel.receipt)
 
@@ -73,7 +77,8 @@ class MenuUiModelTest {
             )
             .toMenuUiModel(
                 session = null,
-                remittanceRemoteState = defaultRemoteState()
+                remittanceRemoteState = defaultRemoteState(),
+                workproofPdfCreateUiState = WorkproofPdfCreateUiState()
             )
 
         val receipt = requireNotNull(uiModel.receipt)

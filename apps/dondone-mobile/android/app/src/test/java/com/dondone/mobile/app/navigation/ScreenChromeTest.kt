@@ -77,7 +77,7 @@ class ScreenChromeTest {
             isWorkproofDetailVisible = false
         )
 
-        assertEquals("계좌·지갑 관리", chrome.headerTitle)
+        assertEquals("계좌 지갑", chrome.headerTitle)
         assertFalse(chrome.showRootTabs)
         assertFalse(chrome.showSettingsAction)
         assertFalse(chrome.showDate)

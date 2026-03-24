@@ -34,10 +34,10 @@ object Route {
 }
 
 val mainTabs = listOf(
-    MainTab(Route.HOME, "Home"),
-    MainTab(Route.FINANCE_HOME, "Finance"),
-    MainTab(Route.WORKPROOF, "Workproof"),
-    MainTab(Route.MENU, "Menu")
+    MainTab(Route.HOME, "홈"),
+    MainTab(Route.FINANCE_HOME, "금융"),
+    MainTab(Route.WORKPROOF, "근무"),
+    MainTab(Route.MENU, "메뉴")
 )
 
 fun isRootRoute(route: String): Boolean = route in setOf(
@@ -59,15 +59,15 @@ fun shouldResetWorkproofUiState(
 ): Boolean = previousRoute == Route.WORKPROOF && nextRoute != Route.WORKPROOF
 
 fun routeTitle(route: String): String = when (route) {
-    Route.WAGE -> "Wage"
-    Route.TRANSFER -> "Transfer"
-    Route.ACCOUNT -> "Accounts"
-    Route.TRANSACTION_HISTORY -> "Transactions"
-    Route.TRANSACTION_HISTORY_DETAIL -> "Transaction Detail"
-    Route.TRANSACTION_HISTORY_EDIT -> "Edit Transaction"
-    Route.WORKPROOF -> "Workproof"
-    Route.FINANCE_HOME -> "Finance"
-    Route.MENU -> "Menu"
+    Route.WAGE -> "급여 점검"
+    Route.TRANSFER -> "송금"
+    Route.ACCOUNT -> "계좌 지갑"
+    Route.TRANSACTION_HISTORY -> "거래 내역"
+    Route.TRANSACTION_HISTORY_DETAIL -> "거래 상세"
+    Route.TRANSACTION_HISTORY_EDIT -> "거래 수정"
+    Route.WORKPROOF -> "근무"
+    Route.FINANCE_HOME -> "금융"
+    Route.MENU -> "메뉴"
     else -> "DonDone"
 }
 

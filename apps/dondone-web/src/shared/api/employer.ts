@@ -198,6 +198,12 @@ export type EmployerReviewRequiredRecordDetailResponse = {
   } | null;
 };
 
+export type EmployerReviewRecordConfirmResponse = {
+  workProofId: number;
+  reflectionStatus: WorkProofReflectionStatus;
+  confirmedAt: string;
+};
+
 export type EmployerCorrectionRequestSummaryResponse = {
   requestId: number;
   workProofId: number;
@@ -396,6 +402,16 @@ export async function getEmployerReviewRecord(token: string, workProofId: number
   return apiRequest<EmployerReviewRequiredRecordDetailResponse>(
     `/api/employer/issues/review-records/${workProofId}`,
     { token }
+  );
+}
+
+export async function confirmEmployerReviewRecord(token: string, workProofId: number) {
+  return apiRequest<EmployerReviewRecordConfirmResponse>(
+    `/api/employer/issues/review-records/${workProofId}/confirm`,
+    {
+      method: "POST",
+      token
+    }
   );
 }
 

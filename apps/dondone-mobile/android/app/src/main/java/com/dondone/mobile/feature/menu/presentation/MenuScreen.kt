@@ -355,7 +355,7 @@ fun MenuScreen(
                 receipt = selectedReceipt,
                 onOpenExplorer = {
                     if (!openMenuReceiptExplorer(context, selectedReceipt.explorerUrl)) {
-                        onShowToast("Explorer를 열 수 없어요.", BadgeTone.Warning)
+                        onShowToast("블록 탐색기를 열 수 없어요.", BadgeTone.Warning)
                     }
                 },
                 onShare = {
@@ -1440,7 +1440,7 @@ private fun MenuSettingsSheet(
                     showDivider = true
                 )
                 MenuLanguageChip(
-                    label = "English",
+                    label = "영어",
                     code = "en",
                     selected = selectedLanguage == "en",
                     onClick = { onSelectLanguage("en") },

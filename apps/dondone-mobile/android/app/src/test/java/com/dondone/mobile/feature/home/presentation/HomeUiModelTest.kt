@@ -1,5 +1,7 @@
 package com.dondone.mobile.feature.home.presentation
 
+import com.dondone.mobile.app.session.RemittanceCompletionNoticeUiState
+import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.data.remittance.RemittanceRemotePayload
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
@@ -44,7 +46,7 @@ class HomeUiModelTest {
     }
 
     @Test
-    fun `confirmed transfer with no difference routes home next action to menu`() {
+    fun `confirmed transfer with no difference keeps finance next action when no completion banner`() {
         val seed = DemoSeedFactory.create()
         val noDifferenceDeposit = seed.wage.hourly * seed.wage.totalHours +
             (seed.wage.hourly * seed.wage.overtimeHours * 0.5).toInt() +
@@ -59,9 +61,10 @@ class HomeUiModelTest {
 
         val uiModel = baseState.toHomeUiModel()
 
-        assertEquals(HomeActionTarget.MENU, uiModel.money.nextAction.actionTarget)
+        assertEquals(HomeActionTarget.FINANCE, uiModel.money.nextAction.actionTarget)
         assertFalse(uiModel.money.showWorkActionCard)
-        assertEquals("문서", uiModel.money.nextAction.buttonText)
+        assertEquals("금융 보기", uiModel.money.nextAction.buttonText)
+        assertEquals(null, uiModel.completionBanner)
     }
 
     @Test
@@ -106,5 +109,47 @@ class HomeUiModelTest {
 
         assertEquals("대표 지갑", uiModel.account.titleText)
         assertEquals("128.5 dUSDC", uiModel.account.balanceText)
+    }
+
+    @Test
+    fun `completion notice shows success banner on home`() {
+        val uiModel = DemoSeedFactory.create().toHomeUiModel(
+            remittanceCompletionNoticeUiState = RemittanceCompletionNoticeUiState(
+                transferId = "tx-1",
+                status = TransferStatus.CONFIRMED,
+                recipientName = "테스트 수신자",
+                amountAtomic = 360_000_000L,
+                assetSymbol = "dUSDC",
+                txHash = "0xabc"
+            )
+        )
+
+        assertEquals("송금 완료", uiModel.completionBanner?.title)
+        assertEquals(
+            "테스트 수신자에게 송금이 완료됐어요.",
+            uiModel.completionBanner?.message
+        )
+        assertEquals(BadgeTone.Success, uiModel.completionBanner?.tone)
+    }
+
+    @Test
+    fun `completion notice shows failure banner on home`() {
+        val uiModel = DemoSeedFactory.create().toHomeUiModel(
+            remittanceCompletionNoticeUiState = RemittanceCompletionNoticeUiState(
+                transferId = "tx-2",
+                status = TransferStatus.FAILED,
+                recipientName = "테스트 수신자",
+                amountAtomic = 360_000_000L,
+                assetSymbol = "dUSDC",
+                txHash = null
+            )
+        )
+
+        assertEquals("송금 실패", uiModel.completionBanner?.title)
+        assertEquals(
+            "테스트 수신자에게 송금을 마치지 못했어요. 잠시 후 다시 시도해 주세요.",
+            uiModel.completionBanner?.message
+        )
+        assertEquals(BadgeTone.Warning, uiModel.completionBanner?.tone)
     }
 }

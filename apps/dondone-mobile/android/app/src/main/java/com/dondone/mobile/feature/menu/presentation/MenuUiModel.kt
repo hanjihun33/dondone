@@ -31,17 +31,17 @@ private const val RECEIPT_STATUS_PENDING = "확인 중"
 private const val RECEIPT_STATUS_CONFIRMED = "완료"
 private const val MENU_UPDATED_AT_PREFIX = "업데이트 "
 private const val MENU_UPDATED_AT_EMPTY = "아직 생성되지 않았어요"
-private const val RECEIPT_NETWORK_LABEL = "Sepolia"
+private const val RECEIPT_NETWORK_LABEL = "세폴리아"
 private const val RECEIPT_HASH_SECTION_TITLE = "전송 해시"
 private const val RECEIPT_HELPER_TEXT = "영수증 링크와 해시는 나중에 다시 확인하거나 공유할 때 그대로 사용할 수 있어요."
-private const val RECEIPT_EXPLORER_BUTTON_TEXT = "Explorer에서 보기"
+private const val RECEIPT_EXPLORER_BUTTON_TEXT = "블록 탐색기에서 보기"
 private const val RECEIPT_SHARE_BUTTON_TEXT = "공유"
 private const val RECEIPT_SHARE_TITLE = "DonDone 테스트넷 송금 영수증\n"
 private const val RECEIPT_SHARE_STATUS_PREFIX = "상태: "
 private const val RECEIPT_SHARE_AMOUNT_PREFIX = "금액: "
 private const val RECEIPT_SHARE_RECIPIENT_PREFIX = "받는 사람: "
-private const val RECEIPT_SHARE_HASH_PREFIX = "Tx Hash: "
-private const val RECEIPT_SHARE_EXPLORER_PREFIX = "Explorer: "
+private const val RECEIPT_SHARE_HASH_PREFIX = "전송 해시: "
+private const val RECEIPT_SHARE_EXPLORER_PREFIX = "블록 탐색기: "
 private const val DOCUMENT_TYPE_READY = "READY"
 private const val DOCUMENT_ID_PROOF = "PROOF"
 private const val DOCUMENT_ID_RECEIPT = "RECEIPT"
@@ -93,7 +93,9 @@ fun DemoState.toMenuUiModel(
     workproofPdfCreateUiState: WorkproofPdfCreateUiState
 ): MenuUiModel {
     val receiptDocument = documents.firstOrNull(DocumentItem::isReceiptDocument)
-    val baseDocuments = documents.map(DocumentItem::toMenuDocumentUiModel)
+    val baseDocuments = documents
+        .filterNot(DocumentItem::isReceiptDocument)
+        .map(DocumentItem::toMenuDocumentUiModel)
     val liveProofDocument = workproofPdfCreateUiState.toLiveProofDocument()
     val mergedDocuments = if (liveProofDocument != null) {
         listOf(liveProofDocument) + baseDocuments.filterNot { it.accent == MenuDocumentAccent.Proof }

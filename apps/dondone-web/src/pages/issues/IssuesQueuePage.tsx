@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { ApiError } from "../../shared/api/client";
 import {
   approveEmployerCorrectionRequest,
+  confirmEmployerReviewRecord,
   getEmployerCorrectionRequest,
   getEmployerCorrectionRequests,
   getEmployerIssues,
@@ -153,6 +154,7 @@ export function IssuesQueuePage() {
   const [closedCorrections, setClosedCorrections] = useState<IssueQueueItem[]>([]);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [submittingReviewWorkProofId, setSubmittingReviewWorkProofId] = useState<number | null>(null);
 
   const reloadCollections = async () => {
     const token = getStoredAccessToken();
@@ -480,6 +482,33 @@ export function IssuesQueuePage() {
     }
   };
 
+  const handleConfirmReview = async (workProofId: number) => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      clearStoredSession();
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setSubmittingReviewWorkProofId(workProofId);
+    setErrorMessage(null);
+
+    try {
+      await confirmEmployerReviewRecord(token, workProofId);
+      await reloadCollections();
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearStoredSession();
+        navigate("/", { replace: true });
+        return;
+      }
+
+      setErrorMessage(error instanceof Error ? error.message : "검토 필요 기록을 처리하지 못했습니다.");
+    } finally {
+      setSubmittingReviewWorkProofId(null);
+    }
+  };
+
   return (
     <div className="board issues-page">
       <header className="topbar issues-header">
@@ -528,8 +557,10 @@ export function IssuesQueuePage() {
         <IssueQueueList
           requests={pagedRequests}
           onApprove={handleApprove}
+          onConfirmReview={handleConfirmReview}
           onReject={handleReject}
           onToggleDetail={handleToggleDetail}
+          submittingWorkProofId={submittingReviewWorkProofId}
         />
 
         <div className="worker-pagination">

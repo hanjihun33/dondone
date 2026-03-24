@@ -99,6 +99,10 @@ docker compose -f docker-compose.dev.yml up -d prometheus grafana
 - `dondone_remittance_worker_job_seconds`
 - `dondone_remittance_chain_operation_seconds`
 
+현재 기본 remittance worker 설정:
+- `poll-interval-ms=500`
+- `receipt-poll-delay-seconds=0`
+
 ## Test
 
 ```bash

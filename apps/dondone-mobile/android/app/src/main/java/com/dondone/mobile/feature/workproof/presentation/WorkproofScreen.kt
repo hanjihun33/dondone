@@ -71,6 +71,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.dondone.mobile.app.session.WorkproofLaunchRequest
+import com.dondone.mobile.app.session.WorkproofLaunchTarget
 import com.dondone.mobile.BuildConfig
 import com.dondone.mobile.R
 import com.dondone.mobile.core.designsystem.DawnBorder
@@ -146,6 +148,8 @@ fun WorkproofScreen(
     onOpenWorkproofPdf: (Long) -> Unit,
     onShareWorkproofPdf: (Long) -> Unit,
     onClearPdfFileState: () -> Unit,
+    launchRequest: WorkproofLaunchRequest?,
+    onConsumeLaunchRequest: () -> Unit,
     resetVersion: Int,
     onDetailVisibilityChange: (Boolean) -> Unit
 ) {
@@ -273,6 +277,18 @@ fun WorkproofScreen(
         onClearPdfPreview()
         onClearPdfCreateState()
         onClearPdfFileState()
+    }
+
+    LaunchedEffect(launchRequest) {
+        val request = launchRequest ?: return@LaunchedEffect
+        when (request.target) {
+            WorkproofLaunchTarget.PDF_CREATION -> {
+                showDetails = true
+                showPdfGenerationResultSheet = false
+                showPdfDateRangeSheet = true
+            }
+        }
+        onConsumeLaunchRequest()
     }
 
     DisposableEffect(Unit) {
@@ -477,9 +493,8 @@ private fun WorkproofPunchCard(
 ) {
     val context = LocalContext.current
     val canClockIn = uiModel.canClockIn && uiModel.isWithinWorkplaceRadius
-    val canClockOut = uiModel.canClockOut && uiModel.isWithinWorkplaceRadius
+    val canClockOut = uiModel.canClockOut
     val showClockInRadiusFeedback = uiModel.canClockIn && !uiModel.isWithinWorkplaceRadius
-    val showClockOutRadiusFeedback = uiModel.canClockOut && !uiModel.isWithinWorkplaceRadius
 
     WorkproofSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -521,7 +536,7 @@ private fun WorkproofPunchCard(
                 }
                 WorkproofActionButtonWithFeedback(
                     enabled = canClockOut,
-                    showDisabledFeedback = showClockOutRadiusFeedback,
+                    showDisabledFeedback = false,
                     onDisabledClick = { showWorkproofRadiusToast(context) },
                     modifier = Modifier.weight(1f)
                 ) {
