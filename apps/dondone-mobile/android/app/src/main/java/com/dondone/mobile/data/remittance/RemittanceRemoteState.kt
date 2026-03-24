@@ -53,6 +53,19 @@ data class RemittanceTransferSummaryPayload(
     val updatedAt: LocalDateTime?
 )
 
+data class RemittanceLedgerItemPayload(
+    val entryId: String,
+    val entryType: String,
+    val direction: String,
+    val status: String,
+    val assetSymbol: String,
+    val amountAtomic: Long,
+    val txHash: String?,
+    val occurredAt: LocalDateTime?,
+    val counterpartyLabel: String?,
+    val memo: String?
+)
+
 data class RemittanceTransferDetailPayload(
     val transferId: String,
     val direction: String = "OUTBOUND",
@@ -97,6 +110,7 @@ data class RemittanceRemotePayload(
     val wallet: RemittanceWalletPayload,
     val balance: RemittanceWalletBalancePayload?,
     val recipients: List<RemittanceRecipientPayload>,
+    val ledgerItems: List<RemittanceLedgerItemPayload>,
     val transfers: List<RemittanceTransferSummaryPayload>,
     val activeTransfer: RemittanceTransferDetailPayload?
 )

@@ -36,14 +36,18 @@ class BackendRemittanceRepository(
                 null
             }
             val recipients = fetchRecipients(accessToken)
-            val transfers = fetchTransfers(accessToken)
-            val activeTransfer = transfers.firstOrNull()?.transferId?.let { fetchTransferDetail(accessToken, it) }
+            val ledgerItems = fetchLedgerItems(accessToken)
+            val transfers = ledgerItems.toTransferSummaryPayloads()
+            val activeTransfer = ledgerItems.firstOrNull { it.entryType == "REMITTANCE_TRANSFER" }
+                ?.entryId
+                ?.let { fetchTransferDetail(accessToken, it) }
 
             RemittanceRemoteState.content(
                 RemittanceRemotePayload(
                     wallet = wallet,
                     balance = balance,
                     recipients = recipients,
+                    ledgerItems = ledgerItems,
                     transfers = transfers,
                     activeTransfer = activeTransfer
                 )
@@ -239,15 +243,15 @@ class BackendRemittanceRepository(
         return data.optJSONArray("recipients").toRecipientPayloads()
     }
 
-    private fun fetchTransfers(accessToken: String): List<RemittanceTransferSummaryPayload> {
+    private fun fetchLedgerItems(accessToken: String): List<RemittanceLedgerItemPayload> {
         val request = Request.Builder()
-            .url("${BackendApiSupport.baseUrl}/api/remittance/transfers?limit=10")
+            .url("${BackendApiSupport.baseUrl}/api/remittance/wallets/me/ledger")
             .header("Authorization", "Bearer $accessToken")
             .get()
             .build()
 
-        val data = executeForData(request, "송금 내역을 불러오지 못했어요.")
-        return data.optJSONArray("transfers").toTransferSummaryPayloads()
+        val data = executeForData(request, "지갑 거래내역을 불러오지 못했어요.")
+        return data.optJSONArray("entries").toLedgerItemPayloads()
     }
 
     private fun fetchTransferDetail(
@@ -425,6 +429,65 @@ private fun JSONArray?.toTransferSummaryPayloads(): List<RemittanceTransferSumma
         }
     }
 }
+
+private fun JSONArray?.toLedgerItemPayloads(): List<RemittanceLedgerItemPayload> {
+    if (this == null) return emptyList()
+    return buildList(length()) {
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            add(
+                RemittanceLedgerItemPayload(
+                    entryId = item.getString("entryId"),
+                    entryType = item.getString("entryType"),
+                    direction = item.getString("direction"),
+                    status = item.getString("status"),
+                    assetSymbol = item.getString("assetSymbol"),
+                    amountAtomic = item.getLong("amountAtomic"),
+                    txHash = item.optNullableString("txHash"),
+                    occurredAt = item.optDateTime("occurredAt"),
+                    counterpartyLabel = item.optNullableString("counterpartyLabel"),
+                    memo = item.optNullableString("memo")
+                )
+            )
+        }
+    }
+}
+
+private fun List<RemittanceLedgerItemPayload>.toTransferSummaryPayloads(): List<RemittanceTransferSummaryPayload> =
+    mapNotNull { item ->
+        if (item.entryType != "REMITTANCE_TRANSFER") {
+            return@mapNotNull null
+        }
+
+        RemittanceTransferSummaryPayload(
+            transferId = item.entryId,
+            direction = when (item.direction.uppercase()) {
+                "INBOUND" -> "INCOME"
+                "OUTBOUND" -> "EXPENSE"
+                else -> item.direction
+            },
+            status = item.status,
+            assetSymbol = item.assetSymbol,
+            amountAtomic = item.amountAtomic,
+            senderAddress = "",
+            senderName = if (item.direction.equals("INBOUND", ignoreCase = true)) {
+                item.counterpartyLabel
+            } else {
+                null
+            },
+            recipientId = item.entryId,
+            recipientAlias = if (item.direction.equals("OUTBOUND", ignoreCase = true)) {
+                item.counterpartyLabel
+            } else {
+                null
+            },
+            recipientAddress = "",
+            txHash = item.txHash,
+            networkFeeWei = null,
+            networkFeeAssetSymbol = null,
+            updatedAt = item.occurredAt
+        )
+    }
 
 internal fun JSONObject.optNullableString(key: String): String? {
     if (!has(key) || isNull(key)) return null
