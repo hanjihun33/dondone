@@ -198,6 +198,10 @@ private fun AuthenticatedDonDoneAppShell(
                 workproofResetVersion = workproofShellState.resetVersion,
                 onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
                 onWorkproofDetailVisibilityChange = workproofShellState.onDetailVisibilityChange,
+                onOpenWorkerRegistrationCode = {
+                    workerRegistrationCodeInput = ""
+                    isWorkerRegistrationSheetVisible = true
+                },
                 onShowToast = { message, tone ->
                     toastState.show(message = message, tone = tone)
                 }
