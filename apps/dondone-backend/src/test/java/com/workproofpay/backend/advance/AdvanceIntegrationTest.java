@@ -370,61 +370,94 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requests[0].status").value("PAYOUT_FAILED"))
                 .andExpect(jsonPath("$.data.requests[0].requestStatus").value("APPROVED"))
                 .andExpect(jsonPath("$.data.requests[0].payoutStatus").value("TIMED_OUT"))
+                .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(50_000_000L))
+                .andExpect(jsonPath("$.data.requests[0].approvedDisplayKrwAmount").value(72_500L))
+                .andExpect(jsonPath("$.data.requests[0].payoutTxHash").value("0x" + "%064x".formatted(timedOutRequestId)))
                 .andExpect(jsonPath("$.data.requests[1].requestId").value(failedRequestId))
                 .andExpect(jsonPath("$.data.requests[1].status").value("PAYOUT_FAILED"))
                 .andExpect(jsonPath("$.data.requests[1].requestStatus").value("APPROVED"))
                 .andExpect(jsonPath("$.data.requests[1].payoutStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.requests[1].approvedAmountAtomic").value(49_000_000L))
+                .andExpect(jsonPath("$.data.requests[1].approvedDisplayKrwAmount").value(71_050L))
+                .andExpect(jsonPath("$.data.requests[1].payoutTxHash").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[2].requestId").value(paidRequestId))
                 .andExpect(jsonPath("$.data.requests[2].status").value("PAID"))
                 .andExpect(jsonPath("$.data.requests[2].requestStatus").value("APPROVED"))
                 .andExpect(jsonPath("$.data.requests[2].payoutStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.requests[2].approvedAmountAtomic").value(48_000_000L))
+                .andExpect(jsonPath("$.data.requests[2].approvedDisplayKrwAmount").value(69_600L))
+                .andExpect(jsonPath("$.data.requests[2].payoutTxHash").value("0x" + "%064x".formatted(paidRequestId)))
                 .andExpect(jsonPath("$.data.requests[3].requestId").value(payingRequestId))
                 .andExpect(jsonPath("$.data.requests[3].status").value("PAYING"))
                 .andExpect(jsonPath("$.data.requests[3].requestStatus").value("APPROVED"))
                 .andExpect(jsonPath("$.data.requests[3].payoutStatus").value("BROADCASTED"))
+                .andExpect(jsonPath("$.data.requests[3].approvedAmountAtomic").value(47_000_000L))
+                .andExpect(jsonPath("$.data.requests[3].approvedDisplayKrwAmount").value(68_150L))
+                .andExpect(jsonPath("$.data.requests[3].payoutTxHash").value("0x" + "%064x".formatted(payingRequestId)))
                 .andExpect(jsonPath("$.data.requests[4].requestId").value(approvedRequestId))
                 .andExpect(jsonPath("$.data.requests[4].status").value("APPROVED"))
                 .andExpect(jsonPath("$.data.requests[4].requestStatus").value("APPROVED"))
                 .andExpect(jsonPath("$.data.requests[4].payoutStatus").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[4].approvedAmountAtomic").value(46_000_000L))
+                .andExpect(jsonPath("$.data.requests[4].approvedDisplayKrwAmount").value(66_700L))
+                .andExpect(jsonPath("$.data.requests[4].payoutTxHash").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[5].requestId").value(submittedRequestId))
                 .andExpect(jsonPath("$.data.requests[5].status").value("SUBMITTED"))
                 .andExpect(jsonPath("$.data.requests[5].requestStatus").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.requests[5].payoutStatus").value(nullValue()));
+                .andExpect(jsonPath("$.data.requests[5].payoutStatus").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[5].approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[5].approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[5].payoutTxHash").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", approvedRequestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("APPROVED"))
                 .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
-                .andExpect(jsonPath("$.data.payoutStatus").value(nullValue()));
+                .andExpect(jsonPath("$.data.payoutStatus").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(46_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(66_700L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", payingRequestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PAYING"))
                 .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
-                .andExpect(jsonPath("$.data.payoutStatus").value("BROADCASTED"));
+                .andExpect(jsonPath("$.data.payoutStatus").value("BROADCASTED"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(47_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(68_150L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value("0x" + "%064x".formatted(payingRequestId)));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", paidRequestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PAID"))
                 .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
-                .andExpect(jsonPath("$.data.payoutStatus").value("CONFIRMED"));
+                .andExpect(jsonPath("$.data.payoutStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(48_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(69_600L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value("0x" + "%064x".formatted(paidRequestId)));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", failedRequestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PAYOUT_FAILED"))
                 .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
-                .andExpect(jsonPath("$.data.payoutStatus").value("FAILED"));
+                .andExpect(jsonPath("$.data.payoutStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(49_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(71_050L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", timedOutRequestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PAYOUT_FAILED"))
                 .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
-                .andExpect(jsonPath("$.data.payoutStatus").value("TIMED_OUT"));
+                .andExpect(jsonPath("$.data.payoutStatus").value("TIMED_OUT"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(50_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(72_500L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value("0x" + "%064x".formatted(timedOutRequestId)));
     }
 
     private Long seedAdvanceEligibleScenario(User user, int reflectedDayCount, boolean addPendingRecord) {
