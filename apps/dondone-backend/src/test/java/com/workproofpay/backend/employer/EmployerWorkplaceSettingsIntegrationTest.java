@@ -24,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -77,6 +78,9 @@ class EmployerWorkplaceSettingsIntegrationTest {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -144,6 +148,41 @@ class EmployerWorkplaceSettingsIntegrationTest {
                 .andExpect(jsonPath("$.data.scheduledClockOutTime").value("18:00"))
                 .andExpect(jsonPath("$.data.overtimeRoundingUnit").value("FIFTEEN_MINUTES"))
                 .andExpect(jsonPath("$.data.activeMembershipCount").value(1));
+    }
+
+    @Test
+    void getSettingsFallsBackToDefaultsWhenLegacyAttendancePolicyColumnsAreNull() throws Exception {
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        User workplaceOwner = userRepository.save(User.register(
+                "worker-owner@example.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Owner"
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                workplaceOwner,
+                company.getId(),
+                "Seoul Hub",
+                "212 Teheran-ro, Seoul",
+                "Gate 1",
+                37.501274,
+                127.039585,
+                300
+        ));
+        createEmployer(company.getId(), workplace.getId(), "manager@acme.test");
+        jdbcTemplate.update(
+                "update companies set scheduled_clock_in_time = null, scheduled_clock_out_time = null, overtime_rounding_unit = null where id = ?",
+                company.getId()
+        );
+
+        String accessToken = loginEmployer("manager@acme.test", "qweqwe123");
+
+        mockMvc.perform(get("/api/employer/workplace-settings")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.scheduledClockInTime").value("09:00"))
+                .andExpect(jsonPath("$.data.scheduledClockOutTime").value("18:00"))
+                .andExpect(jsonPath("$.data.overtimeRoundingUnit").value("FIFTEEN_MINUTES"));
     }
 
     @Test

@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -93,6 +94,9 @@ class EmployerCorrectionRequestIntegrationTest {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -173,6 +177,21 @@ class EmployerCorrectionRequestIntegrationTest {
                 .andExpect(jsonPath("$.data.attachments[1].fileName").value("photo.jpg"))
                 .andExpect(jsonPath("$.data.attachments[1].downloadAvailable").value(false))
                 .andExpect(jsonPath("$.data.status").value("PENDING"));
+    }
+
+    @Test
+    void getCorrectionRequestFallsBackToOtherWhenLegacyReasonCodeIsNull() throws Exception {
+        Fixture fixture = createFixture();
+        jdbcTemplate.update(
+                "update correction_requests set reason_code = null where id = ?",
+                fixture.approvableRequest().getId()
+        );
+
+        mockMvc.perform(get("/api/employer/correction-requests/{requestId}", fixture.approvableRequest().getId())
+                        .header("Authorization", bearer(fixture.employerUser())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.reasonCode").value("OTHER"));
     }
 
     @Test

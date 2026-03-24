@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CorrectionRequest extends BaseTimeEntity {
 
+    private static final CorrectionRequestReasonCode DEFAULT_REASON_CODE = CorrectionRequestReasonCode.OTHER;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -52,7 +54,7 @@ public class CorrectionRequest extends BaseTimeEntity {
     private LocalDateTime requestedClockOutAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "reason_code", nullable = false, length = 50)
+    @Column(name = "reason_code", length = 50)
     private CorrectionRequestReasonCode reasonCode;
 
     @Column(nullable = false, length = 500)
@@ -255,5 +257,9 @@ public class CorrectionRequest extends BaseTimeEntity {
         this.decisionMemo = decisionMemo;
         this.rejectReasonCode = rejectReasonCode;
         this.decisionAt = decisionAt;
+    }
+
+    public CorrectionRequestReasonCode getReasonCode() {
+        return reasonCode == null ? DEFAULT_REASON_CODE : reasonCode;
     }
 }

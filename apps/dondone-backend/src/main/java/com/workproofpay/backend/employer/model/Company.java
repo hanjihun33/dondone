@@ -14,6 +14,11 @@ import java.time.LocalTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Company extends BaseTimeEntity {
 
+    private static final LocalTime DEFAULT_SCHEDULED_CLOCK_IN_TIME = LocalTime.of(9, 0);
+    private static final LocalTime DEFAULT_SCHEDULED_CLOCK_OUT_TIME = LocalTime.of(18, 0);
+    private static final AttendanceOvertimeRoundingUnit DEFAULT_OVERTIME_ROUNDING_UNIT =
+            AttendanceOvertimeRoundingUnit.FIFTEEN_MINUTES;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,14 +32,14 @@ public class Company extends BaseTimeEntity {
     @Column(name = "default_workplace_id")
     private Long defaultWorkplaceId;
 
-    @Column(name = "scheduled_clock_in_time", nullable = false)
+    @Column(name = "scheduled_clock_in_time")
     private LocalTime scheduledClockInTime;
 
-    @Column(name = "scheduled_clock_out_time", nullable = false)
+    @Column(name = "scheduled_clock_out_time")
     private LocalTime scheduledClockOutTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "overtime_rounding_unit", nullable = false, length = 20)
+    @Column(name = "overtime_rounding_unit", length = 20)
     private AttendanceOvertimeRoundingUnit overtimeRoundingUnit;
 
     @Enumerated(EnumType.STRING)
@@ -62,9 +67,9 @@ public class Company extends BaseTimeEntity {
                 name,
                 companyCode,
                 null,
-                LocalTime.of(9, 0),
-                LocalTime.of(18, 0),
-                AttendanceOvertimeRoundingUnit.FIFTEEN_MINUTES,
+                DEFAULT_SCHEDULED_CLOCK_IN_TIME,
+                DEFAULT_SCHEDULED_CLOCK_OUT_TIME,
+                DEFAULT_OVERTIME_ROUNDING_UNIT,
                 CompanyStatus.ACTIVE
         );
     }
@@ -79,5 +84,17 @@ public class Company extends BaseTimeEntity {
         this.scheduledClockInTime = scheduledClockInTime;
         this.scheduledClockOutTime = scheduledClockOutTime;
         this.overtimeRoundingUnit = overtimeRoundingUnit;
+    }
+
+    public LocalTime getScheduledClockInTime() {
+        return scheduledClockInTime == null ? DEFAULT_SCHEDULED_CLOCK_IN_TIME : scheduledClockInTime;
+    }
+
+    public LocalTime getScheduledClockOutTime() {
+        return scheduledClockOutTime == null ? DEFAULT_SCHEDULED_CLOCK_OUT_TIME : scheduledClockOutTime;
+    }
+
+    public AttendanceOvertimeRoundingUnit getOvertimeRoundingUnit() {
+        return overtimeRoundingUnit == null ? DEFAULT_OVERTIME_ROUNDING_UNIT : overtimeRoundingUnit;
     }
 }
