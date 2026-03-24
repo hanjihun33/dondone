@@ -41,7 +41,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.math.BigDecimal;
 
 @Profile("demo")
@@ -130,20 +129,14 @@ public class DevEmployerInitializer implements CommandLineRunner {
         List<Long> seededWorkerIds = seededWorkers.stream()
                 .map(User::getId)
                 .toList();
-        if (!seededWorkerIds.isEmpty()) {
-            List<WorkProof> workProofs = workProofRepository.findAll().stream()
-                    .filter(workProof -> workProof.getWorkplace() != null)
-                    .filter(workProof -> Objects.equals(workProof.getWorkplace().getId(), workplaceId))
-                    .filter(workProof -> seededWorkerIds.contains(workProof.getUser().getId()))
-                    .toList();
-            if (!workProofs.isEmpty()) {
-                workProofAuditLogRepository.deleteAll(
-                        workProofAuditLogRepository.findByWorkProofIdInOrderByCreatedAtDesc(
-                                workProofs.stream().map(WorkProof::getId).toList()
-                        )
-                );
-                workProofRepository.deleteAll(workProofs);
-            }
+        List<WorkProof> workProofs = workProofRepository.findByWorkplaceId(workplaceId);
+        if (!workProofs.isEmpty()) {
+            workProofAuditLogRepository.deleteAll(
+                    workProofAuditLogRepository.findByWorkProofIdInOrderByCreatedAtDesc(
+                            workProofs.stream().map(WorkProof::getId).toList()
+                    )
+            );
+            workProofRepository.deleteAll(workProofs);
         }
 
         employmentMembershipRepository.deleteAll(
