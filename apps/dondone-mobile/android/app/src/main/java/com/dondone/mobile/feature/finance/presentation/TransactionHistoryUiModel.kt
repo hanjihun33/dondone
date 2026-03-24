@@ -224,40 +224,62 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
     }
 
     val currentMonth = YearMonth.now()
-    val currencyUnit = payload.transfers.firstOrNull()?.assetSymbol ?: "USDC"
+    val currencyUnit = payload.ledgerItems.firstOrNull()?.assetSymbol ?: payload.balance?.assetSymbol ?: "USDC"
     val currencyDecimals = payload.balance?.assetDecimals ?: assetDecimalsFor(currencyUnit)
-    val items = payload.transfers.map { transfer ->
-        val timestamp = transfer.updatedAt ?: LocalDateTime.now()
-        val override = overrides[transfer.transferId]
-        val category = override?.category ?: inferRemoteCategory(transfer.recipientAlias)
-        val memo = override?.memo ?: ""
-        val amount = atomicToDisplayAmount(transfer.amountAtomic, currencyDecimals)
-        val direction = transfer.direction.toTransactionDirection()
-        val counterpartyName = when (direction) {
-            TransactionDirection.INCOME -> transfer.senderName ?: transfer.senderAddress.toShortWalletAddress()
-            TransactionDirection.EXPENSE -> transfer.recipientAlias ?: transfer.recipientAddress.toShortWalletAddress()
+    val items = payload.ledgerItems.map { entry ->
+        val timestamp = entry.occurredAt ?: LocalDateTime.now()
+        val override = overrides[entry.entryId]
+        val transfer = payload.transfers.firstOrNull { it.transferId == entry.entryId }
+        val direction = entry.direction.toTransactionDirection()
+        val amount = atomicToDisplayAmount(entry.amountAtomic, currencyDecimals)
+        val category = override?.category ?: inferRemoteCategory(entry, transfer)
+        val memo = override?.memo ?: entry.memo.orEmpty()
+        val counterpartyName = when (entry.entryType.uppercase(Locale.ROOT)) {
+            "ADVANCE_PAYOUT" -> "미리받기 지급"
+            else -> when (direction) {
+                TransactionDirection.INCOME -> {
+                    transfer?.senderName
+                        ?: entry.counterpartyLabel
+                        ?: transfer?.senderAddress?.toShortWalletAddress()
+                        ?: "알 수 없는 입금"
+                }
+
+                TransactionDirection.EXPENSE -> {
+                    transfer?.recipientAlias
+                        ?: entry.counterpartyLabel
+                        ?: transfer?.recipientAddress?.toShortWalletAddress()
+                        ?: "알 수 없는 출금"
+                }
+            }
         }
-        val counterpartyAddress = when (direction) {
-            TransactionDirection.INCOME -> transfer.senderAddress
-            TransactionDirection.EXPENSE -> transfer.recipientAddress
+        val counterpartyAddress = when (entry.entryType.uppercase(Locale.ROOT)) {
+            "ADVANCE_PAYOUT" -> null
+            else -> when (direction) {
+                TransactionDirection.INCOME -> transfer?.senderAddress
+                TransactionDirection.EXPENSE -> transfer?.recipientAddress
+            }
+        }
+        val methodLabel = when (entry.entryType.uppercase(Locale.ROOT)) {
+            "ADVANCE_PAYOUT" -> "미리받기"
+            else -> "지갑 송금"
         }
         TransactionHistoryItemUiModel(
-            id = transfer.transferId,
+            id = entry.entryId,
             walletId = "remote-wallet",
             occurredAt = timestamp,
             day = timestamp.toLocalDate(),
             counterpartyName = counterpartyName,
             counterpartyAddress = counterpartyAddress,
             amountValue = amount,
-            amountText = formatAtomicMoney(transfer.amountAtomic, direction, currencyUnit, currencyDecimals),
-            feeText = formatRemoteFee(transfer.networkFeeWei, transfer.networkFeeAssetSymbol),
+            amountText = formatAtomicMoney(entry.amountAtomic, direction, entry.assetSymbol, currencyDecimals),
+            feeText = formatRemoteFee(transfer?.networkFeeWei, transfer?.networkFeeAssetSymbol),
             direction = direction,
             category = category,
             categoryLabel = category.label,
             memo = memo,
-            methodLabel = "지갑 송금",
+            methodLabel = methodLabel,
             timeText = timestamp.format(TransactionTimeFormatter),
-            currencyUnit = currencyUnit
+            currencyUnit = entry.assetSymbol
         )
     }.sortedByDescending { it.occurredAt }
 
@@ -276,7 +298,14 @@ private fun RemittanceRemoteState.toRemoteTransactionHistoryMainUiModel(
 }
 
 private fun String.toTransactionDirection(): TransactionDirection =
-    if (equals("INCOME", ignoreCase = true)) TransactionDirection.INCOME else TransactionDirection.EXPENSE
+    if (
+        equals("INCOME", ignoreCase = true) ||
+        equals("INBOUND", ignoreCase = true)
+    ) {
+        TransactionDirection.INCOME
+    } else {
+        TransactionDirection.EXPENSE
+    }
 
 private fun TransactionRecord.toUiModel(
     category: TransactionCategory,
@@ -303,8 +332,15 @@ private fun TransactionRecord.toUiModel(
     )
 }
 
-private fun inferRemoteCategory(alias: String?): TransactionCategory {
-    val normalized = alias.orEmpty().lowercase(Locale.ROOT)
+private fun inferRemoteCategory(
+    entry: com.dondone.mobile.data.remittance.RemittanceLedgerItemPayload,
+    transfer: com.dondone.mobile.data.remittance.RemittanceTransferSummaryPayload?
+): TransactionCategory {
+    if (entry.entryType.equals("ADVANCE_PAYOUT", ignoreCase = true)) {
+        return TransactionCategory.SALARY
+    }
+
+    val normalized = (transfer?.recipientAlias ?: entry.counterpartyLabel).orEmpty().lowercase(Locale.ROOT)
     return when {
         normalized.contains("payroll") -> TransactionCategory.SALARY
         normalized.contains("cafe") -> TransactionCategory.CAFE

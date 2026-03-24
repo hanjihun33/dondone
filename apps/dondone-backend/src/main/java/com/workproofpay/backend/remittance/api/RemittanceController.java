@@ -11,11 +11,13 @@ import com.workproofpay.backend.remittance.api.dto.response.RecipientSearchListR
 import com.workproofpay.backend.remittance.api.dto.response.TransferDetailResponse;
 import com.workproofpay.backend.remittance.api.dto.response.TransferListResponse;
 import com.workproofpay.backend.remittance.api.dto.response.TransferPrecheckResponse;
+import com.workproofpay.backend.remittance.api.dto.response.WalletLedgerResponse;
 import com.workproofpay.backend.remittance.api.dto.response.WalletBalanceResponse;
 import com.workproofpay.backend.remittance.api.dto.response.WalletResponse;
 import com.workproofpay.backend.remittance.service.RecipientService;
 import com.workproofpay.backend.remittance.service.TransferCreateResult;
 import com.workproofpay.backend.remittance.service.TransferService;
+import com.workproofpay.backend.remittance.service.WalletLedgerService;
 import com.workproofpay.backend.remittance.service.WalletService;
 import com.workproofpay.backend.shared.api.ApiResponse;
 import com.workproofpay.backend.shared.config.OpenApiConfig;
@@ -47,6 +49,7 @@ public class RemittanceController {
     private final WalletService walletService;
     private final RecipientService recipientService;
     private final TransferService transferService;
+    private final WalletLedgerService walletLedgerService;
 
     @PostMapping("/wallets/me")
     @Operation(
@@ -107,6 +110,25 @@ public class RemittanceController {
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         return ApiResponse.success(walletService.getWalletBalance(user.userId()));
+    }
+
+    @GetMapping("/wallets/me/ledger")
+    @Operation(
+            summary = "내 지갑 거래내역 조회",
+            description = "인증된 사용자의 remittance 송금과 미리받기 지급을 통합한 지갑 거래내역을 최신순으로 반환합니다.",
+            security = @SecurityRequirement(name = OpenApiConfig.BEARER_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "지갑 거래내역을 반환했습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증에 실패했습니다.", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "토큰이 없거나 유효하지 않습니다.", content = @Content)
+    })
+    public ResponseEntity<ApiResponse<WalletLedgerResponse>> getWalletLedger(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @Parameter(description = "반환할 최대 건수", example = "20")
+            @RequestParam(required = false) @Positive(message = "limit must be greater than 0") Integer limit
+    ) {
+        return ApiResponse.success(walletLedgerService.getLedger(user.userId(), limit));
     }
 
     @GetMapping("/recipients")

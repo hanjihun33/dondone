@@ -2,6 +2,10 @@ package com.workproofpay.backend.remittance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workproofpay.backend.advance.model.AdvancePayout;
+import com.workproofpay.backend.advance.model.AdvanceRequest;
+import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
+import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.jobs.repo.JobRepository;
@@ -10,6 +14,7 @@ import com.workproofpay.backend.remittance.api.dto.request.CreateTransferRequest
 import com.workproofpay.backend.remittance.api.dto.request.UpsertRecipientRequest;
 import com.workproofpay.backend.remittance.model.Recipient;
 import com.workproofpay.backend.remittance.model.RecipientRelation;
+import com.workproofpay.backend.remittance.model.Transfer;
 import com.workproofpay.backend.remittance.repo.RecipientRepository;
 import com.workproofpay.backend.remittance.repo.TransferRepository;
 import com.workproofpay.backend.remittance.repo.UserWalletRepository;
@@ -19,6 +24,11 @@ import com.workproofpay.backend.remittance.service.WalletService;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
 import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
+import com.workproofpay.backend.workproof.model.WorkContract;
+import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
+import com.workproofpay.backend.workproof.model.Workplace;
+import com.workproofpay.backend.workproof.repo.WorkContractRepository;
+import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +37,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +47,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -48,6 +63,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
+
+    private static final BigDecimal ADVANCE_EXCHANGE_RATE = BigDecimal.valueOf(1450);
 
     @Autowired
     private MockMvc mockMvc;
@@ -71,6 +88,12 @@ class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
     private JobRepository jobRepository;
 
     @Autowired
+    private AdvancePayoutRepository advancePayoutRepository;
+
+    @Autowired
+    private AdvanceRequestRepository advanceRequestRepository;
+
+    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
@@ -85,13 +108,137 @@ class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
     @Autowired
     private TransferService transferService;
 
+    @Autowired
+    private WorkplaceRepository workplaceRepository;
+
+    @Autowired
+    private WorkContractRepository workContractRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @BeforeEach
     void setUp() {
         jobRepository.deleteAll();
+        advancePayoutRepository.deleteAll();
+        advanceRequestRepository.deleteAll();
         transferRepository.deleteAll();
         recipientRepository.deleteAll();
         userWalletRepository.deleteAll();
+        workContractRepository.deleteAll();
+        workplaceRepository.deleteAll();
         userRepository.deleteAll();
+    }
+
+    @Test
+    void returnsLedgerEntriesForTransferOnlyWithInboundAndOutboundDirections() throws Exception {
+        User walletOwner = userRepository.save(User.register("ledger-owner@test.com", "hashed", "Ledger Owner"));
+        User sender = userRepository.save(User.register("ledger-sender@test.com", "hashed", "Sender User"));
+        String token = tokenFor(walletOwner);
+
+        saveConfirmedOutboundTransfer(
+                walletOwner,
+                "recipient-out",
+                "Lunch Crew",
+                "0x1111111111111111111111111111111111111111",
+                15_000_000L,
+                "0xoutbound00000000000000000000000000000000000000000000000000000001",
+                LocalDateTime.of(2026, 3, 24, 10, 0)
+        );
+        saveConfirmedInboundTransfer(
+                walletOwner,
+                sender,
+                "recipient-in",
+                "0x2222222222222222222222222222222222222222",
+                20_000_000L,
+                "0xinbound00000000000000000000000000000000000000000000000000000002",
+                LocalDateTime.of(2026, 3, 24, 12, 0)
+        );
+
+        mockMvc.perform(get("/api/remittance/wallets/me/ledger")
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.entries.length()").value(2))
+                .andExpect(jsonPath("$.data.entries[0].entryType").value("REMITTANCE_TRANSFER"))
+                .andExpect(jsonPath("$.data.entries[0].direction").value("INBOUND"))
+                .andExpect(jsonPath("$.data.entries[0].counterpartyLabel").value("Sender User"))
+                .andExpect(jsonPath("$.data.entries[0].txHash").value("0xinbound00000000000000000000000000000000000000000000000000000002"))
+                .andExpect(jsonPath("$.data.entries[1].entryType").value("REMITTANCE_TRANSFER"))
+                .andExpect(jsonPath("$.data.entries[1].direction").value("OUTBOUND"))
+                .andExpect(jsonPath("$.data.entries[1].counterpartyLabel").value("Lunch Crew"))
+                .andExpect(jsonPath("$.data.entries[1].txHash").value("0xoutbound00000000000000000000000000000000000000000000000000000001"));
+    }
+
+    @Test
+    void returnsLedgerEntriesForConfirmedAdvancePayoutOnly() throws Exception {
+        User user = userRepository.save(User.register("ledger-advance@test.com", "hashed", "Advance Worker"));
+        String token = tokenFor(user);
+
+        saveConfirmedAdvancePayout(
+                user,
+                "adv-ledger-1",
+                34_000_000L,
+                50_000L,
+                "0xadvance00000000000000000000000000000000000000000000000000000003",
+                LocalDateTime.of(2026, 3, 24, 13, 0)
+        );
+
+        mockMvc.perform(get("/api/remittance/wallets/me/ledger")
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.entries.length()").value(1))
+                .andExpect(jsonPath("$.data.entries[0].entryType").value("ADVANCE_PAYOUT"))
+                .andExpect(jsonPath("$.data.entries[0].direction").value("INBOUND"))
+                .andExpect(jsonPath("$.data.entries[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.entries[0].amountAtomic").value(34_000_000L))
+                .andExpect(jsonPath("$.data.entries[0].counterpartyLabel").value("미리받기 지급"))
+                .andExpect(jsonPath("$.data.entries[0].txHash").value("0xadvance00000000000000000000000000000000000000000000000000000003"))
+                .andExpect(jsonPath("$.data.entries[0].memo").value("약 ₩50,000 상당"));
+    }
+
+    @Test
+    void returnsCombinedLedgerEntriesInLatestOccurredAtOrder() throws Exception {
+        User user = userRepository.save(User.register("ledger-combined@test.com", "hashed", "Combined Worker"));
+        User sender = userRepository.save(User.register("ledger-combined-sender@test.com", "hashed", "Recent Sender"));
+        String token = tokenFor(user);
+
+        saveConfirmedOutboundTransfer(
+                user,
+                "recipient-old",
+                "Old Expense",
+                "0x3333333333333333333333333333333333333333",
+                9_000_000L,
+                "0xolder0000000000000000000000000000000000000000000000000000000004",
+                LocalDateTime.of(2026, 3, 24, 9, 0)
+        );
+        saveConfirmedAdvancePayout(
+                user,
+                "adv-ledger-2",
+                34_000_000L,
+                50_000L,
+                "0xmiddle000000000000000000000000000000000000000000000000000000005",
+                LocalDateTime.of(2026, 3, 24, 11, 0)
+        );
+        saveConfirmedInboundTransfer(
+                user,
+                sender,
+                "recipient-new",
+                "0x4444444444444444444444444444444444444444",
+                21_000_000L,
+                "0xnewest00000000000000000000000000000000000000000000000000000006",
+                LocalDateTime.of(2026, 3, 24, 14, 0)
+        );
+
+        mockMvc.perform(get("/api/remittance/wallets/me/ledger")
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.entries.length()").value(3))
+                .andExpect(jsonPath("$.data.entries[0].entryType").value("REMITTANCE_TRANSFER"))
+                .andExpect(jsonPath("$.data.entries[0].counterpartyLabel").value("Recent Sender"))
+                .andExpect(jsonPath("$.data.entries[1].entryType").value("ADVANCE_PAYOUT"))
+                .andExpect(jsonPath("$.data.entries[1].counterpartyLabel").value("미리받기 지급"))
+                .andExpect(jsonPath("$.data.entries[2].entryType").value("REMITTANCE_TRANSFER"))
+                .andExpect(jsonPath("$.data.entries[2].counterpartyLabel").value("Old Expense"));
     }
 
     @Test
@@ -859,6 +1006,175 @@ class RemittanceIntegrationTest extends PostgresIntegrationTestSupport {
 
     private String bearer(String token) {
         return "Bearer " + token;
+    }
+
+    private void saveConfirmedOutboundTransfer(
+            User owner,
+            String recipientId,
+            String recipientAlias,
+            String recipientAddress,
+            long amountAtomic,
+            String txHash,
+            LocalDateTime updatedAt
+    ) {
+        recipientRepository.saveAndFlush(Recipient.create(
+                recipientId,
+                owner.getId(),
+                null,
+                recipientAlias,
+                RecipientRelation.FRIEND,
+                recipientAddress,
+                true
+        ));
+
+        Transfer transfer = Transfer.request(
+                "tr_" + recipientId,
+                owner.getId(),
+                recipientId,
+                "dUSDC",
+                amountAtomic,
+                "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                recipientAddress,
+                recipientAlias,
+                RecipientRelation.FRIEND,
+                null,
+                "idem-" + recipientId,
+                false,
+                true
+        );
+        transfer.markSigned(txHash, "signed-" + recipientId);
+        transfer.markBroadcasted();
+        transfer.markConfirmed();
+        transferRepository.saveAndFlush(transfer);
+        setTransferUpdatedAt(transfer.getTransferId(), updatedAt);
+    }
+
+    private void saveConfirmedInboundTransfer(
+            User owner,
+            User sender,
+            String recipientId,
+            String recipientAddress,
+            long amountAtomic,
+            String txHash,
+            LocalDateTime updatedAt
+    ) {
+        recipientRepository.saveAndFlush(Recipient.create(
+                recipientId,
+                sender.getId(),
+                owner.getId(),
+                owner.getName(),
+                RecipientRelation.FRIEND,
+                recipientAddress,
+                true
+        ));
+
+        Transfer transfer = Transfer.request(
+                "tr_" + recipientId,
+                sender.getId(),
+                recipientId,
+                "dUSDC",
+                amountAtomic,
+                "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                recipientAddress,
+                owner.getName(),
+                RecipientRelation.FRIEND,
+                owner.getId(),
+                "idem-" + recipientId,
+                false,
+                true
+        );
+        transfer.markSigned(txHash, "signed-" + recipientId);
+        transfer.markBroadcasted();
+        transfer.markConfirmed();
+        transferRepository.saveAndFlush(transfer);
+        setTransferUpdatedAt(transfer.getTransferId(), updatedAt);
+    }
+
+    private void saveConfirmedAdvancePayout(
+            User user,
+            String payoutId,
+            long amountAtomic,
+            long approvedDisplayKrwAmount,
+            String txHash,
+            LocalDateTime updatedAt
+    ) {
+        Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
+                user,
+                "Ledger Workplace " + payoutId,
+                "Seoul",
+                "HQ",
+                37.5,
+                127.0,
+                100
+        ));
+        WorkContract contract = workContractRepository.saveAndFlush(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(12_000),
+                null,
+                null,
+                BigDecimal.valueOf(12_000),
+                LocalDate.of(2026, 1, 1)
+        ));
+        AdvanceRequest request = advanceRequestRepository.saveAndFlush(AdvanceRequest.submit(
+                user,
+                workplace,
+                contract,
+                "2026-03",
+                "advance-" + payoutId,
+                "dUSDC",
+                6,
+                ADVANCE_EXCHANGE_RATE,
+                amountAtomic,
+                approvedDisplayKrwAmount,
+                3_448_275L,
+                5_000L,
+                LocalDate.of(2026, 3, 25),
+                updatedAt.minusHours(1),
+                103_448_275L,
+                150_000L,
+                344_827_586L,
+                500_000L,
+                BigDecimal.valueOf(0.30),
+                20,
+                9_600L,
+                0
+        ));
+        request.approve(999L);
+        advanceRequestRepository.saveAndFlush(request);
+
+        AdvancePayout payout = AdvancePayout.request(
+                payoutId,
+                request.getId(),
+                user.getId(),
+                "0xcccccccccccccccccccccccccccccccccccccccc",
+                amountAtomic,
+                "dUSDC",
+                "payout-idem-" + payoutId
+        );
+        payout.markSigned(txHash, "signed-" + payoutId);
+        payout.markBroadcasted();
+        payout.markConfirmed();
+        advancePayoutRepository.saveAndFlush(payout);
+        setAdvancePayoutUpdatedAt(payout.getAdvancePayoutId(), updatedAt);
+    }
+
+    private void setTransferUpdatedAt(String transferId, LocalDateTime updatedAt) {
+        entityManager.createNativeQuery("update transfers set updated_at = :updatedAt where transfer_id = :transferId")
+                .setParameter("updatedAt", updatedAt)
+                .setParameter("transferId", transferId)
+                .executeUpdate();
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    private void setAdvancePayoutUpdatedAt(String advancePayoutId, LocalDateTime updatedAt) {
+        entityManager.createNativeQuery("update advance_payouts set updated_at = :updatedAt where advance_payout_id = :advancePayoutId")
+                .setParameter("updatedAt", updatedAt)
+                .setParameter("advancePayoutId", advancePayoutId)
+                .executeUpdate();
+        entityManager.flush();
+        entityManager.clear();
     }
 
     private Callable<Object> concurrentTransferTask(
