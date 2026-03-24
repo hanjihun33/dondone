@@ -183,6 +183,42 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void eligibilityUsesRecognizedWorkedMinutesAfterAttendanceCorrection() throws Exception {
+        User user = userRepository.save(User.register("advance-recognized@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long workplaceId = seedAdvanceEligibleScenario(user, 5, false);
+        java.time.YearMonth targetMonth = nextMonth();
+
+        WorkProof adjustedRecord = workProofRepository
+                .findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
+                        user.getId(),
+                        workplaceId,
+                        targetMonth.atDay(1),
+                        targetMonth.atEndOfMonth()
+                ).stream()
+                .filter(record -> record.getWorkDate().getDayOfMonth() == 5)
+                .findFirst()
+                .orElseThrow();
+        adjustedRecord.updateRecognizedTimes(
+                LocalDateTime.of(targetMonth.getYear(), targetMonth.getMonthValue(), 5, 9, 0),
+                LocalDateTime.of(targetMonth.getYear(), targetMonth.getMonthValue(), 5, 13, 0)
+        );
+        workProofRepository.saveAndFlush(adjustedRecord);
+
+        mockMvc.perform(get("/api/advance/eligibility")
+                        .header("Authorization", bearer(token))
+                        .param("workplaceId", workplaceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
+                .andExpect(jsonPath("$.data.availableAmount").value(36000))
+                .andExpect(jsonPath("$.data.repaymentTier").value("C"))
+                .andExpect(jsonPath("$.data.reflectedWorkDays").value(5))
+                .andExpect(jsonPath("$.data.reflectedWorkMinutes").value(2160))
+                .andExpect(jsonPath("$.data.verifiedMinutes").value(2160))
+                .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty());
+    }
+
+    @Test
     void hidesForeignAdvanceRequestAndRejectsMismatchedIdempotencyReplay() throws Exception {
         User owner = userRepository.save(User.register("advance-owner@test.com", "hashed", "Owner"));
         User other = userRepository.save(User.register("advance-other@test.com", "hashed", "Other"));
