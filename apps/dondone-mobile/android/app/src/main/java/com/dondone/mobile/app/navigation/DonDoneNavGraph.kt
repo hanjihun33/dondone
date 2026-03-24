@@ -202,7 +202,12 @@ fun DonDoneNavGraph(
                 onSubmitVaultAction = viewModel::submitVaultAction,
                 onClearVaultMessage = viewModel::clearVaultActionMessage,
                 onOpenAdvanceRequestDetail = viewModel::openAdvanceRequestDetail,
-                onCloseAdvanceRequestDetail = viewModel::closeAdvanceRequestDetail
+                onCloseAdvanceRequestDetail = viewModel::closeAdvanceRequestDetail,
+                onOpenWorkproof = {
+                    navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target ->
+                        navController.navigate(target)
+                    }
+                }
             )
         }
         composable(Route.WAGE) {

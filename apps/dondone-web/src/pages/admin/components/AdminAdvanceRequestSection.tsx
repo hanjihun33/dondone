@@ -9,7 +9,7 @@ import {
 import { ApiError } from "../../../shared/api/client";
 import { clearStoredSession, getStoredAccessToken } from "../../../shared/auth/session";
 
-type RequestFilter = "ALL" | "SUBMITTED" | "APPROVED" | "REJECTED";
+type RequestFilter = "ALL" | "SUBMITTED" | "APPROVED" | "PAYING" | "PAID" | "PAYOUT_FAILED" | "REJECTED";
 
 const REQUEST_FILTERS: Array<{
   value: RequestFilter;
@@ -17,13 +17,19 @@ const REQUEST_FILTERS: Array<{
 }> = [
   { value: "ALL", label: "전체" },
   { value: "SUBMITTED", label: "승인 대기" },
-  { value: "APPROVED", label: "승인 완료" },
+  { value: "APPROVED", label: "승인됨" },
+  { value: "PAYING", label: "지급중" },
+  { value: "PAID", label: "지급완료" },
+  { value: "PAYOUT_FAILED", label: "지급실패" },
   { value: "REJECTED", label: "반려" }
 ];
 
 const STATUS_LABELS: Record<AdminAdvanceRequestItemResponse["status"], string> = {
   SUBMITTED: "승인 대기",
-  APPROVED: "승인 완료",
+  APPROVED: "승인됨",
+  PAYING: "지급중",
+  PAID: "지급완료",
+  PAYOUT_FAILED: "지급실패",
   REJECTED: "반려",
   NEEDS_REVIEW: "검토 필요"
 };
@@ -34,16 +40,38 @@ const STATUS_CLASS_NAMES: Record<
 > = {
   SUBMITTED: "pending",
   APPROVED: "active",
+  PAYING: "active",
+  PAID: "active",
+  PAYOUT_FAILED: "rejected",
   REJECTED: "rejected",
   NEEDS_REVIEW: "pending"
 };
 
-function formatKrw(amount: number | null) {
+function formatAssetAmount(
+  amountAtomic: number | null,
+  assetSymbol: string,
+  assetDecimals: number
+) {
+  if (amountAtomic == null) {
+    return "-";
+  }
+
+  const divisor = 10 ** assetDecimals;
+  const amount = amountAtomic / divisor;
+  const minimumFractionDigits = assetDecimals > 2 ? 2 : assetDecimals;
+
+  return `${new Intl.NumberFormat("ko-KR", {
+    minimumFractionDigits,
+    maximumFractionDigits: assetDecimals
+  }).format(amount)} ${assetSymbol}`;
+}
+
+function formatReferenceKrw(amount: number | null) {
   if (amount == null) {
     return "-";
   }
 
-  return `${new Intl.NumberFormat("ko-KR").format(amount)}원`;
+  return `약 ${new Intl.NumberFormat("ko-KR").format(amount)}원`;
 }
 
 function formatDate(value: string | null) {
@@ -95,6 +123,31 @@ function formatWorkMinutes(minutes: number) {
   }
 
   return `${hours}시간 ${remainingMinutes}분`;
+}
+
+function getStatusHint(request: AdminAdvanceRequestItemResponse) {
+  switch (request.status) {
+    case "SUBMITTED":
+      return "관리자 검토 대기";
+    case "APPROVED":
+      return "지급 요청 생성 전";
+    case "PAYING":
+      return request.payoutStatus ? `지급 상태 ${request.payoutStatus}` : "지급 처리중";
+    case "PAID":
+      return request.payoutTxHash ? `tx ${request.payoutTxHash.slice(0, 12)}...` : "체인 반영 완료";
+    case "PAYOUT_FAILED":
+      return request.payoutFailureReason ?? "지급 처리 실패";
+    case "REJECTED":
+      return "관리자 반려";
+    case "NEEDS_REVIEW":
+      return "추가 검토 필요";
+    default:
+      return "-";
+  }
+}
+
+function canApproveOrReject(status: AdminAdvanceRequestItemResponse["status"]) {
+  return status === "SUBMITTED";
 }
 
 export function AdminAdvanceRequestSection() {
@@ -165,12 +218,15 @@ export function AdminAdvanceRequestSection() {
       ALL: requests.length,
       SUBMITTED: 0,
       APPROVED: 0,
+      PAYING: 0,
+      PAID: 0,
+      PAYOUT_FAILED: 0,
       REJECTED: 0
     };
 
     requests.forEach((request) => {
-      if (request.status === "SUBMITTED" || request.status === "APPROVED" || request.status === "REJECTED") {
-        counts[request.status] += 1;
+      if (request.status in counts) {
+        counts[request.status as RequestFilter] += 1;
       }
     });
 
@@ -180,14 +236,18 @@ export function AdminAdvanceRequestSection() {
   const summary = useMemo(() => {
     return requests.reduce(
       (acc, request) => {
-        acc.totalRequestedAmount += request.requestedAmount;
+        acc.totalRequestedAtomic += request.requestedAmountAtomic;
 
         if (request.status === "SUBMITTED") {
-          acc.pendingRequestedAmount += request.requestedAmount;
+          acc.pendingRequestedAtomic += request.requestedAmountAtomic;
         }
 
-        if (request.status === "APPROVED") {
-          acc.approvedAmount += request.approvedAmount ?? request.requestedAmount;
+        if (request.status === "APPROVED" || request.status === "PAYING" || request.status === "PAID") {
+          acc.approvedAtomic += request.approvedAmountAtomic ?? request.requestedAmountAtomic;
+        }
+
+        if (request.status === "PAYOUT_FAILED") {
+          acc.failedCount += 1;
         }
 
         if (request.status === "REJECTED") {
@@ -197,9 +257,10 @@ export function AdminAdvanceRequestSection() {
         return acc;
       },
       {
-        totalRequestedAmount: 0,
-        pendingRequestedAmount: 0,
-        approvedAmount: 0,
+        totalRequestedAtomic: 0,
+        pendingRequestedAtomic: 0,
+        approvedAtomic: 0,
+        failedCount: 0,
         rejectedCount: 0
       }
     );
@@ -219,7 +280,14 @@ export function AdminAdvanceRequestSection() {
           ? {
               ...request,
               status: nextStatus,
-              approvedAmount: nextStatus === "APPROVED" ? request.requestedAmount : null,
+              requestStatus: nextStatus === "REJECTED" ? "REJECTED" : "APPROVED",
+              payoutStatus: nextStatus === "PAYING" ? "REQUESTED" : request.payoutStatus,
+              approvedAmountAtomic:
+                nextStatus === "REJECTED" ? null : (request.approvedAmountAtomic ?? request.requestedAmountAtomic),
+              approvedDisplayKrwAmount:
+                nextStatus === "REJECTED"
+                  ? null
+                  : (request.approvedDisplayKrwAmount ?? request.requestedDisplayKrwAmount),
               reviewedAt: new Date().toISOString()
             }
           : request
@@ -252,7 +320,7 @@ export function AdminAdvanceRequestSection() {
     try {
       if (action === "approve") {
         await approveAdminAdvanceRequest(token, request.requestId);
-        updateRequestStatus(request.requestId, "APPROVED");
+        updateRequestStatus(request.requestId, "PAYING");
       } else {
         await rejectAdminAdvanceRequest(token, request.requestId);
         updateRequestStatus(request.requestId, "REJECTED");
@@ -272,6 +340,9 @@ export function AdminAdvanceRequestSection() {
     }
   };
 
+  const summaryAssetSymbol = requests[0]?.assetSymbol ?? "dUSDC";
+  const summaryAssetDecimals = requests[0]?.assetDecimals ?? 6;
+
   return (
     <section className="admin-section">
       {feedbackMessage ? (
@@ -284,7 +355,7 @@ export function AdminAdvanceRequestSection() {
         <div>
           <h3>근로자 미리받기 요청</h3>
           <p className="admin-section-sub">
-            앱에서 올라온 미리받기 요청을 현재 계약 범위 기준으로 검토하고 승인 또는 반려합니다.
+            미리받기 승인 이후 지급중, 지급완료, 지급실패 상태까지 포함해 dUSDC 기준으로 추적합니다.
           </p>
         </div>
       </div>
@@ -293,22 +364,24 @@ export function AdminAdvanceRequestSection() {
         <article className="admin-request-summary-card">
           <span>전체 요청</span>
           <strong>{requestCountByStatus.ALL}건</strong>
-          <p>{formatKrw(summary.totalRequestedAmount)}</p>
+          <p>{formatAssetAmount(summary.totalRequestedAtomic, summaryAssetSymbol, summaryAssetDecimals)}</p>
         </article>
         <article className="admin-request-summary-card">
           <span>승인 대기</span>
           <strong>{requestCountByStatus.SUBMITTED}건</strong>
-          <p>{formatKrw(summary.pendingRequestedAmount)}</p>
+          <p>{formatAssetAmount(summary.pendingRequestedAtomic, summaryAssetSymbol, summaryAssetDecimals)}</p>
         </article>
         <article className="admin-request-summary-card">
-          <span>승인 완료</span>
-          <strong>{requestCountByStatus.APPROVED}건</strong>
-          <p>{formatKrw(summary.approvedAmount)}</p>
+          <span>승인·지급 진행</span>
+          <strong>
+            {requestCountByStatus.APPROVED + requestCountByStatus.PAYING + requestCountByStatus.PAID}건
+          </strong>
+          <p>{formatAssetAmount(summary.approvedAtomic, summaryAssetSymbol, summaryAssetDecimals)}</p>
         </article>
         <article className="admin-request-summary-card">
-          <span>반려</span>
-          <strong>{summary.rejectedCount}건</strong>
-          <p>처리 이력 포함</p>
+          <span>지급 이슈</span>
+          <strong>{summary.failedCount + summary.rejectedCount}건</strong>
+          <p>실패 {summary.failedCount}건 · 반려 {summary.rejectedCount}건</p>
         </article>
       </div>
 
@@ -345,7 +418,7 @@ export function AdminAdvanceRequestSection() {
             <thead>
               <tr>
                 <th>근로자</th>
-                <th>요청 금액</th>
+                <th>금액</th>
                 <th>근무 기준</th>
                 <th>일정</th>
                 <th>상태</th>
@@ -364,14 +437,34 @@ export function AdminAdvanceRequestSection() {
                   </td>
                   <td>
                     <div className="admin-metric-stack">
-                      <strong>{formatKrw(request.requestedAmount)}</strong>
+                      <strong>
+                        {formatAssetAmount(
+                          request.requestedAmountAtomic,
+                          request.assetSymbol,
+                          request.assetDecimals
+                        )}
+                      </strong>
+                      <p className="admin-cell-sub">{formatReferenceKrw(request.requestedDisplayKrwAmount)}</p>
                       <p className="admin-cell-sub">
                         승인 금액{" "}
-                        {request.status === "SUBMITTED"
+                        {request.approvedAmountAtomic == null
                           ? "대기"
-                          : formatKrw(request.approvedAmount)}
+                          : formatAssetAmount(
+                              request.approvedAmountAtomic,
+                              request.assetSymbol,
+                              request.assetDecimals
+                            )}
                       </p>
-                      <p className="admin-cell-sub">수수료 {formatKrw(request.feeAmount)}</p>
+                      <p className="admin-cell-sub">
+                        {request.approvedDisplayKrwAmount == null
+                          ? "-"
+                          : formatReferenceKrw(request.approvedDisplayKrwAmount)}
+                      </p>
+                      <p className="admin-cell-sub">
+                        수수료{" "}
+                        {formatAssetAmount(request.feeAmountAtomic, request.assetSymbol, request.assetDecimals)}
+                      </p>
+                      <p className="admin-cell-sub">{formatReferenceKrw(request.feeDisplayKrwAmount)}</p>
                     </div>
                   </td>
                   <td>
@@ -393,12 +486,18 @@ export function AdminAdvanceRequestSection() {
                     </div>
                   </td>
                   <td>
-                    <span className={`admin-status ${STATUS_CLASS_NAMES[request.status]}`}>
-                      {STATUS_LABELS[request.status]}
-                    </span>
+                    <div className="admin-metric-stack">
+                      <span className={`admin-status ${STATUS_CLASS_NAMES[request.status]}`}>
+                        {STATUS_LABELS[request.status]}
+                      </span>
+                      <p className="admin-cell-sub">{getStatusHint(request)}</p>
+                      {request.payoutTxHash ? (
+                        <p className="admin-cell-sub">tx {request.payoutTxHash.slice(0, 18)}...</p>
+                      ) : null}
+                    </div>
                   </td>
                   <td>
-                    {request.status === "SUBMITTED" ? (
+                    {canApproveOrReject(request.status) ? (
                       <div className="admin-action-group">
                         <button
                           type="button"
@@ -418,7 +517,9 @@ export function AdminAdvanceRequestSection() {
                         </button>
                       </div>
                     ) : (
-                      <span className="admin-action-done">처리 완료</span>
+                      <span className="admin-action-done">
+                        {request.status === "PAYOUT_FAILED" ? "재처리 확인 필요" : "처리 완료"}
+                      </span>
                     )}
                   </td>
                 </tr>

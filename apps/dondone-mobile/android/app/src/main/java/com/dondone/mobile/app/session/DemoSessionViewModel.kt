@@ -1216,8 +1216,9 @@ class DemoSessionViewModel(
             )
             return
         }
-        val requestedAmount = (_selectedAdvanceAmount.value ?: eligibility.availableAmount.toInt())
-            .coerceAtMost(eligibility.availableAmount.toInt())
+        val availableAmount = eligibility.availableAmountInWholeAssetUnits
+        val requestedAmount = (_selectedAdvanceAmount.value ?: availableAmount)
+            .coerceAtMost(availableAmount)
         if (requestedAmount <= 0) {
             _advanceRequestUiState.value = AdvanceRequestUiState(
                 message = "신청 가능한 금액이 없어요.",
@@ -1232,7 +1233,7 @@ class DemoSessionViewModel(
                 val result = advanceRepository.createRequest(
                     accessToken = session.accessToken,
                     workplaceId = eligibility.workplaceId,
-                    requestedAmount = requestedAmount.toLong()
+                    requestedAmountAtomic = requestedAmount.toAtomicAmount(eligibility.assetDecimals)
                 )
                 val detail = advanceRepository.getRequestDetail(session.accessToken, result.requestId)
                 loadAdvanceRemoteState(session)
@@ -1464,6 +1465,7 @@ class DemoSessionViewModel(
     }
 
     private suspend fun loadAdvanceRemoteState(session: AuthSession) {
+        val previousState = _advanceRemoteState.value
         _advanceRemoteState.value = AdvanceRemoteState.loading()
         val remoteState = advanceRepository.load(session.accessToken)
         if (!remoteState.isAuthenticated) {
@@ -1476,6 +1478,7 @@ class DemoSessionViewModel(
         }
         _advanceRemoteState.value = remoteState
         syncSelectedAdvanceAmount(remoteState)
+        syncRemittanceBalanceAfterAdvancePayout(previousState = previousState, currentState = remoteState, session = session)
     }
 
     private suspend fun loadWorkproofRemoteState(session: AuthSession) {
@@ -1676,7 +1679,7 @@ class DemoSessionViewModel(
     }
 
     private fun syncSelectedAdvanceAmount(remoteState: AdvanceRemoteState) {
-        val availableAmount = remoteState.eligibility?.availableAmount?.toInt() ?: 0
+        val availableAmount = remoteState.eligibility?.availableAmountInWholeAssetUnits ?: 0
         if (availableAmount <= 0) {
             _selectedAdvanceAmount.value = null
             return
@@ -1720,10 +1723,20 @@ class DemoSessionViewModel(
                 add(
                     AdvanceRequestItemPayload(
                         requestId = detail.requestId,
-                        requestedAmount = detail.requestedAmount,
-                        approvedAmount = detail.approvedAmount,
+                        workplaceId = detail.workplaceId,
+                        assetSymbol = detail.assetSymbol,
+                        assetDecimals = detail.assetDecimals,
+                        exchangeRateSnapshot = detail.exchangeRateSnapshot,
+                        requestedAmountAtomic = detail.requestedAmountAtomic,
+                        requestedDisplayKrwAmount = detail.requestedDisplayKrwAmount,
+                        approvedAmountAtomic = detail.approvedAmountAtomic,
+                        approvedDisplayKrwAmount = detail.approvedDisplayKrwAmount,
                         status = detail.status,
-                        repaymentDueDate = detail.repaymentDueDate
+                        requestStatus = detail.requestStatus,
+                        payoutStatus = detail.payoutStatus,
+                        payoutTxHash = detail.payoutTxHash,
+                        repaymentDueDate = detail.repaymentDueDate,
+                        requestedAt = detail.createdAt
                     )
                 )
                 addAll(current.requests.filterNot { it.requestId == detail.requestId })
@@ -1733,6 +1746,32 @@ class DemoSessionViewModel(
                 requests = mergedRequests,
                 requestDetailsById = current.requestDetailsById + (detail.requestId to detail)
             )
+        }
+    }
+
+    private suspend fun syncRemittanceBalanceAfterAdvancePayout(
+        previousState: AdvanceRemoteState,
+        currentState: AdvanceRemoteState,
+        session: AuthSession
+    ) {
+        if (currentState.mode != AdvanceRemoteMode.CONTENT) {
+            return
+        }
+
+        val previousPaidKeys = previousState.requests
+            .asSequence()
+            .filter { it.status == "PAID" && !it.payoutTxHash.isNullOrBlank() }
+            .map { "${it.requestId}:${it.payoutTxHash}" }
+            .toSet()
+
+        val hasNewPaidPayout = currentState.requests.any { request ->
+            request.status == "PAID" &&
+                !request.payoutTxHash.isNullOrBlank() &&
+                "${request.requestId}:${request.payoutTxHash}" !in previousPaidKeys
+        }
+
+        if (hasNewPaidPayout) {
+            refreshRemittanceRemoteStateSilently(session)
         }
     }
 

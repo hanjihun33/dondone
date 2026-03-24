@@ -17,6 +17,14 @@ import static org.mockito.Mockito.when;
 
 class AdvancePolicyEngineTest {
 
+    private static final long AVAILABLE_B_ATOMIC = 103_448_275L;
+    private static final long REDUCED_CAP_ATOMIC = 34_482_758L;
+    private static final long ZERO_ATOMIC = 0L;
+    private static final long AVAILABLE_B_REFERENCE_KRW = 150_000L;
+    private static final long REDUCED_CAP_REFERENCE_KRW = 50_000L;
+    private static final long FEE_ATOMIC = 3_448_275L;
+    private static final long FEE_REFERENCE_KRW = 5_000L;
+
     private final AdvancePolicyEngine engine = new AdvancePolicyEngine();
 
     @Test
@@ -30,7 +38,8 @@ class AdvancePolicyEngineTest {
                 YearMonth.of(2026, 3)
         );
 
-        assertThat(response.availableAmount()).isZero();
+        assertThat(response.availableAmountAtomic()).isEqualTo(ZERO_ATOMIC);
+        assertThat(response.availableDisplayKrwAmount()).isZero();
         assertThat(response.blockReasonCodes()).contains("INSUFFICIENT_VERIFIED_WORK");
         assertThat(engine.isHardBlocked(response)).isTrue();
     }
@@ -47,8 +56,33 @@ class AdvancePolicyEngineTest {
         );
 
         assertThat(response.repaymentTier()).isEqualTo("B");
-        assertThat(response.availableAmount()).isEqualTo(150_000L);
+        assertThat(response.assetSymbol()).isEqualTo("dUSDC");
+        assertThat(response.assetDecimals()).isEqualTo(6);
+        assertThat(response.exchangeRateSnapshot()).isEqualByComparingTo("1450");
+        assertThat(response.availableAmountAtomic()).isEqualTo(AVAILABLE_B_ATOMIC);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
+        assertThat(response.estimatedFeeAmountAtomic()).isEqualTo(FEE_ATOMIC);
+        assertThat(response.estimatedFeeDisplayKrwAmount()).isEqualTo(FEE_REFERENCE_KRW);
         assertThat(response.blockReasonCodes()).isEmpty();
+        assertThat(response.noticeReasonCodes()).isEmpty();
+        assertThat(engine.isHardBlocked(response)).isFalse();
+    }
+
+    @Test
+    void exposesPendingReviewAsNoticeInsteadOfBlockReason() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 120, 1),
+                false,
+                LocalDate.of(2026, 3, 16),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.availableAmountAtomic()).isEqualTo(AVAILABLE_B_ATOMIC);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
+        assertThat(response.blockReasonCodes()).isEmpty();
+        assertThat(response.noticeReasonCodes()).contains("PENDING_WORKPROOF_REVIEW");
         assertThat(engine.isHardBlocked(response)).isFalse();
     }
 
@@ -63,9 +97,66 @@ class AdvancePolicyEngineTest {
                 YearMonth.of(2026, 3)
         );
 
-        assertThat(response.availableAmount()).isZero();
+        assertThat(response.availableAmountAtomic()).isEqualTo(ZERO_ATOMIC);
+        assertThat(response.availableDisplayKrwAmount()).isZero();
         assertThat(response.blockReasonCodes()).contains("EXISTING_OUTSTANDING_ADVANCE");
+        assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isTrue();
+    }
+
+    @Test
+    void blocksEligibilityOnlyOnRepaymentDate() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 0, 0),
+                false,
+                LocalDate.of(2026, 3, 25),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.availableAmountAtomic()).isEqualTo(ZERO_ATOMIC);
+        assertThat(response.availableDisplayKrwAmount()).isZero();
+        assertThat(response.blockReasonCodes()).contains("ADVANCE_WINDOW_CLOSED_TODAY");
+        assertThat(response.noticeReasonCodes()).isEmpty();
+        assertThat(engine.isHardBlocked(response)).isTrue();
+    }
+
+    @Test
+    void doesNotBlockDayBeforeRepaymentDate() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 0, 0),
+                false,
+                LocalDate.of(2026, 3, 24),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.availableAmountAtomic()).isEqualTo(REDUCED_CAP_ATOMIC);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(REDUCED_CAP_REFERENCE_KRW);
+        assertThat(response.blockReasonCodes()).doesNotContain("ADVANCE_WINDOW_CLOSED_TODAY");
+        assertThat(engine.isHardBlocked(response)).isFalse();
+    }
+
+    @Test
+    void rollsTargetMonthForwardAfterPayday() {
+        YearMonth targetMonth = engine.resolveTargetMonth(
+                LocalDate.of(2026, 3, 26),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(targetMonth).isEqualTo(YearMonth.of(2026, 4));
+    }
+
+    @Test
+    void keepsFutureWorkedMonthWhenItIsAlreadyNextCycle() {
+        YearMonth targetMonth = engine.resolveTargetMonth(
+                LocalDate.of(2026, 3, 26),
+                YearMonth.of(2026, 4)
+        );
+
+        assertThat(targetMonth).isEqualTo(YearMonth.of(2026, 4));
     }
 
     private WorkContract contractWithHourlyWage(long hourlyWage) {

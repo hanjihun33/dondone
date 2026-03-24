@@ -232,6 +232,7 @@ class DemoSessionViewModelTest {
                 availableAmount = 180_000L,
                 repaymentTier = "T2",
                 blockReasonCodes = emptyList(),
+                noticeReasonCodes = emptyList(),
                 estimatedRepaymentDate = "2026-03-25",
                 disclaimer = "데모 시뮬레이션",
                 needsReviewRecordCount = 0
@@ -1542,6 +1543,7 @@ class DemoSessionViewModelTest {
                 availableAmount = 180_000L,
                 repaymentTier = "T2",
                 blockReasonCodes = emptyList(),
+                noticeReasonCodes = emptyList(),
                 estimatedRepaymentDate = "2026-03-25",
                 disclaimer = "데모 시뮬레이션",
                 needsReviewRecordCount = 0

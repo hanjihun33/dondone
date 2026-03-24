@@ -2,6 +2,10 @@ package com.workproofpay.backend.advance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workproofpay.backend.advance.model.AdvancePayout;
+import com.workproofpay.backend.advance.model.AdvancePayoutStatus;
+import com.workproofpay.backend.advance.model.AdvanceRequest;
+import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
@@ -26,6 +30,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,6 +43,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
 
+    private static final long ELIGIBLE_AVAILABLE_ATOMIC = 103_448_275L;
+    private static final long ELIGIBLE_AVAILABLE_DISPLAY_KRW = 150_000L;
+    private static final long REQUEST_ATOMIC = 60_000_000L;
+    private static final long REQUEST_DISPLAY_KRW = 87_000L;
+    private static final long REPLAY_MISMATCH_ATOMIC = 61_000_000L;
+    private static final long SECOND_WORKPLACE_REQUEST_ATOMIC = 50_000_000L;
+    private static final long SAME_WORKPLACE_OPEN_REQUEST_ATOMIC = 70_000_000L;
+    private static final long REDUCED_CAP_ATOMIC = 34_482_758L;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -45,6 +60,9 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
 
     @Autowired
     private AdvanceRequestRepository advanceRequestRepository;
+
+    @Autowired
+    private AdvancePayoutRepository advancePayoutRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -66,6 +84,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
 
     @BeforeEach
     void setUp() {
+        advancePayoutRepository.deleteAll();
         advanceRequestRepository.deleteAll();
         workProofAuditLogRepository.deleteAll();
         workProofRepository.deleteAll();
@@ -85,18 +104,24 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
-                .andExpect(jsonPath("$.data.availableAmount").value(150000))
+                .andExpect(jsonPath("$.data.assetSymbol").value("dUSDC"))
+                .andExpect(jsonPath("$.data.assetDecimals").value(6))
+                .andExpect(jsonPath("$.data.exchangeRateSnapshot").value(1450))
+                .andExpect(jsonPath("$.data.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.repaymentTier").value("B"))
-                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
-                .andExpect(jsonPath("$.data.needsReviewRecordCount").value(1));
+                .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty())
+                .andExpect(jsonPath("$.data.noticeReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
+                .andExpect(jsonPath("$.data.needsReviewRecordCount").value(1))
+                .andExpect(jsonPath("$.data.estimatedRepaymentDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
 
         String requestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 100000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, REQUEST_ATOMIC);
 
         String createdBody = mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -105,8 +130,15 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(requestJson))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()))
-                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmount").value(150000))
+                .andExpect(jsonPath("$.data.assetSymbol").value("dUSDC"))
+                .andExpect(jsonPath("$.data.assetDecimals").value(6))
+                .andExpect(jsonPath("$.data.exchangeRateSnapshot").value(1450))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.feeAmountAtomic").value(3448275))
+                .andExpect(jsonPath("$.data.feeDisplayKrwAmount").value(5000))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -121,23 +153,32 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()));
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests")
                         .header("Authorization", bearer(token))
-                        .param("month", nextMonth().toString()))
+                        .param("month", currentAdvanceCycleMonth().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requests.length()").value(1))
                 .andExpect(jsonPath("$.data.requests[0].requestId").value(requestId))
                 .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.requests[0].approvedAmount").value(nullValue()));
+                .andExpect(jsonPath("$.data.requests[0].requestedAmountAtomic").value(REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.requests[0].requestedDisplayKrwAmount").value(REQUEST_DISPLAY_KRW))
+                .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[0].approvedDisplayKrwAmount").value(nullValue()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", requestId)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestId").value(requestId))
                 .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
-                .andExpect(jsonPath("$.data.approvedAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.exchangeRateSnapshot").value(1450))
+                .andExpect(jsonPath("$.data.requestedAmountAtomic").value(REQUEST_ATOMIC))
+                .andExpect(jsonPath("$.data.requestedDisplayKrwAmount").value(REQUEST_DISPLAY_KRW))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.exchangeRateSnapshot").value(1450))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.needsReviewRecordCount").value(1));
     }
 
@@ -152,10 +193,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String requestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 50000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, SECOND_WORKPLACE_REQUEST_ATOMIC);
 
         String createdBody = mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(ownerToken))
@@ -177,10 +218,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String mismatchedJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 60000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, REPLAY_MISMATCH_ATOMIC);
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(ownerToken))
@@ -201,10 +242,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String firstRequestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 50000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(firstWorkplaceId);
+                """.formatted(firstWorkplaceId, SECOND_WORKPLACE_REQUEST_ATOMIC);
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -218,7 +259,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .param("workplaceId", secondWorkplaceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workplaceId").value(secondWorkplaceId))
-                .andExpect(jsonPath("$.data.availableAmount").value(150000))
+                .andExpect(jsonPath("$.data.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty());
     }
 
@@ -231,10 +273,10 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         String firstRequestJson = """
                 {
                   "workplaceId": %d,
-                  "requestedAmount": 70000,
+                  "requestedAmountAtomic": %d,
                   "requestedAt": "2030-01-10T09:00:00"
                 }
-                """.formatted(workplaceId);
+                """.formatted(workplaceId, SAME_WORKPLACE_OPEN_REQUEST_ATOMIC);
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -248,8 +290,174 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(token))
                         .param("workplaceId", workplaceId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.availableAmount").value(0))
-                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("OUTSTANDING_ADVANCE_EXISTS"));
+                .andExpect(jsonPath("$.data.availableAmountAtomic").value(0))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(0))
+                .andExpect(jsonPath("$.data.blockReasonCodes[0]").value("EXISTING_OUTSTANDING_ADVANCE"))
+                .andExpect(jsonPath("$.data.noticeReasonCodes").isEmpty());
+    }
+
+    @Test
+    void listsRequestsUnderResolvedAdvanceCycleMonth() throws Exception {
+        User user = userRepository.save(User.register("advance-cycle@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long workplaceId = seedAdvanceEligibleScenario(user, 10, false);
+
+        String requestJson = """
+                {
+                  "workplaceId": %d,
+                  "requestedAmountAtomic": %d,
+                  "requestedAt": "2030-01-10T09:00:00"
+                }
+                """.formatted(workplaceId, SECOND_WORKPLACE_REQUEST_ATOMIC);
+
+        mockMvc.perform(post("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "advance-req-cycle-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .param("month", currentAdvanceCycleMonth().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.month").value(currentAdvanceCycleMonth().toString()))
+                .andExpect(jsonPath("$.data.requests.length()").value(1));
+
+        mockMvc.perform(get("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .param("month", currentAdvanceCycleMonth().minusMonths(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.month").value(currentAdvanceCycleMonth().minusMonths(1).toString()))
+                .andExpect(jsonPath("$.data.requests.length()").value(0));
+    }
+
+    @Test
+    void mapsWorkerResponsesAcrossRequestAndPayoutStatuses() throws Exception {
+        User user = userRepository.save(User.register("advance-status@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long submittedWorkplaceId = seedAdvanceEligibleScenario(user, 10, false);
+        Long approvedWorkplaceId = seedAdvanceEligibleScenario(user, 10, false);
+        Long payingWorkplaceId = seedAdvanceEligibleScenario(user, 10, false);
+        Long paidWorkplaceId = seedAdvanceEligibleScenario(user, 10, false);
+        Long failedWorkplaceId = seedAdvanceEligibleScenario(user, 10, false);
+        Long timedOutWorkplaceId = seedAdvanceEligibleScenario(user, 10, false);
+
+        long submittedRequestId = createAdvanceRequest(token, submittedWorkplaceId, 45_000_000L, "2030-01-10T09:00:00", "advance-status-submitted");
+        long approvedRequestId = createAdvanceRequest(token, approvedWorkplaceId, 46_000_000L, "2030-01-10T10:00:00", "advance-status-approved");
+        long payingRequestId = createAdvanceRequest(token, payingWorkplaceId, 47_000_000L, "2030-01-10T11:00:00", "advance-status-paying");
+        long paidRequestId = createAdvanceRequest(token, paidWorkplaceId, 48_000_000L, "2030-01-10T12:00:00", "advance-status-paid");
+        long failedRequestId = createAdvanceRequest(token, failedWorkplaceId, 49_000_000L, "2030-01-10T13:00:00", "advance-status-failed");
+        long timedOutRequestId = createAdvanceRequest(token, timedOutWorkplaceId, 50_000_000L, "2030-01-10T14:00:00", "advance-status-timeout");
+
+        approveRequest(approvedRequestId);
+        approveRequest(payingRequestId);
+        approveRequest(paidRequestId);
+        approveRequest(failedRequestId);
+        approveRequest(timedOutRequestId);
+
+        attachPayout(payingRequestId, user.getId(), 47_000_000L, AdvancePayoutStatus.BROADCASTED);
+        attachPayout(paidRequestId, user.getId(), 48_000_000L, AdvancePayoutStatus.CONFIRMED);
+        attachPayout(failedRequestId, user.getId(), 49_000_000L, AdvancePayoutStatus.FAILED);
+        attachPayout(timedOutRequestId, user.getId(), 50_000_000L, AdvancePayoutStatus.TIMED_OUT);
+
+        mockMvc.perform(get("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .param("month", currentAdvanceCycleMonth().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requests.length()").value(6))
+                .andExpect(jsonPath("$.data.requests[0].requestId").value(timedOutRequestId))
+                .andExpect(jsonPath("$.data.requests[0].status").value("PAYOUT_FAILED"))
+                .andExpect(jsonPath("$.data.requests[0].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[0].payoutStatus").value("TIMED_OUT"))
+                .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(50_000_000L))
+                .andExpect(jsonPath("$.data.requests[0].approvedDisplayKrwAmount").value(72_500L))
+                .andExpect(jsonPath("$.data.requests[0].payoutTxHash").value("0x" + "%064x".formatted(timedOutRequestId)))
+                .andExpect(jsonPath("$.data.requests[1].requestId").value(failedRequestId))
+                .andExpect(jsonPath("$.data.requests[1].status").value("PAYOUT_FAILED"))
+                .andExpect(jsonPath("$.data.requests[1].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[1].payoutStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.requests[1].approvedAmountAtomic").value(49_000_000L))
+                .andExpect(jsonPath("$.data.requests[1].approvedDisplayKrwAmount").value(71_050L))
+                .andExpect(jsonPath("$.data.requests[1].payoutTxHash").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[2].requestId").value(paidRequestId))
+                .andExpect(jsonPath("$.data.requests[2].status").value("PAID"))
+                .andExpect(jsonPath("$.data.requests[2].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[2].payoutStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.requests[2].approvedAmountAtomic").value(48_000_000L))
+                .andExpect(jsonPath("$.data.requests[2].approvedDisplayKrwAmount").value(69_600L))
+                .andExpect(jsonPath("$.data.requests[2].payoutTxHash").value("0x" + "%064x".formatted(paidRequestId)))
+                .andExpect(jsonPath("$.data.requests[3].requestId").value(payingRequestId))
+                .andExpect(jsonPath("$.data.requests[3].status").value("PAYING"))
+                .andExpect(jsonPath("$.data.requests[3].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[3].payoutStatus").value("BROADCASTED"))
+                .andExpect(jsonPath("$.data.requests[3].approvedAmountAtomic").value(47_000_000L))
+                .andExpect(jsonPath("$.data.requests[3].approvedDisplayKrwAmount").value(68_150L))
+                .andExpect(jsonPath("$.data.requests[3].payoutTxHash").value("0x" + "%064x".formatted(payingRequestId)))
+                .andExpect(jsonPath("$.data.requests[4].requestId").value(approvedRequestId))
+                .andExpect(jsonPath("$.data.requests[4].status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[4].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[4].payoutStatus").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[4].approvedAmountAtomic").value(46_000_000L))
+                .andExpect(jsonPath("$.data.requests[4].approvedDisplayKrwAmount").value(66_700L))
+                .andExpect(jsonPath("$.data.requests[4].payoutTxHash").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[5].requestId").value(submittedRequestId))
+                .andExpect(jsonPath("$.data.requests[5].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[5].requestStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[5].payoutStatus").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[5].approvedAmountAtomic").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[5].approvedDisplayKrwAmount").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[5].payoutTxHash").value(nullValue()));
+
+        mockMvc.perform(get("/api/advance/requests/{requestId}", approvedRequestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.payoutStatus").value(nullValue()))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(46_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(66_700L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value(nullValue()));
+
+        mockMvc.perform(get("/api/advance/requests/{requestId}", payingRequestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAYING"))
+                .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.payoutStatus").value("BROADCASTED"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(47_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(68_150L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value("0x" + "%064x".formatted(payingRequestId)));
+
+        mockMvc.perform(get("/api/advance/requests/{requestId}", paidRequestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAID"))
+                .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.payoutStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(48_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(69_600L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value("0x" + "%064x".formatted(paidRequestId)));
+
+        mockMvc.perform(get("/api/advance/requests/{requestId}", failedRequestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAYOUT_FAILED"))
+                .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.payoutStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(49_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(71_050L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value(nullValue()));
+
+        mockMvc.perform(get("/api/advance/requests/{requestId}", timedOutRequestId)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAYOUT_FAILED"))
+                .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.payoutStatus").value("TIMED_OUT"))
+                .andExpect(jsonPath("$.data.approvedAmountAtomic").value(50_000_000L))
+                .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(72_500L))
+                .andExpect(jsonPath("$.data.payoutTxHash").value("0x" + "%064x".formatted(timedOutRequestId)));
     }
 
     private Long seedAdvanceEligibleScenario(User user, int reflectedDayCount, boolean addPendingRecord) {
@@ -269,11 +477,11 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 null,
                 null,
                 BigDecimal.valueOf(10_000),
-                nextMonth().atDay(1)
+                currentAdvanceCycleMonth().atDay(1)
         ));
 
         for (int day = 1; day <= reflectedDayCount; day++) {
-            LocalDateTime checkIn = nextMonth().atDay(day).atTime(9, 0);
+            LocalDateTime checkIn = currentAdvanceCycleMonth().atDay(day).atTime(9, 0);
             WorkProof record = WorkProof.checkIn(
                     user,
                     workplace,
@@ -296,7 +504,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         }
 
         if (addPendingRecord) {
-            LocalDateTime pendingCheckIn = nextMonth().atDay(reflectedDayCount + 1).atTime(9, 0);
+            LocalDateTime pendingCheckIn = currentAdvanceCycleMonth().atDay(reflectedDayCount + 1).atTime(9, 0);
             workProofRepository.save(WorkProof.checkIn(
                     user,
                     workplace,
@@ -317,8 +525,80 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         return root.path("data").path(fieldName).asLong();
     }
 
-    private java.time.YearMonth nextMonth() {
-        return java.time.YearMonth.now().plusMonths(1);
+    private long createAdvanceRequest(
+            String token,
+            Long workplaceId,
+            long requestedAmountAtomic,
+            String requestedAt,
+            String idempotencyKey
+    ) throws Exception {
+        String requestJson = """
+                {
+                  "workplaceId": %d,
+                  "requestedAmountAtomic": %d,
+                  "requestedAt": "%s"
+                }
+                """.formatted(workplaceId, requestedAmountAtomic, requestedAt);
+
+        String body = mockMvc.perform(post("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return readId(body, "requestId");
+    }
+
+    private void approveRequest(long requestId) {
+        AdvanceRequest request = advanceRequestRepository.findById(requestId).orElseThrow();
+        request.approve(999L);
+        advanceRequestRepository.save(request);
+    }
+
+    private void attachPayout(long requestId, long userId, long amountAtomic, AdvancePayoutStatus targetStatus) {
+        AdvancePayout payout = AdvancePayout.request(
+                UUID.randomUUID().toString().replace("-", ""),
+                requestId,
+                userId,
+                "0x" + "%040x".formatted(requestId),
+                amountAtomic,
+                "dUSDC",
+                "advance-payout-" + requestId
+        );
+        advancePayoutRepository.save(payout);
+
+        switch (targetStatus) {
+            case REQUESTED -> {
+            }
+            case BROADCASTED -> {
+                payout.markSigned("0x" + "%064x".formatted(requestId), "signed-" + requestId);
+                payout.markBroadcasted();
+            }
+            case CONFIRMED -> {
+                payout.markSigned("0x" + "%064x".formatted(requestId), "signed-" + requestId);
+                payout.markBroadcasted();
+                payout.markConfirmed();
+            }
+            case FAILED -> payout.markFailed("submit failed");
+            case TIMED_OUT -> {
+                payout.markSigned("0x" + "%064x".formatted(requestId), "signed-" + requestId);
+                payout.markBroadcasted();
+                payout.markTimedOut("receipt timeout");
+            }
+            default -> throw new IllegalArgumentException("Unsupported payout status for test: " + targetStatus);
+        }
+
+        advancePayoutRepository.save(payout);
+    }
+
+    private YearMonth currentAdvanceCycleMonth() {
+        LocalDate today = LocalDate.now();
+        YearMonth cycleMonth = YearMonth.from(today);
+        return today.getDayOfMonth() > 25 ? cycleMonth.plusMonths(1) : cycleMonth;
     }
 
     private String tokenFor(User user) {

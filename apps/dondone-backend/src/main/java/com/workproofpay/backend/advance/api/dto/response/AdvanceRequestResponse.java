@@ -4,9 +4,16 @@ import java.time.LocalDate;
 
 public record AdvanceRequestResponse(
         Long requestId,
+        String assetSymbol,
+        Integer assetDecimals,
+        java.math.BigDecimal exchangeRateSnapshot,
         String status,
-        Long approvedAmount,
-        Long feeAmount,
+        String requestStatus,
+        String payoutStatus,
+        Long approvedAmountAtomic,
+        Long approvedDisplayKrwAmount,
+        Long feeAmountAtomic,
+        Long feeDisplayKrwAmount,
         LocalDate repaymentDueDate,
         AdvanceEligibilitySnapshotResponse eligibilitySnapshot
 ) {
