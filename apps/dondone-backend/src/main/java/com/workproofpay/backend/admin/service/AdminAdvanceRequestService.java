@@ -122,6 +122,8 @@ public class AdminAdvanceRequestService {
                 viewStatus.status(),
                 viewStatus.requestStatus(),
                 viewStatus.payoutStatus(),
+                payout != null ? payout.getTxHash() : null,
+                payout != null ? payout.getFailureReason() : null,
                 request.getRepaymentDueDate(),
                 request.getRequestedAt(),
                 request.getSnapshotReflectedWorkDays(),

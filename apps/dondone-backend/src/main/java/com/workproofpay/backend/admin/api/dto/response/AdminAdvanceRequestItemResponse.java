@@ -22,6 +22,8 @@ public record AdminAdvanceRequestItemResponse(
         String status,
         String requestStatus,
         String payoutStatus,
+        String payoutTxHash,
+        String payoutFailureReason,
         LocalDate repaymentDueDate,
         LocalDateTime requestedAt,
         Integer reflectedWorkDays,
