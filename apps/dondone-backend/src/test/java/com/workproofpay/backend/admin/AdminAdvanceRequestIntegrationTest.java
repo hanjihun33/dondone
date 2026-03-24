@@ -2,11 +2,18 @@ package com.workproofpay.backend.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workproofpay.backend.advance.model.AdvancePayoutStatus;
+import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.auth.api.dto.request.LoginRequest;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.employer.model.Company;
 import com.workproofpay.backend.employer.repo.CompanyRepository;
+import com.workproofpay.backend.jobs.model.JobReferenceKind;
+import com.workproofpay.backend.jobs.model.JobStatus;
+import com.workproofpay.backend.jobs.model.JobType;
+import com.workproofpay.backend.jobs.repo.JobRepository;
+import com.workproofpay.backend.remittance.repo.UserWalletRepository;
 import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
@@ -29,7 +36,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -81,6 +90,15 @@ class AdminAdvanceRequestIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AdvancePayoutRepository advancePayoutRepository;
+
+    @Autowired
+    private UserWalletRepository userWalletRepository;
+
+    @Autowired
+    private JobRepository jobRepository;
+
     @BeforeEach
     void setUp() {
         workProofAuditLogRepository.deleteAll();
@@ -88,6 +106,9 @@ class AdminAdvanceRequestIntegrationTest {
         workContractRepository.deleteAll();
         workplaceRepository.deleteAll();
         companyRepository.deleteAll();
+        advancePayoutRepository.deleteAll();
+        jobRepository.deleteAll();
+        userWalletRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -154,6 +175,23 @@ class AdminAdvanceRequestIntegrationTest {
         mockMvc.perform(post("/api/admin/advance/requests/{requestId}/approve", approvedCandidateId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
+
+        var payout = advancePayoutRepository.findByAdvanceRequestId(approvedCandidateId).orElseThrow();
+        assertThat(payout.getUserId()).isEqualTo(workerOne.getId());
+        assertThat(payout.getWalletAddress()).matches("^0x[a-f0-9]{40}$");
+        assertThat(payout.getAmountAtomic()).isEqualTo(APPROVED_REQUEST_ATOMIC);
+        assertThat(payout.getAssetSymbol()).isEqualTo("dUSDC");
+        assertThat(payout.getStatus()).isEqualTo(AdvancePayoutStatus.REQUESTED);
+        assertThat(userWalletRepository.findById(workerOne.getId())).isPresent();
+
+        assertThat(jobRepository.findByReferenceKindAndStatusInOrderByUpdatedAtDescIdDesc(
+                JobReferenceKind.ADVANCE_PAYOUT,
+                List.of(JobStatus.QUEUED),
+                org.springframework.data.domain.PageRequest.of(0, 10)
+        )).anySatisfy(job -> {
+            assertThat(job.getJobType()).isEqualTo(JobType.SUBMIT_ADVANCE_PAYOUT);
+            assertThat(job.getReferenceId()).isEqualTo(payout.getAdvancePayoutId());
+        });
 
         mockMvc.perform(post("/api/admin/advance/requests/{requestId}/reject", rejectedCandidateId)
                         .header("Authorization", "Bearer " + adminToken))

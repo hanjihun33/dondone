@@ -4,6 +4,7 @@ import com.workproofpay.backend.admin.api.dto.response.AdminAdvanceRequestItemRe
 import com.workproofpay.backend.admin.api.dto.response.AdminAdvanceRequestListResponse;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
+import com.workproofpay.backend.advance.service.AdvancePayoutService;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.employer.model.Company;
@@ -27,6 +28,7 @@ public class AdminAdvanceRequestService {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final AdvanceRequestRepository advanceRequestRepository;
+    private final AdvancePayoutService advancePayoutService;
 
     @Transactional(readOnly = true)
     public AdminAdvanceRequestListResponse getRequests(Long adminAccountId) {
@@ -56,6 +58,7 @@ public class AdminAdvanceRequestService {
         AdvanceRequest request = getRequest(requestId);
         ensureSubmitted(request);
         request.approve(adminAccountId);
+        advancePayoutService.createRequestedPayout(request);
     }
 
     @Transactional
