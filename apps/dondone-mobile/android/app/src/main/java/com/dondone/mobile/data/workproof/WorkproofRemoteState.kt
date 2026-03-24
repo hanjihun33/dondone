@@ -18,10 +18,41 @@ data class WorkproofRecordPayload(
     val status: String,
     val checkInDeviceAt: LocalDateTime,
     val checkOutDeviceAt: LocalDateTime?,
+    val recognizedClockInAt: LocalDateTime?,
+    val recognizedClockOutAt: LocalDateTime?,
     val workedMinutes: Long?,
     val modified: Boolean,
     val reflectionStatus: String,
     val riskFlags: List<String>
+)
+
+enum class WorkproofCorrectionStatus {
+    PENDING,
+    APPROVED,
+    REJECTED
+}
+
+data class WorkproofCorrectionRequestMutation(
+    val workproofId: Long,
+    val requestedClockInAt: LocalDateTime,
+    val requestedClockOutAt: LocalDateTime,
+    val reasonCode: String,
+    val reason: String,
+    val memo: String?,
+    val attachmentCount: Int
+)
+
+data class WorkproofCorrectionRequestPayload(
+    val requestId: Long,
+    val workproofId: Long,
+    val reasonCode: String,
+    val reviewReasonCode: String?,
+    val status: WorkproofCorrectionStatus
+)
+
+data class WorkproofCorrectionSubmitResult(
+    val correctionRequest: WorkproofCorrectionRequestPayload,
+    val remoteState: WorkproofRemoteState
 )
 
 data class WorkproofRemotePayload(

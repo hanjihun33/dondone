@@ -102,6 +102,7 @@ import com.kakao.vectormap.shape.PolygonOptions
 import com.kakao.vectormap.shape.PolygonStyles
 import com.kakao.vectormap.shape.PolygonStylesSet
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
@@ -140,7 +141,7 @@ fun WorkproofScreen(
     pdfFileUiState: WorkproofPdfFileUiState,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
-    onSaveEdit: (String, String, String, Boolean) -> Unit,
+    onSaveEdit: (String, String, String, String, String, Boolean) -> Unit,
     onRefreshPdfPreview: (LocalDate, LocalDate) -> Unit,
     onClearPdfPreview: () -> Unit,
     onCreateWorkproofPdf: (LocalDate, LocalDate) -> Unit,
@@ -162,6 +163,8 @@ fun WorkproofScreen(
     var editingRecordId by remember(resetVersion) { mutableStateOf<String?>(null) }
     var editReasonKey by remember(resetVersion) { mutableStateOf("") }
     var editMemo by remember(resetVersion) { mutableStateOf("") }
+    var requestedClockInText by remember(resetVersion) { mutableStateOf("") }
+    var requestedClockOutText by remember(resetVersion) { mutableStateOf("") }
     var selectedAttachmentName by remember(resetVersion) { mutableStateOf<String?>(null) }
     var showDetails by remember(resetVersion) { mutableStateOf(false) }
     var showPdfDateRangeSheet by remember(resetVersion) { mutableStateOf(false) }
@@ -212,6 +215,8 @@ fun WorkproofScreen(
     fun clearEditDraft() {
         editReasonKey = ""
         editMemo = ""
+        requestedClockInText = ""
+        requestedClockOutText = ""
         selectedAttachmentName = null
         reasonMenuExpanded = false
     }
@@ -222,6 +227,8 @@ fun WorkproofScreen(
     fun openEditSheet(record: WorkproofRecordUiModel) {
         editingRecordId = record.id
         clearEditDraft()
+        requestedClockInText = record.clockInText.takeUnless { it == "-" }.orEmpty()
+        requestedClockOutText = record.clockOutText.takeUnless { it == "-" }.orEmpty()
     }
 
     LaunchedEffect(showDetails) {
@@ -317,6 +324,8 @@ fun WorkproofScreen(
                 selectedReasonLabel = selectedReason?.label.orEmpty(),
                 reasonMenuExpanded = reasonMenuExpanded,
                 memo = editMemo,
+                requestedClockInText = requestedClockInText,
+                requestedClockOutText = requestedClockOutText,
                 selectedAttachmentName = selectedAttachmentName,
                 onToggleReasonMenu = { reasonMenuExpanded = !reasonMenuExpanded },
                 onDismissReasonMenu = { reasonMenuExpanded = false },
@@ -325,13 +334,17 @@ fun WorkproofScreen(
                     reasonMenuExpanded = false
                 },
                 onMemoChange = { editMemo = it },
+                onRequestedClockInChange = { requestedClockInText = it },
+                onRequestedClockOutChange = { requestedClockOutText = it },
                 onPickAttachment = { attachmentLauncher.launch(arrayOf("*/*")) },
                 onClearAttachment = { selectedAttachmentName = null },
                 onSave = {
-                    val reasonLabel = selectedReason?.label ?: return@WorkproofEditSheet
+                    val selectedReasonKey = selectedReason?.key ?: return@WorkproofEditSheet
                     onSaveEdit(
                         editingRecord.id,
-                        reasonLabel,
+                        requestedClockInText,
+                        requestedClockOutText,
+                        selectedReasonKey,
                         editMemo.trim(),
                         selectedAttachmentName != null
                     )
@@ -1506,7 +1519,7 @@ private fun WorkproofRecentRecordRow(
                     color = DawnText
                 )
                 WorkproofStatusPill(
-                    text = recordStatusText(record.tone),
+                    text = record.statusText,
                     tone = record.tone
                 )
             }
@@ -1520,9 +1533,9 @@ private fun WorkproofRecentRecordRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = DawnTextSubtle
             )
-            record.modifiedReason?.let { reason ->
+            record.detailText?.let { reason ->
                 Text(
-                    text = stringResource(R.string.workproof_value_modified_reason, reason),
+                    text = reason,
                     style = MaterialTheme.typography.bodySmall,
                     color = DawnTextSubtle
                 )
@@ -1758,20 +1771,26 @@ private fun WorkproofEditSheet(
     selectedReasonLabel: String,
     reasonMenuExpanded: Boolean,
     memo: String,
+    requestedClockInText: String,
+    requestedClockOutText: String,
     selectedAttachmentName: String?,
     onToggleReasonMenu: () -> Unit,
     onDismissReasonMenu: () -> Unit,
     onSelectReason: (WorkproofEditReasonOption) -> Unit,
     onMemoChange: (String) -> Unit,
+    onRequestedClockInChange: (String) -> Unit,
+    onRequestedClockOutChange: (String) -> Unit,
     onPickAttachment: () -> Unit,
     onClearAttachment: () -> Unit,
     onSave: () -> Unit,
     onClose: () -> Unit
 ) {
-    val timeParts = remember(record.timeText) {
-        record.timeText.split(" - ").let { parts ->
-            (parts.getOrNull(0) ?: "-") to (parts.getOrNull(1) ?: "-")
-        }
+    val isTimeInputValid = remember(requestedClockInText, requestedClockOutText) {
+        requestedClockInText.isValidWorkproofTimeInput() &&
+            requestedClockOutText.isValidWorkproofTimeInput()
+    }
+    val timeParts = remember(record.clockInText, record.clockOutText) {
+        record.clockInText to record.clockOutText
     }
 
     Column(
@@ -1817,6 +1836,37 @@ private fun WorkproofEditSheet(
 
         WorkproofKeyValueRow(label = "출근", value = timeParts.first)
         WorkproofKeyValueRow(label = "퇴근", value = timeParts.second)
+        HorizontalDivider(color = WorkproofDivider)
+        WorkproofEditSheetSection(title = "요청 시간") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = requestedClockInText,
+                    onValueChange = onRequestedClockInChange,
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text(text = "출근") },
+                    placeholder = { Text(text = "09:00") }
+                )
+                OutlinedTextField(
+                    value = requestedClockOutText,
+                    onValueChange = onRequestedClockOutChange,
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text(text = "퇴근") },
+                    placeholder = { Text(text = "18:00") }
+                )
+            }
+            if (!isTimeInputValid && (requestedClockInText.isNotBlank() || requestedClockOutText.isNotBlank())) {
+                Text(
+                    text = "요청 시간은 HH:mm 형식으로 입력해 주세요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = WorkproofModifiedText
+                )
+            }
+        }
         HorizontalDivider(color = WorkproofDivider)
 
         WorkproofEditSheetSection(title = "수정 사유") {
@@ -1899,9 +1949,9 @@ private fun WorkproofEditSheet(
         Spacer(modifier = Modifier.height(4.dp))
 
         PrimaryActionButton(
-            text = "저장",
+            text = "요청 보내기",
             onClick = onSave,
-            enabled = selectedReasonLabel.isNotBlank(),
+            enabled = selectedReasonLabel.isNotBlank() && isTimeInputValid,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -2151,6 +2201,10 @@ private fun formatRecordTimeLine(timeText: String): String {
     return stringResource(R.string.workproof_record_time_line, parts[0], parts[1])
 }
 
+private fun String.isValidWorkproofTimeInput(): Boolean {
+    return runCatching { LocalTime.parse(trim()) }.isSuccess
+}
+
 private fun resolveAttachmentName(context: Context, uri: Uri): String {
     val cursor = context.contentResolver.query(
         uri,
@@ -2267,23 +2321,19 @@ private data class WorkproofEditReasonOption(
 
 private val WorkproofEditReasons = listOf(
     WorkproofEditReasonOption(
-        key = "late_tap",
+        key = "LATE_BUTTON_PRESS",
         label = "출근/퇴근 탭을 늦게 눌렀어요"
     ),
     WorkproofEditReasonOption(
-        key = "overtime",
-        label = "연장근무가 있었어요"
+        key = "LATE_CLOCK_IN",
+        label = "출근 시간을 다시 인정받고 싶어요"
     ),
     WorkproofEditReasonOption(
-        key = "break",
-        label = "휴게시간이 달랐어요"
+        key = "EARLY_CLOCK_OUT",
+        label = "퇴근 시간을 다시 인정받고 싶어요"
     ),
     WorkproofEditReasonOption(
-        key = "missing",
-        label = "기록이 누락됐어요"
-    ),
-    WorkproofEditReasonOption(
-        key = "other",
-        label = "기타(직접 입력)"
+        key = "OTHER",
+        label = "기타 사유"
     )
 )

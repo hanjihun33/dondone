@@ -19,6 +19,7 @@ import com.dondone.mobile.domain.model.WageData
 import com.dondone.mobile.domain.model.WorkAudit
 import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.WorkproofData
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 object DemoSeedFactory {
@@ -34,9 +35,9 @@ object DemoSeedFactory {
                 currentLongitude = 128.3418,
                 today = TodayWork(clockIn = null, clockOut = null),
                 records = listOf(
-                    WorkRecord("WP-0327-01", 27, "09:01", "18:03", false, 0),
-                    WorkRecord("WP-0326-01", 26, "09:05", "18:15", false, 0),
-                    WorkRecord("WP-0318-01", 18, "09:10", "18:10", true, 1)
+                    WorkRecord("WP-0327-01", LocalDate.of(2026, 3, 27), 27, "09:01", "18:03", false, 0),
+                    WorkRecord("WP-0326-01", LocalDate.of(2026, 3, 26), 26, "09:05", "18:15", false, 0),
+                    WorkRecord("WP-0318-01", LocalDate.of(2026, 3, 18), 18, "09:10", "18:10", true, 1)
                 ),
                 audit = listOf(
                     WorkAudit(

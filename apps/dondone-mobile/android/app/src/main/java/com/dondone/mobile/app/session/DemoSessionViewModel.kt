@@ -47,6 +47,8 @@ import com.dondone.mobile.data.wage.WageRemoteState
 import com.dondone.mobile.data.wage.WageRepository
 import com.dondone.mobile.data.wage.WageUnauthorizedException
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
+import com.dondone.mobile.data.workproof.WorkproofCorrectionRequestMutation
+import com.dondone.mobile.data.workproof.WorkproofCorrectionStatus
 import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
@@ -76,6 +78,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
@@ -769,15 +772,90 @@ class DemoSessionViewModel(
         }
     }
 
-    fun saveWorkproofEdit(recordId: String, reason: String, memo: String, addAttachment: Boolean) {
-        _uiState.update { state ->
-            DemoSessionReducer.saveWorkproofEdit(
-                state,
-                recordId = recordId,
-                reason = reason,
-                memo = memo,
-                addAttachment = addAttachment
+    fun saveWorkproofEdit(
+        recordId: String,
+        requestedClockInText: String,
+        requestedClockOutText: String,
+        reasonCode: String,
+        memo: String,
+        addAttachment: Boolean
+    ) {
+        if (_workproofActionUiState.value.isSubmitting) {
+            return
+        }
+        val session = _authUiState.value.session ?: run {
+            _workproofActionUiState.value = WorkproofActionUiState(
+                message = "로그인 후 수정 요청을 제출할 수 있어요.",
+                isError = true
             )
+            return
+        }
+        val targetRecord = _uiState.value.workproof.records.firstOrNull { it.id == recordId } ?: run {
+            _workproofActionUiState.value = WorkproofActionUiState(
+                message = "다시 불러온 뒤 수정 요청을 제출해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val workproofId = targetRecord.id.toLongOrNull() ?: run {
+            _workproofActionUiState.value = WorkproofActionUiState(
+                message = "실연동 기록만 수정 요청을 보낼 수 있어요.",
+                isError = true
+            )
+            return
+        }
+        val requestedClockIn = requestedClockInText.toWorkproofLocalTimeOrNull() ?: run {
+            _workproofActionUiState.value = WorkproofActionUiState(
+                message = "출근 요청 시간을 HH:mm 형식으로 입력해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val requestedClockOut = requestedClockOutText.toWorkproofLocalTimeOrNull() ?: run {
+            _workproofActionUiState.value = WorkproofActionUiState(
+                message = "퇴근 요청 시간을 HH:mm 형식으로 입력해 주세요.",
+                isError = true
+            )
+            return
+        }
+        val request = WorkproofCorrectionRequestMutation(
+            workproofId = workproofId,
+            requestedClockInAt = targetRecord.workDate.atTime(requestedClockIn),
+            requestedClockOutAt = targetRecord.workDate.atTime(requestedClockOut),
+            reasonCode = reasonCode,
+            reason = reasonCode.toWorkproofReasonLabel(),
+            memo = memo.ifBlank { null },
+            attachmentCount = if (addAttachment) 1 else 0
+        )
+
+        viewModelScope.launch {
+            _workproofActionUiState.value = WorkproofActionUiState(isSubmitting = true)
+            try {
+                val result = workproofRepository.createCorrectionRequest(session.accessToken, request)
+                if (result.remoteState.mode != WorkproofRemoteMode.CONTENT) {
+                    _workproofRemoteState.value = result.remoteState
+                    _workproofActionUiState.value = WorkproofActionUiState(
+                        message = result.remoteState.errorMessage ?: "수정 요청을 제출하지 못했어요.",
+                        isError = true
+                    )
+                    return@launch
+                }
+                applyWorkproofRemoteState(result.remoteState)
+                _workproofActionUiState.value = WorkproofActionUiState(
+                    message = result.correctionRequest.status.toWorkproofSuccessMessage()
+                )
+            } catch (error: WorkproofUnauthorizedException) {
+                expireSession(error.message)
+                _workproofActionUiState.value = WorkproofActionUiState(
+                    message = error.message,
+                    isError = true
+                )
+            } catch (error: Exception) {
+                _workproofActionUiState.value = WorkproofActionUiState(
+                    message = error.message ?: "수정 요청을 제출하지 못했어요.",
+                    isError = true
+                )
+            }
         }
     }
 
@@ -2227,13 +2305,21 @@ class DemoSessionViewModel(
         val nextRecords = payload.records
             .sortedByDescending { it.workDate }
             .map { record ->
+                val actualClockIn = record.checkInDeviceAt.toLocalTime().toString().take(5)
+                val actualClockOut = record.checkOutDeviceAt?.toLocalTime()?.toString()?.take(5) ?: "-"
                 WorkRecord(
                     id = record.recordId.toString(),
+                    workDate = record.workDate,
                     day = record.workDate.dayOfMonth,
-                    inTime = record.checkInDeviceAt.toLocalTime().toString().take(5),
-                    outTime = record.checkOutDeviceAt?.toLocalTime()?.toString()?.take(5) ?: "-",
-                    modified = record.modified,
-                    attachments = 0
+                    inTime = actualClockIn,
+                    outTime = actualClockOut,
+                    modified = record.modified || record.reflectionStatus != "PENDING",
+                    attachments = 0,
+                    reflectionStatus = record.reflectionStatus,
+                    recognizedInTime = record.recognizedClockInAt?.toLocalTime()?.toString()?.take(5)
+                        ?: actualClockIn,
+                    recognizedOutTime = record.recognizedClockOutAt?.toLocalTime()?.toString()?.take(5)
+                        ?: actualClockOut.takeUnless { it == "-" }
                 )
             }
 
@@ -2362,6 +2448,27 @@ class DemoSessionViewModel(
             _uiState.value.demo.month,
             _uiState.value.demo.asOfDay
         )
+
+    private fun String.toWorkproofReasonLabel(): String {
+        return when (this) {
+            "LATE_BUTTON_PRESS" -> "퇴근 버튼을 늦게 눌렀어요."
+            "LATE_CLOCK_IN" -> "출근 시간을 다시 인정해 주세요."
+            "EARLY_CLOCK_OUT" -> "퇴근 시간을 다시 인정해 주세요."
+            else -> "기타 사유로 수정 요청해요."
+        }
+    }
+}
+
+private fun String.toWorkproofLocalTimeOrNull(): LocalTime? {
+    return runCatching { LocalTime.parse(this.trim()) }.getOrNull()
+}
+
+private fun WorkproofCorrectionStatus.toWorkproofSuccessMessage(): String {
+    return when (this) {
+        WorkproofCorrectionStatus.APPROVED -> "수정 요청이 바로 반영됐어요."
+        WorkproofCorrectionStatus.PENDING -> "수정 요청이 검토 대기열에 등록됐어요."
+        WorkproofCorrectionStatus.REJECTED -> "수정 요청이 반려됐어요."
+    }
 }
 
 private fun List<com.dondone.mobile.domain.model.DocumentItem>.syncWageDocuments(

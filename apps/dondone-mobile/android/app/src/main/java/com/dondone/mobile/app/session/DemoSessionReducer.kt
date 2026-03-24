@@ -8,6 +8,7 @@ import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.WorkAudit
 import com.dondone.mobile.domain.model.WorkRecord
+import java.time.LocalDate
 
 private const val CLOCK_IN_TIME = "09:02"
 private const val CLOCK_OUT_TIME = "18:03"
@@ -400,6 +401,7 @@ object DemoSessionReducer {
     ): WorkRecord {
         return WorkRecord(
             id = "WP-${state.demo.month.toString().padStart(2, '0')}${day.toString().padStart(2, '0')}-TODAY",
+            workDate = LocalDate.of(state.demo.year, state.demo.month, day),
             day = day,
             inTime = clockIn,
             outTime = clockOut,
