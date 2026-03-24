@@ -2,7 +2,9 @@ package com.workproofpay.backend.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.model.AdvancePayoutStatus;
+import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.auth.api.dto.request.LoginRequest;
 import com.workproofpay.backend.auth.model.User;
@@ -94,6 +96,9 @@ class AdminAdvanceRequestIntegrationTest {
     private AdvancePayoutRepository advancePayoutRepository;
 
     @Autowired
+    private AdvanceRequestRepository advanceRequestRepository;
+
+    @Autowired
     private UserWalletRepository userWalletRepository;
 
     @Autowired
@@ -101,14 +106,15 @@ class AdminAdvanceRequestIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        advancePayoutRepository.deleteAll();
+        advanceRequestRepository.deleteAll();
+        jobRepository.deleteAll();
+        userWalletRepository.deleteAll();
         workProofAuditLogRepository.deleteAll();
         workProofRepository.deleteAll();
         workContractRepository.deleteAll();
         workplaceRepository.deleteAll();
         companyRepository.deleteAll();
-        advancePayoutRepository.deleteAll();
-        jobRepository.deleteAll();
-        userWalletRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -256,6 +262,68 @@ class AdminAdvanceRequestIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void adminResponseSeparatesSubmittedApprovedPayingPaidAndPayoutFailedStates() throws Exception {
+        User admin = userRepository.save(User.registerAdmin(
+                "admin-status@dondone.local",
+                passwordEncoder.encode("qweqwe123"),
+                "Service Admin"
+        ));
+        User worker = userRepository.save(User.register(
+                "worker.status@test.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Status"
+        ));
+        Workplace submittedWorkplace = seedAdvanceEligibleScenario(worker, "Gamma Logistics A", "DN-GAMMA-3003");
+        Workplace approvedWorkplace = seedAdvanceEligibleScenario(worker, "Gamma Logistics B", "DN-GAMMA-3004");
+        Workplace payingWorkplace = seedAdvanceEligibleScenario(worker, "Gamma Logistics C", "DN-GAMMA-3005");
+        Workplace paidWorkplace = seedAdvanceEligibleScenario(worker, "Gamma Logistics D", "DN-GAMMA-3006");
+        Workplace failedWorkplace = seedAdvanceEligibleScenario(worker, "Gamma Logistics E", "DN-GAMMA-3007");
+
+        String adminToken = loginAndReadAccessToken(new LoginRequest("admin-status@dondone.local", "qweqwe123"));
+        String workerToken = loginAndReadAccessToken(new LoginRequest("worker.status@test.com", "qweqwe123"));
+
+        long submittedRequestId = createAdvanceRequest(workerToken, submittedWorkplace.getId(), 40_000_000L, "2030-01-10T09:00:00", "advance-admin-status-submitted");
+        long approvedRequestId = createAdvanceRequest(workerToken, approvedWorkplace.getId(), 41_000_000L, "2030-01-10T10:00:00", "advance-admin-status-approved");
+        long payingRequestId = createAdvanceRequest(workerToken, payingWorkplace.getId(), 42_000_000L, "2030-01-10T11:00:00", "advance-admin-status-paying");
+        long paidRequestId = createAdvanceRequest(workerToken, paidWorkplace.getId(), 43_000_000L, "2030-01-10T12:00:00", "advance-admin-status-paid");
+        long failedRequestId = createAdvanceRequest(workerToken, failedWorkplace.getId(), 44_000_000L, "2030-01-10T13:00:00", "advance-admin-status-failed");
+
+        approveRequest(approvedRequestId);
+        approveRequest(payingRequestId);
+        approveRequest(paidRequestId);
+        approveRequest(failedRequestId);
+
+        attachPayout(payingRequestId, AdvancePayoutStatus.REQUESTED);
+        attachPayout(paidRequestId, AdvancePayoutStatus.CONFIRMED);
+        attachPayout(failedRequestId, AdvancePayoutStatus.TIMED_OUT);
+
+        mockMvc.perform(get("/api/admin/advance/requests")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requests.length()").value(5))
+                .andExpect(jsonPath("$.data.requests[0].requestId").value(failedRequestId))
+                .andExpect(jsonPath("$.data.requests[0].status").value("PAYOUT_FAILED"))
+                .andExpect(jsonPath("$.data.requests[0].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[0].payoutStatus").value("TIMED_OUT"))
+                .andExpect(jsonPath("$.data.requests[1].requestId").value(paidRequestId))
+                .andExpect(jsonPath("$.data.requests[1].status").value("PAID"))
+                .andExpect(jsonPath("$.data.requests[1].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[1].payoutStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.requests[2].requestId").value(payingRequestId))
+                .andExpect(jsonPath("$.data.requests[2].status").value("PAYING"))
+                .andExpect(jsonPath("$.data.requests[2].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[2].payoutStatus").value("REQUESTED"))
+                .andExpect(jsonPath("$.data.requests[3].requestId").value(approvedRequestId))
+                .andExpect(jsonPath("$.data.requests[3].status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[3].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[3].payoutStatus").value(nullValue()))
+                .andExpect(jsonPath("$.data.requests[4].requestId").value(submittedRequestId))
+                .andExpect(jsonPath("$.data.requests[4].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[4].requestStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[4].payoutStatus").value(nullValue()));
+    }
+
     private Workplace seedAdvanceEligibleScenario(User worker, String companyName, String companyCode) {
         Company company = companyRepository.save(Company.create(companyName, companyCode));
         Workplace workplace = workplaceRepository.save(Workplace.create(
@@ -348,5 +416,44 @@ class AdminAdvanceRequestIntegrationTest {
 
     private YearMonth nextMonth() {
         return YearMonth.now().plusMonths(1);
+    }
+
+    private void approveRequest(long requestId) {
+        AdvanceRequest request = advanceRequestRepository.findById(requestId).orElseThrow();
+        request.approve(999L);
+        advanceRequestRepository.save(request);
+    }
+
+    private void attachPayout(long requestId, AdvancePayoutStatus targetStatus) {
+        AdvanceRequest request = advanceRequestRepository.findById(requestId).orElseThrow();
+        var payout = advancePayoutRepository.findByAdvanceRequestId(requestId).orElseGet(() -> advancePayoutRepository.save(
+                com.workproofpay.backend.advance.model.AdvancePayout.request(
+                        java.util.UUID.randomUUID().toString().replace("-", ""),
+                        requestId,
+                        request.getUser().getId(),
+                        "0x" + "%040x".formatted(requestId),
+                        request.getApprovedAmountAtomic(),
+                        request.getAssetSymbol(),
+                        "advance-admin-payout-" + requestId
+                )
+        ));
+
+        switch (targetStatus) {
+            case REQUESTED -> {
+            }
+            case CONFIRMED -> {
+                payout.markSigned("0x" + "%064x".formatted(requestId), "signed-" + requestId);
+                payout.markBroadcasted();
+                payout.markConfirmed();
+            }
+            case TIMED_OUT -> {
+                payout.markSigned("0x" + "%064x".formatted(requestId), "signed-" + requestId);
+                payout.markBroadcasted();
+                payout.markTimedOut("receipt timeout");
+            }
+            default -> throw new IllegalArgumentException("Unsupported payout status for admin response test: " + targetStatus);
+        }
+
+        advancePayoutRepository.save(payout);
     }
 }
