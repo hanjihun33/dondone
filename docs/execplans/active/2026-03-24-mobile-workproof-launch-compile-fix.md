@@ -40,14 +40,14 @@
 - launch request는 로컬 상태 전달 이벤트로만 사용
 
 ## Maintainability Notes
-- launch request 타입 선언 위치를 기존 세션 상태 선언 파일과 일관되게 맞춰 타입 발견 실패 위험을 낮춘다.
-- 이벤트 타입을 단일 선언 지점으로 유지해 탐색성과 추적성을 높인다.
+- launch request 타입은 도메인별 파일(`WorkproofLaunchRequest.kt`, `RemittanceCompletionNoticeUiState.kt`)로 분리해 파일명 기반 탐색성을 유지한다.
+- 참조 지점(`DemoSessionViewModel`, `DonDoneNavGraph`, `WorkproofScreen`)의 import/타입 해석만 정합화해 컴파일 안정성을 확보한다.
 
 ## Implementation Steps
-1. 기존 세션 상태 선언 파일에 `WorkproofLaunchTarget`, `WorkproofLaunchRequest`를 추가한다.
-2. 중복/충돌을 막기 위해 단독 선언 파일(`WorkproofLaunchRequest.kt`)은 제거한다.
-3. `DemoSessionViewModel`, `DonDoneNavGraph`, `WorkproofScreen` 참조가 추가 import 없이 일관되게 해석되는지 확인한다.
-4. deprecated warning(`LocalClipboardManager`)은 본 범위 밖으로 두고 컴파일 오류만 해결한다.
+1. `WorkproofLaunchTarget`, `WorkproofLaunchRequest`를 `WorkproofLaunchRequest.kt`에 유지/복원하고 세션 참조부 타입 해석 오류를 제거한다.
+2. `DemoSessionViewModel`, `DonDoneNavGraph`, `WorkproofScreen`의 launch request 소비 흐름이 동일하게 유지되는지 확인한다.
+3. `AccountManageScreen`, `TransferScreen`의 deprecated clipboard API(`LocalClipboardManager`, Compose `ClipboardManager`)를 Android `ClipboardManager` 기반으로 치환한다.
+4. 컴파일 에러 해소와 deprecation warning 제거를 함께 검증한다.
 
 ## Test Plan
 - 가능 시 `:app:compileDebugKotlin` 또는 `:app:assembleDebug` 재실행
@@ -63,11 +63,11 @@
 - 이유: 동일 launch 타입을 세션/네비게이션/화면이 공통으로 참조하므로 병렬 분할 시 충돌 위험이 높고, 작업 크기가 작아 단일 레인 처리 효율이 높다.
 
 ## Commit Plan
-- 1개 커밋: `fix: 모바일 workproof launch 타입 해석 오류 복구`
+- 2개 fix + 1개 docs 커밋으로 분리
 
 ## Open Questions
 - 없음
 
 ## Assumptions
 - 사용자 목표는 모바일 빌드 복구이며 기능 확장/UX 변경은 요구하지 않는다.
-- 컴파일 경고(`LocalClipboardManager` deprecation)는 현재 실패 원인이 아니므로 후속 분리 대응한다.
+- 컴파일 경고(`LocalClipboardManager` deprecation) 제거까지 같은 작업 묶음에서 처리해도 계약/보안 영향이 없다.
