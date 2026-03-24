@@ -3,6 +3,10 @@ package com.dondone.mobile.feature.finance.presentation
 import com.dondone.mobile.app.session.VaultActionUiState
 import com.dondone.mobile.app.session.VaultMessagePresentation
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.remittance.RemittanceRemotePayload
+import com.dondone.mobile.data.remittance.RemittanceRemoteState
+import com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload
+import com.dondone.mobile.data.remittance.RemittanceWalletPayload
 import com.dondone.mobile.data.vault.VaultActionType
 import com.dondone.mobile.data.vault.VaultInterestPreviewPayload
 import com.dondone.mobile.data.vault.VaultRemotePayload
@@ -50,6 +54,21 @@ class FinanceHomeUiModelTest {
 
         assertEquals("0.3124 dUSDC", uiModel.vault.detail.monthlyInterestText)
         assertEquals("0.0104 dUSDC", uiModel.vault.detail.dailyInterestText)
+    }
+
+    @Test
+    fun `finance wallet balance prefers remittance balance so it matches home`() {
+        val uiModel = DemoSeedFactory.create().toFinanceHomeUiModel(
+            remittanceRemoteState = remoteRemittanceState(tokenBalanceAtomic = "128500000"),
+            vaultRemoteState = remoteVaultState(
+                storedAmountAtomic = "100000000",
+                availableToStoreAmountAtomic = "400000000",
+                monthlyEstimatedYieldAtomic = "416666",
+                dailyEstimatedYieldAtomic = "13888"
+            )
+        )
+
+        assertEquals("128.5 dUSDC", uiModel.vault.detail.walletBalanceText)
     }
 
     @Test
@@ -185,6 +204,7 @@ class FinanceHomeUiModelTest {
 
         assertEquals(true, uiModel.vault.detail.statusIsTerminal)
         assertEquals("예치 완료", uiModel.vault.latestStatusText)
+        assertEquals(true, uiModel.vault.shouldDismissDetailSheet)
     }
 
     @Test
@@ -235,6 +255,30 @@ class FinanceHomeUiModelTest {
                     disclaimer = disclaimer
                 ),
                 latestTransaction = latestTransaction
+            )
+        )
+    }
+
+    private fun remoteRemittanceState(tokenBalanceAtomic: String): RemittanceRemoteState {
+        return RemittanceRemoteState.content(
+            RemittanceRemotePayload(
+                wallet = RemittanceWalletPayload(
+                    walletAddress = "0x1111111111111111111111111111111111111111",
+                    fundingStatus = "FUNDED",
+                    fundingFailureReason = null,
+                    fundedAt = LocalDateTime.parse("2026-03-19T09:00:00"),
+                    createdAt = LocalDateTime.parse("2026-03-19T08:59:00")
+                ),
+                balance = RemittanceWalletBalancePayload(
+                    walletAddress = "0x1111111111111111111111111111111111111111",
+                    assetSymbol = "dUSDC",
+                    assetDecimals = 6,
+                    tokenBalanceAtomic = tokenBalanceAtomic,
+                    nativeBalanceWei = "10000000000000000"
+                ),
+                recipients = emptyList(),
+                transfers = emptyList(),
+                activeTransfer = null
             )
         )
     }

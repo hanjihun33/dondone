@@ -9,7 +9,7 @@ import org.junit.Test
 
 class DonDoneAppStateTest {
     @Test
-    fun `home route uses collapsed root top bar when no chrome copy exists`() {
+    fun `home route keeps root top bar so wordmark remains visible`() {
         val state = resolveAppTopBarState(
             currentRoute = Route.HOME,
             showRootTabs = true,
@@ -18,7 +18,7 @@ class DonDoneAppStateTest {
             headerDateText = null
         )
 
-        assertEquals(AppTopBarLayout.COLLAPSED_ROOT, state.layout)
+        assertEquals(AppTopBarLayout.ROOT, state.layout)
         assertTrue(state.showWordmark)
         assertNull(state.headerTitle)
         assertNull(state.headerDateText)

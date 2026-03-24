@@ -1727,7 +1727,8 @@ function applyInterestVault() {
 
     renderSend();
     renderInterestOverlay();
-    showToast(tr('toast_interest_applied', '예치 신청이 완료되었습니다.'));
+    closeOverlay('overlay-interest');
+    showToast(tr('toast_interest_applied', '예치 요청을 접수했어요.'));
 }
 
 function requestAdvance() {

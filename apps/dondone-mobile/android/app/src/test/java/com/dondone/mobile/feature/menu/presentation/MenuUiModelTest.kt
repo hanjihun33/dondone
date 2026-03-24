@@ -1,5 +1,6 @@
 package com.dondone.mobile.feature.menu.presentation
 
+import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.domain.model.TransferDestinationMode
@@ -84,6 +85,32 @@ class MenuUiModelTest {
         val receipt = requireNotNull(uiModel.receipt)
 
         assertTrue(receipt.shareText.contains("금액: ${'$'}360 USDC"))
+    }
+
+    @Test
+    fun `session maps company and workplace names for profile sheet`() {
+        val session = AuthSession(
+            accessToken = "token",
+            tokenType = "Bearer",
+            expiresAtEpochMillis = Long.MAX_VALUE,
+            userId = 1L,
+            email = "menu@test.com",
+            name = "메뉴 사용자",
+            phoneNumber = "01012345678",
+            companyCode = "C-001",
+            companyName = "돈던건설",
+            workplaceName = "광주 상단지점"
+        )
+        val uiModel = DemoSeedFactory.create().toMenuUiModel(
+            session = session,
+            remittanceRemoteState = defaultRemoteState(),
+            workproofPdfCreateUiState = WorkproofPdfCreateUiState()
+        )
+
+        val menuSession = requireNotNull(uiModel.session)
+        assertEquals("돈던건설", menuSession.companyName)
+        assertEquals("광주 상단지점", menuSession.workplaceName)
+        assertEquals("010-1234-5678", menuSession.phoneNumber)
     }
 }
 

@@ -16,6 +16,10 @@ import java.time.YearMonth
 
 private const val SESSION_EXPIRED_MESSAGE = "세션이 만료되어 다시 로그인해 주세요."
 private const val WAGE_LOGIN_MESSAGE = "로그인 후 급여 점검 데이터를 불러옵니다."
+private const val ACTIVE_CONTRACT_NOT_FOUND_CODE = "ACTIVE_CONTRACT_NOT_FOUND"
+private const val ACTIVE_CONTRACT_NOT_FOUND_BACKEND_MESSAGE = "Active contract not found"
+private const val ACTIVE_CONTRACT_NOT_FOUND_USER_MESSAGE =
+    "활성 근로계약이 확인되지 않았어요. 소속 관리자에게 근로계약 등록을 요청해 주세요."
 private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 class BackendWageRepository(
@@ -274,12 +278,46 @@ class BackendWageRepository(
         responseBody: String,
         fallbackMessage: String
     ): Exception {
-        val message = parseBackendErrorMessage(responseBody, fallbackMessage)
+        val message = resolveWageErrorMessage(responseBody, fallbackMessage)
         return if (statusCode == 401 || statusCode == 403) {
             WageUnauthorizedException(message)
         } else {
             BackendApiException(message)
         }
+    }
+
+    private fun resolveWageErrorMessage(
+        responseBody: String,
+        fallbackMessage: String
+    ): String {
+        val rawBody = responseBody.trim()
+        if (
+            rawBody.contains(ACTIVE_CONTRACT_NOT_FOUND_CODE, ignoreCase = true) ||
+            rawBody.contains(ACTIVE_CONTRACT_NOT_FOUND_BACKEND_MESSAGE, ignoreCase = true)
+        ) {
+            return ACTIVE_CONTRACT_NOT_FOUND_USER_MESSAGE
+        }
+
+        val json = runCatching { JSONObject(responseBody.ifBlank { "{}" }) }.getOrNull()
+        val backendCode = json?.optString("code").orEmpty()
+        val backendMessage = json?.optString("message").orEmpty()
+
+        if (
+            backendCode == ACTIVE_CONTRACT_NOT_FOUND_CODE ||
+            backendMessage.equals(ACTIVE_CONTRACT_NOT_FOUND_BACKEND_MESSAGE, ignoreCase = true)
+        ) {
+            return ACTIVE_CONTRACT_NOT_FOUND_USER_MESSAGE
+        }
+
+        val parsedMessage = parseBackendErrorMessage(responseBody, fallbackMessage)
+        if (
+            parsedMessage.contains(ACTIVE_CONTRACT_NOT_FOUND_CODE, ignoreCase = true) ||
+            parsedMessage.contains(ACTIVE_CONTRACT_NOT_FOUND_BACKEND_MESSAGE, ignoreCase = true)
+        ) {
+            return ACTIVE_CONTRACT_NOT_FOUND_USER_MESSAGE
+        }
+
+        return parsedMessage
     }
 
     private fun requireAuthorized(accessToken: String) {

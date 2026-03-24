@@ -4,9 +4,12 @@ import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.app.session.AdvanceRequestUiState
 import com.dondone.mobile.app.session.AdvanceRequestDetailUiState
+import com.dondone.mobile.app.session.VaultMessagePresentation
 import com.dondone.mobile.app.session.VaultActionUiState
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
 import com.dondone.mobile.data.advance.AdvanceRemoteState
+import com.dondone.mobile.data.remittance.RemittanceRemoteMode
+import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.vault.VaultActionType
 import com.dondone.mobile.data.vault.VaultRemoteMode
 import com.dondone.mobile.data.vault.VaultRemoteState
@@ -188,6 +191,7 @@ data class FinanceVaultUiModel(
     val helperText: String,
     val latestStatusText: String?,
     val latestStatusIsError: Boolean,
+    val shouldDismissDetailSheet: Boolean,
     val actionText: String,
     val detail: FinanceVaultDetailUiModel
 )
@@ -203,6 +207,7 @@ data class FinanceHomeUiModel(
 fun DemoState.toFinanceHomeUiModel(
     remoteState: AdvanceRemoteState? = null,
     wageRemoteState: WageRemoteState? = null,
+    remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
     vaultRemoteState: VaultRemoteState? = null,
     selectedAdvanceAmount: Int? = null,
     selectedVaultAmount: Int? = null,
@@ -417,6 +422,11 @@ fun DemoState.toFinanceHomeUiModel(
     }
     val remoteVaultSummary = vaultRemoteState?.payload?.summary
     val remoteLatestVaultTransaction = vaultRemoteState?.payload?.latestTransaction
+    val remoteWalletBalance = if (remittanceRemoteState.mode == RemittanceRemoteMode.CONTENT) {
+        remittanceRemoteState.payload?.balance
+    } else {
+        null
+    }
     val vaultStatusMessage = remoteLatestVaultTransaction?.toVaultStatusMessage()
         ?: when (vaultRemoteState?.mode) {
             VaultRemoteMode.LOADING -> FinanceVaultStatusMessage(
@@ -725,6 +735,9 @@ fun DemoState.toFinanceHomeUiModel(
             },
             latestStatusText = vaultStatusMessage?.title,
             latestStatusIsError = vaultStatusMessage?.isError == true,
+            shouldDismissDetailSheet =
+                vaultActionUiState.message != null &&
+                    vaultActionUiState.messagePresentation == VaultMessagePresentation.TOAST_ONLY,
             actionText = if (usesRemoteVault) "관리" else if (vault.enabled && vault.userDeposit > 0) "보관 보기" else "신청",
             detail = FinanceVaultDetailUiModel(
                 subtitleText = if (usesRemoteVault) {
@@ -737,7 +750,13 @@ fun DemoState.toFinanceHomeUiModel(
                 selectedActionType = effectiveVaultActionType,
                 depositEnabled = if (usesRemoteVault) remoteAvailableDepositUnits > 0 else true,
                 withdrawEnabled = if (usesRemoteVault) remoteAvailableWithdrawUnits > 0 else vault.enabled && vault.userDeposit > 0,
-                walletBalanceText = if (usesRemoteVault) {
+                walletBalanceText = if (remoteWalletBalance != null) {
+                    formatTokenAmount(
+                        atomic = remoteWalletBalance.tokenBalanceAtomic,
+                        decimals = remoteWalletBalance.assetDecimals,
+                        symbol = remoteWalletBalance.assetSymbol
+                    )
+                } else if (usesRemoteVault) {
                     formatTokenAmount(
                         atomic = remoteVaultSummary!!.walletTokenBalanceAtomic,
                         decimals = remoteVaultDecimals,

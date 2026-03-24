@@ -19,6 +19,12 @@ enum class WageSurfaceState {
     CONTENT
 }
 
+enum class WageSurfaceActionType {
+    REFRESH,
+    OPEN_MENU,
+    OPEN_MENU_AND_REGISTRATION_CODE
+}
+
 enum class WageMetricIcon {
     BASE,
     OVERTIME,
@@ -59,6 +65,7 @@ data class WageUiModel(
     val surfaceState: WageSurfaceState,
     val surfaceMessage: String?,
     val surfaceActionText: String?,
+    val surfaceActionType: WageSurfaceActionType?,
     val descriptionText: String,
     val deposit: WageDepositUiModel,
     val overviewItems: List<WageMetricItemUiModel>,
@@ -118,20 +125,35 @@ fun DemoState.toWageUiModel(
         nightHours = nightHours,
         modifiedCount = modifiedCount
     )
+    val surfaceMessage = when (surfaceState) {
+        WageSurfaceState.LOADING -> "급여 데이터를 불러오는 중입니다."
+        WageSurfaceState.UNAUTHENTICATED -> remoteState?.errorMessage ?: "로그인 후 급여 점검을 확인할 수 있습니다."
+        WageSurfaceState.ERROR -> remoteState?.errorMessage ?: "급여 데이터를 다시 불러오지 못했습니다."
+        WageSurfaceState.EMPTY -> remoteState?.errorMessage ?: "표시할 급여 데이터가 없습니다."
+        WageSurfaceState.CONTENT -> null
+    }
 
     return WageUiModel(
         surfaceState = surfaceState,
-        surfaceMessage = when (surfaceState) {
-            WageSurfaceState.LOADING -> "급여 데이터를 불러오는 중입니다."
-            WageSurfaceState.UNAUTHENTICATED -> remoteState?.errorMessage ?: "로그인 후 급여 점검을 확인할 수 있습니다."
-            WageSurfaceState.ERROR -> remoteState?.errorMessage ?: "급여 데이터를 다시 불러오지 못했습니다."
-            WageSurfaceState.EMPTY -> remoteState?.errorMessage ?: "표시할 급여 데이터가 없습니다."
-            WageSurfaceState.CONTENT -> null
-        },
+        surfaceMessage = surfaceMessage,
         surfaceActionText = when (surfaceState) {
             WageSurfaceState.ERROR,
-            WageSurfaceState.EMPTY -> "다시 시도"
+            WageSurfaceState.EMPTY -> {
+                if (surfaceMessage.isActiveContractMissingMessage()) "근로계약 확인하기" else "다시 시도"
+            }
             WageSurfaceState.UNAUTHENTICATED -> "로그인 필요"
+            else -> null
+        },
+        surfaceActionType = when (surfaceState) {
+            WageSurfaceState.ERROR,
+            WageSurfaceState.EMPTY -> {
+                if (surfaceMessage.isActiveContractMissingMessage()) {
+                    WageSurfaceActionType.OPEN_MENU_AND_REGISTRATION_CODE
+                } else {
+                    WageSurfaceActionType.REFRESH
+                }
+            }
+            WageSurfaceState.UNAUTHENTICATED -> WageSurfaceActionType.REFRESH
             else -> null
         },
         descriptionText = "실제 입금액을 입력하면 예상 급여와 비교해 차액을 확인할 수 있어요.",
@@ -199,6 +221,11 @@ fun DemoState.toWageUiModel(
             evidenceLines = evidenceLines
         )
     )
+}
+
+private fun String?.isActiveContractMissingMessage(): Boolean {
+    val message = this ?: return false
+    return message.contains("활성 근로계약")
 }
 
 private fun buildEvidenceLines(

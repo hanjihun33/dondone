@@ -20,7 +20,7 @@ class ScreenChromeTest {
 
         assertNull(chrome.headerTitle)
         assertTrue(chrome.showRootTabs)
-        assertTrue(chrome.showSettingsAction)
+        assertFalse(chrome.showSettingsAction)
         assertFalse(chrome.showDate)
     }
 

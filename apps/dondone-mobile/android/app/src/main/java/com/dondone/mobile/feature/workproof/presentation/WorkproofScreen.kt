@@ -1367,42 +1367,11 @@ private fun WorkproofRecentLogsCard(
     onEditRecord: (WorkproofRecordUiModel) -> Unit,
     onOpenPdfCreation: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-
     WorkproofSurfaceCard {
         WorkproofSectionHeader(
             title = "최근 기록",
             trailing = {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(WorkproofRowAccentBackground)
-                        .border(1.dp, WorkproofPdfPresetSelectedBorder, RoundedCornerShape(999.dp))
-                        .pressableScale(
-                            interactionSource = interactionSource,
-                            pressedScale = 0.98f
-                        )
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = rememberDonDoneGrayRipple(),
-                            onClick = onOpenPdfCreation
-                        )
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "문서 생성",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = WorkproofRowAccentTint
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = WorkproofRowAccentTint,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                WorkproofDocumentCreateHeaderAction(onClick = onOpenPdfCreation)
             }
         )
 
@@ -1415,6 +1384,58 @@ private fun WorkproofRecentLogsCard(
                 HorizontalDivider(color = WorkproofDivider)
             }
         }
+    }
+}
+
+@Composable
+private fun WorkproofDocumentCreateHeaderAction(
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(DawnSurfaceAlt)
+            .border(1.dp, DawnBorder, RoundedCornerShape(14.dp))
+            .pressableScale(
+                interactionSource = interactionSource,
+                pressedScale = 0.985f
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(),
+                onClick = onClick
+            )
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Description,
+                contentDescription = null,
+                tint = DawnPrimaryDeep,
+                modifier = Modifier.size(12.dp)
+            )
+        }
+        Text(
+            text = "문서 생성",
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = DawnText
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = DawnTextSubtle,
+            modifier = Modifier.size(14.dp)
+        )
     }
 }
 

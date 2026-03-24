@@ -84,7 +84,9 @@ data class MenuUiModel(
 data class MenuSessionUiModel(
     val name: String,
     val email: String,
-    val phoneNumber: String?
+    val phoneNumber: String?,
+    val companyName: String?,
+    val workplaceName: String?
 )
 
 fun DemoState.toMenuUiModel(
@@ -109,7 +111,9 @@ fun DemoState.toMenuUiModel(
             MenuSessionUiModel(
                 name = it.name,
                 email = it.email,
-                phoneNumber = it.phoneNumber?.toDisplayPhoneNumber()
+                phoneNumber = it.phoneNumber?.toDisplayPhoneNumber(),
+                companyName = it.companyName,
+                workplaceName = it.workplaceName
             )
         },
         documents = mergedDocuments,
