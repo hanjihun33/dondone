@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { ApiError } from "../../shared/api/client";
 import {
+  type AttendanceOvertimeRoundingUnit,
   getEmployerWorkplaceSettings,
   updateEmployerWorkplaceSettings
 } from "../../shared/api/employer";
@@ -16,10 +17,20 @@ type SettingsFormState = {
   detailAddress: string;
   center: { lat: number; lng: number };
   radiusMeters: number;
+  scheduledClockInTime: string;
+  scheduledClockOutTime: string;
+  overtimeRoundingUnit: AttendanceOvertimeRoundingUnit;
 };
 
 const DEFAULT_CENTER = { lat: 37.501274, lng: 127.039585 };
+const DEFAULT_CLOCK_IN_TIME = "09:00";
+const DEFAULT_CLOCK_OUT_TIME = "18:00";
 const radiusOptions = [100, 200, 300, 500, 1000];
+const roundingUnitOptions: Array<{ value: AttendanceOvertimeRoundingUnit; label: string }> = [
+  { value: "FIFTEEN_MINUTES", label: "15분 단위" },
+  { value: "THIRTY_MINUTES", label: "30분 단위" },
+  { value: "ONE_HOUR", label: "1시간 단위" }
+];
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -28,7 +39,10 @@ export function SettingsPage() {
     address: "",
     detailAddress: "",
     center: DEFAULT_CENTER,
-    radiusMeters: 300
+    radiusMeters: 300,
+    scheduledClockInTime: DEFAULT_CLOCK_IN_TIME,
+    scheduledClockOutTime: DEFAULT_CLOCK_OUT_TIME,
+    overtimeRoundingUnit: "FIFTEEN_MINUTES"
   });
   const [initialState, setInitialState] = useState<SettingsFormState | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -65,7 +79,10 @@ export function SettingsPage() {
             lat: response.latitude,
             lng: response.longitude
           },
-          radiusMeters: response.allowedRadiusMeters
+          radiusMeters: response.allowedRadiusMeters,
+          scheduledClockInTime: response.scheduledClockInTime ?? DEFAULT_CLOCK_IN_TIME,
+          scheduledClockOutTime: response.scheduledClockOutTime ?? DEFAULT_CLOCK_OUT_TIME,
+          overtimeRoundingUnit: response.overtimeRoundingUnit ?? "FIFTEEN_MINUTES"
         };
 
         setFormState(nextState);
@@ -151,7 +168,10 @@ export function SettingsPage() {
         detailAddress: formState.detailAddress.trim(),
         latitude: formState.center.lat,
         longitude: formState.center.lng,
-        allowedRadiusMeters: formState.radiusMeters
+        allowedRadiusMeters: formState.radiusMeters,
+        scheduledClockInTime: formState.scheduledClockInTime,
+        scheduledClockOutTime: formState.scheduledClockOutTime,
+        overtimeRoundingUnit: formState.overtimeRoundingUnit
       });
 
       const nextState: SettingsFormState = {
@@ -161,7 +181,10 @@ export function SettingsPage() {
           lat: response.latitude,
           lng: response.longitude
         },
-        radiusMeters: response.allowedRadiusMeters
+        radiusMeters: response.allowedRadiusMeters,
+        scheduledClockInTime: response.scheduledClockInTime ?? DEFAULT_CLOCK_IN_TIME,
+        scheduledClockOutTime: response.scheduledClockOutTime ?? DEFAULT_CLOCK_OUT_TIME,
+        overtimeRoundingUnit: response.overtimeRoundingUnit ?? "FIFTEEN_MINUTES"
       };
 
       setInitialState(nextState);
@@ -194,9 +217,9 @@ export function SettingsPage() {
     <div className="console-page location-settings-page">
       <header className="location-settings-header">
         <div>
-          <h2 className="location-settings-title">근무 위치 설정</h2>
+          <h2 className="location-settings-title">근무 위치 및 출퇴근 정책</h2>
           <p className="location-settings-subtitle">
-            기준 위치와 반경을 설정해 출근 위치 판정에 사용합니다.
+            기준 위치, 반경, 기준 출퇴근 시간을 함께 설정합니다.
           </p>
           {loadMessage ? <p className="location-settings-subtitle">{loadMessage}</p> : null}
         </div>
@@ -338,6 +361,69 @@ export function SettingsPage() {
               }}
             />
             <small>출근 위치를 설명하는 메모입니다.</small>
+          </label>
+
+          <label className="location-field">
+            <span>
+              기준 출근 시간
+              <em aria-hidden="true">*</em>
+            </span>
+            <input
+              type="time"
+              value={formState.scheduledClockInTime}
+              onChange={(event) => {
+                setFormState((prev) => ({
+                  ...prev,
+                  scheduledClockInTime: event.currentTarget.value
+                }));
+                setSaveState("idle");
+              }}
+            />
+            <small>근로자 출근 인정 시각 기준입니다.</small>
+          </label>
+
+          <label className="location-field">
+            <span>
+              기준 퇴근 시간
+              <em aria-hidden="true">*</em>
+            </span>
+            <input
+              type="time"
+              value={formState.scheduledClockOutTime}
+              onChange={(event) => {
+                setFormState((prev) => ({
+                  ...prev,
+                  scheduledClockOutTime: event.currentTarget.value
+                }));
+                setSaveState("idle");
+              }}
+            />
+            <small>자동 보정과 검토 요청 기준이 되는 퇴근 시각입니다.</small>
+          </label>
+
+          <label className="location-field">
+            <span>
+              연장근무 반올림 단위
+              <em aria-hidden="true">*</em>
+            </span>
+            <select
+              value={formState.overtimeRoundingUnit}
+              onChange={(event) => {
+                setFormState((prev) => ({
+                  ...prev,
+                  overtimeRoundingUnit: event.currentTarget
+                    .value as AttendanceOvertimeRoundingUnit
+                }));
+                setSaveState("idle");
+              }}
+            >
+              {roundingUnitOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <small>연장근무 시간을 집계할 때 사용할 반올림 단위입니다.</small>
           </label>
         </div>
       </section>
