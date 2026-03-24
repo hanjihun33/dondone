@@ -8,6 +8,7 @@ mockup-*.png
 .gradle-sandbox/
 .gradle-backend/
 .gradle-cache/
+.gradle-test/
 *.lck
 *.part
 # backend IDE/build output
