@@ -225,6 +225,19 @@ BEGIN
     END IF;
 END $$;
 
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'advance_requests'
+          AND column_name = 'approved_amount'
+    ) THEN
+        ALTER TABLE advance_requests
+            ALTER COLUMN approved_amount DROP NOT NULL;
+    END IF;
+END $$;
+
 UPDATE advance_requests
 SET fee_amount_atomic = COALESCE(fee_amount_atomic, 0),
     fee_reference_krw = COALESCE(fee_reference_krw, 0),
