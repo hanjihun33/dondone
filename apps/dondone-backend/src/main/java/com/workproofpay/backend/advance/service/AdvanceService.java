@@ -3,6 +3,7 @@ package com.workproofpay.backend.advance.service;
 import com.workproofpay.backend.advance.api.dto.request.CreateAdvanceRequest;
 import com.workproofpay.backend.advance.api.dto.response.*;
 import com.workproofpay.backend.advance.model.AdvancePayout;
+import com.workproofpay.backend.advance.model.AdvancePayoutStatus;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.model.AdvanceRequestStatus;
 import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
@@ -130,11 +131,12 @@ public class AdvanceService {
         var policy = advancePolicyResolver.resolve();
         YearMonth targetMonth = resolveTargetMonth(userId, workplaceId, policy);
         WorkProofMonthlySummaryContractResponse summary = toMonthlySummary(userId, workplaceId, targetMonth);
-        boolean hasOpenAdvanceRequest = advanceRequestRepository.existsByUserIdAndWorkplaceIdAndYearMonthAndStatusIn(
-                userId,
-                workplaceId,
-                targetMonth.toString(),
-                List.of(AdvanceRequestStatus.SUBMITTED, AdvanceRequestStatus.APPROVED)
+        AdvanceCycleUsage cycleUsage = summarizeCycleUsage(
+                advanceRequestRepository.findByUserIdAndWorkplaceIdAndYearMonthOrderByRequestedAtDescCreatedAtDesc(
+                        userId,
+                        workplaceId,
+                        targetMonth.toString()
+                )
         );
 
         AdvanceEligibilityResponse response = advancePolicyEngine.evaluate(
@@ -142,7 +144,9 @@ public class AdvanceService {
                 workplaceId,
                 contract,
                 summary,
-                hasOpenAdvanceRequest,
+                cycleUsage.alreadyAdvancedAmountAtomic(),
+                cycleUsage.alreadyAdvancedDisplayKrwAmount(),
+                cycleUsage.hasOutstandingAdvance(),
                 java.time.LocalDate.now(),
                 targetMonth
         );
@@ -154,6 +158,49 @@ public class AdvanceService {
                 response,
                 advancePolicyEngine.isHardBlocked(response)
         );
+    }
+
+    private AdvanceCycleUsage summarizeCycleUsage(List<AdvanceRequest> cycleRequests) {
+        if (cycleRequests.isEmpty()) {
+            return new AdvanceCycleUsage(0L, 0L, false);
+        }
+        Map<Long, AdvancePayout> payoutsByRequestId = mapPayoutsByRequestId(
+                cycleRequests.stream().map(AdvanceRequest::getId).toList()
+        );
+
+        long alreadyAdvancedAmountAtomic = 0L;
+        long alreadyAdvancedDisplayKrwAmount = 0L;
+        boolean hasOutstandingAdvance = false;
+        for (AdvanceRequest request : cycleRequests) {
+            if (request.getStatus() == AdvanceRequestStatus.SUBMITTED) {
+                hasOutstandingAdvance = true;
+                continue;
+            }
+            if (request.getStatus() != AdvanceRequestStatus.APPROVED) {
+                continue;
+            }
+
+            AdvancePayout payout = payoutsByRequestId.get(request.getId());
+            if (payout == null || isActivePayout(payout.getStatus())) {
+                hasOutstandingAdvance = true;
+                continue;
+            }
+            if (payout.getStatus() == AdvancePayoutStatus.CONFIRMED) {
+                alreadyAdvancedAmountAtomic += nullSafe(request.getApprovedAmountAtomic());
+                alreadyAdvancedDisplayKrwAmount += nullSafe(request.getApprovedDisplayKrwAmount());
+            }
+        }
+        return new AdvanceCycleUsage(alreadyAdvancedAmountAtomic, alreadyAdvancedDisplayKrwAmount, hasOutstandingAdvance);
+    }
+
+    private boolean isActivePayout(AdvancePayoutStatus status) {
+        return status == AdvancePayoutStatus.REQUESTED
+                || status == AdvancePayoutStatus.SIGNED
+                || status == AdvancePayoutStatus.BROADCASTED;
+    }
+
+    private long nullSafe(Long value) {
+        return value == null ? 0L : value;
     }
 
     private WorkProofMonthlySummaryContractResponse toMonthlySummary(Long userId, Long workplaceId, YearMonth targetMonth) {
@@ -277,5 +324,12 @@ public class AdvanceService {
                 .multiply(exchangeRate)
                 .divide(java.math.BigDecimal.TEN.pow(assetDecimals), 0, java.math.RoundingMode.DOWN)
                 .longValue();
+    }
+
+    private record AdvanceCycleUsage(
+            long alreadyAdvancedAmountAtomic,
+            long alreadyAdvancedDisplayKrwAmount,
+            boolean hasOutstandingAdvance
+    ) {
     }
 }

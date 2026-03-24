@@ -27,6 +27,8 @@ public class AdvancePolicyEngine {
             Long workplaceId,
             WorkContract contract,
             WorkProofMonthlySummaryContractResponse summary,
+            long alreadyAdvancedAmountAtomic,
+            long alreadyAdvancedDisplayKrwAmount,
             boolean hasOutstandingAdvance,
             LocalDate today,
             YearMonth targetMonth
@@ -42,6 +44,7 @@ public class AdvancePolicyEngine {
                 .multiply(BigDecimal.valueOf(verifiedMinutes))
                 .divide(BigDecimal.valueOf(60), 0, RoundingMode.DOWN)
                 .longValue();
+        long reflectedEarnedAmountAtomic = toAtomic(policy, verifiedAmount);
         long baseLimit = BigDecimal.valueOf(verifiedAmount)
                 .multiply(tier.ratio())
                 .setScale(0, RoundingMode.DOWN)
@@ -74,9 +77,10 @@ public class AdvancePolicyEngine {
             noticeReasonCodes.add(AdvanceBlockReasonCode.PENDING_WORKPROOF_REVIEW.name());
         }
 
+        long maxAvailableBeforeUsageDisplayKrwAmount = Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCapKrw, policy.getMaxCapDisplayKrwAmount()));
         long availableDisplayKrwAmount = hardBlocked
                 ? 0L
-                : Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCapKrw, policy.getMaxCapDisplayKrwAmount()));
+                : Math.max(0L, maxAvailableBeforeUsageDisplayKrwAmount - alreadyAdvancedDisplayKrwAmount);
         long maxCapDisplayKrwAmount = policy.getMaxCapDisplayKrwAmount();
         long estimatedFeeDisplayKrwAmount = estimateFeeDisplayKrwAmount(policy, availableDisplayKrwAmount);
 
@@ -90,6 +94,10 @@ public class AdvancePolicyEngine {
                 policy.getAssetSymbol(),
                 policy.getAssetDecimals(),
                 policy.getReferenceKrwPerAsset(),
+                reflectedEarnedAmountAtomic,
+                verifiedAmount,
+                alreadyAdvancedAmountAtomic,
+                alreadyAdvancedDisplayKrwAmount,
                 toAtomic(policy, availableDisplayKrwAmount),
                 availableDisplayKrwAmount,
                 toAtomic(policy, maxCapDisplayKrwAmount),
@@ -101,11 +109,13 @@ public class AdvancePolicyEngine {
                 verifiedMinutes,
                 pendingMinutes,
                 needsReviewRecordCount,
+                needsReviewRecordCount,
                 List.copyOf(blockReasonCodes),
                 List.copyOf(noticeReasonCodes),
                 nextTierRemainingMinutes,
                 toAtomic(policy, estimatedFeeDisplayKrwAmount),
                 estimatedFeeDisplayKrwAmount,
+                repaymentDate(policy, today, targetMonth),
                 repaymentDate(policy, today, targetMonth),
                 policy.getDisclaimer()
         );

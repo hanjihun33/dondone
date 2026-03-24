@@ -36,6 +36,8 @@ class AdvancePolicyEngineTest {
                 1L,
                 contractWithHourlyWage(12_000),
                 summary(0, 0, 0, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -54,6 +56,8 @@ class AdvancePolicyEngineTest {
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -63,6 +67,8 @@ class AdvancePolicyEngineTest {
         assertThat(response.assetSymbol()).isEqualTo("dUSDC");
         assertThat(response.assetDecimals()).isEqualTo(6);
         assertThat(response.exchangeRateSnapshot()).isEqualByComparingTo("1450");
+        assertThat(response.reflectedEarnedDisplayKrwAmount()).isEqualTo(960_000L);
+        assertThat(response.alreadyAdvancedDisplayKrwAmount()).isZero();
         assertThat(response.availableAmountAtomic()).isEqualTo(AVAILABLE_B_ATOMIC);
         assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
         assertThat(response.estimatedFeeAmountAtomic()).isEqualTo(FEE_ATOMIC);
@@ -79,6 +85,8 @@ class AdvancePolicyEngineTest {
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 120, 1),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -98,6 +106,8 @@ class AdvancePolicyEngineTest {
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 true,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -117,6 +127,8 @@ class AdvancePolicyEngineTest {
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 25),
                 YearMonth.of(2026, 3)
@@ -136,6 +148,8 @@ class AdvancePolicyEngineTest {
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 24),
                 YearMonth.of(2026, 3)
@@ -145,6 +159,26 @@ class AdvancePolicyEngineTest {
         assertThat(response.availableDisplayKrwAmount()).isEqualTo(REDUCED_CAP_REFERENCE_KRW);
         assertThat(response.blockReasonCodes()).doesNotContain("ADVANCE_WINDOW_CLOSED_TODAY");
         assertThat(engine.isHardBlocked(response)).isFalse();
+    }
+
+    @Test
+    void deductsAlreadyAdvancedAmountFromAvailableAmount() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 0, 0),
+                34_482_758L,
+                50_000L,
+                false,
+                LocalDate.of(2026, 3, 16),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.alreadyAdvancedAmountAtomic()).isEqualTo(34_482_758L);
+        assertThat(response.alreadyAdvancedDisplayKrwAmount()).isEqualTo(50_000L);
+        assertThat(response.availableAmountAtomic()).isEqualTo(68_965_517L);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(100_000L);
     }
 
     @Test
