@@ -187,7 +187,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         User user = userRepository.save(User.register("advance-recognized@test.com", "hashed", "Advance"));
         String token = tokenFor(user);
         Long workplaceId = seedAdvanceEligibleScenario(user, 5, false);
-        java.time.YearMonth targetMonth = nextMonth();
+        java.time.YearMonth targetMonth = currentAdvanceCycleMonth();
 
         WorkProof adjustedRecord = workProofRepository
                 .findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
