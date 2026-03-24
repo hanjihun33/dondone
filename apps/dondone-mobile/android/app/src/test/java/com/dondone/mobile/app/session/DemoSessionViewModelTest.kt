@@ -33,6 +33,8 @@ import com.dondone.mobile.data.wage.WageVerificationDetailPayload
 import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.data.workproof.WorkproofRepository
+import com.dondone.mobile.data.workproof.WorkproofCorrectionRequestMutation
+import com.dondone.mobile.data.workproof.WorkproofCorrectionSubmitResult
 import com.dondone.mobile.data.workproof.WorkproofWorkplacePayload
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.WorkproofData
@@ -180,6 +182,62 @@ class DemoSessionViewModelTest {
         assertFalse(viewModel.authUiState.value.isAuthenticated)
         assertEquals("세션이 만료되어 다시 로그인해 주세요.", viewModel.profileUpdateUiState.value.message)
         assertTrue(viewModel.profileUpdateUiState.value.isError)
+    }
+
+    @Test
+    fun `redeem worker registration code refreshes authenticated remote state`() = runTest {
+        val session = testSession()
+        val updatedSession = session.copy(
+            companyCode = "DN-SEOUL-2914",
+            companyName = "돈던 물류",
+            workplaceName = "서울 허브"
+        )
+        val authRepository = FakeAuthRepository(
+            restoredSession = session,
+            redeemWorkerRegistrationCodeSession = updatedSession
+        )
+        val advanceRepository = FakeAdvanceRepository()
+        val workproofRepository = FakeWorkproofRepository(workplaceName = "서울 허브")
+        val remittanceRepository = FakeRemittanceRepository(
+            result = RemittanceRemoteState.content(
+                RemittanceRemotePayload(
+                    wallet = RemittanceWalletPayload(
+                        walletAddress = "0x1111111111111111111111111111111111111111",
+                        fundingStatus = "FUNDED",
+                        fundingFailureReason = null,
+                        fundedAt = LocalDateTime.parse("2026-03-19T09:00:00"),
+                        createdAt = LocalDateTime.parse("2026-03-19T08:59:00")
+                    ),
+                    balance = RemittanceWalletBalancePayload(
+                        walletAddress = "0x1111111111111111111111111111111111111111",
+                        assetSymbol = "dUSDC",
+                        assetDecimals = 6,
+                        tokenBalanceAtomic = "128500000",
+                        nativeBalanceWei = "10000000000000000"
+                    ),
+                    recipients = emptyList(),
+                    transfers = emptyList(),
+                    activeTransfer = null
+                )
+            )
+        )
+        val viewModel = DemoSessionViewModel(
+            authRepository = authRepository,
+            advanceRepository = advanceRepository,
+            workproofRepository = workproofRepository,
+            remittanceRepository = remittanceRepository
+        )
+
+        advanceUntilIdle()
+        advanceRepository.loadedTokens.clear()
+        workproofRepository.loadedTokens.clear()
+
+        viewModel.redeemWorkerRegistrationCode("WORKER-AB12-CD34")
+        advanceUntilIdle()
+
+        assertEquals(listOf(session.accessToken), advanceRepository.loadedTokens)
+        assertEquals(listOf(session.accessToken), workproofRepository.loadedTokens)
+        assertEquals("서울 허브", viewModel.authUiState.value.session?.workplaceName)
     }
 
     @Test
@@ -1601,13 +1659,18 @@ class DemoSessionViewModelTest {
         }
     }
 
-    private class FakeWorkproofRepository : WorkproofRepository {
+    private class FakeWorkproofRepository(
+        private val workplaceName: String = "DonDone Cafe"
+    ) : WorkproofRepository {
+        val loadedTokens = mutableListOf<String>()
+
         override suspend fun load(accessToken: String): WorkproofRemoteState {
+            loadedTokens += accessToken
             return WorkproofRemoteState.content(
                 WorkproofRemotePayload(
                     workplace = WorkproofWorkplacePayload(
                         workplaceId = 1L,
-                        name = "DonDone Cafe",
+                        name = workplaceName,
                         address = "서울시 강남구 테헤란로",
                         latitude = 37.5013,
                         longitude = 127.0396,
@@ -1625,6 +1688,11 @@ class DemoSessionViewModelTest {
         override suspend fun clockOut(accessToken: String, workproof: WorkproofData): WorkproofRemoteState {
             return load(accessToken)
         }
+
+        override suspend fun createCorrectionRequest(
+            accessToken: String,
+            request: WorkproofCorrectionRequestMutation
+        ): WorkproofCorrectionSubmitResult = error("not used")
     }
 
     private class FakeWageRepository : WageRepository {

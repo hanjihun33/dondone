@@ -6,6 +6,8 @@ import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
+import com.dondone.mobile.data.workproof.WorkproofRemoteMode
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.DocumentItem
 import com.dondone.mobile.domain.model.TransferDestinationMode
@@ -78,7 +80,9 @@ data class MenuReceiptUiModel(
 data class MenuUiModel(
     val session: MenuSessionUiModel?,
     val documents: List<MenuDocumentUiModel>,
-    val receipt: MenuReceiptUiModel?
+    val receipt: MenuReceiptUiModel?,
+    val fallbackNoticeTitle: String? = null,
+    val fallbackNoticeMessage: String? = null
 )
 
 data class MenuSessionUiModel(
@@ -92,7 +96,8 @@ data class MenuSessionUiModel(
 fun DemoState.toMenuUiModel(
     session: AuthSession?,
     remittanceRemoteState: RemittanceRemoteState,
-    workproofPdfCreateUiState: WorkproofPdfCreateUiState
+    workproofPdfCreateUiState: WorkproofPdfCreateUiState,
+    workproofRemoteState: WorkproofRemoteState = WorkproofRemoteState.unauthenticated("")
 ): MenuUiModel {
     val receiptDocument = documents.firstOrNull(DocumentItem::isReceiptDocument)
     val baseDocuments = documents
@@ -105,6 +110,8 @@ fun DemoState.toMenuUiModel(
         baseDocuments
     }
     val remoteTransfer = remittanceRemoteState.payload?.activeTransfer
+    val remoteWorkplaceName = workproofRemoteState.payload?.workplace?.name
+    val usesFallbackData = workproofRemoteState.mode != WorkproofRemoteMode.CONTENT
 
     return MenuUiModel(
         session = session?.let {
@@ -112,8 +119,8 @@ fun DemoState.toMenuUiModel(
                 name = it.name,
                 email = it.email,
                 phoneNumber = it.phoneNumber?.toDisplayPhoneNumber(),
-                companyName = it.companyName,
-                workplaceName = it.workplaceName
+                companyName = it.companyName ?: it.companyCode,
+                workplaceName = it.workplaceName ?: remoteWorkplaceName
             )
         },
         documents = mergedDocuments,
@@ -121,6 +128,12 @@ fun DemoState.toMenuUiModel(
             remoteTransfer != null -> toRemoteMenuReceiptUiModel(remoteTransfer, receiptDocument)
             receiptDocument != null -> toMenuReceiptUiModel(receiptDocument)
             else -> null
+        },
+        fallbackNoticeTitle = if (usesFallbackData) "가상 예시 데이터" else null,
+        fallbackNoticeMessage = if (usesFallbackData) {
+            "문서와 근무 정보 일부는 예시 데이터입니다. 회사 등록 후 실제 데이터로 전환됩니다."
+        } else {
+            null
         }
     )
 }

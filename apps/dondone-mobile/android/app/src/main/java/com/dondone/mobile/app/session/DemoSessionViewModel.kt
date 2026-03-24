@@ -140,6 +140,7 @@ class DemoSessionViewModel(
     val advanceRemoteState: StateFlow<AdvanceRemoteState> = _advanceRemoteState.asStateFlow()
     private val _workproofRemoteState =
         MutableStateFlow(WorkproofRemoteState.unauthenticated(WORKPROOF_REMOTE_LOGIN_MESSAGE))
+    val workproofRemoteState: StateFlow<WorkproofRemoteState> = _workproofRemoteState.asStateFlow()
     private val _wageRemoteState =
         MutableStateFlow(WageRemoteState.unauthenticated(WAGE_REMOTE_LOGIN_MESSAGE))
     private val _remittanceRemoteState =
@@ -1181,7 +1182,7 @@ class DemoSessionViewModel(
                     session = session,
                     registrationCode = normalizedRegistrationCode
                 )
-                _authUiState.value = AuthUiState.authenticated(updatedSession)
+                onAuthenticated(updatedSession)
                 val companyLabel = updatedSession.companyName ?: "회사"
                 val workplaceLabel = updatedSession.workplaceName?.let { " / $it" }.orEmpty()
                 _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
@@ -1661,7 +1662,19 @@ class DemoSessionViewModel(
 
         _workproofRemoteState.value = remoteState
         val payload = remoteState.payload ?: return
+        syncAuthenticatedOrganization(payload)
         _uiState.update { current -> current.syncRemoteWorkproof(payload) }
+    }
+
+    private fun syncAuthenticatedOrganization(payload: WorkproofRemotePayload) {
+        val session = _authUiState.value.session ?: return
+        val nextSession = session.copy(
+            companyName = session.companyName ?: session.companyCode,
+            workplaceName = payload.workplace.name
+        )
+        if (nextSession != session) {
+            _authUiState.value = AuthUiState.authenticated(nextSession)
+        }
     }
 
     private suspend fun applyWageRemoteState(

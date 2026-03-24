@@ -1,8 +1,10 @@
 package com.dondone.mobile.feature.workproof.presentation
 
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.YearMonth
@@ -68,5 +70,17 @@ class WorkproofUiModelTest {
 
         assertTrue(!uiModel.summary.canClockIn)
         assertTrue(uiModel.summary.canClockOut)
+    }
+
+    @Test
+    fun `fallback workproof shows demo data notice and disables remote punch actions`() {
+        val uiModel = DemoSeedFactory.create().toWorkproofUiModel(
+            remoteState = WorkproofRemoteState.empty("연결된 근무지가 없습니다."),
+            isAuthenticated = true
+        )
+
+        assertEquals("가상 예시 데이터", uiModel.fallbackNoticeTitle)
+        assertFalse(uiModel.summary.canClockIn)
+        assertFalse(uiModel.summary.canClockOut)
     }
 }

@@ -76,6 +76,7 @@ import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DawnWarning
+import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
@@ -230,6 +231,13 @@ fun MenuScreen(
             MenuSectionDivider()
             MenuAccountLinkSection(
                 onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode
+            )
+            MenuSectionDivider()
+        }
+        uiModel.fallbackNoticeMessage?.let { message ->
+            DonDoneNoticeBanner(
+                title = uiModel.fallbackNoticeTitle ?: "가상 예시 데이터",
+                message = message
             )
             MenuSectionDivider()
         }

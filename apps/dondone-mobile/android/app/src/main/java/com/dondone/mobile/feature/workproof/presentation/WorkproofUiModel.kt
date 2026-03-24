@@ -1,6 +1,8 @@
 package com.dondone.mobile.feature.workproof.presentation
 
 import com.dondone.mobile.app.session.WorkproofActionUiState
+import com.dondone.mobile.data.workproof.WorkproofRemoteMode
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.WorkRecord
@@ -67,15 +69,21 @@ data class WorkproofUiModel(
     val calendarDayTones: Map<Int, WorkproofCalendarTone>,
     val summary: WorkproofSummaryUiModel,
     val recentRecords: List<WorkproofRecordUiModel>,
-    val audits: List<WorkproofAuditUiModel>
+    val audits: List<WorkproofAuditUiModel>,
+    val fallbackNoticeTitle: String? = null,
+    val fallbackNoticeMessage: String? = null
 )
 
 fun DemoState.toWorkproofUiModel(
-    actionUiState: WorkproofActionUiState? = null
+    actionUiState: WorkproofActionUiState? = null,
+    remoteState: WorkproofRemoteState = WorkproofRemoteState.unauthenticated(""),
+    isAuthenticated: Boolean = false
 ): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val workplaceRadiusMeters = workproof.allowedRadiusMeters
     val canSubmitAction = actionUiState?.isSubmitting != true
+    val usesFallbackData = remoteState.mode != WorkproofRemoteMode.CONTENT
+    val allowRemoteActions = !isAuthenticated || remoteState.mode == WorkproofRemoteMode.CONTENT
     val isWithinWorkplaceRadius = isWithinWorkplaceRadius(
         startLatitude = workproof.currentLatitude,
         startLongitude = workproof.currentLongitude,
@@ -132,8 +140,11 @@ fun DemoState.toWorkproofUiModel(
         calendarCurrentDay = demo.asOfDay,
         calendarDayTones = dayTones,
         summary = WorkproofSummaryUiModel(
-            canClockIn = workproof.today.clockIn == null && canSubmitAction,
-            canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null && canSubmitAction,
+            canClockIn = allowRemoteActions && workproof.today.clockIn == null && canSubmitAction,
+            canClockOut = allowRemoteActions &&
+                workproof.today.clockIn != null &&
+                workproof.today.clockOut == null &&
+                canSubmitAction,
             workplaceLatitude = workproof.workplaceLatitude,
             workplaceLongitude = workproof.workplaceLongitude,
             currentLatitude = workproof.currentLatitude,
@@ -142,7 +153,13 @@ fun DemoState.toWorkproofUiModel(
             isWithinWorkplaceRadius = isWithinWorkplaceRadius
         ),
         recentRecords = recentRecords,
-        audits = auditItems
+        audits = auditItems,
+        fallbackNoticeTitle = if (usesFallbackData) "가상 예시 데이터" else null,
+        fallbackNoticeMessage = if (usesFallbackData) {
+            "현재 보이는 근무 기록은 데모 데이터입니다. 회사 등록 후 실제 기록으로 전환됩니다."
+        } else {
+            null
+        }
     )
 }
 

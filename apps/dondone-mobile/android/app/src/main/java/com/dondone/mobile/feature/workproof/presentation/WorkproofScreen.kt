@@ -81,6 +81,7 @@ import com.dondone.mobile.core.designsystem.DawnSurface
 import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.DonDoneErrorPanel
 import com.dondone.mobile.core.designsystem.DonDoneLoadingPanel
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
@@ -480,6 +481,13 @@ fun WorkproofScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                uiModel.fallbackNoticeMessage?.let { message ->
+                    DonDoneNoticeBanner(
+                        title = uiModel.fallbackNoticeTitle ?: "가상 예시 데이터",
+                        message = message
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
                 WorkproofPunchCard(
                     uiModel = uiModel.summary,
                     onClockIn = onClockIn,

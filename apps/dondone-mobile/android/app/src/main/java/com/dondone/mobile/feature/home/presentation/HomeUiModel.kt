@@ -4,9 +4,12 @@ import com.dondone.mobile.app.session.RemittanceCompletionNoticeUiState
 import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.ui.formatKrw
+import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.wage.WageRemoteState
+import com.dondone.mobile.data.workproof.WorkproofRemoteMode
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.calculator.WageEstimator
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.TransferStatus
@@ -31,7 +34,11 @@ data class HomeWorkUiModel(
     val canClockOut: Boolean,
     val isWithinWorkplaceRadius: Boolean,
     val clockInText: String,
-    val clockOutText: String
+    val clockOutText: String,
+    val noticeTitle: String? = null,
+    val noticeMessage: String? = null,
+    val showRecordSummary: Boolean = true,
+    val showActions: Boolean = true
 )
 
 enum class HomeActionTarget {
@@ -70,7 +77,9 @@ fun DemoState.toHomeUiModel(
     wageRemoteState: WageRemoteState? = null,
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
     remittanceCompletionNoticeUiState: RemittanceCompletionNoticeUiState = RemittanceCompletionNoticeUiState(),
-    isAuthenticated: Boolean = false
+    isAuthenticated: Boolean = false,
+    session: AuthSession? = null,
+    workproofRemoteState: WorkproofRemoteState = WorkproofRemoteState.unauthenticated("")
 ): HomeUiModel {
     val selectedAccount = remittance.selectedAccount()
     val wageEstimate = WageEstimator.calculate(this)
@@ -126,6 +135,10 @@ fun DemoState.toHomeUiModel(
         )
     }
     val completionBanner = remittanceCompletionNoticeUiState.toHomeCompletionBannerUiModel()
+    val requiresCompanyRegistration =
+        isAuthenticated &&
+            workproofRemoteState.mode == WorkproofRemoteMode.EMPTY &&
+            session?.workplaceName.isNullOrBlank()
 
     return HomeUiModel(
         account = resolveHomeAccountUiModel(
@@ -134,14 +147,27 @@ fun DemoState.toHomeUiModel(
             isAuthenticated = isAuthenticated
         ),
         work = HomeWorkUiModel(
-            dateText = currentDateText,
-            statusText = workStatusText,
-            statusTone = workStatusTone,
-            canClockIn = workproof.today.clockIn == null && workproofActionUiState?.isSubmitting != true,
-            canClockOut = workproof.today.clockIn != null && workproof.today.clockOut == null && workproofActionUiState?.isSubmitting != true,
+            dateText = if (requiresCompanyRegistration) "회사 등록 필요" else currentDateText,
+            statusText = if (requiresCompanyRegistration) "안내" else workStatusText,
+            statusTone = if (requiresCompanyRegistration) BadgeTone.Info else workStatusTone,
+            canClockIn = !requiresCompanyRegistration &&
+                workproof.today.clockIn == null &&
+                workproofActionUiState?.isSubmitting != true,
+            canClockOut = !requiresCompanyRegistration &&
+                workproof.today.clockIn != null &&
+                workproof.today.clockOut == null &&
+                workproofActionUiState?.isSubmitting != true,
             isWithinWorkplaceRadius = workproof.isWithinWorkplaceRadius(),
             clockInText = clockIn,
-            clockOutText = clockOut
+            clockOutText = clockOut,
+            noticeTitle = if (requiresCompanyRegistration) "회사 등록 필요" else null,
+            noticeMessage = if (requiresCompanyRegistration) {
+                "등록 코드를 입력하면 실제 근무 데이터가 표시됩니다."
+            } else {
+                null
+            },
+            showRecordSummary = !requiresCompanyRegistration,
+            showActions = !requiresCompanyRegistration
         ),
         money = HomeMoneyUiModel(
             showWorkActionCard = isDepositRecorded && hasDifference,

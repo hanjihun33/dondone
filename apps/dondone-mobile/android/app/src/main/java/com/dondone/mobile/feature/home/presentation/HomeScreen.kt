@@ -357,26 +357,35 @@ private fun HomeWorkSection(
                 )
             }
 
-            HomeKeyValueRow(label = "출근", value = uiModel.work.clockInText)
-            HomeKeyValueRow(label = "퇴근", value = uiModel.work.clockOutText)
+            if (uiModel.work.showRecordSummary) {
+                HomeKeyValueRow(label = "출근", value = uiModel.work.clockInText)
+                HomeKeyValueRow(label = "퇴근", value = uiModel.work.clockOutText)
+            } else {
+                DonDoneNoticeBanner(
+                    title = uiModel.work.noticeTitle ?: uiModel.work.dateText,
+                    message = uiModel.work.noticeMessage.orEmpty()
+                )
+            }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            HomePrimaryButton(
-                text = "출근",
-                onClick = onClockIn,
-                enabled = uiModel.work.canClockIn && uiModel.work.isWithinWorkplaceRadius,
-                modifier = Modifier.weight(1f)
-            )
-            HomeSoftButton(
-                text = "퇴근",
-                onClick = onClockOut,
-                enabled = uiModel.work.canClockOut,
-                modifier = Modifier.weight(1f)
-            )
+        if (uiModel.work.showActions) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HomePrimaryButton(
+                    text = "출근",
+                    onClick = onClockIn,
+                    enabled = uiModel.work.canClockIn && uiModel.work.isWithinWorkplaceRadius,
+                    modifier = Modifier.weight(1f)
+                )
+                HomeSoftButton(
+                    text = "퇴근",
+                    onClick = onClockOut,
+                    enabled = uiModel.work.canClockOut,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
 
     }
