@@ -1,4 +1,6 @@
-name: dondone-dev
+# Local development helper infra only.
+# Application runtime env vars such as REMITTANCE_* / VAULT_* are consumed
+# by backend/web local execution or the runtime deploy compose file.
 
 x-dev-service: &dev-service
   restart: unless-stopped
