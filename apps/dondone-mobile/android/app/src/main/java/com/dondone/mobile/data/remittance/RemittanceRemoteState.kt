@@ -110,7 +110,7 @@ data class RemittanceRemotePayload(
     val wallet: RemittanceWalletPayload,
     val balance: RemittanceWalletBalancePayload?,
     val recipients: List<RemittanceRecipientPayload>,
-    val ledgerItems: List<RemittanceLedgerItemPayload>,
+    val ledgerItems: List<RemittanceLedgerItemPayload> = emptyList(),
     val transfers: List<RemittanceTransferSummaryPayload>,
     val activeTransfer: RemittanceTransferDetailPayload?
 )
