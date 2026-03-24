@@ -85,6 +85,9 @@ public class AdvancePayout {
     @Column(name = "tx_hash", length = 66)
     private String txHash;
 
+    @Column(name = "signed_transaction", columnDefinition = "TEXT")
+    private String signedTransaction;
+
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
@@ -140,10 +143,11 @@ public class AdvancePayout {
                 && this.assetSymbol.equals(assetSymbol);
     }
 
-    public void markSigned(String txHash) {
+    public void markSigned(String txHash, String signedTransaction) {
         requireStatus(AdvancePayoutStatus.REQUESTED);
         this.status = AdvancePayoutStatus.SIGNED;
         this.txHash = txHash;
+        this.signedTransaction = signedTransaction;
         this.failureReason = null;
     }
 
@@ -156,18 +160,21 @@ public class AdvancePayout {
     public void markConfirmed() {
         requireStatus(AdvancePayoutStatus.BROADCASTED);
         this.status = AdvancePayoutStatus.CONFIRMED;
+        this.signedTransaction = null;
         this.failureReason = null;
     }
 
     public void markFailed(String failureReason) {
         requireStatus(AdvancePayoutStatus.REQUESTED, AdvancePayoutStatus.SIGNED, AdvancePayoutStatus.BROADCASTED);
         this.status = AdvancePayoutStatus.FAILED;
+        this.signedTransaction = null;
         this.failureReason = sanitizeFailureReason(failureReason);
     }
 
     public void markTimedOut(String failureReason) {
         requireStatus(AdvancePayoutStatus.BROADCASTED);
         this.status = AdvancePayoutStatus.TIMED_OUT;
+        this.signedTransaction = null;
         this.failureReason = sanitizeFailureReason(failureReason);
     }
 
@@ -175,6 +182,7 @@ public class AdvancePayout {
         requireStatus(AdvancePayoutStatus.FAILED, AdvancePayoutStatus.TIMED_OUT);
         this.status = AdvancePayoutStatus.REQUESTED;
         this.txHash = null;
+        this.signedTransaction = null;
         this.failureReason = null;
     }
 

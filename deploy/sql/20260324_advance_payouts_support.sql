@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS advance_payouts (
     idempotency_key VARCHAR(128) NOT NULL,
     status VARCHAR(20) NOT NULL,
     tx_hash VARCHAR(66),
+    signed_transaction TEXT,
     failure_reason VARCHAR(500),
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL

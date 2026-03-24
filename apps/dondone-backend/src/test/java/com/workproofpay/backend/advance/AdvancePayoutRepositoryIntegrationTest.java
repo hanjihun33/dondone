@@ -160,7 +160,7 @@ class AdvancePayoutRepositoryIntegrationTest extends PostgresIntegrationTestSupp
                 "dUSDC",
                 "advance-payout-idem-4a"
         ));
-        confirmed.markSigned("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        confirmed.markSigned("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "signed-confirmed");
         confirmed.markBroadcasted();
         confirmed.markConfirmed();
         advancePayoutRepository.saveAndFlush(confirmed);
@@ -174,7 +174,7 @@ class AdvancePayoutRepositoryIntegrationTest extends PostgresIntegrationTestSupp
                 "dUSDC",
                 "advance-payout-idem-4b"
         ));
-        failed.markSigned("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        failed.markSigned("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "signed-failed");
         failed.markFailed("  treasury   balance   was   insufficient  ");
         advancePayoutRepository.saveAndFlush(failed);
 
