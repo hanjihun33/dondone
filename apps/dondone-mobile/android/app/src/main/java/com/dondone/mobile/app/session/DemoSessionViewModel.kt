@@ -1184,7 +1184,7 @@ class DemoSessionViewModel(
                 )
                 onAuthenticated(updatedSession)
                 val companyLabel = updatedSession.companyName ?: "회사"
-                val workplaceLabel = updatedSession.workplaceName?.let { " / $it" }.orEmpty()
+                val workplaceLabel = ""
                 _workerRegistrationCodeUiState.value = WorkerRegistrationCodeUiState(
                     message = "$companyLabel$workplaceLabel 등록이 완료됐어요."
                 )

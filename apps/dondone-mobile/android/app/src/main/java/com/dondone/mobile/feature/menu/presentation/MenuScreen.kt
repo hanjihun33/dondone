@@ -428,7 +428,7 @@ private fun MenuSessionSection(
     session: MenuSessionUiModel,
     onEditProfile: () -> Unit
 ) {
-    val organizationSummary = session.toOrganizationSummary()
+    val organizationSummary = session.companyName.toProfileValue()
 
     MenuSectionSurface {
         MenuSectionHeader(title = "계정")
@@ -642,14 +642,8 @@ private fun MenuSessionUiModel.toOrganizationSummary(): String {
     val company = companyName?.trim().orEmpty()
     val workplace = workplaceName?.trim().orEmpty()
 
-    if (company.isBlank() && workplace.isBlank()) {
-        return "소속 정보 없음"
-    }
     if (company.isBlank()) {
-        return workplace
-    }
-    if (workplace.isBlank()) {
-        return company
+        return "소속 정보 없음"
     }
     return "$company · $workplace"
 }

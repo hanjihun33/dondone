@@ -53,7 +53,8 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.email").value("phone-auth@test.com"))
                 .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"))
-                .andExpect(jsonPath("$.data.companyCode").isEmpty());
+                .andExpect(jsonPath("$.data.companyCode").isEmpty())
+                .andExpect(jsonPath("$.data.companyName").isEmpty());
 
         String loginJson = """
                 {
@@ -67,7 +68,8 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                         .content(loginJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"))
-                .andExpect(jsonPath("$.data.companyCode").isEmpty());
+                .andExpect(jsonPath("$.data.companyCode").isEmpty())
+                .andExpect(jsonPath("$.data.companyName").isEmpty());
 
         User user = userRepository.findByEmailIgnoreCase("phone-auth@test.com").orElseThrow();
 
@@ -75,7 +77,8 @@ class AuthProfileIntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(tokenFor(user))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.phoneNumber").value("01098765432"))
-                .andExpect(jsonPath("$.data.companyCode").isEmpty());
+                .andExpect(jsonPath("$.data.companyCode").isEmpty())
+                .andExpect(jsonPath("$.data.companyName").isEmpty());
     }
 
     @Test

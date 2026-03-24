@@ -142,10 +142,24 @@ class WorkerCompanyRegistrationIntegrationTest {
                 .andExpect(jsonPath("$.data.workplaceName").value("Acme Logistics 기본 사업장"))
                 .andExpect(jsonPath("$.data.membershipStatus").value("ACTIVE"));
 
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest("worker1@dondone.test", "qweqwe123"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyCode").value("DN-SEOUL-4101"))
+                .andExpect(jsonPath("$.data.companyName").value("Acme Logistics"));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", bearer(workerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.companyCode").value("DN-SEOUL-4101"))
+                .andExpect(jsonPath("$.data.companyName").value("Acme Logistics"));
+
         List<EmploymentMembership> memberships = employmentMembershipRepository.findAll();
         assertThat(memberships).hasSize(1);
         assertThat(memberships.get(0).getCompanyId()).isEqualTo(fixture.companyId());
         assertThat(memberships.get(0).getWorkplaceId()).isEqualTo(fixture.workplaceId());
+
         mockMvc.perform(post("/api/auth/me/worker-registration-code")
                         .header("Authorization", bearer(workerToken))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -287,7 +301,7 @@ class WorkerCompanyRegistrationIntegrationTest {
 
         AdminCreateEmployerCompanyRequest createRequest = new AdminCreateEmployerCompanyRequest(
                 "Invalid Logistics",
-                "돈던 서울"
+                "invalid code"
         );
 
         mockMvc.perform(post("/api/admin/employers/companies")

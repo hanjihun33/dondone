@@ -91,7 +91,7 @@ class BackendAuthRepository(
                 name = data.getString("name"),
                 phoneNumber = data.optNullableString("phoneNumber"),
                 companyCode = data.optNullableString("companyCode"),
-                companyName = null,
+                companyName = data.optNullableString("companyName"),
                 workplaceName = null
             )
             sessionStore.save(session)
@@ -132,7 +132,8 @@ class BackendAuthRepository(
             val updatedSession = session.copy(
                 name = data.getString("name"),
                 phoneNumber = data.optNullableString("phoneNumber"),
-                companyCode = data.optNullableString("companyCode")
+                companyCode = data.optNullableString("companyCode"),
+                companyName = data.optNullableString("companyName") ?: session.companyName
             )
             sessionStore.save(updatedSession)
             updatedSession

@@ -19,9 +19,11 @@ public record LoginResponse(
         @Schema(description = "Authenticated user phone number", example = "01012345678")
         String phoneNumber,
         @Schema(description = "Authenticated user company code", example = "DONDONE2026")
-        String companyCode
+        String companyCode,
+        @Schema(description = "Authenticated user company name when a current worker membership exists", example = "Acme Logistics")
+        String companyName
 ) {
-    public static LoginResponse of(String accessToken, long expiresIn, User user) {
+    public static LoginResponse of(String accessToken, long expiresIn, User user, String companyCode, String companyName) {
         return new LoginResponse(
                 accessToken,
                 "Bearer",
@@ -30,7 +32,8 @@ public record LoginResponse(
                 user.getEmail(),
                 user.getName(),
                 user.getPhoneNumber(),
-                user.getCompanyCode()
+                companyCode,
+                companyName
         );
     }
 }
