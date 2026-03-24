@@ -8,6 +8,8 @@ public record AdvanceRequestResponse(
         Integer assetDecimals,
         java.math.BigDecimal exchangeRateSnapshot,
         String status,
+        String requestStatus,
+        String payoutStatus,
         Long approvedAmountAtomic,
         Long approvedDisplayKrwAmount,
         Long feeAmountAtomic,

@@ -20,6 +20,8 @@ public record AdminAdvanceRequestItemResponse(
         Long feeAmountAtomic,
         Long feeDisplayKrwAmount,
         String status,
+        String requestStatus,
+        String payoutStatus,
         LocalDate repaymentDueDate,
         LocalDateTime requestedAt,
         Integer reflectedWorkDays,

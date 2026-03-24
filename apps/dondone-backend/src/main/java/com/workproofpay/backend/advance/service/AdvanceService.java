@@ -2,8 +2,10 @@ package com.workproofpay.backend.advance.service;
 
 import com.workproofpay.backend.advance.api.dto.request.CreateAdvanceRequest;
 import com.workproofpay.backend.advance.api.dto.response.*;
+import com.workproofpay.backend.advance.model.AdvancePayout;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.model.AdvanceRequestStatus;
+import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
@@ -22,18 +24,23 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AdvanceService {
 
     private final AdvanceRequestRepository advanceRequestRepository;
+    private final AdvancePayoutRepository advancePayoutRepository;
     private final UserRepository userRepository;
     private final WorkplaceRepository workplaceRepository;
     private final WorkContractRepository workContractRepository;
     private final WorkProofRepository workProofRepository;
     private final WorkProofLane1Service workProofLane1Service;
     private final AdvancePolicyEngine advancePolicyEngine;
+    private final AdvanceRequestViewStatusResolver advanceRequestViewStatusResolver;
 
     @Transactional(readOnly = true)
     public AdvanceEligibilityResponse getEligibility(Long userId, Long workplaceId) {
@@ -93,19 +100,23 @@ public class AdvanceService {
     @Transactional(readOnly = true)
     public AdvanceRequestListResponse getRequests(Long userId, String month) {
         parseYearMonth(month);
-        List<AdvanceRequestListItemResponse> requests = advanceRequestRepository
-                .findByUserIdAndYearMonthOrderByRequestedAtDescCreatedAtDesc(userId, month)
-                .stream()
-                .map(this::toListItemResponse)
+        List<AdvanceRequest> requests = advanceRequestRepository
+                .findByUserIdAndYearMonthOrderByRequestedAtDescCreatedAtDesc(userId, month);
+        Map<Long, AdvancePayout> payoutsByRequestId = mapPayoutsByRequestId(
+                requests.stream().map(AdvanceRequest::getId).toList()
+        );
+        List<AdvanceRequestListItemResponse> items = requests.stream()
+                .map(request -> toListItemResponse(request, payoutsByRequestId.get(request.getId())))
                 .toList();
-        return new AdvanceRequestListResponse(month, requests);
+        return new AdvanceRequestListResponse(month, items);
     }
 
     @Transactional(readOnly = true)
     public AdvanceRequestDetailResponse getRequest(Long userId, Long requestId) {
         AdvanceRequest request = advanceRequestRepository.findByIdAndUserId(requestId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.ADVANCE_REQUEST_NOT_FOUND));
-        return toDetailResponse(request);
+        AdvancePayout payout = advancePayoutRepository.findByAdvanceRequestId(request.getId()).orElse(null);
+        return toDetailResponse(request, payout);
     }
 
     private AdvanceEligibilityResult evaluateEligibility(Long userId, Long workplaceId) {
@@ -167,12 +178,16 @@ public class AdvanceService {
     }
 
     private AdvanceRequestResponse toRequestResponse(AdvanceRequest request) {
+        AdvancePayout payout = advancePayoutRepository.findByAdvanceRequestId(request.getId()).orElse(null);
+        AdvanceRequestViewStatusResolver.AdvanceRequestViewStatus viewStatus = advanceRequestViewStatusResolver.resolve(request, payout);
         return new AdvanceRequestResponse(
                 request.getId(),
                 request.getAssetSymbol(),
                 request.getAssetDecimals(),
                 request.getExchangeRateSnapshot(),
-                request.getStatus().name(),
+                viewStatus.status(),
+                viewStatus.requestStatus(),
+                viewStatus.payoutStatus(),
                 request.getApprovedAmountAtomic(),
                 request.getApprovedDisplayKrwAmount(),
                 request.getFeeAmountAtomic(),
@@ -182,7 +197,8 @@ public class AdvanceService {
         );
     }
 
-    private AdvanceRequestListItemResponse toListItemResponse(AdvanceRequest request) {
+    private AdvanceRequestListItemResponse toListItemResponse(AdvanceRequest request, AdvancePayout payout) {
+        AdvanceRequestViewStatusResolver.AdvanceRequestViewStatus viewStatus = advanceRequestViewStatusResolver.resolve(request, payout);
         return new AdvanceRequestListItemResponse(
                 request.getId(),
                 request.getWorkplace().getId(),
@@ -193,13 +209,16 @@ public class AdvanceService {
                 request.getRequestedDisplayKrwAmount(),
                 request.getApprovedAmountAtomic(),
                 request.getApprovedDisplayKrwAmount(),
-                request.getStatus().name(),
+                viewStatus.status(),
+                viewStatus.requestStatus(),
+                viewStatus.payoutStatus(),
                 request.getRepaymentDueDate(),
                 request.getRequestedAt()
         );
     }
 
-    private AdvanceRequestDetailResponse toDetailResponse(AdvanceRequest request) {
+    private AdvanceRequestDetailResponse toDetailResponse(AdvanceRequest request, AdvancePayout payout) {
+        AdvanceRequestViewStatusResolver.AdvanceRequestViewStatus viewStatus = advanceRequestViewStatusResolver.resolve(request, payout);
         return new AdvanceRequestDetailResponse(
                 request.getId(),
                 request.getWorkplace().getId(),
@@ -212,11 +231,21 @@ public class AdvanceService {
                 request.getApprovedDisplayKrwAmount(),
                 request.getFeeAmountAtomic(),
                 request.getFeeDisplayKrwAmount(),
-                request.getStatus().name(),
+                viewStatus.status(),
+                viewStatus.requestStatus(),
+                viewStatus.payoutStatus(),
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request),
                 request.getCreatedAt()
         );
+    }
+
+    private Map<Long, AdvancePayout> mapPayoutsByRequestId(List<Long> requestIds) {
+        if (requestIds.isEmpty()) {
+            return Map.of();
+        }
+        return advancePayoutRepository.findByAdvanceRequestIdIn(requestIds).stream()
+                .collect(Collectors.toMap(AdvancePayout::getAdvanceRequestId, Function.identity()));
     }
 
     private AdvanceEligibilitySnapshotResponse toSnapshotResponse(AdvanceRequest request) {

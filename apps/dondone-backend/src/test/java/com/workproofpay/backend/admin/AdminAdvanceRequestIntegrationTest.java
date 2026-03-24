@@ -165,12 +165,16 @@ class AdminAdvanceRequestIntegrationTest {
                 .andExpect(jsonPath("$.data.requests[0].requestedAmountAtomic").value(REJECTED_REQUEST_ATOMIC))
                 .andExpect(jsonPath("$.data.requests[0].requestedDisplayKrwAmount").value(REJECTED_REQUEST_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[0].requestStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[0].payoutStatus").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[1].workerName").value("Worker One"))
                 .andExpect(jsonPath("$.data.requests[1].companyName").value("Alpha Logistics"))
                 .andExpect(jsonPath("$.data.requests[1].requestedAmountAtomic").value(APPROVED_REQUEST_ATOMIC))
                 .andExpect(jsonPath("$.data.requests[1].requestedDisplayKrwAmount").value(APPROVED_REQUEST_DISPLAY_KRW))
-                .andExpect(jsonPath("$.data.requests[1].status").value("SUBMITTED"));
+                .andExpect(jsonPath("$.data.requests[1].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[1].requestStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[1].payoutStatus").value(nullValue()));
 
         mockMvc.perform(post("/api/admin/advance/requests/{requestId}/approve", approvedCandidateId)
                         .header("Authorization", "Bearer " + adminToken))
@@ -202,10 +206,14 @@ class AdminAdvanceRequestIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requests[0].requestId").value(rejectedCandidateId))
                 .andExpect(jsonPath("$.data.requests[0].status").value("REJECTED"))
+                .andExpect(jsonPath("$.data.requests[0].requestStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.data.requests[0].payoutStatus").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[0].reviewedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.requests[1].requestId").value(approvedCandidateId))
-                .andExpect(jsonPath("$.data.requests[1].status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[1].status").value("PAYING"))
+                .andExpect(jsonPath("$.data.requests[1].requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.requests[1].payoutStatus").value("REQUESTED"))
                 .andExpect(jsonPath("$.data.requests[1].approvedAmountAtomic").value(APPROVED_REQUEST_ATOMIC))
                 .andExpect(jsonPath("$.data.requests[1].approvedDisplayKrwAmount").value(APPROVED_REQUEST_DISPLAY_KRW))
                 .andExpect(jsonPath("$.data.requests[1].reviewedAt").isNotEmpty());
@@ -213,7 +221,9 @@ class AdminAdvanceRequestIntegrationTest {
         mockMvc.perform(get("/api/advance/requests/{requestId}", approvedCandidateId)
                         .header("Authorization", "Bearer " + workerOneToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.status").value("PAYING"))
+                .andExpect(jsonPath("$.data.requestStatus").value("APPROVED"))
+                .andExpect(jsonPath("$.data.payoutStatus").value("REQUESTED"))
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(APPROVED_REQUEST_ATOMIC))
                 .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(APPROVED_REQUEST_DISPLAY_KRW));
 
@@ -221,6 +231,8 @@ class AdminAdvanceRequestIntegrationTest {
                         .header("Authorization", "Bearer " + workerTwoToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("REJECTED"))
+                .andExpect(jsonPath("$.data.requestStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.data.payoutStatus").value(nullValue()))
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()));
 

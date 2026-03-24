@@ -2,9 +2,12 @@ package com.workproofpay.backend.admin.service;
 
 import com.workproofpay.backend.admin.api.dto.response.AdminAdvanceRequestItemResponse;
 import com.workproofpay.backend.admin.api.dto.response.AdminAdvanceRequestListResponse;
+import com.workproofpay.backend.advance.model.AdvancePayout;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
+import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.advance.service.AdvancePayoutService;
+import com.workproofpay.backend.advance.service.AdvanceRequestViewStatusResolver;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.employer.model.Company;
@@ -27,14 +30,20 @@ public class AdminAdvanceRequestService {
 
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
+    private final AdvancePayoutRepository advancePayoutRepository;
     private final AdvanceRequestRepository advanceRequestRepository;
     private final AdvancePayoutService advancePayoutService;
+    private final AdvanceRequestViewStatusResolver advanceRequestViewStatusResolver;
 
     @Transactional(readOnly = true)
     public AdminAdvanceRequestListResponse getRequests(Long adminAccountId) {
         ensureAdminUserExists(adminAccountId);
 
         List<AdvanceRequest> requests = advanceRequestRepository.findAllByOrderByRequestedAtDescCreatedAtDesc();
+        Map<Long, AdvancePayout> payoutsByRequestId = advancePayoutRepository.findByAdvanceRequestIdIn(
+                        requests.stream().map(AdvanceRequest::getId).toList()
+                ).stream()
+                .collect(Collectors.toMap(AdvancePayout::getAdvanceRequestId, Function.identity()));
         Map<Long, Company> companiesById = companyRepository.findAllById(
                         requests.stream()
                                 .map(AdvanceRequest::getWorkplace)
@@ -47,7 +56,11 @@ public class AdminAdvanceRequestService {
 
         return new AdminAdvanceRequestListResponse(
                 requests.stream()
-                        .map(request -> toItemResponse(request, companiesById.get(request.getWorkplace().getCompanyId())))
+                        .map(request -> toItemResponse(
+                                request,
+                                payoutsByRequestId.get(request.getId()),
+                                companiesById.get(request.getWorkplace().getCompanyId())
+                        ))
                         .toList()
         );
     }
@@ -86,9 +99,10 @@ public class AdminAdvanceRequestService {
         }
     }
 
-    private AdminAdvanceRequestItemResponse toItemResponse(AdvanceRequest request, Company company) {
+    private AdminAdvanceRequestItemResponse toItemResponse(AdvanceRequest request, AdvancePayout payout, Company company) {
         User worker = request.getUser();
         Workplace workplace = request.getWorkplace();
+        AdvanceRequestViewStatusResolver.AdvanceRequestViewStatus viewStatus = advanceRequestViewStatusResolver.resolve(request, payout);
         return new AdminAdvanceRequestItemResponse(
                 request.getId(),
                 worker.getId(),
@@ -105,7 +119,9 @@ public class AdminAdvanceRequestService {
                 request.getApprovedDisplayKrwAmount(),
                 request.getFeeAmountAtomic(),
                 request.getFeeDisplayKrwAmount(),
-                request.getStatus().name(),
+                viewStatus.status(),
+                viewStatus.requestStatus(),
+                viewStatus.payoutStatus(),
                 request.getRepaymentDueDate(),
                 request.getRequestedAt(),
                 request.getSnapshotReflectedWorkDays(),

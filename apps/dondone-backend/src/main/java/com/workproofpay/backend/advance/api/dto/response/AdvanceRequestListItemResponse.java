@@ -14,6 +14,8 @@ public record AdvanceRequestListItemResponse(
         Long approvedAmountAtomic,
         Long approvedDisplayKrwAmount,
         String status,
+        String requestStatus,
+        String payoutStatus,
         LocalDate repaymentDueDate,
         LocalDateTime requestedAt
 ) {

@@ -4,6 +4,7 @@ import com.workproofpay.backend.advance.api.dto.request.CreateAdvanceRequest;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.service.AdvancePolicyEngine;
 import com.workproofpay.backend.advance.service.AdvanceCreateResult;
+import com.workproofpay.backend.advance.service.AdvanceRequestViewStatusResolver;
 import com.workproofpay.backend.advance.service.AdvanceService;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
@@ -33,6 +34,7 @@ class AdvanceServiceTest {
     private static final long SNAPSHOT_MAX_CAP_ATOMIC = 344_827_586L;
     private static final long SNAPSHOT_MAX_CAP_DISPLAY_KRW = 500_000L;
 
+    private final com.workproofpay.backend.advance.repo.AdvancePayoutRepository advancePayoutRepository = mock(com.workproofpay.backend.advance.repo.AdvancePayoutRepository.class);
     private final com.workproofpay.backend.advance.repo.AdvanceRequestRepository advanceRequestRepository = mock(com.workproofpay.backend.advance.repo.AdvanceRequestRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final WorkplaceRepository workplaceRepository = mock(WorkplaceRepository.class);
@@ -40,15 +42,18 @@ class AdvanceServiceTest {
     private final WorkProofRepository workProofRepository = mock(WorkProofRepository.class);
     private final WorkProofLane1Service workProofLane1Service = mock(WorkProofLane1Service.class);
     private final AdvancePolicyEngine advancePolicyEngine = new AdvancePolicyEngine();
+    private final AdvanceRequestViewStatusResolver advanceRequestViewStatusResolver = new AdvanceRequestViewStatusResolver();
 
     private final AdvanceService service = new AdvanceService(
             advanceRequestRepository,
+            advancePayoutRepository,
             userRepository,
             workplaceRepository,
             workContractRepository,
             workProofRepository,
             workProofLane1Service,
-            advancePolicyEngine
+            advancePolicyEngine,
+            advanceRequestViewStatusResolver
     );
 
     @Test
@@ -95,6 +100,7 @@ class AdvanceServiceTest {
         when(existing.getSnapshotNeedsReviewRecordCount()).thenReturn(0);
         when(existing.getWorkplace()).thenReturn(mock(com.workproofpay.backend.workproof.model.Workplace.class));
         when(existing.getCreatedAt()).thenReturn(LocalDateTime.of(2026, 3, 16, 10, 0));
+        when(advancePayoutRepository.findByAdvanceRequestId(9L)).thenReturn(java.util.Optional.empty());
 
         AdvanceCreateResult result = service.createRequest(1L, "idem-1", request);
 

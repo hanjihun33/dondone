@@ -16,6 +16,8 @@ public record AdvanceRequestDetailResponse(
         Long feeAmountAtomic,
         Long feeDisplayKrwAmount,
         String status,
+        String requestStatus,
+        String payoutStatus,
         LocalDate repaymentDueDate,
         AdvanceEligibilitySnapshotResponse eligibilitySnapshot,
         LocalDateTime createdAt

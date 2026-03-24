@@ -16,6 +16,7 @@ import java.util.Optional;
 public interface AdvancePayoutRepository extends JpaRepository<AdvancePayout, String> {
     Optional<AdvancePayout> findByAdvancePayoutIdAndUserId(String advancePayoutId, Long userId);
     Optional<AdvancePayout> findByAdvanceRequestId(Long advanceRequestId);
+    List<AdvancePayout> findByAdvanceRequestIdIn(Collection<Long> advanceRequestIds);
     Optional<AdvancePayout> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
     List<AdvancePayout> findByUserIdOrderByCreatedAtDescAdvancePayoutIdDesc(Long userId, Pageable pageable);
     List<AdvancePayout> findByStatusInOrderByUpdatedAtDescAdvancePayoutIdDesc(Collection<AdvancePayoutStatus> statuses, Pageable pageable);
