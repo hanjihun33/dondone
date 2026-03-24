@@ -20,7 +20,10 @@ import com.workproofpay.backend.employerauth.service.EmployerSignupCodeCryptoSer
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.shared.util.CompanyCodeUtils;
+import com.workproofpay.backend.workproof.model.WorkContract;
+import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
 import com.workproofpay.backend.workproof.model.Workplace;
+import com.workproofpay.backend.workproof.repo.WorkContractRepository;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -28,7 +31,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Comparator;
@@ -47,6 +52,7 @@ public class AdminEmployerCompanyService {
     private static final double PLACEHOLDER_LATITUDE = 37.5665;
     private static final double PLACEHOLDER_LONGITUDE = 126.9780;
     private static final int PLACEHOLDER_ALLOWED_RADIUS_METERS = 300;
+    private static final BigDecimal DEFAULT_CONTRACT_BASE_PAY = BigDecimal.valueOf(12_000);
     private static final char[] SIGNUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
     private static final int SIGNUP_CODE_SEGMENT_LENGTH = 4;
     private static final int SIGNUP_CODE_SEGMENT_COUNT = 3;
@@ -56,6 +62,7 @@ public class AdminEmployerCompanyService {
     private final CompanyRepository companyRepository;
     private final EmployerProfileRepository employerProfileRepository;
     private final WorkplaceRepository workplaceRepository;
+    private final WorkContractRepository workContractRepository;
     private final EmployerSignupCodeRepository employerSignupCodeRepository;
     private final EmployerSignupCodeCryptoService employerSignupCodeCryptoService;
 
@@ -83,6 +90,15 @@ public class AdminEmployerCompanyService {
                 PLACEHOLDER_LATITUDE,
                 PLACEHOLDER_LONGITUDE,
                 PLACEHOLDER_ALLOWED_RADIUS_METERS
+        ));
+        workContractRepository.save(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                DEFAULT_CONTRACT_BASE_PAY,
+                null,
+                null,
+                DEFAULT_CONTRACT_BASE_PAY,
+                LocalDate.now()
         ));
 
         company.bindDefaultWorkplace(workplace.getId());

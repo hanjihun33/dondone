@@ -20,10 +20,14 @@ import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
 import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
 import com.workproofpay.backend.employerauth.service.EmployerSignupCodeCryptoService;
+import com.workproofpay.backend.remittance.repo.UserWalletRepository;
 import com.workproofpay.backend.workproof.api.dto.request.WorkProofAttachmentMetadataRequest;
+import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.model.WorkProof;
 import com.workproofpay.backend.workproof.model.WorkProofAuditLog;
+import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
 import com.workproofpay.backend.workproof.model.Workplace;
+import com.workproofpay.backend.workproof.repo.WorkContractRepository;
 import com.workproofpay.backend.workproof.repo.WorkProofAuditLogRepository;
 import com.workproofpay.backend.workproof.repo.WorkProofRepository;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
@@ -38,6 +42,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.math.BigDecimal;
 
 @Profile("demo")
 @Component
@@ -73,9 +78,11 @@ public class DevEmployerInitializer implements CommandLineRunner {
     private final EmployerSignupCodeRepository employerSignupCodeRepository;
     private final EmployerSignupCodeCryptoService employerSignupCodeCryptoService;
     private final WorkProofRepository workProofRepository;
+    private final WorkContractRepository workContractRepository;
     private final CorrectionRequestRepository correctionRequestRepository;
     private final CorrectionDecisionAuditRepository correctionDecisionAuditRepository;
     private final WorkProofAuditLogRepository workProofAuditLogRepository;
+    private final UserWalletRepository userWalletRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -142,9 +149,11 @@ public class DevEmployerInitializer implements CommandLineRunner {
         employmentMembershipRepository.deleteAll(
                 employmentMembershipRepository.findByCompanyIdAndWorkplaceId(companyId, workplaceId)
         );
+        workContractRepository.deleteAll(workContractRepository.findByWorkplaceId(workplaceId));
         employerSignupCodeRepository.deleteAll(
                 employerSignupCodeRepository.findByCompanyIdAndDefaultWorkplaceId(companyId, workplaceId)
         );
+        userWalletRepository.deleteAllById(seededWorkerIds);
         employerProfileRepository.delete(employerProfile);
         workplaceRepository.findById(workplaceId).ifPresent(workplaceRepository::delete);
         companyRepository.findById(companyId).ifPresent(companyRepository::delete);
@@ -196,16 +205,17 @@ public class DevEmployerInitializer implements CommandLineRunner {
         createMembership(workingWorker, company, workplace);
         createMembership(reviewWorker, company, workplace);
         createMembership(noRecordWorker, company, workplace);
+        WorkContract activeContract = createActiveContract(workplace);
 
         LocalDate today = LocalDate.now();
 
-        createCompletedTodayWorkProof(completedWorker, workplace, today);
-        createWorkingTodayWorkProof(workingWorker, workplace, today);
-        createReviewTodayWorkProof(reviewWorker, workplace, today);
+        createCompletedTodayWorkProof(completedWorker, workplace, activeContract, today);
+        createWorkingTodayWorkProof(workingWorker, workplace, activeContract, today);
+        createReviewTodayWorkProof(reviewWorker, workplace, activeContract, today);
 
-        createPendingCorrectionSeed(completedWorker, company, workplace, today.minusDays(1));
-        createApprovedCorrectionSeed(workingWorker, employerUser, company, workplace, today.minusDays(2));
-        createRejectedCorrectionSeed(reviewWorker, employerUser, company, workplace, today.minusDays(3));
+        createPendingCorrectionSeed(completedWorker, company, workplace, activeContract, today.minusDays(1));
+        createApprovedCorrectionSeed(workingWorker, employerUser, company, workplace, activeContract, today.minusDays(2));
+        createRejectedCorrectionSeed(reviewWorker, employerUser, company, workplace, activeContract, today.minusDays(3));
     }
 
     private User createWorker(String email, String name, String phoneNumber) {
@@ -226,11 +236,23 @@ public class DevEmployerInitializer implements CommandLineRunner {
         ));
     }
 
-    private void createCompletedTodayWorkProof(User worker, Workplace workplace, LocalDate date) {
+    private WorkContract createActiveContract(Workplace workplace) {
+        return workContractRepository.save(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(12_000),
+                null,
+                null,
+                BigDecimal.valueOf(12_000),
+                MEMBERSHIP_START_DATE
+        ));
+    }
+
+    private void createCompletedTodayWorkProof(User worker, Workplace workplace, WorkContract contract, LocalDate date) {
         WorkProof workProof = WorkProof.checkIn(
                 worker,
                 workplace,
-                null,
+                contract,
                 date.atTime(9, 0),
                 date.atTime(9, 1),
                 WORKPLACE_LATITUDE,
@@ -248,11 +270,11 @@ public class DevEmployerInitializer implements CommandLineRunner {
         workProofRepository.save(workProof);
     }
 
-    private void createWorkingTodayWorkProof(User worker, Workplace workplace, LocalDate date) {
+    private void createWorkingTodayWorkProof(User worker, Workplace workplace, WorkContract contract, LocalDate date) {
         workProofRepository.save(WorkProof.checkIn(
                 worker,
                 workplace,
-                null,
+                contract,
                 date.atTime(9, 12),
                 date.atTime(9, 13),
                 WORKPLACE_LATITUDE,
@@ -261,11 +283,11 @@ public class DevEmployerInitializer implements CommandLineRunner {
         ));
     }
 
-    private void createReviewTodayWorkProof(User worker, Workplace workplace, LocalDate date) {
+    private void createReviewTodayWorkProof(User worker, Workplace workplace, WorkContract contract, LocalDate date) {
         WorkProof workProof = WorkProof.checkIn(
                 worker,
                 workplace,
-                null,
+                contract,
                 date.atTime(8, 55),
                 date.atTime(8, 56),
                 WORKPLACE_LATITUDE,
@@ -295,10 +317,11 @@ public class DevEmployerInitializer implements CommandLineRunner {
         workProofRepository.save(workProof);
     }
 
-    private void createPendingCorrectionSeed(User worker, Company company, Workplace workplace, LocalDate date) {
+    private void createPendingCorrectionSeed(User worker, Company company, Workplace workplace, WorkContract contract, LocalDate date) {
         WorkProof workProof = createHistoricalReflectedWorkProof(
                 worker,
                 workplace,
+                contract,
                 date,
                 9,
                 3,
@@ -329,10 +352,11 @@ public class DevEmployerInitializer implements CommandLineRunner {
         ));
     }
 
-    private void createApprovedCorrectionSeed(User worker, User employerUser, Company company, Workplace workplace, LocalDate date) {
+    private void createApprovedCorrectionSeed(User worker, User employerUser, Company company, Workplace workplace, WorkContract contract, LocalDate date) {
         WorkProof workProof = createHistoricalReflectedWorkProof(
                 worker,
                 workplace,
+                contract,
                 date,
                 8,
                 57,
@@ -412,10 +436,11 @@ public class DevEmployerInitializer implements CommandLineRunner {
         ));
     }
 
-    private void createRejectedCorrectionSeed(User worker, User employerUser, Company company, Workplace workplace, LocalDate date) {
+    private void createRejectedCorrectionSeed(User worker, User employerUser, Company company, Workplace workplace, WorkContract contract, LocalDate date) {
         WorkProof workProof = createHistoricalReflectedWorkProof(
                 worker,
                 workplace,
+                contract,
                 date,
                 9,
                 14,
@@ -461,6 +486,7 @@ public class DevEmployerInitializer implements CommandLineRunner {
 
     private WorkProof createHistoricalReflectedWorkProof(User worker,
                                                          Workplace workplace,
+                                                         WorkContract contract,
                                                          LocalDate date,
                                                          int checkInHour,
                                                          int checkInMinute,
@@ -470,7 +496,7 @@ public class DevEmployerInitializer implements CommandLineRunner {
         WorkProof workProof = WorkProof.checkIn(
                 worker,
                 workplace,
-                null,
+                contract,
                 date.atTime(checkInHour, checkInMinute),
                 date.atTime(checkInHour, checkInMinute).plusMinutes(1),
                 WORKPLACE_LATITUDE,

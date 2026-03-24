@@ -10,5 +10,7 @@ public interface WorkplaceRepository extends JpaRepository<Workplace, Long> {
 
     List<Workplace> findByUserIdOrderByCreatedAtDesc(Long userId);
 
+    List<Workplace> findByIdInOrderByCreatedAtDesc(List<Long> ids);
+
     Optional<Workplace> findByIdAndUserId(Long id, Long userId);
 }

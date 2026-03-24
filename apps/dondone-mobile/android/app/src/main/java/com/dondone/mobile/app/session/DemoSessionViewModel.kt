@@ -1140,7 +1140,7 @@ class DemoSessionViewModel(
                     name = trimmedName,
                     phoneNumber = normalizedPhoneNumber
                 )
-                _authUiState.value = AuthUiState.authenticated(updatedSession)
+                onAuthenticated(updatedSession)
                 _profileUpdateUiState.value = ProfileUpdateUiState(message = "내 정보를 수정했어요.")
             } catch (error: AuthUnauthorizedException) {
                 expireSession(error.message)
