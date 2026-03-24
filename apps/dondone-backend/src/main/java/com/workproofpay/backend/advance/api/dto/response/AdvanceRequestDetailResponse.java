@@ -18,6 +18,7 @@ public record AdvanceRequestDetailResponse(
         String status,
         String requestStatus,
         String payoutStatus,
+        String payoutTxHash,
         LocalDate repaymentDueDate,
         AdvanceEligibilitySnapshotResponse eligibilitySnapshot,
         LocalDateTime createdAt

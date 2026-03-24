@@ -16,6 +16,7 @@ public record AdvanceRequestListItemResponse(
         String status,
         String requestStatus,
         String payoutStatus,
+        String payoutTxHash,
         LocalDate repaymentDueDate,
         LocalDateTime requestedAt
 ) {

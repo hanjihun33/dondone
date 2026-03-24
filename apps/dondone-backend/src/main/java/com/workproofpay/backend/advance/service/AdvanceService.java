@@ -212,6 +212,7 @@ public class AdvanceService {
                 viewStatus.status(),
                 viewStatus.requestStatus(),
                 viewStatus.payoutStatus(),
+                payout != null ? payout.getTxHash() : null,
                 request.getRepaymentDueDate(),
                 request.getRequestedAt()
         );
@@ -234,6 +235,7 @@ public class AdvanceService {
                 viewStatus.status(),
                 viewStatus.requestStatus(),
                 viewStatus.payoutStatus(),
+                payout != null ? payout.getTxHash() : null,
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request),
                 request.getCreatedAt()
