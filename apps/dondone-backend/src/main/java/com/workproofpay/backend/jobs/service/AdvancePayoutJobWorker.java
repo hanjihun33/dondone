@@ -8,20 +8,27 @@ import com.workproofpay.backend.jobs.model.JobReferenceKind;
 import com.workproofpay.backend.jobs.model.JobStatus;
 import com.workproofpay.backend.jobs.model.JobType;
 import com.workproofpay.backend.jobs.repo.JobRepository;
+import com.workproofpay.backend.remittance.adapter.ChainReceiptLookupException;
+import com.workproofpay.backend.remittance.adapter.ChainReceiptResult;
 import com.workproofpay.backend.remittance.adapter.PreparedTokenTransfer;
 import com.workproofpay.backend.remittance.adapter.RemittanceBlockchainGateway;
 import com.workproofpay.backend.remittance.config.RemittanceProperties;
+import com.workproofpay.backend.remittance.model.TransferFailureCode;
 import com.workproofpay.backend.remittance.service.WalletCryptoService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigInteger;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class AdvancePayoutJobWorker {
+
+    private static final List<JobStatus> ACTIVE_JOB_STATUSES = List.of(JobStatus.QUEUED, JobStatus.RUNNING);
 
     private final JobRepository jobRepository;
     private final AdvancePayoutRepository advancePayoutRepository;
@@ -29,6 +36,7 @@ public class AdvancePayoutJobWorker {
     private final WalletCryptoService walletCryptoService;
     private final RemittanceProperties properties;
     private final TransactionTemplate transactionTemplate;
+    private final JobService jobService;
 
     public AdvancePayoutJobWorker(
             JobRepository jobRepository,
@@ -36,7 +44,8 @@ public class AdvancePayoutJobWorker {
             RemittanceBlockchainGateway blockchainGateway,
             WalletCryptoService walletCryptoService,
             RemittanceProperties properties,
-            TransactionTemplate transactionTemplate
+            TransactionTemplate transactionTemplate,
+            JobService jobService
     ) {
         this.jobRepository = jobRepository;
         this.advancePayoutRepository = advancePayoutRepository;
@@ -44,6 +53,7 @@ public class AdvancePayoutJobWorker {
         this.walletCryptoService = walletCryptoService;
         this.properties = properties;
         this.transactionTemplate = transactionTemplate;
+        this.jobService = jobService;
     }
 
     @Scheduled(fixedDelayString = "${remittance.worker.poll-interval-ms:2000}")
@@ -75,11 +85,12 @@ public class AdvancePayoutJobWorker {
         }
 
         try {
-            if (claimedJob.jobType() == JobType.SUBMIT_ADVANCE_PAYOUT) {
-                handleSubmit(claimedJob);
+            switch (claimedJob.jobType()) {
+                case SUBMIT_ADVANCE_PAYOUT -> handleSubmit(claimedJob);
+                case POLL_ADVANCE_PAYOUT_RECEIPT -> handlePoll(claimedJob);
             }
         } catch (Exception e) {
-            handleFailure(claimedJob.jobId(), e);
+            handleFailure(claimedJob.jobId(), claimedJob.jobType(), claimedJob.referenceId(), e);
         }
     }
 
@@ -137,10 +148,65 @@ public class AdvancePayoutJobWorker {
         if (payout.getStatus() == AdvancePayoutStatus.SIGNED) {
             payout.markBroadcasted();
         }
+        enqueuePollJobIfAbsent(advancePayoutId);
         requiredJob(jobId).markDone();
     }
 
-    private void handleFailure(Long jobId, Exception e) {
+    private void handlePoll(ClaimedJob claimedJob) {
+        try {
+            PollTarget pollTarget = transactionTemplate.execute(status -> {
+                AdvancePayout payout = requiredPayout(claimedJob.referenceId());
+                if (payout.getStatus() != AdvancePayoutStatus.BROADCASTED || payout.getTxHash() == null) {
+                    return null;
+                }
+                return new PollTarget(payout.getAdvancePayoutId(), payout.getTxHash());
+            });
+
+            if (pollTarget == null) {
+                markJobDone(claimedJob.jobId());
+                return;
+            }
+
+            Optional<ChainReceiptResult> receiptResult = blockchainGateway.getReceipt(pollTarget.txHash());
+            transactionTemplate.executeWithoutResult(status -> applyPollResult(claimedJob.jobId(), pollTarget.advancePayoutId(), receiptResult));
+        } catch (ChainReceiptLookupException e) {
+            transactionTemplate.executeWithoutResult(status -> requeueClaimedJob(claimedJob.jobId(), nextPollAt(), e.getMessage()));
+        }
+    }
+
+    private void applyPollResult(Long jobId, String advancePayoutId, Optional<ChainReceiptResult> receiptResult) {
+        Job job = requiredJob(jobId);
+        AdvancePayout payout = requiredPayout(advancePayoutId);
+        if (payout.getStatus() != AdvancePayoutStatus.BROADCASTED || payout.getTxHash() == null) {
+            job.markDone();
+            return;
+        }
+
+        if (receiptResult.isEmpty()) {
+            if (isReceiptTimedOut(payout) && !blockchainGateway.isTransactionKnown(payout.getTxHash())) {
+                payout.markTimedOut(TransferFailureCode.NETWORK_ERROR.name());
+                job.markDone();
+                return;
+            }
+            if (isReceiptTimedOut(payout)) {
+                job.requeue(nextPollAt(), "receipt delayed for known transaction");
+                return;
+            }
+            job.requeue(nextPollAt(), null);
+            return;
+        }
+
+        if (receiptResult.get().success()) {
+            payout.markConfirmed();
+            job.markDone();
+            return;
+        }
+
+        payout.markFailed(receiptFailureReason(receiptResult.get()));
+        job.markDone();
+    }
+
+    private void handleFailure(Long jobId, JobType jobType, String referenceId, Exception e) {
         transactionTemplate.executeWithoutResult(status -> {
             Job job = requiredJob(jobId);
             if (job.getStatus() != JobStatus.RUNNING) {
@@ -148,7 +214,11 @@ public class AdvancePayoutJobWorker {
             }
 
             if (job.getAttemptCount() > properties.getPolicy().getMaxAutoRetryCount()) {
-                markPayoutFailed(job.getReferenceId(), e.getMessage());
+                if (jobType == JobType.SUBMIT_ADVANCE_PAYOUT && keepBroadcastedPayoutTrackable(referenceId)) {
+                    job.markFailed(e.getMessage());
+                    return;
+                }
+                markPayoutFailed(referenceId, e.getMessage());
                 job.markFailed(e.getMessage());
                 return;
             }
@@ -178,6 +248,34 @@ public class AdvancePayoutJobWorker {
         }
     }
 
+    private boolean keepBroadcastedPayoutTrackable(String advancePayoutId) {
+        AdvancePayout payout = advancePayoutRepository.findById(advancePayoutId).orElse(null);
+        if (payout == null || payout.getStatus() != AdvancePayoutStatus.BROADCASTED || payout.getTxHash() == null) {
+            return false;
+        }
+        enqueuePollJobIfAbsent(advancePayoutId);
+        return true;
+    }
+
+    private void enqueuePollJobIfAbsent(String advancePayoutId) {
+        if (jobRepository.existsByReferenceKindAndReferenceIdAndJobTypeAndStatusIn(
+                JobReferenceKind.ADVANCE_PAYOUT,
+                advancePayoutId,
+                JobType.POLL_ADVANCE_PAYOUT_RECEIPT,
+                ACTIVE_JOB_STATUSES
+        )) {
+            return;
+        }
+        jobService.enqueue(JobReferenceKind.ADVANCE_PAYOUT, JobType.POLL_ADVANCE_PAYOUT_RECEIPT, advancePayoutId, nextPollAt());
+    }
+
+    private void requeueClaimedJob(Long jobId, LocalDateTime nextRunAt, String lastError) {
+        Job job = requiredJob(jobId);
+        if (job.getStatus() == JobStatus.RUNNING) {
+            job.requeue(nextRunAt, lastError);
+        }
+    }
+
     private AdvancePayout requiredPayout(String advancePayoutId) {
         return advancePayoutRepository.findByIdForUpdate(advancePayoutId).orElseThrow();
     }
@@ -202,6 +300,19 @@ public class AdvancePayoutJobWorker {
         return privateKey;
     }
 
+    private LocalDateTime nextPollAt() {
+        return LocalDateTime.now().plusSeconds(properties.getWorker().getReceiptPollDelaySeconds());
+    }
+
+    private boolean isReceiptTimedOut(AdvancePayout payout) {
+        return Duration.between(payout.getUpdatedAt(), LocalDateTime.now()).getSeconds()
+                >= properties.getWorker().getReceiptTimeoutSeconds();
+    }
+
+    private String receiptFailureReason(ChainReceiptResult receiptResult) {
+        return receiptResult.failureCode() == null ? TransferFailureCode.UNKNOWN.name() : receiptResult.failureCode().name();
+    }
+
     private record PendingSubmission(
             String advancePayoutId,
             String signedTransaction
@@ -212,6 +323,12 @@ public class AdvancePayoutJobWorker {
             Long jobId,
             JobType jobType,
             String referenceId
+    ) {
+    }
+
+    private record PollTarget(
+            String advancePayoutId,
+            String txHash
     ) {
     }
 }
