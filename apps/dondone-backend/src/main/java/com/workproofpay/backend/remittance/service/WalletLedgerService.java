@@ -70,19 +70,7 @@ public class WalletLedgerService {
     }
 
     private WalletLedgerItemResponse toTransferEntry(Transfer transfer, Long userId) {
-        boolean outbound = userId.equals(transfer.getUserId());
-        return new WalletLedgerItemResponse(
-                transfer.getTransferId(),
-                WalletLedgerEntryType.REMITTANCE_TRANSFER,
-                outbound ? WalletLedgerDirection.OUTBOUND : WalletLedgerDirection.INBOUND,
-                transfer.getStatus().name(),
-                transfer.getAssetSymbol(),
-                transfer.getAmountAtomic(),
-                transfer.getTxHash(),
-                occurredAt(transfer.getUpdatedAt(), transfer.getCreatedAt()),
-                outbound ? transfer.getRecipientAliasSnapshot() : defaultIfBlank(transfer.getUser().getName(), transfer.getSenderAddress()),
-                null
-        );
+        return RemittanceReadModelMapper.toLedgerTransferEntry(transfer, userId);
     }
 
     private WalletLedgerItemResponse toAdvancePayoutEntry(AdvancePayout payout) {
@@ -110,12 +98,5 @@ public class WalletLedgerService {
         }
         return "약 ₩" + NumberFormat.getNumberInstance(Locale.KOREA)
                 .format(payout.getAdvanceRequest().getApprovedDisplayKrwAmount()) + " 상당";
-    }
-
-    private String defaultIfBlank(String preferred, String fallback) {
-        if (preferred == null || preferred.isBlank()) {
-            return fallback;
-        }
-        return preferred;
     }
 }

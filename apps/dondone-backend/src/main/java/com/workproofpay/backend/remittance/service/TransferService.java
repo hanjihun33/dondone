@@ -119,22 +119,7 @@ public class TransferService {
         }
         return new TransferListResponse(
                 transfers.stream()
-                        .map(transfer -> new TransferListItemResponse(
-                                transfer.getTransferId(),
-                                resolveDirection(transfer, userId),
-                                transfer.getStatus().name(),
-                                transfer.getAssetSymbol(),
-                                transfer.getAmountAtomic(),
-                                transfer.getSenderAddress(),
-                                transfer.getUser().getName(),
-                                transfer.getRecipientId(),
-                                transfer.getRecipientAliasSnapshot(),
-                                transfer.getRecipientAddress(),
-                                transfer.getTxHash(),
-                                transfer.getNetworkFeeWei(),
-                                getNetworkFeeAssetSymbol(),
-                                transfer.getUpdatedAt()
-                        ))
+                        .map(transfer -> RemittanceReadModelMapper.toTransferListItemResponse(transfer, userId))
                         .toList()
         );
     }
@@ -144,32 +129,7 @@ public class TransferService {
         Transfer transfer = transferRepository.findAccessibleTransferByTransferId(transferId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.TRANSFER_NOT_FOUND));
 
-        return new TransferDetailResponse(
-                transfer.getTransferId(),
-                resolveDirection(transfer, userId),
-                transfer.getStatus().name(),
-                transfer.getAssetSymbol(),
-                transfer.getAmountAtomic(),
-                transfer.getSenderAddress(),
-                transfer.getUser().getName(),
-                transfer.getRecipientId(),
-                transfer.getRecipientAliasSnapshot(),
-                transfer.getRecipientAddress(),
-                transfer.getTxHash(),
-                transfer.getNetworkFeeWei(),
-                getNetworkFeeAssetSymbol(),
-                transfer.getFailureCode() == null ? null : transfer.getFailureCode().name(),
-                transfer.getCreatedAt(),
-                transfer.getUpdatedAt()
-        );
-    }
-
-    private String resolveDirection(Transfer transfer, Long userId) {
-        return userId.equals(transfer.getUserId()) ? "EXPENSE" : "INCOME";
-    }
-
-    private String getNetworkFeeAssetSymbol() {
-        return "ETH";
+        return RemittanceReadModelMapper.toTransferDetailResponse(transfer, userId);
     }
 
     private CreateTransferResponse toCreateResponse(Transfer transfer) {
