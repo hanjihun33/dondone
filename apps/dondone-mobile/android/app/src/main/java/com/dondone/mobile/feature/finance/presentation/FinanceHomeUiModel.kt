@@ -63,6 +63,8 @@ data class FinanceAdvanceRequestDetailUiModel(
     val isLoading: Boolean,
     val titleText: String,
     val stateText: String,
+    val payoutStatusText: String,
+    val payoutTxHashText: String?,
     val requestedAmountText: String,
     val approvedAmountText: String,
     val feeAmountText: String,
@@ -239,9 +241,15 @@ fun DemoState.toFinanceHomeUiModel(
     val remoteMode = remoteState?.mode
     val remoteRequests = if (remoteMode == AdvanceRemoteMode.CONTENT) remoteState.requests else emptyList()
     val latestRemoteRequest = remoteRequests.maxByOrNull { it.requestId }
-    val remoteUsedAmount = remoteRequests.sumOf { it.approvedAmount ?: 0L }
+    val remoteEligibility = remoteState?.eligibility
+    val remoteAssetSymbol = remoteEligibility?.assetSymbol ?: latestRemoteRequest?.assetSymbol.orEmpty()
+    val remoteAssetDecimals = remoteEligibility?.assetDecimals ?: latestRemoteRequest?.assetDecimals ?: 6
+    val remoteUsedAmountAtomic = remoteRequests.sumOf { it.approvedAmountAtomic ?: 0L }
+    val remoteUsedDisplayKrwAmount = remoteRequests.sumOf { it.approvedDisplayKrwAmount ?: 0L }
+    val remoteAvailableAmountAtomic = remoteEligibility?.availableAmountAtomic ?: 0L
+    val remoteAvailableDisplayKrwAmount = remoteEligibility?.availableDisplayKrwAmount ?: 0L
     val remoteAvailableAmount = if (usesRemoteAdvance) {
-        advanceContractState.availableAmountOverride ?: 0L
+        remoteEligibility?.availableAmountInWholeAssetUnits?.toLong() ?: 0L
     } else {
         advanceSnapshot.available.toLong()
     }
@@ -319,20 +327,39 @@ fun DemoState.toFinanceHomeUiModel(
     val detailReflectedCountText = if (usesRemoteAdvance) "-" else "${advanceSnapshot.verifiedDays}일"
     val detailUnreflectedCountText = if (usesRemoteAdvance) "-" else "${unreflectedDays}일"
     val detailRequestAmountText = when {
-        latestRemoteRequest != null -> formatKrw(latestRemoteRequest.requestedAmount.toInt())
+        latestRemoteRequest != null -> formatAdvanceAmount(
+            amountAtomic = latestRemoteRequest.requestedAmountAtomic,
+            displayKrwAmount = latestRemoteRequest.requestedDisplayKrwAmount,
+            assetDecimals = latestRemoteRequest.assetDecimals,
+            assetSymbol = latestRemoteRequest.assetSymbol
+        )
         usesRemoteAdvance -> "-"
         else -> formatKrw(advanceSnapshot.requestAmount)
     }
     val detailReceiveAmountText = when {
-        latestRemoteRequest != null -> latestRemoteRequest.approvedAmount?.toInt()?.let(::formatKrw) ?: "승인 대기"
+        latestRemoteRequest != null -> latestRemoteRequest.approvedAmountAtomic?.let { approvedAmountAtomic ->
+            formatAdvanceAmount(
+                amountAtomic = approvedAmountAtomic,
+                displayKrwAmount = latestRemoteRequest.approvedDisplayKrwAmount,
+                assetDecimals = latestRemoteRequest.assetDecimals,
+                assetSymbol = latestRemoteRequest.assetSymbol
+            )
+        } ?: "승인 대기"
         usesRemoteAdvance -> "-"
         else -> formatKrw(advanceSnapshot.receiveAmount)
     }
     val detailFeeText = when {
-        latestRemoteRequest != null ->
-            latestRemoteRequest.approvedAmount?.let { approvedAmount ->
-                formatKrw((latestRemoteRequest.requestedAmount - approvedAmount).toInt())
-            } ?: "-"
+        latestRemoteRequest != null -> latestRemoteRequest.approvedAmountAtomic?.let { approvedAmountAtomic ->
+            val feeAmountAtomic = (latestRemoteRequest.requestedAmountAtomic - approvedAmountAtomic).coerceAtLeast(0L)
+            val feeDisplayKrwAmount =
+                (latestRemoteRequest.requestedDisplayKrwAmount - (latestRemoteRequest.approvedDisplayKrwAmount ?: 0L)).coerceAtLeast(0L)
+            formatAdvanceAmount(
+                amountAtomic = feeAmountAtomic,
+                displayKrwAmount = feeDisplayKrwAmount,
+                assetDecimals = latestRemoteRequest.assetDecimals,
+                assetSymbol = latestRemoteRequest.assetSymbol
+            )
+        } ?: "-"
 
         usesRemoteAdvance -> "-"
         else -> formatKrw(advanceSnapshot.fee)
@@ -346,15 +373,40 @@ fun DemoState.toFinanceHomeUiModel(
     val advanceAmountOptions = buildAmountOptions(
         available = if (usesRemoteAdvance) remoteAvailableAmount.toInt() else advanceSnapshot.available,
         selected = effectiveSelectedAdvanceAmount,
-        presets = listOf(50_000, 100_000, 150_000, 200_000)
+        presets = if (usesRemoteAdvance) listOf(10, 25, 50, 100) else listOf(50_000, 100_000, 150_000, 200_000),
+        labelFormatter = if (usesRemoteAdvance) {
+            { amount -> "$amount $remoteAssetSymbol" }
+        } else {
+            ::formatKrw
+        }
     )
     val selectedRequestText = if (usesRemoteAdvance && advanceContractState.canRequest) {
-        formatKrw(effectiveSelectedAdvanceAmount)
+        formatWholeAdvanceUnits(
+            amount = effectiveSelectedAdvanceAmount,
+            assetSymbol = remoteAssetSymbol,
+            displayKrwAmount = remoteEligibility?.let {
+                if (it.availableAmountInWholeAssetUnits > 0) {
+                    (it.availableDisplayKrwAmount * effectiveSelectedAdvanceAmount) / it.availableAmountInWholeAssetUnits
+                } else {
+                    0L
+                }
+            } ?: 0L
+        )
     } else {
         detailRequestAmountText
     }
     val selectedReceiveText = if (usesRemoteAdvance && advanceContractState.canRequest) {
-        formatKrw(effectiveSelectedAdvanceAmount)
+        formatWholeAdvanceUnits(
+            amount = effectiveSelectedAdvanceAmount,
+            assetSymbol = remoteAssetSymbol,
+            displayKrwAmount = remoteEligibility?.let {
+                if (it.availableAmountInWholeAssetUnits > 0) {
+                    (it.availableDisplayKrwAmount * effectiveSelectedAdvanceAmount) / it.availableAmountInWholeAssetUnits
+                } else {
+                    0L
+                }
+            } ?: 0L
+        )
     } else {
         detailReceiveAmountText
     }
@@ -505,7 +557,16 @@ fun DemoState.toFinanceHomeUiModel(
         ),
         advance = FinanceAdvanceUiModel(
             surfaceState = advanceContractState.surfaceState,
-            availableText = formatKrw(remoteAvailableAmount.toInt()),
+            availableText = if (usesRemoteAdvance) {
+                formatAdvanceAmount(
+                    amountAtomic = remoteAvailableAmountAtomic,
+                    displayKrwAmount = remoteAvailableDisplayKrwAmount,
+                    assetDecimals = remoteAssetDecimals,
+                    assetSymbol = remoteAssetSymbol
+                )
+            } else {
+                formatKrw(remoteAvailableAmount.toInt())
+            },
             repaymentDueText = remoteRepaymentDueText,
             statusText = advanceContractState.repaymentTier,
             sourceLabelText = advanceContractState.sourceLabelText,
@@ -524,8 +585,26 @@ fun DemoState.toFinanceHomeUiModel(
                 stateBodyText = advanceContractState.stateBodyText,
                 noticeTitleText = advanceContractState.noticeTitleText,
                 noticeBodyText = advanceContractState.noticeBodyText,
-                availableText = formatKrw(remoteAvailableAmount.toInt()),
-                usedText = formatKrw(remoteUsedAmount.toInt()),
+                availableText = if (usesRemoteAdvance) {
+                    formatAdvanceAmount(
+                        amountAtomic = remoteAvailableAmountAtomic,
+                        displayKrwAmount = remoteAvailableDisplayKrwAmount,
+                        assetDecimals = remoteAssetDecimals,
+                        assetSymbol = remoteAssetSymbol
+                    )
+                } else {
+                    formatKrw(remoteAvailableAmount.toInt())
+                },
+                usedText = if (usesRemoteAdvance) {
+                    formatAdvanceAmount(
+                        amountAtomic = remoteUsedAmountAtomic,
+                        displayKrwAmount = remoteUsedDisplayKrwAmount,
+                        assetDecimals = remoteAssetDecimals,
+                        assetSymbol = remoteAssetSymbol
+                    )
+                } else {
+                    formatKrw(advanceSnapshot.used)
+                },
                 repaymentDueText = remoteRepaymentDueText,
                 calendarSummaryText = detailCalendarSummaryText,
                 updatedAtText = detailUpdatedAtText,
@@ -552,7 +631,8 @@ fun DemoState.toFinanceHomeUiModel(
                     buildAmountOptions(
                         available = remoteAvailableAmount.toInt(),
                         selected = effectiveSelectedAdvanceAmount,
-                        presets = listOf(50_000, 100_000, 150_000, 200_000)
+                        presets = listOf(10, 25, 50, 100),
+                        labelFormatter = { amount -> "$amount $remoteAssetSymbol" }
                     )
                 } else {
                     advanceAmountOptions
@@ -882,8 +962,29 @@ private fun buildRemoteAdvanceHistoryItems(
             FinanceAdvanceHistoryUiModel(
                 requestId = request.requestId,
                 title = "요청 #${request.requestId}",
-                metaText = "${request.status} · 상환 예정 ${request.repaymentDueDate}",
-                valueText = request.approvedAmount?.toInt()?.let(::formatKrw) ?: "승인 대기",
+                metaText = buildString {
+                    append(formatAdvanceStatusLabel(request.status, request.payoutStatus))
+                    append(" · 상환 예정 ")
+                    append(request.repaymentDueDate)
+                    request.payoutTxHash?.takeIf { it.isNotBlank() }?.let { txHash ->
+                        append("\nTX ")
+                        append(txHash.take(10))
+                        append("...")
+                    }
+                },
+                valueText = request.approvedAmountAtomic?.let { approvedAmountAtomic ->
+                    formatAdvanceAmount(
+                        amountAtomic = approvedAmountAtomic,
+                        displayKrwAmount = request.approvedDisplayKrwAmount,
+                        assetDecimals = request.assetDecimals,
+                        assetSymbol = request.assetSymbol
+                    )
+                } ?: formatAdvanceAmount(
+                    amountAtomic = request.requestedAmountAtomic,
+                    displayKrwAmount = request.requestedDisplayKrwAmount,
+                    assetDecimals = request.assetDecimals,
+                    assetSymbol = request.assetSymbol
+                ),
                 clickable = true
             )
         }
@@ -896,13 +997,50 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
         isLoading = isLoading,
         titleText = detailValue?.let { "요청 #${it.requestId}" } ?: "신청 상세",
         stateText = detailValue?.status ?: "-",
-        requestedAmountText = detailValue?.requestedAmount?.toInt()?.let(::formatKrw) ?: "-",
-        approvedAmountText = detailValue?.approvedAmount?.toInt()?.let(::formatKrw) ?: "승인 대기",
-        feeAmountText = detailValue?.feeAmount?.toInt()?.let(::formatKrw) ?: "-",
+        payoutStatusText = detailValue?.let { formatAdvanceStatusLabel(it.status, it.payoutStatus) } ?: "-",
+        payoutTxHashText = detailValue?.payoutTxHash,
+        requestedAmountText = detailValue?.let {
+            formatAdvanceAmount(
+                amountAtomic = it.requestedAmountAtomic,
+                displayKrwAmount = it.requestedDisplayKrwAmount,
+                assetDecimals = it.assetDecimals,
+                assetSymbol = it.assetSymbol
+            )
+        } ?: "-",
+        approvedAmountText = detailValue?.approvedAmountAtomic?.let { approvedAmountAtomic ->
+            formatAdvanceAmount(
+                amountAtomic = approvedAmountAtomic,
+                displayKrwAmount = detailValue.approvedDisplayKrwAmount,
+                assetDecimals = detailValue.assetDecimals,
+                assetSymbol = detailValue.assetSymbol
+            )
+        } ?: "승인 대기",
+        feeAmountText = detailValue?.let {
+            formatAdvanceAmount(
+                amountAtomic = it.feeAmountAtomic,
+                displayKrwAmount = it.feeDisplayKrwAmount,
+                assetDecimals = it.assetDecimals,
+                assetSymbol = it.assetSymbol
+            )
+        } ?: "-",
         repaymentDueText = detailValue?.repaymentDueDate ?: "-",
         createdAtText = detailValue?.createdAt ?: "-",
-        snapshotAvailableText = detailValue?.eligibilitySnapshot?.availableAmount?.toInt()?.let(::formatKrw) ?: "-",
-        snapshotCapText = detailValue?.eligibilitySnapshot?.maxCap?.toInt()?.let(::formatKrw) ?: "-",
+        snapshotAvailableText = detailValue?.eligibilitySnapshot?.let {
+            formatAdvanceAmount(
+                amountAtomic = it.availableAmountAtomic,
+                displayKrwAmount = it.availableDisplayKrwAmount,
+                assetDecimals = it.assetDecimals,
+                assetSymbol = it.assetSymbol
+            )
+        } ?: "-",
+        snapshotCapText = detailValue?.eligibilitySnapshot?.let {
+            formatAdvanceAmount(
+                amountAtomic = it.maxCapAmountAtomic,
+                displayKrwAmount = it.maxCapDisplayKrwAmount,
+                assetDecimals = it.assetDecimals,
+                assetSymbol = it.assetSymbol
+            )
+        } ?: "-",
         snapshotReflectedText = detailValue?.eligibilitySnapshot?.reflectedWorkDays?.let { days ->
             "${days}일 · ${detailValue.eligibilitySnapshot.reflectedWorkMinutes}분"
         } ?: "-",
@@ -1001,6 +1139,45 @@ private fun formatYieldTokenAmount(
     symbol = symbol,
     fractionDigits = 4
 )
+
+private fun formatAdvanceAmount(
+    amountAtomic: Long,
+    displayKrwAmount: Long?,
+    assetDecimals: Int,
+    assetSymbol: String
+): String {
+    val assetText = formatTokenAmount(
+        atomic = amountAtomic.toString(),
+        decimals = assetDecimals,
+        symbol = assetSymbol
+    )
+    val approxText = displayKrwAmount?.toInt()?.let(::formatKrw)
+    return if (approxText != null) "$assetText · 약 $approxText" else assetText
+}
+
+private fun formatWholeAdvanceUnits(
+    amount: Int,
+    assetSymbol: String,
+    displayKrwAmount: Long
+): String {
+    val assetText = "$amount $assetSymbol"
+    return if (displayKrwAmount > 0) "$assetText · 약 ${formatKrw(displayKrwAmount.toInt())}" else assetText
+}
+
+private fun formatAdvanceStatusLabel(status: String, payoutStatus: String?): String = when (status) {
+    "SUBMITTED" -> "신청됨"
+    "APPROVED" -> "승인됨"
+    "PAYING" -> when (payoutStatus) {
+        "SIGNED" -> "서명 완료"
+        "BROADCASTED" -> "지급중"
+        else -> "지급 준비중"
+    }
+    "PAID" -> "지급완료"
+    "PAYOUT_FAILED" -> "지급실패"
+    "REJECTED" -> "반려됨"
+    "NEEDS_REVIEW" -> "확인 필요"
+    else -> status
+}
 
 private fun String.toWholeAssetUnits(decimals: Int): Int {
     val sanitized = trim().ifBlank { return 0 }

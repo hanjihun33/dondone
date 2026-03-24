@@ -738,10 +738,14 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
                     )
                 }
             } else {
+                FinanceKeyValueRow(label = "지급 상태", value = uiModel.payoutStatusText)
                 FinanceKeyValueRow(label = "요청 금액", value = uiModel.requestedAmountText)
                 FinanceKeyValueRow(label = "승인 금액", value = uiModel.approvedAmountText)
                 FinanceKeyValueRow(label = "수수료", value = uiModel.feeAmountText)
                 FinanceKeyValueRow(label = "상환 예정일", value = uiModel.repaymentDueText)
+                uiModel.payoutTxHashText?.let { txHash ->
+                    FinanceKeyValueRow(label = "지급 TX", value = txHash)
+                }
                 FinanceKeyValueRow(label = "생성 시각", value = uiModel.createdAtText)
             }
         }
