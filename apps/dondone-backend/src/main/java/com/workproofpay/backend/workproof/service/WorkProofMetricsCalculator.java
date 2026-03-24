@@ -101,8 +101,11 @@ public class WorkProofMetricsCalculator {
             return 0L;
         }
 
-        LocalDateTime start = workProof.getClockInAt();
-        LocalDateTime end = workProof.getClockOutAt();
+        LocalDateTime start = workProof.resolveRecognizedClockInAt();
+        LocalDateTime end = workProof.resolveRecognizedClockOutAt();
+        if (start == null || end == null) {
+            return 0L;
+        }
         long nightMinutes = 0L;
 
         for (LocalDate date = start.toLocalDate().minusDays(1); !date.isAfter(end.toLocalDate()); date = date.plusDays(1)) {

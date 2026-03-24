@@ -9,6 +9,10 @@ export type IssueFilterKey = "all" | "pending" | "needs_review" | "approved" | "
 export type IssueQueueDetail =
   | {
       kind: "correction";
+      reasonCode: string | null;
+      reviewReasonCode: string | null;
+      recognizedCheckIn: string;
+      recognizedCheckOut: string;
       requestMemo: string | null;
       decisionMemo: string | null;
       decisionByName: string | null;
@@ -24,6 +28,8 @@ export type IssueQueueDetail =
       kind: "review";
       reviewReason: string | null;
       reviewReasonCode: string;
+      recognizedCheckIn: string;
+      recognizedCheckOut: string;
       recordStatus: string;
       reflectionStatus: string;
       workedMinutes: number;
@@ -53,6 +59,10 @@ export type IssueQueueItem = {
   originalCheckOut: string;
   requestedCheckIn: string;
   requestedCheckOut: string;
+  recognizedCheckIn: string;
+  recognizedCheckOut: string;
+  reasonCode: string | null;
+  reviewReasonCode: string | null;
   reason: string;
   requestedAt: string;
   detailState: "idle" | "loading" | "loaded" | "error";

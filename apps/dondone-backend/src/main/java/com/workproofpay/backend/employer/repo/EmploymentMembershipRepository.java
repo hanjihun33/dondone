@@ -16,6 +16,21 @@ public interface EmploymentMembershipRepository extends JpaRepository<Employment
     @Query("""
             select membership
             from EmploymentMembership membership
+            where membership.workerAccountId = :workerAccountId
+              and membership.status = :status
+              and membership.effectiveFrom <= :targetDate
+              and (membership.effectiveTo is null or membership.effectiveTo >= :targetDate)
+            order by membership.createdAt desc, membership.id desc
+            """)
+    List<EmploymentMembership> findActiveByWorkerAccountId(
+            @Param("workerAccountId") Long workerAccountId,
+            @Param("status") EmploymentMembershipStatus status,
+            @Param("targetDate") LocalDate targetDate
+    );
+
+    @Query("""
+            select membership
+            from EmploymentMembership membership
             where membership.companyId = :companyId
               and membership.workplaceId = :workplaceId
               and membership.status = :status

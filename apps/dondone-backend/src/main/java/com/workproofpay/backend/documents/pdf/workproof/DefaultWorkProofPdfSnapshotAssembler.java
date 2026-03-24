@@ -196,8 +196,8 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
         return new WorkProofPdfSnapshot.WorkProofRecordItem(
                 record.getId(),
                 formatDate(record.getWorkDate()),
-                formatTime(record.getClockInAt()),
-                formatTime(record.getClockOutAt()),
+                formatTime(record.resolveRecognizedClockInAt()),
+                formatTime(record.resolveRecognizedClockOutAt()),
                 workedMinutes,
                 formatMinutesLabel(workedMinutes, locale),
                 buildRemarks(record, locale)

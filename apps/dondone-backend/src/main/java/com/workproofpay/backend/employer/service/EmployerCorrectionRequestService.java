@@ -91,24 +91,24 @@ public class EmployerCorrectionRequestService {
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
                 correctionRequest.getReason(),
-                workProof.getMemo(),
+                correctionRequest.getRequestMemo(),
                 correctionRequest.getAttachmentCount(),
                 null
         );
         workProofRequestValidator.validateForUpdate(workProof, updateRequest);
 
-        LocalDateTime beforeClockInAt = workProof.getClockInAt();
-        LocalDateTime beforeClockOutAt = workProof.getClockOutAt();
+        LocalDateTime beforeClockInAt = workProof.resolveRecognizedClockInAt();
+        LocalDateTime beforeClockOutAt = workProof.resolveRecognizedClockOutAt();
         String beforeEditReason = workProof.getEditReason();
         String beforeMemo = workProof.getMemo();
         int beforeAttachmentCount = workProof.getAttachmentCount();
         String beforeAttachmentMetadataJson = workProof.getAttachmentMetadataJson();
 
-        workProof.updateTimes(
+        workProof.applyApprovedCorrection(
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
                 correctionRequest.getReason(),
-                workProof.getMemo(),
+                correctionRequest.getRequestMemo(),
                 correctionRequest.getAttachmentCount(),
                 correctionRequest.getAttachmentMetadataJson()
         );
@@ -118,8 +118,8 @@ public class EmployerCorrectionRequestService {
                 accountId,
                 beforeClockInAt,
                 beforeClockOutAt,
-                workProof.getClockInAt(),
-                workProof.getClockOutAt(),
+                workProof.resolveRecognizedClockInAt(),
+                workProof.resolveRecognizedClockOutAt(),
                 beforeEditReason,
                 workProof.getEditReason(),
                 beforeMemo,
@@ -216,6 +216,10 @@ public class EmployerCorrectionRequestService {
                 correctionRequest.getOriginalClockOutAt(),
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
+                correctionRequest.getWorkProof().resolveRecognizedClockInAt(),
+                correctionRequest.getWorkProof().resolveRecognizedClockOutAt(),
+                correctionRequest.getReasonCode(),
+                correctionRequest.getReviewReasonCode(),
                 correctionRequest.getReason(),
                 correctionRequest.getCreatedAt(),
                 correctionRequest.getStatus()
@@ -237,6 +241,10 @@ public class EmployerCorrectionRequestService {
                 correctionRequest.getOriginalClockOutAt(),
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
+                correctionRequest.getWorkProof().resolveRecognizedClockInAt(),
+                correctionRequest.getWorkProof().resolveRecognizedClockOutAt(),
+                correctionRequest.getReasonCode(),
+                correctionRequest.getReviewReasonCode(),
                 correctionRequest.getReason(),
                 correctionRequest.getRequestMemo(),
                 correctionRequest.getAttachmentCount(),

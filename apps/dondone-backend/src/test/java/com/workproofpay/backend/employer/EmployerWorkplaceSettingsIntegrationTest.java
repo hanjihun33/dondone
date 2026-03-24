@@ -6,6 +6,7 @@ import com.workproofpay.backend.auth.api.dto.request.LoginRequest;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.employer.api.dto.request.UpdateEmployerWorkplaceSettingsRequest;
+import com.workproofpay.backend.employer.model.AttendanceOvertimeRoundingUnit;
 import com.workproofpay.backend.employer.model.Company;
 import com.workproofpay.backend.employer.model.EmployerProfile;
 import com.workproofpay.backend.employer.model.EmploymentMembership;
@@ -23,11 +24,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -76,6 +79,9 @@ class EmployerWorkplaceSettingsIntegrationTest {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setUp() {
         employmentMembershipRepository.deleteAll();
@@ -97,13 +103,13 @@ class EmployerWorkplaceSettingsIntegrationTest {
                 workplaceOwner,
                 company.getId(),
                 "Seoul Hub",
-                "서울특별시 강남구 테헤란로 212",
-                "1층 정문 앞",
+                "212 Teheran-ro, Seoul",
+                "Gate 1",
                 37.501274,
                 127.039585,
                 300
         ));
-        User employerUser = createEmployer(company.getId(), workplace.getId(), "manager@acme.test");
+        createEmployer(company.getId(), workplace.getId(), "manager@acme.test");
         User activeWorker = userRepository.save(User.register(
                 "worker1@acme.test",
                 passwordEncoder.encode("qweqwe123"),
@@ -135,10 +141,48 @@ class EmployerWorkplaceSettingsIntegrationTest {
                 .andExpect(jsonPath("$.code").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.workplaceId").value(workplace.getId()))
                 .andExpect(jsonPath("$.data.workplaceName").value("Seoul Hub"))
-                .andExpect(jsonPath("$.data.address").value("서울특별시 강남구 테헤란로 212"))
-                .andExpect(jsonPath("$.data.detailAddress").value("1층 정문 앞"))
+                .andExpect(jsonPath("$.data.address").value("212 Teheran-ro, Seoul"))
+                .andExpect(jsonPath("$.data.detailAddress").value("Gate 1"))
                 .andExpect(jsonPath("$.data.allowedRadiusMeters").value(300))
+                .andExpect(jsonPath("$.data.scheduledClockInTime").value("09:00"))
+                .andExpect(jsonPath("$.data.scheduledClockOutTime").value("18:00"))
+                .andExpect(jsonPath("$.data.overtimeRoundingUnit").value("FIFTEEN_MINUTES"))
                 .andExpect(jsonPath("$.data.activeMembershipCount").value(1));
+    }
+
+    @Test
+    void getSettingsFallsBackToDefaultsWhenLegacyAttendancePolicyColumnsAreNull() throws Exception {
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        User workplaceOwner = userRepository.save(User.register(
+                "worker-owner@example.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Owner"
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                workplaceOwner,
+                company.getId(),
+                "Seoul Hub",
+                "212 Teheran-ro, Seoul",
+                "Gate 1",
+                37.501274,
+                127.039585,
+                300
+        ));
+        createEmployer(company.getId(), workplace.getId(), "manager@acme.test");
+        jdbcTemplate.update(
+                "update companies set scheduled_clock_in_time = null, scheduled_clock_out_time = null, overtime_rounding_unit = null where id = ?",
+                company.getId()
+        );
+
+        String accessToken = loginEmployer("manager@acme.test", "qweqwe123");
+
+        mockMvc.perform(get("/api/employer/workplace-settings")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.scheduledClockInTime").value("09:00"))
+                .andExpect(jsonPath("$.data.scheduledClockOutTime").value("18:00"))
+                .andExpect(jsonPath("$.data.overtimeRoundingUnit").value("FIFTEEN_MINUTES"));
     }
 
     @Test
@@ -153,8 +197,8 @@ class EmployerWorkplaceSettingsIntegrationTest {
                 workplaceOwner,
                 company.getId(),
                 "Seoul Hub",
-                "서울특별시 강남구 테헤란로 212",
-                "1층 정문 앞",
+                "212 Teheran-ro, Seoul",
+                "Gate 1",
                 37.501274,
                 127.039585,
                 300
@@ -163,11 +207,14 @@ class EmployerWorkplaceSettingsIntegrationTest {
         String accessToken = loginEmployer("manager@acme.test", "qweqwe123");
 
         UpdateEmployerWorkplaceSettingsRequest request = new UpdateEmployerWorkplaceSettingsRequest(
-                "서울특별시 강남구 테헤란로 999",
-                "2층 출입구 앞",
+                "999 Teheran-ro, Seoul",
+                "Gate 2",
                 37.502,
                 127.041,
-                500
+                500,
+                LocalTime.of(8, 30),
+                LocalTime.of(17, 30),
+                AttendanceOvertimeRoundingUnit.THIRTY_MINUTES
         );
 
         mockMvc.perform(put("/api/employer/workplace-settings")
@@ -176,18 +223,25 @@ class EmployerWorkplaceSettingsIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("SUCCESS"))
-                .andExpect(jsonPath("$.data.address").value("서울특별시 강남구 테헤란로 999"))
-                .andExpect(jsonPath("$.data.detailAddress").value("2층 출입구 앞"))
+                .andExpect(jsonPath("$.data.address").value("999 Teheran-ro, Seoul"))
+                .andExpect(jsonPath("$.data.detailAddress").value("Gate 2"))
                 .andExpect(jsonPath("$.data.allowedRadiusMeters").value(500))
+                .andExpect(jsonPath("$.data.scheduledClockInTime").value("08:30"))
+                .andExpect(jsonPath("$.data.scheduledClockOutTime").value("17:30"))
+                .andExpect(jsonPath("$.data.overtimeRoundingUnit").value("THIRTY_MINUTES"))
                 .andExpect(jsonPath("$.data.updatedByAccountId").value(employerUser.getId()))
                 .andExpect(jsonPath("$.data.effectiveFrom").isNotEmpty());
 
         Workplace saved = workplaceRepository.findById(workplace.getId()).orElseThrow();
-        assertThat(saved.getAddress()).isEqualTo("서울특별시 강남구 테헤란로 999");
-        assertThat(saved.getMapLabel()).isEqualTo("2층 출입구 앞");
+        Company savedCompany = companyRepository.findById(company.getId()).orElseThrow();
+        assertThat(saved.getAddress()).isEqualTo("999 Teheran-ro, Seoul");
+        assertThat(saved.getMapLabel()).isEqualTo("Gate 2");
         assertThat(saved.getAllowedRadiusMeters()).isEqualTo(500);
         assertThat(saved.getSettingsUpdatedByAccountId()).isEqualTo(employerUser.getId());
         assertThat(saved.getSettingsEffectiveFrom()).isNotNull();
+        assertThat(savedCompany.getScheduledClockInTime()).isEqualTo(LocalTime.of(8, 30));
+        assertThat(savedCompany.getScheduledClockOutTime()).isEqualTo(LocalTime.of(17, 30));
+        assertThat(savedCompany.getOvertimeRoundingUnit()).isEqualTo(AttendanceOvertimeRoundingUnit.THIRTY_MINUTES);
     }
 
     @Test
@@ -202,7 +256,7 @@ class EmployerWorkplaceSettingsIntegrationTest {
                 workplaceOwner,
                 company.getId(),
                 "Seoul Hub",
-                "서울특별시 강남구 테헤란로 212",
+                "212 Teheran-ro, Seoul",
                 null,
                 37.501274,
                 127.039585,
@@ -216,11 +270,14 @@ class EmployerWorkplaceSettingsIntegrationTest {
         );
 
         UpdateEmployerWorkplaceSettingsRequest request = new UpdateEmployerWorkplaceSettingsRequest(
-                "서울특별시 강남구 테헤란로 999",
-                "2층 출입구 앞",
+                "999 Teheran-ro, Seoul",
+                "Gate 2",
                 37.502,
                 127.041,
-                10
+                10,
+                null,
+                null,
+                null
         );
 
         mockMvc.perform(put("/api/employer/workplace-settings")
@@ -230,6 +287,51 @@ class EmployerWorkplaceSettingsIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
                 .andExpect(jsonPath("$.details[0].field").value("allowedRadiusMeters"));
+    }
+
+    @Test
+    void updateSettingsRejectsClockOutTimeEarlierThanClockInTime() throws Exception {
+        Company company = companyRepository.save(Company.create("Acme Logistics", "ACME-SEOUL"));
+        User workplaceOwner = userRepository.save(User.register(
+                "worker-owner@example.com",
+                passwordEncoder.encode("qweqwe123"),
+                "Worker Owner"
+        ));
+        Workplace workplace = workplaceRepository.save(Workplace.create(
+                workplaceOwner,
+                company.getId(),
+                "Seoul Hub",
+                "212 Teheran-ro, Seoul",
+                null,
+                37.501274,
+                127.039585,
+                300
+        ));
+        User employerUser = createEmployer(company.getId(), workplace.getId(), "manager@acme.test");
+        String accessToken = jwtTokenProvider.createAccessToken(
+                employerUser.getId(),
+                employerUser.getEmail(),
+                employerUser.getRole().name()
+        );
+
+        UpdateEmployerWorkplaceSettingsRequest request = new UpdateEmployerWorkplaceSettingsRequest(
+                "999 Teheran-ro, Seoul",
+                "Gate 2",
+                37.502,
+                127.041,
+                500,
+                LocalTime.of(18, 0),
+                LocalTime.of(9, 0),
+                AttendanceOvertimeRoundingUnit.FIFTEEN_MINUTES
+        );
+
+        mockMvc.perform(put("/api/employer/workplace-settings")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.message").value("scheduledClockOutTime must be after scheduledClockInTime"));
     }
 
     @Test
@@ -260,7 +362,7 @@ class EmployerWorkplaceSettingsIntegrationTest {
                 workplaceOwner,
                 otherCompany.getId(),
                 "Other Hub",
-                "서울특별시 강남구 테헤란로 300",
+                "300 Teheran-ro, Seoul",
                 null,
                 37.501274,
                 127.039585,

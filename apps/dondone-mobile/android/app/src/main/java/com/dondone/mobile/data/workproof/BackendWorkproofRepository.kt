@@ -106,6 +106,57 @@ class BackendWorkproofRepository(
         load(accessToken)
     }
 
+    override suspend fun createCorrectionRequest(
+        accessToken: String,
+        request: WorkproofCorrectionRequestMutation
+    ): WorkproofCorrectionSubmitResult = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) {
+            throw WorkproofUnauthorizedException()
+        }
+        val body = JSONObject()
+            .put("requestedClockInAt", request.requestedClockInAt.toString())
+            .put("requestedClockOutAt", request.requestedClockOutAt.toString())
+            .put("reasonCode", request.reasonCode)
+            .put("reason", request.reason)
+            .put("memo", request.memo)
+            .put("attachmentCount", request.attachmentCount)
+            .toString()
+        val httpRequest = Request.Builder()
+            .url("${BackendApiSupport.baseUrl}/api/workproof/${request.workproofId}/correction-requests")
+            .header("Authorization", "Bearer $accessToken")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        val responsePayload = client.newCall(httpRequest).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                if (response.code == 401 || response.code == 403) {
+                    throw WorkproofUnauthorizedException()
+                }
+                throw BackendApiException(
+                    parseBackendErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "수정 요청을 제출하지 못했어요."
+                    )
+                )
+            }
+
+            val data = JSONObject(responseBody.ifBlank { "{}" }).getJSONObject("data")
+            WorkproofCorrectionRequestPayload(
+                requestId = data.getLong("requestId"),
+                workproofId = data.getLong("workProofId"),
+                reasonCode = data.getString("reasonCode"),
+                reviewReasonCode = data.optNullableString("reviewReasonCode"),
+                status = WorkproofCorrectionStatus.valueOf(data.getString("status"))
+            )
+        }
+
+        WorkproofCorrectionSubmitResult(
+            correctionRequest = responsePayload,
+            remoteState = load(accessToken)
+        )
+    }
+
     private fun fetchPrimaryWorkplace(token: String): WorkproofWorkplacePayload? {
         val request = Request.Builder()
             .url("${BackendApiSupport.baseUrl}/api/workproof/workplaces")
@@ -246,6 +297,8 @@ class BackendWorkproofRepository(
             status = getString("status"),
             checkInDeviceAt = LocalDateTime.parse(getString("checkInDeviceAt")),
             checkOutDeviceAt = optLocalDateTime("checkOutDeviceAt"),
+            recognizedClockInAt = optLocalDateTime("recognizedClockInAt"),
+            recognizedClockOutAt = optLocalDateTime("recognizedClockOutAt"),
             workedMinutes = optLongValue("workedMinutes"),
             modified = getBoolean("modified"),
             reflectionStatus = getString("reflectionStatus"),
@@ -263,6 +316,11 @@ class BackendWorkproofRepository(
         val value = optString(key)
         if (value.isBlank() || value == "null") return null
         return LocalDateTime.parse(value)
+    }
+
+    private fun JSONObject.optNullableString(key: String): String? {
+        if (!has(key) || isNull(key)) return null
+        return optString(key).takeIf { it.isNotBlank() && it != "null" }
     }
 
     private fun optStringList(jsonArray: JSONArray): List<String> {

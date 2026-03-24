@@ -448,6 +448,8 @@ public class EmployerWorkerReadModelService {
                 latestWorkProof.getWorkDate(),
                 latestWorkProof.getClockInAt(),
                 latestWorkProof.getClockOutAt(),
+                latestWorkProof.resolveRecognizedClockInAt(),
+                latestWorkProof.resolveRecognizedClockOutAt(),
                 latestDaySnapshot.recordStatus(),
                 latestDaySnapshot.reflectionStatus(),
                 latestDaySnapshot.attendanceStatus(),
@@ -473,7 +475,7 @@ public class EmployerWorkerReadModelService {
                 resolveRecordStatus(workProof),
                 resolveReflectionStatus(workProof),
                 resolveAttendanceStatus(workProof),
-                workProof.getClockOutAt() == null ? null : workProof.workedMinutes()
+                workProof.resolveRecognizedClockOutAt() == null ? null : workProof.workedMinutes()
         );
     }
 

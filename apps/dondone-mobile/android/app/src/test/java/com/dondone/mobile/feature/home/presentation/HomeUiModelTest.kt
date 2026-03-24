@@ -2,11 +2,13 @@ package com.dondone.mobile.feature.home.presentation
 
 import com.dondone.mobile.app.session.RemittanceCompletionNoticeUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.data.remittance.RemittanceRemotePayload
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload
 import com.dondone.mobile.data.remittance.RemittanceWalletPayload
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.model.TransferStatus
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
@@ -109,6 +111,31 @@ class HomeUiModelTest {
 
         assertEquals("대표 지갑", uiModel.account.titleText)
         assertEquals("128.5 dUSDC", uiModel.account.balanceText)
+    }
+
+    @Test
+    fun `authenticated empty workplace state shows company registration guidance on home`() {
+        val uiModel = DemoSeedFactory.create().toHomeUiModel(
+            isAuthenticated = true,
+            session = AuthSession(
+                accessToken = "token",
+                tokenType = "Bearer",
+                expiresAtEpochMillis = Long.MAX_VALUE,
+                userId = 1L,
+                email = "worker@test.com",
+                name = "테스트 근로자",
+                phoneNumber = "01012345678",
+                companyCode = null,
+                companyName = null,
+                workplaceName = null
+            ),
+            workproofRemoteState = WorkproofRemoteState.empty("연결된 근무지가 없습니다.")
+        )
+
+        assertEquals("회사 등록 필요", uiModel.work.dateText)
+        assertEquals("등록 코드를 입력하면 실제 근무 데이터가 표시됩니다.", uiModel.work.noticeMessage)
+        assertFalse(uiModel.work.showRecordSummary)
+        assertFalse(uiModel.work.showActions)
     }
 
     @Test

@@ -48,6 +48,7 @@ fun DonDoneNavGraph(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
+    val workproofRemoteState by viewModel.workproofRemoteState.collectAsStateWithLifecycle()
     val wageRemoteState by viewModel.wageRemoteState.collectAsStateWithLifecycle()
     val remittanceRemoteState by viewModel.remittanceRemoteState.collectAsStateWithLifecycle()
     val vaultRemoteState by viewModel.vaultRemoteState.collectAsStateWithLifecycle()
@@ -139,7 +140,9 @@ fun DonDoneNavGraph(
                     wageRemoteState = wageRemoteState,
                     remittanceRemoteState = remittanceRemoteState,
                     remittanceCompletionNoticeUiState = remittanceCompletionNoticeUiState,
-                    isAuthenticated = authUiState.isAuthenticated
+                    isAuthenticated = authUiState.isAuthenticated,
+                    session = authUiState.session,
+                    workproofRemoteState = workproofRemoteState
                 ),
                 onOpenTransfer = {
                     if (viewModel.openTransferFlow()) {
@@ -160,7 +163,11 @@ fun DonDoneNavGraph(
         }
         composable(Route.WORKPROOF) {
             WorkproofScreen(
-                uiModel = uiState.toWorkproofUiModel(actionUiState = workproofActionUiState),
+                uiModel = uiState.toWorkproofUiModel(
+                    actionUiState = workproofActionUiState,
+                    remoteState = workproofRemoteState,
+                    isAuthenticated = authUiState.isAuthenticated
+                ),
                 pdfPreviewUiState = workproofPdfPreviewUiState,
                 pdfCreateUiState = workproofPdfCreateUiState,
                 pdfFileUiState = workproofPdfFileUiState,
@@ -335,7 +342,8 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toMenuUiModel(
                     session = authUiState.session,
                     remittanceRemoteState = remittanceRemoteState,
-                    workproofPdfCreateUiState = workproofPdfCreateUiState
+                    workproofPdfCreateUiState = workproofPdfCreateUiState,
+                    workproofRemoteState = workproofRemoteState
                 ),
                 workproofPdfFileUiState = workproofPdfFileUiState,
                 launchRequest = menuLaunchRequest,

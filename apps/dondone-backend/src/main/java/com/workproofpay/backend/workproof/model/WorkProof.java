@@ -60,6 +60,12 @@ public class WorkProof extends BaseTimeEntity {
     @Column(name = "clock_out_at")
     private LocalDateTime clockOutAt;
 
+    @Column(name = "recognized_clock_in_at")
+    private LocalDateTime recognizedClockInAt;
+
+    @Column(name = "recognized_clock_out_at")
+    private LocalDateTime recognizedClockOutAt;
+
     @Column(name = "device_clock_in_at", nullable = false)
     private LocalDateTime deviceClockInAt;
 
@@ -121,6 +127,8 @@ public class WorkProof extends BaseTimeEntity {
                       LocalDate workDate,
                       LocalDateTime clockInAt,
                       LocalDateTime clockOutAt,
+                      LocalDateTime recognizedClockInAt,
+                      LocalDateTime recognizedClockOutAt,
                       LocalDateTime deviceClockInAt,
                       LocalDateTime deviceClockOutAt,
                       LocalDateTime serverClockInAt,
@@ -148,6 +156,8 @@ public class WorkProof extends BaseTimeEntity {
         this.workDate = workDate;
         this.clockInAt = clockInAt;
         this.clockOutAt = clockOutAt;
+        this.recognizedClockInAt = recognizedClockInAt;
+        this.recognizedClockOutAt = recognizedClockOutAt;
         this.deviceClockInAt = deviceClockInAt;
         this.deviceClockOutAt = deviceClockOutAt;
         this.serverClockInAt = serverClockInAt;
@@ -192,6 +202,8 @@ public class WorkProof extends BaseTimeEntity {
                 workDate,
                 clockInAt,
                 clockOutAt,
+                clockInAt,
+                clockOutAt,
                 deviceClockInAt,
                 deviceClockOutAt,
                 serverRecordedAt,
@@ -229,6 +241,8 @@ public class WorkProof extends BaseTimeEntity {
                 workplace.getLongitude(),
                 contract,
                 deviceAt.toLocalDate(),
+                deviceAt,
+                null,
                 deviceAt,
                 null,
                 deviceAt,
@@ -271,10 +285,12 @@ public class WorkProof extends BaseTimeEntity {
     }
 
     public long workedMinutes() {
-        if (clockOutAt == null) {
+        LocalDateTime recognizedClockInAt = resolveRecognizedClockInAt();
+        LocalDateTime recognizedClockOutAt = resolveRecognizedClockOutAt();
+        if (recognizedClockInAt == null || recognizedClockOutAt == null) {
             return 0L;
         }
-        return Duration.between(clockInAt, clockOutAt).toMinutes();
+        return Duration.between(recognizedClockInAt, recognizedClockOutAt).toMinutes();
     }
 
     public void updateTimes(LocalDateTime clockInAt,
@@ -287,12 +303,37 @@ public class WorkProof extends BaseTimeEntity {
         boolean keepNeedsReview = isClockOutOutsideAllowedRadius();
         this.clockInAt = clockInAt;
         this.clockOutAt = clockOutAt;
+        this.recognizedClockInAt = clockInAt;
+        this.recognizedClockOutAt = clockOutAt;
         this.editReason = editReason;
         this.memo = memo != null ? memo : this.memo;
         this.attachmentCount = attachmentCount;
         this.attachmentMetadataJson = attachmentMetadataJson;
         this.clockOutOutsideAllowedRadius = keepNeedsReview ? Boolean.TRUE : Boolean.FALSE;
         this.financialStatus = keepNeedsReview
+                ? WorkProofFinancialStatus.NEEDS_REVIEW
+                : WorkProofFinancialStatus.REFLECTED;
+    }
+
+    public void updateRecognizedTimes(LocalDateTime recognizedClockInAt,
+                                      LocalDateTime recognizedClockOutAt) {
+        this.recognizedClockInAt = recognizedClockInAt;
+        this.recognizedClockOutAt = recognizedClockOutAt;
+    }
+
+    public void applyApprovedCorrection(LocalDateTime recognizedClockInAt,
+                                        LocalDateTime recognizedClockOutAt,
+                                        String editReason,
+                                        String memo,
+                                        int attachmentCount,
+                                        String attachmentMetadataJson) {
+        this.recognizedClockInAt = recognizedClockInAt;
+        this.recognizedClockOutAt = recognizedClockOutAt;
+        this.editReason = editReason;
+        this.memo = memo;
+        this.attachmentCount = attachmentCount;
+        this.attachmentMetadataJson = attachmentMetadataJson;
+        this.financialStatus = isClockOutOutsideAllowedRadius()
                 ? WorkProofFinancialStatus.NEEDS_REVIEW
                 : WorkProofFinancialStatus.REFLECTED;
     }
@@ -304,6 +345,7 @@ public class WorkProof extends BaseTimeEntity {
                                  String locationLabel,
                                  boolean outsideAllowedRadius) {
         this.clockOutAt = deviceAt;
+        this.recognizedClockOutAt = deviceAt;
         this.deviceClockOutAt = deviceAt;
         this.serverClockOutAt = serverAt;
         this.clockOutLatitude = latitude;
@@ -352,5 +394,13 @@ public class WorkProof extends BaseTimeEntity {
             return workplaceLongitudeSnapshot;
         }
         return workplace == null ? null : workplace.getLongitude();
+    }
+
+    public LocalDateTime resolveRecognizedClockInAt() {
+        return recognizedClockInAt != null ? recognizedClockInAt : clockInAt;
+    }
+
+    public LocalDateTime resolveRecognizedClockOutAt() {
+        return recognizedClockOutAt != null ? recognizedClockOutAt : clockOutAt;
     }
 }

@@ -86,11 +86,15 @@ class DefaultWorkproofDocumentServiceTest {
         );
         reflected.updateTimes(
                 LocalDateTime.of(2026, 1, 10, 9, 10),
-                LocalDateTime.of(2026, 1, 10, 18, 10),
+                LocalDateTime.of(2026, 1, 10, 18, 23),
                 "Correction",
                 "Updated memo",
                 2,
                 "{\"attachments\":[]}"
+        );
+        reflected.updateRecognizedTimes(
+                LocalDateTime.of(2026, 1, 10, 9, 0),
+                LocalDateTime.of(2026, 1, 10, 18, 0)
         );
 
         WorkProof review = WorkProof.checkIn(

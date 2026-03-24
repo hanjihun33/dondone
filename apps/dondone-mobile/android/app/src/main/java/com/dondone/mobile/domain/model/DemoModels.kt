@@ -1,5 +1,7 @@
 package com.dondone.mobile.domain.model
 
+import java.time.LocalDate
+
 data class DemoInfo(
     val year: Int,
     val month: Int,
@@ -14,11 +16,15 @@ data class TodayWork(
 
 data class WorkRecord(
     val id: String,
+    val workDate: LocalDate,
     val day: Int,
     val inTime: String,
     val outTime: String,
     val modified: Boolean,
-    val attachments: Int
+    val attachments: Int,
+    val reflectionStatus: String = "PENDING",
+    val recognizedInTime: String? = null,
+    val recognizedOutTime: String? = null
 )
 
 data class WorkAudit(

@@ -108,6 +108,8 @@ public class EmployerIssueReadModelService {
                 workProof.isNeedsReview() ? WorkProofReflectionStatus.NEEDS_REVIEW : WorkProofReflectionStatus.REFLECTED,
                 resolveReviewReasonCode(workProof),
                 resolveReviewReasonLabel(workProof),
+                workProof.resolveRecognizedClockInAt(),
+                workProof.resolveRecognizedClockOutAt(),
                 workProof.workedMinutes(),
                 workProof.isClockOutOutsideAllowedRadius(),
                 workProof.isEdited(),
@@ -155,8 +157,9 @@ public class EmployerIssueReadModelService {
                 correctionRequest.getOriginalClockOutAt(),
                 correctionRequest.getRequestedClockInAt(),
                 correctionRequest.getRequestedClockOutAt(),
+                correctionRequest.getReasonCode(),
                 correctionRequest.getReason(),
-                null,
+                correctionRequest.getReviewReasonCode() == null ? null : correctionRequest.getReviewReasonCode().name(),
                 correctionRequest.getCreatedAt()
         );
     }
@@ -175,6 +178,7 @@ public class EmployerIssueReadModelService {
                 workProof.getWorkDate(),
                 workProof.getClockInAt(),
                 workProof.getClockOutAt(),
+                null,
                 null,
                 null,
                 resolveReviewReasonLabel(workProof),

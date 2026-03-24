@@ -10,6 +10,7 @@ import com.workproofpay.backend.employer.repo.CompanyRepository;
 import com.workproofpay.backend.employer.repo.EmployerProfileRepository;
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerSignupRequest;
 import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
+import com.workproofpay.backend.workproof.repo.WorkContractRepository;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -56,6 +58,9 @@ class AdminEmployerCompanyIntegrationTest {
     private WorkplaceRepository workplaceRepository;
 
     @Autowired
+    private WorkContractRepository workContractRepository;
+
+    @Autowired
     private EmployerSignupCodeRepository employerSignupCodeRepository;
 
     @Autowired
@@ -68,6 +73,7 @@ class AdminEmployerCompanyIntegrationTest {
     void setUp() {
         employerProfileRepository.deleteAll();
         employerSignupCodeRepository.deleteAll();
+        workContractRepository.deleteAll();
         workplaceRepository.deleteAll();
         companyRepository.deleteAll();
         userRepository.deleteAll();
@@ -105,7 +111,18 @@ class AdminEmployerCompanyIntegrationTest {
 
         JsonNode createBody = objectMapper.readTree(createResult.getResponse().getContentAsString());
         long companyId = createBody.path("data").path("companyId").asLong();
+        long defaultWorkplaceId = createBody.path("data").path("defaultWorkplaceId").asLong();
         String employerSignupCode = createBody.path("data").path("employerSignupCode").asText();
+
+        assertThat(workContractRepository.findFirstByWorkplaceIdAndEffectiveToIsNullOrderByEffectiveFromDesc(defaultWorkplaceId))
+                .isPresent()
+                .get()
+                .satisfies(contract -> {
+                    assertThat(contract.getPayUnit().name()).isEqualTo("HOURLY");
+                    assertThat(contract.getBasePayAmount()).isEqualByComparingTo("12000");
+                    assertThat(contract.getNormalizedHourlyWage()).isEqualByComparingTo("12000");
+                    assertThat(contract.isActive()).isTrue();
+                });
 
         mockMvc.perform(get("/api/admin/employers/companies")
                         .header("Authorization", "Bearer " + adminToken))

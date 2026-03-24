@@ -76,6 +76,7 @@ import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DawnWarning
+import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
@@ -230,6 +231,13 @@ fun MenuScreen(
             MenuSectionDivider()
             MenuAccountLinkSection(
                 onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode
+            )
+            MenuSectionDivider()
+        }
+        uiModel.fallbackNoticeMessage?.let { message ->
+            DonDoneNoticeBanner(
+                title = uiModel.fallbackNoticeTitle ?: "가상 예시 데이터",
+                message = message
             )
             MenuSectionDivider()
         }
@@ -420,7 +428,7 @@ private fun MenuSessionSection(
     session: MenuSessionUiModel,
     onEditProfile: () -> Unit
 ) {
-    val organizationSummary = session.toOrganizationSummary()
+    val organizationSummary = session.companyName.toProfileValue()
 
     MenuSectionSurface {
         MenuSectionHeader(title = "계정")
@@ -634,14 +642,8 @@ private fun MenuSessionUiModel.toOrganizationSummary(): String {
     val company = companyName?.trim().orEmpty()
     val workplace = workplaceName?.trim().orEmpty()
 
-    if (company.isBlank() && workplace.isBlank()) {
-        return "소속 정보 없음"
-    }
     if (company.isBlank()) {
-        return workplace
-    }
-    if (workplace.isBlank()) {
-        return company
+        return "소속 정보 없음"
     }
     return "$company · $workplace"
 }

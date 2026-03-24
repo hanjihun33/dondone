@@ -1,5 +1,6 @@
 package com.workproofpay.backend.employer;
 
+import com.workproofpay.backend.employer.model.AttendanceOvertimeRoundingUnit;
 import com.workproofpay.backend.employer.model.EmploymentMembership;
 import com.workproofpay.backend.employer.service.EmployerAccessScope;
 import com.workproofpay.backend.employer.service.EmployerAccessScopeService;
@@ -7,6 +8,7 @@ import com.workproofpay.backend.shared.exception.ApiException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +28,9 @@ class EmployerAccessScopeServiceTest {
                 10L,
                 "Acme Logistics",
                 "ACME",
+                LocalTime.of(9, 0),
+                LocalTime.of(18, 0),
+                AttendanceOvertimeRoundingUnit.FIFTEEN_MINUTES,
                 100L,
                 "Seoul Hub",
                 null
@@ -44,6 +49,9 @@ class EmployerAccessScopeServiceTest {
                 10L,
                 "Acme Logistics",
                 "ACME",
+                LocalTime.of(9, 0),
+                LocalTime.of(18, 0),
+                AttendanceOvertimeRoundingUnit.FIFTEEN_MINUTES,
                 100L,
                 "Seoul Hub",
                 null

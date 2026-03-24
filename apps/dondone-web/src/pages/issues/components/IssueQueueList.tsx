@@ -35,6 +35,14 @@ const reviewReasonLabels: Record<string, string> = {
   NEEDS_REVIEW: "검토 필요 기록"
 };
 
+const correctionReasonLabels: Record<string, string> = {
+  LATE_BUTTON_PRESS: "퇴근 버튼 지연",
+  LATE_CLOCK_IN: "지각 출근",
+  EARLY_CLOCK_OUT: "조기 퇴근",
+  OUTSIDE_ALLOWED_RADIUS: "반경 밖 기록",
+  OTHER: "기타"
+};
+
 function getBadgeTone(item: IssueQueueItem) {
   if (item.correctionStatus === "APPROVED") {
     return "success" as const;
@@ -122,6 +130,14 @@ function getReviewReasonLabel(reviewReason: string | null, reviewReasonCode: str
   return reviewReason ?? reviewReasonLabels[reviewReasonCode] ?? reviewReasonCode;
 }
 
+function getCorrectionReasonLabel(reasonCode: string | null) {
+  if (!reasonCode) {
+    return null;
+  }
+
+  return correctionReasonLabels[reasonCode] ?? reasonCode;
+}
+
 function renderDetail(item: IssueQueueItem) {
   if (item.detailState === "loading") {
     return <div className="issue-detail-card">상세 정보를 불러오는 중입니다...</div>;
@@ -138,6 +154,13 @@ function renderDetail(item: IssueQueueItem) {
   if (item.detail.kind === "correction") {
     return (
       <div className="issue-detail-card">
+        {item.detail.reasonCode ? (
+          <p>요청 코드: {getCorrectionReasonLabel(item.detail.reasonCode)}</p>
+        ) : null}
+        {item.detail.reviewReasonCode ? <p>검토 코드: {item.detail.reviewReasonCode}</p> : null}
+        <p>
+          현재 인정 시간: 출근 {item.detail.recognizedCheckIn} / 퇴근 {item.detail.recognizedCheckOut}
+        </p>
         <p>요청 메모: {item.detail.requestMemo ?? "없음"}</p>
         <p>
           처리 결과:{" "}
@@ -170,6 +193,9 @@ function renderDetail(item: IssueQueueItem) {
   return (
     <div className="issue-detail-card">
       <p>검토 사유: {getReviewReasonLabel(item.detail.reviewReason, item.detail.reviewReasonCode)}</p>
+      <p>
+        인정 시간: 출근 {item.detail.recognizedCheckIn} / 퇴근 {item.detail.recognizedCheckOut}
+      </p>
       <p>
         기록 상태: {getRecordStatusLabel(item.detail.recordStatus)} / 반영 상태:{" "}
         {getReflectionStatusLabel(item.detail.reflectionStatus)}
@@ -243,6 +269,12 @@ export function IssueQueueList({
                   <span>요청</span>
                   <strong>{request.requestedCheckIn}</strong>
                 </div>
+                {request.recognizedCheckIn !== "-" ? (
+                  <div className="issue-time-row">
+                    <span>인정</span>
+                    <strong>{request.recognizedCheckIn}</strong>
+                  </div>
+                ) : null}
                 <p className={`issue-time-diff ${checkInDiff.tone}`}>{checkInDiff.text}</p>
               </div>
 
@@ -256,11 +288,24 @@ export function IssueQueueList({
                   <span>요청</span>
                   <strong>{request.requestedCheckOut}</strong>
                 </div>
+                {request.recognizedCheckOut !== "-" ? (
+                  <div className="issue-time-row">
+                    <span>인정</span>
+                    <strong>{request.recognizedCheckOut}</strong>
+                  </div>
+                ) : null}
                 <p className={`issue-time-diff ${checkOutDiff.tone}`}>{checkOutDiff.text}</p>
               </div>
             </div>
 
             <p className="issue-request-reason">{request.reason}</p>
+            {request.reasonCode || request.reviewReasonCode ? (
+              <p className="issue-request-meta">
+                {request.reasonCode ? `요청 코드 ${getCorrectionReasonLabel(request.reasonCode)}` : null}
+                {request.reasonCode && request.reviewReasonCode ? " / " : null}
+                {request.reviewReasonCode ? `검토 코드 ${request.reviewReasonCode}` : null}
+              </p>
+            ) : null}
 
             <footer className="issue-request-foot">
               <span className="issue-request-meta">

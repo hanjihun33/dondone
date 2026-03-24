@@ -2,6 +2,9 @@ package com.workproofpay.backend.workproof.service;
 
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.employer.model.EmploymentMembership;
+import com.workproofpay.backend.employer.model.EmploymentMembershipStatus;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.api.dto.request.CheckInWorkProofRequest;
@@ -33,7 +36,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * WorkProof lane 1의 근무지, 활성 계약, 출퇴근 기록 흐름을 하나의 use-case 단위로 묶는다.
@@ -57,6 +62,7 @@ public class WorkProofLane1Service {
     private static final double TEMPORARY_WORKPLACE_LONGITUDE = 126.8083831d;
 
     private final UserRepository userRepository;
+    private final EmploymentMembershipRepository employmentMembershipRepository;
     private final WorkplaceRepository workplaceRepository;
     private final WorkContractRepository workContractRepository;
     private final WorkProofRepository workProofRepository;
@@ -88,7 +94,7 @@ public class WorkProofLane1Service {
         List<WorkplaceResponse> workplaces = getOrCreateSelectableWorkplaces(userId).stream()
                 .map(workplace -> toWorkplaceResponse(
                         workplace,
-                        workContractRepository.existsByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNull(workplace.getId(), userId)
+                        workContractRepository.existsByWorkplaceIdAndEffectiveToIsNull(workplace.getId())
                 ))
                 .toList();
         return new WorkplaceListResponse(workplaces);
@@ -102,7 +108,7 @@ public class WorkProofLane1Service {
         draftValidator.validateCreateContract(request);
 
         Workplace workplace = getOwnedWorkplace(userId, request.workplaceId());
-        if (workContractRepository.existsByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNull(workplace.getId(), userId)) {
+        if (workContractRepository.existsByWorkplaceIdAndEffectiveToIsNull(workplace.getId())) {
             throw new ApiException(ErrorCode.ACTIVE_CONTRACT_EXISTS);
         }
 
@@ -123,8 +129,8 @@ public class WorkProofLane1Service {
      */
     @Transactional(readOnly = true)
     public CurrentContractResponse getCurrentContract(Long userId, Long workplaceId) {
-        getOwnedWorkplace(userId, workplaceId);
-        return toCurrentContractResponse(getActiveContract(userId, workplaceId, ErrorCode.ACTIVE_CONTRACT_NOT_FOUND));
+        getAccessibleWorkplace(userId, workplaceId);
+        return toCurrentContractResponse(getActiveContract(workplaceId, ErrorCode.ACTIVE_CONTRACT_NOT_FOUND));
     }
 
     /**
@@ -132,8 +138,8 @@ public class WorkProofLane1Service {
      */
     @Transactional
     public WorkProofRecordResponse checkIn(Long userId, CheckInWorkProofRequest request) {
-        Workplace workplace = getOwnedWorkplace(userId, request.workplaceId());
-        WorkContract contract = getActiveContract(userId, workplace.getId(), ErrorCode.ACTIVE_CONTRACT_REQUIRED);
+        Workplace workplace = getAccessibleWorkplace(userId, request.workplaceId());
+        WorkContract contract = getActiveContract(workplace.getId(), ErrorCode.ACTIVE_CONTRACT_REQUIRED);
 
         if (workProofRepository.findFirstByUserIdAndClockOutAtIsNullOrderByCreatedAtDesc(userId).isPresent()) {
             throw new ApiException(ErrorCode.ACTIVE_WORKPROOF_EXISTS);
@@ -188,7 +194,7 @@ public class WorkProofLane1Service {
     @Transactional(readOnly = true)
     public WorkProofRecordListResponse getRecords(Long userId, String month, Long workplaceId) {
         YearMonth targetMonth = parseYearMonth(month);
-        getOwnedWorkplace(userId, workplaceId);
+        getAccessibleWorkplace(userId, workplaceId);
 
         List<WorkProofRecordListItemResponse> records = workProofRepository
                 .findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
@@ -210,8 +216,8 @@ public class WorkProofLane1Service {
     @Transactional(readOnly = true)
     public WageLane1Snapshot getWageLane1Snapshot(Long userId, String month, Long workplaceId) {
         YearMonth targetMonth = parseYearMonth(month);
-        Workplace workplace = getOwnedWorkplace(userId, workplaceId);
-        WorkContract contract = getActiveContract(userId, workplace.getId(), ErrorCode.ACTIVE_CONTRACT_NOT_FOUND);
+        Workplace workplace = getAccessibleWorkplace(userId, workplaceId);
+        WorkContract contract = getActiveContract(workplace.getId(), ErrorCode.ACTIVE_CONTRACT_NOT_FOUND);
         List<WorkProof> records = workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
                 userId,
                 workplaceId,
@@ -244,7 +250,7 @@ public class WorkProofLane1Service {
     @Transactional(readOnly = true)
     public WorkProofMonthlySummaryContractResponse getMonthlySummary(Long userId, String month, Long workplaceId) {
         YearMonth targetMonth = parseYearMonth(month);
-        getOwnedWorkplace(userId, workplaceId);
+        getAccessibleWorkplace(userId, workplaceId);
 
         List<WorkProof> records = workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
                 userId,
@@ -343,9 +349,28 @@ public class WorkProofLane1Service {
 
     // 고용주 등록 기능이 들어오기 전까지는 lane 1 출퇴근 흐름이 끊기지 않도록 임시 근무지를 보장한다.
     private List<Workplace> getOrCreateSelectableWorkplaces(Long userId) {
-        List<Workplace> workplaces = workplaceRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        if (!workplaces.isEmpty()) {
-            return workplaces;
+        LinkedHashMap<Long, Workplace> accessibleWorkplaces = new LinkedHashMap<>();
+
+        workplaceRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                .forEach(workplace -> accessibleWorkplaces.put(workplace.getId(), workplace));
+
+        List<Long> membershipWorkplaceIds = employmentMembershipRepository.findActiveByWorkerAccountId(
+                        userId,
+                        EmploymentMembershipStatus.ACTIVE,
+                        LocalDate.now()
+                ).stream()
+                .map(EmploymentMembership::getWorkplaceId)
+                .filter(workplaceId -> !accessibleWorkplaces.containsKey(workplaceId))
+                .distinct()
+                .toList();
+
+        if (!membershipWorkplaceIds.isEmpty()) {
+            workplaceRepository.findByIdInOrderByCreatedAtDesc(membershipWorkplaceIds)
+                    .forEach(workplace -> accessibleWorkplaces.putIfAbsent(workplace.getId(), workplace));
+        }
+
+        if (!accessibleWorkplaces.isEmpty()) {
+            return List.copyOf(accessibleWorkplaces.values());
         }
 
         Workplace temporary = workplaceRepository.save(Workplace.create(
@@ -363,6 +388,15 @@ public class WorkProofLane1Service {
     private Workplace getOwnedWorkplace(Long userId, Long workplaceId) {
         return workplaceRepository.findByIdAndUserId(workplaceId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+    }
+
+    private Workplace getAccessibleWorkplace(Long userId, Long workplaceId) {
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        if (Objects.equals(workplace.getUser().getId(), userId) || hasActiveMembership(userId, workplace)) {
+            return workplace;
+        }
+        throw new ApiException(ErrorCode.WORKPLACE_NOT_FOUND);
     }
 
     // P0에서는 GPS를 백그라운드 추적이 아니라 출퇴근 허용 범위를 막는 1차 차단 규칙으로 쓴다.
@@ -398,9 +432,22 @@ public class WorkProofLane1Service {
         return EARTH_RADIUS_METERS * angularDistance;
     }
 
-    private WorkContract getActiveContract(Long userId, Long workplaceId, ErrorCode errorCode) {
-        return workContractRepository.findFirstByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId, userId)
+    private WorkContract getActiveContract(Long workplaceId, ErrorCode errorCode) {
+        return workContractRepository.findFirstByWorkplaceIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId)
                 .orElseThrow(() -> new ApiException(errorCode));
+    }
+
+    private boolean hasActiveMembership(Long userId, Workplace workplace) {
+        if (workplace.getCompanyId() == null) {
+            return false;
+        }
+        return !employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                userId,
+                workplace.getCompanyId(),
+                workplace.getId(),
+                EmploymentMembershipStatus.ACTIVE,
+                LocalDate.now()
+        ).isEmpty();
     }
 
     private User findUser(Long userId) {
@@ -479,6 +526,8 @@ public class WorkProofLane1Service {
                 workProof.isCheckedIn() ? WorkProofRecordStatus.CHECKED_IN : WorkProofRecordStatus.CHECKED_OUT,
                 workProof.getDeviceClockInAt(),
                 workProof.getDeviceClockOutAt(),
+                workProof.resolveRecognizedClockInAt(),
+                workProof.resolveRecognizedClockOutAt(),
                 resolveWorkedMinutes(workProof),
                 workProof.isEdited(),
                 resolveReflectionStatus(workProof),
@@ -517,6 +566,8 @@ public class WorkProofLane1Service {
                         workProof.getClockOutLongitude(),
                         workProof.getClockOutLocationLabel()
                 ),
+                workProof.resolveRecognizedClockInAt(),
+                workProof.resolveRecognizedClockOutAt(),
                 resolveReflectionStatus(workProof),
                 resolveWorkedMinutes(workProof),
                 riskFlags,

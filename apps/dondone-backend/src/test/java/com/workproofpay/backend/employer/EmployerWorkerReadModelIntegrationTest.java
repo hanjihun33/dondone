@@ -169,6 +169,8 @@ class EmployerWorkerReadModelIntegrationTest {
                 .andExpect(jsonPath("$.data.attendanceStatus").value("NEEDS_REVIEW"))
                 .andExpect(jsonPath("$.data.latestWorkDate").value(fixture.today().toString()))
                 .andExpect(jsonPath("$.data.latestRecord.workDate").value(fixture.today().toString()))
+                .andExpect(jsonPath("$.data.latestRecord.recognizedClockInAt").value("2026-03-18T08:55:00"))
+                .andExpect(jsonPath("$.data.latestRecord.recognizedClockOutAt").value("2026-03-18T18:05:00"))
                 .andExpect(jsonPath("$.data.latestRecord.recordStatus").value("CHECKED_OUT"))
                 .andExpect(jsonPath("$.data.latestRecord.reflectionStatus").value("NEEDS_REVIEW"))
                 .andExpect(jsonPath("$.data.latestRecord.attendanceStatus").value("NEEDS_REVIEW"))

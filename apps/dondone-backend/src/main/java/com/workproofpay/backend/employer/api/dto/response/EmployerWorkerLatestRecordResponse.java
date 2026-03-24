@@ -10,6 +10,8 @@ public record EmployerWorkerLatestRecordResponse(
         LocalDate workDate,
         LocalDateTime clockInAt,
         LocalDateTime clockOutAt,
+        LocalDateTime recognizedClockInAt,
+        LocalDateTime recognizedClockOutAt,
         WorkProofRecordStatus recordStatus,
         WorkProofReflectionStatus reflectionStatus,
         EmployerWorkerAttendanceStatus attendanceStatus,

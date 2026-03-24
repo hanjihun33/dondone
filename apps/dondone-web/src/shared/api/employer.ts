@@ -14,6 +14,11 @@ export type WorkProofReflectionStatus =
   | "NEEDS_REVIEW"
   | "EXCLUDED";
 
+export type AttendanceOvertimeRoundingUnit =
+  | "FIFTEEN_MINUTES"
+  | "THIRTY_MINUTES"
+  | "ONE_HOUR";
+
 export type EmployerIssueItemType = "CORRECTION_REQUEST" | "REVIEW_REQUIRED_RECORD";
 export type EmployerIssueStatus = "PENDING" | "NEEDS_REVIEW";
 export type CorrectionRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -50,6 +55,9 @@ export type EmployerWorkplaceSettingsResponse = {
   latitude: number;
   longitude: number;
   allowedRadiusMeters: number;
+  scheduledClockInTime: string | null;
+  scheduledClockOutTime: string | null;
+  overtimeRoundingUnit: AttendanceOvertimeRoundingUnit | null;
   effectiveFrom: string | null;
   updatedAt: string | null;
   updatedByAccountId: number | null;
@@ -145,6 +153,7 @@ export type EmployerIssueSummaryResponse = {
   clockOutAt: string | null;
   requestedClockInAt: string | null;
   requestedClockOutAt: string | null;
+  reasonCode: string | null;
   reason: string | null;
   reviewReasonCode: string | null;
   raisedAt: string;
@@ -168,6 +177,8 @@ export type EmployerReviewRequiredRecordDetailResponse = {
   reflectionStatus: WorkProofReflectionStatus;
   reviewReasonCode: string;
   reviewReason: string | null;
+  recognizedClockInAt: string | null;
+  recognizedClockOutAt: string | null;
   workedMinutes: number;
   clockOutOutsideAllowedRadius: boolean;
   edited: boolean;
@@ -216,6 +227,10 @@ export type EmployerCorrectionRequestSummaryResponse = {
   originalClockOutAt: string | null;
   requestedClockInAt: string | null;
   requestedClockOutAt: string | null;
+  recognizedClockInAt: string | null;
+  recognizedClockOutAt: string | null;
+  reasonCode: string | null;
+  reviewReasonCode: string | null;
   reason: string;
   requestedAt: string;
   status: CorrectionRequestStatus;
@@ -241,6 +256,10 @@ export type EmployerCorrectionRequestDetailResponse = {
   originalClockOutAt: string | null;
   requestedClockInAt: string | null;
   requestedClockOutAt: string | null;
+  recognizedClockInAt: string | null;
+  recognizedClockOutAt: string | null;
+  reasonCode: string | null;
+  reviewReasonCode: string | null;
   reason: string;
   requestMemo: string | null;
   attachmentCount: number;
@@ -283,6 +302,9 @@ type UpdateEmployerWorkplaceSettingsRequest = {
   latitude: number;
   longitude: number;
   allowedRadiusMeters: number;
+  scheduledClockInTime: string | null;
+  scheduledClockOutTime: string | null;
+  overtimeRoundingUnit: AttendanceOvertimeRoundingUnit | null;
 };
 
 export async function loginEmployer(request: EmployerLoginRequest) {

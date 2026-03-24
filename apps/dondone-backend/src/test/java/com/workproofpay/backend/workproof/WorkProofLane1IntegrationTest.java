@@ -177,6 +177,8 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.status").value("CHECKED_IN"))
                 .andExpect(jsonPath("$.data.reflectionStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.recognizedClockInAt").value("2026-03-13T09:00:00"))
+                .andExpect(jsonPath("$.data.recognizedClockOutAt").doesNotExist())
                 .andExpect(jsonPath("$.data.workplace.workplaceId").value(workplaceId))
                 .andExpect(jsonPath("$.data.contract.contractId").value(contractId))
                 .andExpect(jsonPath("$.data.checkOut").doesNotExist())
@@ -202,6 +204,8 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.recordId").value(recordId))
                 .andExpect(jsonPath("$.data.status").value("CHECKED_OUT"))
                 .andExpect(jsonPath("$.data.reflectionStatus").value("REFLECTED"))
+                .andExpect(jsonPath("$.data.recognizedClockInAt").value("2026-03-13T09:00:00"))
+                .andExpect(jsonPath("$.data.recognizedClockOutAt").value("2026-03-13T18:00:00"))
                 .andExpect(jsonPath("$.data.workedMinutes").value(540));
 
         // 7. 월별 목록과 상세 조회가 같은 근무 기록을 반환하는지 검증
@@ -212,6 +216,8 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records.length()").value(1))
                 .andExpect(jsonPath("$.data.records[0].recordId").value(recordId))
+                .andExpect(jsonPath("$.data.records[0].recognizedClockInAt").value("2026-03-13T09:00:00"))
+                .andExpect(jsonPath("$.data.records[0].recognizedClockOutAt").value("2026-03-13T18:00:00"))
                 .andExpect(jsonPath("$.data.records[0].reflectionStatus").value("REFLECTED"))
                 .andExpect(jsonPath("$.data.records[0].workedMinutes").value(540));
 
@@ -219,6 +225,8 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recordId").value(recordId))
+                .andExpect(jsonPath("$.data.recognizedClockInAt").value("2026-03-13T09:00:00"))
+                .andExpect(jsonPath("$.data.recognizedClockOutAt").value("2026-03-13T18:00:00"))
                 .andExpect(jsonPath("$.data.reflectionStatus").value("REFLECTED"))
                 .andExpect(jsonPath("$.data.riskFlags.length()").value(0))
                 .andExpect(jsonPath("$.data.modifications.length()").value(0))
@@ -380,6 +388,8 @@ class WorkProofLane1IntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.recordId").value(recordId))
                 .andExpect(jsonPath("$.data.status").value("CHECKED_OUT"))
                 .andExpect(jsonPath("$.data.reflectionStatus").value("NEEDS_REVIEW"))
+                .andExpect(jsonPath("$.data.recognizedClockInAt").value("2026-03-16T09:05:00"))
+                .andExpect(jsonPath("$.data.recognizedClockOutAt").value("2026-03-16T18:00:00"))
                 .andExpect(jsonPath("$.data.workedMinutes").value(535))
                 .andExpect(jsonPath("$.data.riskFlags[0]").value("CHECK_OUT_OUTSIDE_RADIUS"));
 

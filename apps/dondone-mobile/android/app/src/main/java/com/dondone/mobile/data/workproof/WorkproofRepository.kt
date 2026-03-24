@@ -9,6 +9,11 @@ interface WorkproofRepository {
     suspend fun clockIn(accessToken: String, workproof: WorkproofData): WorkproofRemoteState
 
     suspend fun clockOut(accessToken: String, workproof: WorkproofData): WorkproofRemoteState
+
+    suspend fun createCorrectionRequest(
+        accessToken: String,
+        request: WorkproofCorrectionRequestMutation
+    ): WorkproofCorrectionSubmitResult
 }
 
 class WorkproofUnauthorizedException(message: String = "세션이 만료되어 다시 로그인해 주세요.") : IOException(message)
