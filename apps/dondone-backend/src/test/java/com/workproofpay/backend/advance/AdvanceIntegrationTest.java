@@ -371,6 +371,43 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
     }
 
     @Test
+    void allowsAdditionalAdvanceRequestWithinSameCycleAfterConfirmedPayoutWhenLimitRemains() throws Exception {
+        User user = userRepository.save(User.register("advance-repeat@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long workplaceId = seedAdvanceEligibleScenario(user, 10, false);
+
+        long firstRequestId = createAdvanceRequest(token, workplaceId, REDUCED_CAP_ATOMIC, "2030-01-10T09:00:00", "advance-repeat-1");
+        approveRequest(firstRequestId);
+        attachPayout(firstRequestId, user.getId(), REDUCED_CAP_ATOMIC, AdvancePayoutStatus.CONFIRMED);
+
+        String secondRequestJson = """
+                {
+                  "workplaceId": %d,
+                  "requestedAmountAtomic": %d,
+                  "requestedAt": "2030-01-11T09:00:00"
+                }
+                """.formatted(workplaceId, 20_000_000L);
+
+        mockMvc.perform(post("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "advance-repeat-2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(secondRequestJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmountAtomic").value(68_965_517L))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableDisplayKrwAmount").value(100_000L));
+
+        mockMvc.perform(get("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .param("month", currentAdvanceCycleMonth().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requests.length()").value(2))
+                .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[1].status").value("PAID"));
+    }
+
+    @Test
     void listsRequestsUnderResolvedAdvanceCycleMonth() throws Exception {
         User user = userRepository.save(User.register("advance-cycle@test.com", "hashed", "Advance"));
         String token = tokenFor(user);
