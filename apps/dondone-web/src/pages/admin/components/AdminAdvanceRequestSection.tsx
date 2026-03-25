@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AdminAdvanceRequestItemResponse,
   approveAdminAdvanceRequest,
@@ -10,6 +10,9 @@ import { ApiError } from "../../../shared/api/client";
 import { clearStoredSession, getStoredAccessToken } from "../../../shared/auth/session";
 
 type RequestFilter = "ALL" | "SUBMITTED" | "APPROVED" | "PAYING" | "PAID" | "PAYOUT_FAILED" | "REJECTED";
+
+const ALL_COMPANIES_FILTER = "__ALL_COMPANIES__";
+const UNKNOWN_COMPANY_FILTER = "__UNKNOWN_COMPANY__";
 
 const REQUEST_FILTERS: Array<{
   value: RequestFilter;
@@ -134,7 +137,7 @@ function getStatusHint(request: AdminAdvanceRequestItemResponse) {
     case "PAYING":
       return request.payoutStatus ? `지급 상태 ${request.payoutStatus}` : "지급 처리중";
     case "PAID":
-      return request.payoutTxHash ? `tx ${request.payoutTxHash.slice(0, 12)}...` : "체인 반영 완료";
+      return request.payoutTxHash ? `tx ${request.payoutTxHash}` : "체인 반영 완료";
     case "PAYOUT_FAILED":
       return request.payoutFailureReason ?? "지급 처리 실패";
     case "REJECTED":
@@ -147,10 +150,6 @@ function getStatusHint(request: AdminAdvanceRequestItemResponse) {
 }
 
 function getStatusDetail(request: AdminAdvanceRequestItemResponse) {
-  if (request.payoutTxHash) {
-    return `tx ${request.payoutTxHash.slice(0, 18)}...`;
-  }
-
   return getStatusHint(request);
 }
 
@@ -158,11 +157,21 @@ function canApproveOrReject(status: AdminAdvanceRequestItemResponse["status"]) {
   return status === "SUBMITTED";
 }
 
+function getCompanyFilterValue(companyName: string | null) {
+  return companyName?.trim() ? companyName : UNKNOWN_COMPANY_FILTER;
+}
+
+function getCompanyFilterLabel(companyName: string | null) {
+  return companyName?.trim() ? companyName : "회사 미지정";
+}
+
 export function AdminAdvanceRequestSection() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<AdminAdvanceRequestItemResponse[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "success" | "error">("loading");
   const [filter, setFilter] = useState<RequestFilter>("ALL");
+  const [companyFilter, setCompanyFilter] = useState<string>(ALL_COMPANIES_FILTER);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
@@ -210,6 +219,17 @@ export function AdminAdvanceRequestSection() {
   }, [navigate]);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const company = params.get("company");
+    if (!company) {
+      setCompanyFilter(ALL_COMPANIES_FILTER);
+      return;
+    }
+
+    setCompanyFilter(company);
+  }, [location.search]);
+
+  useEffect(() => {
     if (!feedbackMessage) {
       return undefined;
     }
@@ -221,9 +241,17 @@ export function AdminAdvanceRequestSection() {
     return () => window.clearTimeout(timer);
   }, [feedbackMessage]);
 
+  const companyScopedRequests = useMemo(() => {
+    return requests.filter((request) =>
+      companyFilter === ALL_COMPANIES_FILTER
+        ? true
+        : getCompanyFilterValue(request.companyName) === companyFilter
+    );
+  }, [companyFilter, requests]);
+
   const requestCountByStatus = useMemo(() => {
     const counts: Record<RequestFilter, number> = {
-      ALL: requests.length,
+      ALL: companyScopedRequests.length,
       SUBMITTED: 0,
       APPROVED: 0,
       PAYING: 0,
@@ -232,17 +260,31 @@ export function AdminAdvanceRequestSection() {
       REJECTED: 0
     };
 
-    requests.forEach((request) => {
+    companyScopedRequests.forEach((request) => {
       if (request.status in counts) {
         counts[request.status as RequestFilter] += 1;
       }
     });
 
     return counts;
+  }, [companyScopedRequests]);
+
+  const companyFilters = useMemo(() => {
+    const values = Array.from(
+      new Set(requests.map((request) => getCompanyFilterValue(request.companyName)))
+    );
+
+    return [
+      { value: ALL_COMPANIES_FILTER, label: "전체 회사" },
+      ...values.map((value) => ({
+        value,
+        label: value === UNKNOWN_COMPANY_FILTER ? "회사 미지정" : value
+      }))
+    ];
   }, [requests]);
 
   const summary = useMemo(() => {
-    return requests.reduce(
+    return companyScopedRequests.reduce(
       (acc, request) => {
         acc.totalRequestedAtomic += request.requestedAmountAtomic;
 
@@ -272,11 +314,13 @@ export function AdminAdvanceRequestSection() {
         rejectedCount: 0
       }
     );
-  }, [requests]);
+  }, [companyScopedRequests]);
 
   const filteredRequests = useMemo(() => {
-    return filter === "ALL" ? requests : requests.filter((request) => request.status === filter);
-  }, [filter, requests]);
+    return companyScopedRequests.filter((request) =>
+      filter === "ALL" ? true : request.status === filter
+    );
+  }, [companyScopedRequests, filter]);
 
   const updateRequestStatus = (
     requestId: number,
@@ -361,10 +405,7 @@ export function AdminAdvanceRequestSection() {
 
       <div className="admin-section-head with-sub">
         <div>
-          <h3>근로자 미리받기 요청</h3>
-          <p className="admin-section-sub">
-            미리받기 승인 이후 지급중, 지급완료, 지급실패 상태까지 포함해 dUSDC 기준으로 추적합니다.
-          </p>
+          <h3 className="admin-feature-title admin-feature-title-large">미리받기</h3>
         </div>
       </div>
 
@@ -407,7 +448,18 @@ export function AdminAdvanceRequestSection() {
             </button>
           ))}
         </div>
-        <p className="admin-request-count">현재 {filteredRequests.length}건</p>
+
+        <div className="admin-request-toolbar-right">
+          <label className="admin-company-filter-select">
+            <select value={companyFilter} onChange={(event) => setCompanyFilter(event.currentTarget.value)}>
+              {companyFilters.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {errorMessage ? (
@@ -425,6 +477,7 @@ export function AdminAdvanceRequestSection() {
           <table className="admin-table">
             <thead>
               <tr>
+                <th>회사</th>
                 <th>근로자</th>
                 <th>금액</th>
                 <th>근무 기준</th>
@@ -434,95 +487,98 @@ export function AdminAdvanceRequestSection() {
               </tr>
             </thead>
             <tbody>
-              {filteredRequests.map((request) => (
-                <tr key={request.requestId}>
-                  <td>
-                    <strong>{request.workerName}</strong>
-                    <p className="admin-cell-sub">{request.workerEmail}</p>
-                    <p className="admin-cell-sub">
-                      {[request.companyName, request.workplaceName].filter(Boolean).join(" / ")}
-                    </p>
-                  </td>
-                  <td>
-                    <div className="admin-metric-stack">
-                      <strong>
-                        {formatAssetAmount(
-                          request.requestedAmountAtomic,
-                          request.assetSymbol,
-                          request.assetDecimals
-                        )}
-                      </strong>
-                      <p className="admin-cell-sub">{formatReferenceKrw(request.requestedDisplayKrwAmount)}</p>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="admin-metric-stack">
-                      <strong>{request.reflectedWorkDays}일 반영</strong>
-                      <p className="admin-cell-sub">
-                        반영 근무 {formatWorkMinutes(request.reflectedWorkMinutes)}
-                      </p>
-                      <p className="admin-cell-sub">
-                        검토 필요 기록 {request.needsReviewRecordCount}건
-                      </p>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="admin-metric-stack">
-                      {request.reviewedAt ? (
-                        <p className="admin-cell-sub">신청 {formatDateTime(request.requestedAt)}</p>
-                      ) : (
-                        <strong>신청 {formatDateTime(request.requestedAt)}</strong>
-                      )}
-                      <p className="admin-cell-sub">
-                        급여 정산 예정 {formatDate(request.settlementDueDate ?? request.repaymentDueDate)}
-                      </p>
-                      {request.reviewedAt ? (
-                        <strong>처리 {formatDateTime(request.reviewedAt)}</strong>
-                      ) : (
-                        <p className="admin-cell-sub">처리 -</p>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="admin-metric-stack">
-                      <span className={`admin-status ${STATUS_CLASS_NAMES[request.status]}`}>
-                        {STATUS_LABELS[request.status]}
-                      </span>
-                      <p className="admin-cell-sub">{getStatusDetail(request)}</p>
-                    </div>
-                  </td>
-                  <td>
-                    {canApproveOrReject(request.status) ? (
-                      <div className="admin-action-group">
-                        <button
-                          type="button"
-                          className="admin-action-button approve"
-                          onClick={() => handleAction(request, "approve")}
-                          disabled={processingRequestId === request.requestId}
-                        >
-                          승인
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-action-button reject"
-                          onClick={() => handleAction(request, "reject")}
-                          disabled={processingRequestId === request.requestId}
-                        >
-                          반려
-                        </button>
+              {filteredRequests.map((request) => {
+                const statusDetail = getStatusDetail(request);
+
+                return (
+                  <tr key={request.requestId}>
+                    <td>
+                      <strong>{getCompanyFilterLabel(request.companyName)}</strong>
+                      <p className="admin-cell-sub">{request.workplaceName}</p>
+                    </td>
+                    <td>
+                      <strong>{request.workerName}</strong>
+                      <p className="admin-cell-sub">{request.workerEmail}</p>
+                    </td>
+                    <td>
+                      <div className="admin-metric-stack">
+                        <strong>
+                          {formatAssetAmount(
+                            request.requestedAmountAtomic,
+                            request.assetSymbol,
+                            request.assetDecimals
+                          )}
+                        </strong>
+                        <p className="admin-cell-sub">{formatReferenceKrw(request.requestedDisplayKrwAmount)}</p>
                       </div>
-                    ) : (
-                      <span className="admin-action-done">
-                        {request.status === "PAYOUT_FAILED" ? "재처리 확인 필요" : "처리 완료"}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <div className="admin-metric-stack">
+                        <strong>{request.reflectedWorkDays}일 반영</strong>
+                        <p className="admin-cell-sub">반영 근무 {formatWorkMinutes(request.reflectedWorkMinutes)}</p>
+                        <p className="admin-cell-sub">검토 필요 기록 {request.needsReviewRecordCount}건</p>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="admin-metric-stack">
+                        {request.reviewedAt ? (
+                          <p className="admin-cell-sub">신청 {formatDateTime(request.requestedAt)}</p>
+                        ) : (
+                          <strong>신청 {formatDateTime(request.requestedAt)}</strong>
+                        )}
+                        <p className="admin-cell-sub">
+                          급여 정산 예정 {formatDate(request.settlementDueDate ?? request.repaymentDueDate)}
+                        </p>
+                        {request.reviewedAt ? (
+                          <strong>처리 {formatDateTime(request.reviewedAt)}</strong>
+                        ) : (
+                          <p className="admin-cell-sub">처리 -</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="admin-status-cell">
+                      <div className="admin-metric-stack admin-status-stack">
+                        <span className={`admin-status ${STATUS_CLASS_NAMES[request.status]}`}>
+                          {STATUS_LABELS[request.status]}
+                        </span>
+                        <p className="admin-cell-sub admin-status-detail" title={statusDetail}>
+                          {statusDetail}
+                        </p>
+                      </div>
+                    </td>
+                    <td>
+                      {canApproveOrReject(request.status) ? (
+                        <div className="admin-action-group">
+                          <button
+                            type="button"
+                            className="admin-action-button approve"
+                            onClick={() => handleAction(request, "approve")}
+                            disabled={processingRequestId === request.requestId}
+                          >
+                            승인
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-action-button reject"
+                            onClick={() => handleAction(request, "reject")}
+                            disabled={processingRequestId === request.requestId}
+                          >
+                            반려
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="admin-action-done">
+                          {request.status === "PAYOUT_FAILED" ? "재처리 확인 필요" : "처리 완료"}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="admin-empty-cell">
-                    선택한 상태에 해당하는 미리받기 요청이 없습니다.
+                  <td colSpan={7} className="admin-empty-cell">
+                    선택한 조건에 해당하는 미리받기 요청이 없습니다.
                   </td>
                 </tr>
               ) : null}

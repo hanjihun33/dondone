@@ -1,12 +1,13 @@
-import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  AdminAdvanceRequestItemResponse,
   AdminEmployerCompanyEmployerSummaryResponse,
-  AdminEmployerCompanyCreatedResponse,
   AdminEmployerCompanySummaryResponse,
   createAdminEmployerCompany,
-  getAdminEmployerCompanyEmployers,
+  getAdminAdvanceRequests,
   getAdminEmployerCompanies,
+  getAdminEmployerCompanyEmployers,
   getAdminEmployerSignupCode
 } from "../../shared/api/admin";
 import { ApiError } from "../../shared/api/client";
@@ -16,6 +17,16 @@ import { AdminAdvanceRequestSection } from "./components/AdminAdvanceRequestSect
 type AdminCompanyFormState = {
   companyName: string;
   companyCode: string;
+};
+
+type RevealedCodeState = {
+  employerSignupCode: string;
+  issuedAt: string;
+};
+
+type EmployerDetailState = {
+  employers: AdminEmployerCompanyEmployerSummaryResponse[];
+  errorMessage: string | null;
 };
 
 const INITIAL_FORM_STATE: AdminCompanyFormState = {
@@ -59,32 +70,29 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
+function getCompanyDefaultWorkplaceLabel(companyName: string) {
+  return `${companyName || "회사명"} 기본 사업장`;
+}
+
 export function AdminPage() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const activeSection = location.hash === "#companies" ? "companies" : "advance";
   const [formState, setFormState] = useState<AdminCompanyFormState>(INITIAL_FORM_STATE);
   const [companies, setCompanies] = useState<AdminEmployerCompanySummaryResponse[]>([]);
+  const [advanceRequests, setAdvanceRequests] = useState<AdminAdvanceRequestItemResponse[]>([]);
+  const [revealedCodesByCompanyId, setRevealedCodesByCompanyId] = useState<
+    Record<number, RevealedCodeState>
+  >({});
+  const [employerDetailsByCompanyId, setEmployerDetailsByCompanyId] = useState<
+    Record<number, EmployerDetailState>
+  >({});
+  const [loadingCompanyMeta, setLoadingCompanyMeta] = useState(false);
   const [loadState, setLoadState] = useState<"loading" | "success" | "error">("loading");
   const [submitState, setSubmitState] = useState<"idle" | "submitting">("idle");
   const [pageError, setPageError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [lastIssuedCode, setLastIssuedCode] =
-    useState<AdminEmployerCompanyCreatedResponse | null>(null);
-  const [revealedCode, setRevealedCode] = useState<{
-    companyId: number;
-    companyName: string;
-    employerSignupCode: string;
-    issuedAt: string;
-  } | null>(null);
-  const [revealingCompanyId, setRevealingCompanyId] = useState<number | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<{
-    companyId: number;
-    companyName: string;
-  } | null>(null);
-  const [companyEmployers, setCompanyEmployers] = useState<
-    AdminEmployerCompanyEmployerSummaryResponse[]
-  >([]);
-  const [detailState, setDetailState] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [detailError, setDetailError] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -103,6 +111,18 @@ export function AdminPage() {
         }
 
         setCompanies(response.companies);
+        void getAdminAdvanceRequests(token)
+          .then((advanceResponse) => {
+            if (disposed) {
+              return;
+            }
+            setAdvanceRequests(advanceResponse.requests);
+          })
+          .catch(() => {
+            if (!disposed) {
+              setAdvanceRequests([]);
+            }
+          });
         setLoadState("success");
         setPageError(null);
       })
@@ -126,11 +146,144 @@ export function AdminPage() {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    if (activeSection !== "companies" || loadState !== "success" || companies.length === 0) {
+      return;
+    }
+
+    const token = getStoredAccessToken();
+    if (!token) {
+      clearStoredSession();
+      navigate("/", { replace: true });
+      return;
+    }
+
+    const companiesNeedingCode = companies.filter(
+      (company) => company.hasActiveEmployerSignupCode && !revealedCodesByCompanyId[company.companyId]
+    );
+    const companiesNeedingDetails = companies.filter(
+      (company) => !employerDetailsByCompanyId[company.companyId]
+    );
+
+    if (companiesNeedingCode.length === 0 && companiesNeedingDetails.length === 0) {
+      return;
+    }
+
+    let disposed = false;
+    setLoadingCompanyMeta(true);
+
+    void Promise.all([
+      Promise.all(
+        companiesNeedingCode.map(async (company) => {
+          const response = await getAdminEmployerSignupCode(token, company.companyId);
+          return {
+            companyId: company.companyId,
+            data: {
+              employerSignupCode: response.employerSignupCode,
+              issuedAt: response.issuedAt
+            }
+          };
+        })
+      ),
+      Promise.all(
+        companiesNeedingDetails.map(async (company) => {
+          try {
+            const response = await getAdminEmployerCompanyEmployers(token, company.companyId);
+            return {
+              companyId: company.companyId,
+              data: {
+                employers: response.employers,
+                errorMessage: null
+              }
+            };
+          } catch (error: unknown) {
+            if (error instanceof ApiError && error.status === 401) {
+              throw error;
+            }
+
+            return {
+              companyId: company.companyId,
+              data: {
+                employers: [],
+                errorMessage:
+                  error instanceof Error ? error.message : "고용주 상세를 불러오지 못했어요."
+              }
+            };
+          }
+        })
+      )
+    ])
+      .then(([codeEntries, detailEntries]) => {
+        if (disposed) {
+          return;
+        }
+
+        if (codeEntries.length > 0) {
+          setRevealedCodesByCompanyId((prev) => {
+            const next = { ...prev };
+            codeEntries.forEach((entry) => {
+              next[entry.companyId] = entry.data;
+            });
+            return next;
+          });
+        }
+
+        if (detailEntries.length > 0) {
+          setEmployerDetailsByCompanyId((prev) => {
+            const next = { ...prev };
+            detailEntries.forEach((entry) => {
+              next[entry.companyId] = entry.data;
+            });
+            return next;
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        if (disposed) {
+          return;
+        }
+
+        if (error instanceof ApiError && error.status === 401) {
+          clearStoredSession();
+          navigate("/", { replace: true });
+          return;
+        }
+
+        setPageError(error instanceof Error ? error.message : "회사 상세 데이터를 불러오지 못했어요.");
+      })
+      .finally(() => {
+        if (!disposed) {
+          setLoadingCompanyMeta(false);
+        }
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [
+    activeSection,
+    companies,
+    employerDetailsByCompanyId,
+    loadState,
+    navigate,
+    revealedCodesByCompanyId
+  ]);
+
   const handleFieldChange = (key: keyof AdminCompanyFormState, value: string) => {
     setFormState((prev) => ({
       ...prev,
       [key]: value
     }));
+  };
+
+  const handleCloseCreateModal = () => {
+    if (submitState === "submitting") {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
+    setFormError(null);
+    setFormState(INITIAL_FORM_STATE);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -152,7 +305,6 @@ export function AdminPage() {
         companyCode: formState.companyCode.trim()
       });
 
-      setLastIssuedCode(created);
       setCompanies((prev) => [
         {
           companyId: created.companyId,
@@ -175,8 +327,23 @@ export function AdminPage() {
         },
         ...prev
       ]);
+      setRevealedCodesByCompanyId((prev) => ({
+        ...prev,
+        [created.companyId]: {
+          employerSignupCode: created.employerSignupCode,
+          issuedAt: created.employerSignupCodeIssuedAt
+        }
+      }));
+      setEmployerDetailsByCompanyId((prev) => ({
+        ...prev,
+        [created.companyId]: {
+          employers: [],
+          errorMessage: null
+        }
+      }));
       setFormState(INITIAL_FORM_STATE);
       setLoadState("success");
+      setIsCreateModalOpen(false);
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 401) {
         clearStoredSession();
@@ -196,367 +363,197 @@ export function AdminPage() {
     }
   };
 
-  const handleRevealCode = async (company: AdminEmployerCompanySummaryResponse) => {
-    const token = getStoredAccessToken();
-    if (!token) {
-      clearStoredSession();
-      navigate("/", { replace: true });
-      return;
-    }
+  const companyRows = useMemo(() => {
+    return companies.map((company) => {
+      const revealedCode = revealedCodesByCompanyId[company.companyId];
+      const employerDetail = employerDetailsByCompanyId[company.companyId];
+      const advanceRequestCount = advanceRequests.filter(
+        (request) => request.companyName === company.companyName
+      ).length;
 
-    setRevealingCompanyId(company.companyId);
-    setFormError(null);
-
-    try {
-      const response = await getAdminEmployerSignupCode(token, company.companyId);
-      setRevealedCode({
-        companyId: response.companyId,
-        companyName: response.companyName,
-        employerSignupCode: response.employerSignupCode,
-        issuedAt: response.issuedAt
-      });
-    } catch (error: unknown) {
-      if (error instanceof ApiError && error.status === 401) {
-        clearStoredSession();
-        navigate("/", { replace: true });
-        return;
-      }
-
-      if (error instanceof ApiError) {
-        setFormError(error.message || error.code);
-      } else if (error instanceof Error) {
-        setFormError(error.message);
-      } else {
-        setFormError("고용주 가입 코드를 불러오지 못했어요.");
-      }
-    } finally {
-      setRevealingCompanyId(null);
-    }
-  };
-
-  const handleToggleEmployerDetail = async (company: AdminEmployerCompanySummaryResponse) => {
-    if (selectedCompany?.companyId === company.companyId) {
-      setSelectedCompany(null);
-      setCompanyEmployers([]);
-      setDetailError(null);
-      setDetailState("idle");
-      return;
-    }
-
-    const token = getStoredAccessToken();
-    if (!token) {
-      clearStoredSession();
-      navigate("/", { replace: true });
-      return;
-    }
-
-    setSelectedCompany({
-      companyId: company.companyId,
-      companyName: company.companyName
+      return {
+        company,
+        revealedCode,
+        employerDetail,
+        advanceRequestCount
+      };
     });
-    setCompanyEmployers([]);
-    setDetailError(null);
-    setDetailState("loading");
+  }, [advanceRequests, companies, employerDetailsByCompanyId, revealedCodesByCompanyId]);
 
-    try {
-      const response = await getAdminEmployerCompanyEmployers(token, company.companyId);
-      setSelectedCompany({
-        companyId: response.companyId,
-        companyName: response.companyName
-      });
-      setCompanyEmployers(response.employers);
-      setDetailState("success");
-    } catch (error: unknown) {
-      if (error instanceof ApiError && error.status === 401) {
-        clearStoredSession();
-        navigate("/", { replace: true });
-        return;
-      }
-
-      if (error instanceof ApiError) {
-        setDetailError(error.message || error.code);
-      } else if (error instanceof Error) {
-        setDetailError(error.message);
-      } else {
-        setDetailError("고용주 상세를 불러오지 못했어요.");
-      }
-      setDetailState("error");
-    }
-  };
+  const companySummary = useMemo(
+    () => ({
+      companyCount: companies.length,
+      companyWithEmployerCount: companies.filter((company) => company.hasJoinedEmployer).length,
+      activeCodeCount: companies.filter((company) => company.hasActiveEmployerSignupCode).length,
+      totalAdvanceRequestCount: advanceRequests.length
+    }),
+    [advanceRequests.length, companies]
+  );
 
   return (
     <div className="admin-page">
       <header className="admin-header">
         <div>
-          <h2 className="admin-title">회사 온보딩 관리</h2>
-          <p className="admin-subtitle">
-            서비스 관리자가 회사를 등록하고, 고용주 가입 코드 발급과 가입/설정 진행 상태를 함께
-            확인합니다.
-          </p>
+          <h2 className="admin-title">관리자 운영</h2>
         </div>
       </header>
 
-      {lastIssuedCode ? (
-        <section className="admin-section">
-          <div className="admin-section-head with-sub">
-            <div>
-              <h3>최근 발급된 고용주 가입 코드</h3>
-              <p className="admin-section-sub">
-                raw 코드는 발급 직후에만 다시 볼 수 있습니다. 필요한 담당자에게 지금 전달하고,
-                고용주는 가입 후 설정에서 사업장 위치와 허용 반경을 직접 완료해야 합니다.
-              </p>
-            </div>
-          </div>
-          <div className="admin-code-banner">
-            <div>
-              <strong>{lastIssuedCode.companyName}</strong>
-              <p>
-                기본 사업장: {lastIssuedCode.defaultWorkplaceName} / 회사 코드:{" "}
-                {lastIssuedCode.companyCode}
-              </p>
-            </div>
-            <div className="admin-code-banner-value">{lastIssuedCode.employerSignupCode}</div>
-          </div>
+      {activeSection === "advance" ? (
+        <section id="advance" className="admin-anchor-section">
+          <AdminAdvanceRequestSection />
         </section>
       ) : null}
 
-      {revealedCode ? (
-        <section className="admin-section">
+      {activeSection === "companies" ? (
+        <section id="companies" className="admin-section admin-anchor-section">
           <div className="admin-section-head with-sub">
             <div>
-              <h3>현재 고용주 가입 코드</h3>
-              <p className="admin-section-sub">
-                {revealedCode.companyName}의 현재 active 코드를 다시 확인한 결과입니다.
-              </p>
+              <h3 className="admin-company-title">등록된 회사</h3>
             </div>
-          </div>
-          <div className="admin-code-banner">
-            <div>
-              <strong>{revealedCode.companyName}</strong>
-              <p>최근 발급: {formatDateTime(revealedCode.issuedAt)}</p>
-            </div>
-            <div className="admin-code-banner-value">{revealedCode.employerSignupCode}</div>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="admin-section">
-        <div className="admin-section-head with-sub">
-          <div>
-            <h3>회사 등록</h3>
-            <p className="admin-section-sub">
-              서비스 관리자는 회사명과 회사 코드만 등록합니다. 기본 사업장은 placeholder로 자동
-              생성되고, 실제 위치와 허용 반경은 고용주가 가입 후 설정에서 직접 입력합니다.
-            </p>
-          </div>
-        </div>
-        <form className="admin-company-form" onSubmit={handleSubmit}>
-          <div className="admin-company-form-grid">
-            {CREATE_FIELDS.map((field) => (
-              <label key={field.key} className="admin-company-field">
-                <span>{field.label}</span>
-                <input
-                  type="text"
-                  value={formState[field.key]}
-                  onChange={(event) => handleFieldChange(field.key, event.currentTarget.value)}
-                  placeholder={field.placeholder}
-                />
-              </label>
-            ))}
-          </div>
-
-          <div className="admin-form-note">
-            생성되는 기본 사업장명은 <strong>{formState.companyName || "회사명"} 기본 사업장</strong>
-            입니다.
-          </div>
-
-          {formError ? (
-            <p className="admin-form-feedback" role="alert">
-              {formError}
-            </p>
-          ) : null}
-
-          <div className="admin-company-form-actions">
-            <button type="submit" className="admin-add-button" disabled={submitState === "submitting"}>
-              {submitState === "submitting" ? "회사 생성 중..." : "회사 등록 및 코드 발급"}
+            <button type="button" className="admin-add-button" onClick={() => setIsCreateModalOpen(true)}>
+              회사 추가
             </button>
           </div>
-        </form>
-      </section>
 
-      <section className="admin-section">
-        <div className="admin-section-head with-sub">
-          <div>
-            <h3>등록된 회사</h3>
-            <p className="admin-section-sub">
-              회사 생성 이후 고용주 가입 여부와 설정 완료 여부를 함께 확인합니다.
-            </p>
-          </div>
-        </div>
-
-        {loadState === "loading" ? (
-          <div className="admin-empty-state">회사 목록을 불러오는 중입니다.</div>
-        ) : null}
-
-        {loadState === "error" ? (
-          <div className="admin-empty-state" role="alert">
-            {pageError ?? "회사 목록을 불러오지 못했어요."}
-          </div>
-        ) : null}
-
-        {loadState === "success" && companies.length === 0 ? (
-          <div className="admin-empty-state">등록된 회사가 없습니다.</div>
-        ) : null}
-
-        {loadState === "success" && companies.length > 0 ? (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>회사</th>
-                  <th>기본 사업장</th>
-                  <th>고용주 가입 상태</th>
-                  <th>고용주 설정 상태</th>
-                  <th>고용주 코드 상태</th>
-                  <th>코드 조회</th>
-                  <th>고용주 상세</th>
-                  <th>등록일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {companies.map((company) => (
-                  <tr key={company.companyId}>
-                    <td>
-                      <strong>{company.companyName}</strong>
-                      <p className="admin-cell-sub">{company.companyCode}</p>
-                    </td>
-                    <td>
-                      <strong>{company.defaultWorkplaceName}</strong>
-                      <p className="admin-cell-sub">#{company.defaultWorkplaceId}</p>
-                    </td>
-                    <td>
-                      <span
-                        className={`admin-status ${company.hasJoinedEmployer ? "active" : "pending"}`}
-                      >
-                        {company.hasJoinedEmployer ? "가입 완료" : "가입 대기"}
-                      </span>
-                      <p className="admin-cell-sub">
-                        {company.hasJoinedEmployer
-                          ? `가입 고용주 ${company.employerCount}명 / 최근 ${formatDateTime(company.latestEmployerJoinedAt)}`
-                          : "발급된 코드로 아직 가입한 고용주가 없습니다."}
-                      </p>
-                    </td>
-                    <td>
-                      <span
-                        className={`admin-status ${
-                          company.workplaceSettingsConfigured ? "active" : "pending"
-                        }`}
-                      >
-                        {company.workplaceSettingsConfigured ? "설정 완료" : "설정 필요"}
-                      </span>
-                      <p className="admin-cell-sub">
-                        {company.workplaceSettingsConfigured
-                          ? `${company.address} / ${company.allowedRadiusMeters}m`
-                          : "고용주가 위치와 허용 반경을 입력해야 합니다."}
-                      </p>
-                    </td>
-                    <td>
-                      <span
-                        className={`admin-status ${
-                          company.hasActiveEmployerSignupCode ? "active" : "pending"
-                        }`}
-                      >
-                        {company.hasActiveEmployerSignupCode ? "발급 완료" : "발급 필요"}
-                      </span>
-                      <p className="admin-cell-sub">
-                        최근 발급: {formatDateTime(company.latestEmployerSignupCodeIssuedAt)}
-                      </p>
-                    </td>
-                    <td>
-                      {company.hasActiveEmployerSignupCode ? (
-                        <button
-                          type="button"
-                          className="admin-action-button"
-                          onClick={() => handleRevealCode(company)}
-                          disabled={revealingCompanyId === company.companyId}
-                        >
-                          {revealingCompanyId === company.companyId ? "조회 중..." : "코드 보기"}
-                        </button>
-                      ) : (
-                        <span className="admin-action-done">조회 불가</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="admin-action-button"
-                        onClick={() => handleToggleEmployerDetail(company)}
-                        disabled={
-                          detailState === "loading" && selectedCompany?.companyId === company.companyId
-                        }
-                      >
-                        {selectedCompany?.companyId === company.companyId
-                          ? detailState === "loading"
-                            ? "불러오는 중.."
-                            : "닫기"
-                          : "상세 보기"}
-                      </button>
-                    </td>
-                    <td>{formatDateTime(company.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </section>
-
-      <AdminAdvanceRequestSection />
-
-      {selectedCompany ? (
-        <section className="admin-section">
-          <div className="admin-section-head with-sub">
-            <div>
-              <h3>{selectedCompany.companyName} 고용주 상세</h3>
-              <p className="admin-section-sub">
-                어떤 담당자가 가입했는지, 언제 가입했는지, 기본 사업장 설정이 끝났는지 확인합니다.
-              </p>
-            </div>
+          <div className="admin-request-summary admin-request-summary-top">
+            <article className="admin-request-summary-card">
+              <span>등록 회사</span>
+              <strong>{companySummary.companyCount}개</strong>
+              <p>관리 중인 전체 회사 수</p>
+            </article>
+            <article className="admin-request-summary-card">
+              <span>가입 완료 회사</span>
+              <strong>{companySummary.companyWithEmployerCount}개</strong>
+              <p>고용주가 가입한 회사 수</p>
+            </article>
+            <article className="admin-request-summary-card">
+              <span>활성 코드</span>
+              <strong>{companySummary.activeCodeCount}개</strong>
+              <p>즉시 사용 가능한 가입 코드 수</p>
+            </article>
+            <article className="admin-request-summary-card">
+              <span>미리받기 요청</span>
+              <strong>{companySummary.totalAdvanceRequestCount}건</strong>
+              <p>전체 회사 기준 누적 요청 수</p>
+            </article>
           </div>
 
-          {detailState === "loading" ? (
-            <div className="admin-empty-state">고용주 상세를 불러오는 중입니다.</div>
-          ) : null}
-
-          {detailState === "error" ? (
+          {pageError ? (
             <div className="admin-empty-state" role="alert">
-              {detailError ?? "고용주 상세를 불러오지 못했어요."}
+              {pageError}
             </div>
           ) : null}
 
-          {detailState === "success" && companyEmployers.length === 0 ? (
-            <div className="admin-empty-state">아직 가입한 고용주가 없습니다.</div>
+          {loadState === "loading" ? (
+            <div className="admin-empty-state">회사 목록을 불러오는 중입니다.</div>
           ) : null}
 
-          {detailState === "success" && companyEmployers.length > 0 ? (
+          {loadState === "error" ? (
+            <div className="admin-empty-state" role="alert">
+              {pageError ?? "회사 목록을 불러오지 못했어요."}
+            </div>
+          ) : null}
+
+          {loadState === "success" && companies.length === 0 ? (
+            <div className="admin-empty-state">등록된 회사가 없습니다.</div>
+          ) : null}
+
+          {loadState === "success" && companies.length > 0 ? (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>
+                    <th>회사</th>
+                    <th>기본 사업장</th>
+                    <th>고용주 코드</th>
                     <th>담당자</th>
                     <th>이메일</th>
-                    <th>가입일</th>
+                    <th>등록일</th>
+                    <th>미리받기</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {companyEmployers.map((employer) => (
-                    <tr key={employer.employerProfileId}>
+                  {companyRows.map(({ company, revealedCode, employerDetail, advanceRequestCount }) => (
+                    <tr key={company.companyId}>
                       <td>
-                        <strong>{employer.displayName}</strong>
-                        <p className="admin-cell-sub">계정 #{employer.accountId}</p>
+                        <strong>{company.companyName}</strong>
+                        <p className="admin-cell-sub">{company.companyCode}</p>
+                        <p className="admin-cell-sub">
+                          고용주 {company.employerCount}명 / 최근 {formatDateTime(company.latestEmployerJoinedAt)}
+                        </p>
                       </td>
-                      <td>{employer.email ?? "-"}</td>
-                      <td>{formatDateTime(employer.joinedAt)}</td>
+                      <td>
+                        <strong>{company.defaultWorkplaceName}</strong>
+                        <p className="admin-cell-sub">#{company.defaultWorkplaceId}</p>
+                        <p className="admin-cell-sub">
+                          {company.workplaceSettingsConfigured
+                            ? `${company.address} / 허용 반경 ${company.allowedRadiusMeters}m`
+                            : "위치 설정 필요"}
+                        </p>
+                      </td>
+                      <td>
+                        <div className="admin-code-inline">
+                          <strong>
+                            {company.hasActiveEmployerSignupCode
+                              ? revealedCode?.employerSignupCode ?? (loadingCompanyMeta ? "불러오는 중..." : "-")
+                              : "-"}
+                          </strong>
+                          <p className="admin-cell-sub">
+                            {company.hasActiveEmployerSignupCode
+                              ? `발급 ${formatDateTime(revealedCode?.issuedAt ?? company.latestEmployerSignupCodeIssuedAt)}`
+                              : "활성 코드 없음"}
+                          </p>
+                        </div>
+                      </td>
+                      <td>
+                        {!employerDetail && loadingCompanyMeta ? (
+                          <p className="admin-cell-sub">불러오는 중...</p>
+                        ) : null}
+                        {employerDetail?.employers.length ? (
+                          <div className="admin-inline-text-list">
+                            {employerDetail.employers.map((employer) => (
+                              <p key={employer.employerProfileId} className="admin-inline-text-item">
+                                {employer.displayName}
+                              </p>
+                            ))}
+                          </div>
+                        ) : null}
+                        {employerDetail?.errorMessage ? (
+                          <p className="admin-cell-sub">{employerDetail.errorMessage}</p>
+                        ) : null}
+                        {employerDetail && employerDetail.employers.length === 0 && !employerDetail.errorMessage ? (
+                          <p className="admin-cell-sub">가입한 고용주가 없습니다.</p>
+                        ) : null}
+                      </td>
+                      <td>
+                        {!employerDetail && loadingCompanyMeta ? (
+                          <p className="admin-cell-sub">불러오는 중...</p>
+                        ) : null}
+                        {employerDetail?.employers.length ? (
+                          <div className="admin-inline-text-list">
+                            {employerDetail.employers.map((employer) => (
+                              <p key={employer.employerProfileId} className="admin-inline-text-item">
+                                {employer.email ?? "-"}
+                              </p>
+                            ))}
+                          </div>
+                        ) : null}
+                        {employerDetail?.errorMessage ? <p className="admin-cell-sub">-</p> : null}
+                        {employerDetail && employerDetail.employers.length === 0 && !employerDetail.errorMessage ? (
+                          <p className="admin-cell-sub">-</p>
+                        ) : null}
+                      </td>
+                      <td>{formatDateTime(company.createdAt)}</td>
+                      <td>
+                        <div className="admin-company-detail-cell">
+                          <Link
+                            className="admin-inline-link-button admin-inline-count-link"
+                            to={`/admin?company=${encodeURIComponent(company.companyName)}#advance`}
+                          >
+                            {advanceRequestCount}건
+                          </Link>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -564,6 +561,58 @@ export function AdminPage() {
             </div>
           ) : null}
         </section>
+      ) : null}
+
+      {isCreateModalOpen ? (
+        <div className="admin-modal-backdrop" onClick={handleCloseCreateModal}>
+          <div className="admin-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-modal-head">
+              <div>
+                <h3>회사등록</h3>
+                <p>회사명과 회사 코드만 입력하면 기본 사업장과 가입 코드가 함께 준비됩니다.</p>
+              </div>
+              <button type="button" className="admin-modal-close" onClick={handleCloseCreateModal}>
+                닫기
+              </button>
+            </div>
+
+            <form className="admin-company-form" onSubmit={handleSubmit}>
+              <div className="admin-company-form-grid">
+                {CREATE_FIELDS.map((field) => (
+                  <label key={field.key} className="admin-company-field">
+                    <span>{field.label}</span>
+                    <input
+                      type="text"
+                      value={formState[field.key]}
+                      onChange={(event) => handleFieldChange(field.key, event.currentTarget.value)}
+                      placeholder={field.placeholder}
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="admin-form-note">
+                생성되는 기본 사업장명은{" "}
+                <strong>{getCompanyDefaultWorkplaceLabel(formState.companyName || "회사명")}</strong> 입니다.
+              </div>
+
+              {formError ? (
+                <p className="admin-form-feedback" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+
+              <div className="admin-company-form-actions">
+                <button type="button" className="admin-ghost-button" onClick={handleCloseCreateModal}>
+                  취소
+                </button>
+                <button type="submit" className="admin-add-button" disabled={submitState === "submitting"}>
+                  {submitState === "submitting" ? "회사 생성 중..." : "회사 등록"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
     </div>
   );
