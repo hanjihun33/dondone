@@ -36,7 +36,10 @@ const managerNavItems: NavItem[] = [
   { icon: <SettingsIcon />, label: "설정", to: "/settings" }
 ];
 
-const adminNavItems: NavItem[] = [{ icon: <AdminShieldIcon />, label: "관리자", to: "/admin" }];
+const adminNavItems: NavItem[] = [
+  { icon: <ClipboardCheckIcon />, label: "미리받기", to: "/admin#advance" },
+  { icon: <AdminShieldIcon />, label: "회사 관리", to: "/admin#companies" }
+];
 
 type SettingsSummaryState = {
   activeMembershipCount: number | null;
@@ -302,7 +305,11 @@ export function AppShell() {
               key={item.to}
               to={item.to}
               className={({ isActive }) => {
-                const active = isActive && location.pathname === item.to;
+                const active =
+                  userRole === "admin"
+                    ? location.pathname === "/admin" &&
+                      (location.hash || "#advance") === item.to.slice(item.to.indexOf("#"))
+                    : isActive && location.pathname === item.to;
                 return `nav-item${active ? " active" : ""}`;
               }}
               title={isSidebarCollapsed ? item.label : undefined}
