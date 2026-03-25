@@ -27,6 +27,9 @@ import com.dondone.mobile.domain.model.DemoState
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
@@ -228,6 +231,7 @@ fun DemoState.toFinanceHomeUiModel(
     vaultActionUiState: VaultActionUiState = VaultActionUiState()
 ): FinanceHomeUiModel {
     val selectedAccount = remittance.selectedAccount()
+    val today = LocalDate.now()
     val advanceSnapshot = AdvanceCalculator.calculate(this)
     val advanceContractState = toAdvanceContractState(remoteState)
     val verifiedSnapshot = WorkproofCalculator.verify(this)
@@ -747,7 +751,8 @@ fun DemoState.toFinanceHomeUiModel(
                     (1..demo.monthLength).map { day ->
                         val record = remoteWorkproofRecords.firstOrNull { it.workDate.dayOfMonth == day }
                         val tone = when {
-                            day == demo.asOfDay -> FinanceAdvanceCalendarTone.TODAY
+                            today.year == demo.year && today.monthValue == demo.month && day == today.dayOfMonth ->
+                                FinanceAdvanceCalendarTone.TODAY
                             record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.MODIFIED
                             record?.reflectionStatus == "REFLECTED" -> FinanceAdvanceCalendarTone.COMPLETE
                             else -> FinanceAdvanceCalendarTone.DEFAULT
@@ -1090,17 +1095,8 @@ private fun buildRemoteAdvanceHistoryItems(
         .map { request ->
             FinanceAdvanceHistoryUiModel(
                 requestId = request.requestId,
-                title = "요청 #${request.requestId}",
-                metaText = buildString {
-                    append(formatAdvanceStatusLabel(request.status, request.payoutStatus))
-                    append(" · 급여 정산 예정 ")
-                    append(request.effectiveSettlementDueDate)
-                    request.payoutTxHash?.takeIf { it.isNotBlank() }?.let { txHash ->
-                        append("\nTX ")
-                        append(txHash.take(10))
-                        append("...")
-                    }
-                },
+                title = formatAdvanceHistoryTitle(request.status, request.payoutStatus),
+                metaText = formatAdvanceHistoryMeta(request),
                 valueText = request.approvedAmountAtomic?.let { approvedAmountAtomic ->
                     formatAdvanceAmount(
                         amountAtomic = approvedAmountAtomic,
@@ -1124,10 +1120,10 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
     return FinanceAdvanceRequestDetailUiModel(
         isVisible = isLoading || detailValue != null || errorMessage != null,
         isLoading = isLoading,
-        titleText = detailValue?.let { "요청 #${it.requestId}" } ?: "신청 상세",
-        stateText = detailValue?.status ?: "-",
+        titleText = detailValue?.let { formatAdvanceDetailTitle(it.status, it.payoutStatus) } ?: "미리받기 상세",
+        stateText = detailValue?.let { formatAdvanceDetailSubtitle(it.status, it.payoutStatus) } ?: "-",
         payoutStatusText = detailValue?.let { formatAdvanceStatusLabel(it.status, it.payoutStatus) } ?: "-",
-        payoutTxHashText = detailValue?.payoutTxHash,
+        payoutTxHashText = detailValue?.payoutTxHash?.let(::formatAdvanceTxHash),
         requestedAmountText = detailValue?.let {
             formatAdvanceAmount(
                 amountAtomic = it.requestedAmountAtomic,
@@ -1154,7 +1150,7 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
         } ?: "-",
         settlementStatusText = detailValue?.settlementStatus?.let(::formatAdvanceSettlementStatusLabel) ?: "-",
         repaymentDueText = detailValue?.effectiveSettlementDueDate ?: "-",
-        createdAtText = detailValue?.createdAt ?: "-",
+        createdAtText = detailValue?.createdAt?.let(::formatAdvanceDateTime) ?: "-",
         snapshotAvailableText = detailValue?.eligibilitySnapshot?.let {
             formatAdvanceAmount(
                 amountAtomic = it.availableAmountAtomic,
@@ -1309,12 +1305,78 @@ private fun formatAdvanceStatusLabel(status: String, payoutStatus: String?): Str
     else -> status
 }
 
+private fun formatAdvanceHistoryTitle(status: String, payoutStatus: String?): String = when (status) {
+    "PAID" -> "미리받기 지급 완료"
+    "PAYING", "APPROVED" -> "미리받기 지급 진행 중"
+    "SUBMITTED" -> "미리받기 신청 완료"
+    "REJECTED" -> "미리받기 신청 반려"
+    "PAYOUT_FAILED" -> "미리받기 지급 실패"
+    "NEEDS_REVIEW" -> "미리받기 확인 필요"
+    else -> formatAdvanceStatusLabel(status, payoutStatus)
+}
+
+private fun formatAdvanceHistoryMeta(request: com.dondone.mobile.data.advance.AdvanceRequestItemPayload): String {
+    val requestedDate = formatAdvanceDate(request.requestedAt)
+    return when (request.status) {
+        "PAID" -> buildString {
+            if (requestedDate.isNotBlank()) {
+                append("신청일 ")
+                append(requestedDate)
+                append(" · ")
+            }
+            append("급여 정산 예정 ")
+            append(request.effectiveSettlementDueDate)
+        }
+        "REJECTED" -> "반려된 요청이에요."
+        "PAYOUT_FAILED" -> "지급이 완료되지 않았어요. 다시 확인해 주세요."
+        else -> buildString {
+            if (requestedDate.isNotBlank()) {
+                append("신청일 ")
+                append(requestedDate)
+                append(" · ")
+            }
+            append(formatAdvanceStatusLabel(request.status, request.payoutStatus))
+        }
+    }
+}
+
+private fun formatAdvanceDetailTitle(status: String, payoutStatus: String?): String = when (status) {
+    "PAID" -> "미리받기 지급 상세"
+    "PAYING", "APPROVED" -> "미리받기 진행 상태"
+    "SUBMITTED" -> "미리받기 신청 상세"
+    "REJECTED" -> "반려된 미리받기 요청"
+    "PAYOUT_FAILED" -> "미리받기 지급 실패"
+    else -> "미리받기 상세"
+}
+
+private fun formatAdvanceDetailSubtitle(status: String, payoutStatus: String?): String = when (status) {
+    "PAID" -> "지급 상태와 급여 정산 일정을 확인할 수 있어요."
+    "PAYING", "APPROVED" -> "지급 진행 상태를 확인할 수 있어요."
+    "SUBMITTED" -> "신청이 접수되어 검토 중이에요."
+    "REJECTED" -> "이번 요청은 승인되지 않았어요."
+    "PAYOUT_FAILED" -> "지급이 완료되지 않아 확인이 필요해요."
+    else -> formatAdvanceStatusLabel(status, payoutStatus)
+}
+
 private fun formatAdvanceSettlementStatusLabel(status: String): String = when (status) {
     "SCHEDULED_FOR_PAYDAY" -> "급여일 자동 정산 예정"
     "SETTLED" -> "정산 완료"
     "FAILED" -> "정산 실패"
     else -> status
 }
+
+private fun formatAdvanceTxHash(raw: String): String {
+    if (raw.length <= 14) return raw
+    return "${raw.take(8)}...${raw.takeLast(6)}"
+}
+
+private fun formatAdvanceDate(raw: String): String = runCatching {
+    LocalDateTime.parse(raw).format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
+}.getOrElse { raw.take(10) }
+
+private fun formatAdvanceDateTime(raw: String): String = runCatching {
+    LocalDateTime.parse(raw).format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm"))
+}.getOrElse { raw }
 
 private fun String.toWholeAssetUnits(decimals: Int): Int {
     val sanitized = trim().ifBlank { return 0 }

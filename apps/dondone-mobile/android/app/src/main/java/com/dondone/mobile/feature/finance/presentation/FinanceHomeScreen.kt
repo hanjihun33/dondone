@@ -70,9 +70,14 @@ private val FinanceAdvanceSheetHero = Color(0xFFF5F0FF)
 private val FinanceAdvanceSheetHeroBorder = Color(0xFFE9DFFF)
 private val FinanceAdvanceSheetMutedBackground = Color(0xFFF8FAFC)
 private val FinanceAdvanceSheetMutedBorder = Color(0xFFE2E8F0)
-private val FinanceAdvanceSheetWarningBorder = Color(0xFFFDE68A)
-private val FinanceAdvanceSheetWarningBackground = Color(0xFFFFFBEB)
 private val FinanceAdvanceSheetDefaultText = Color(0xFF94A3B8)
+private val FinanceReflectedBackground = Color(0xFFF7F2FF)
+private val FinanceReflectedBorder = Color(0xFFD4C5FF)
+private val FinanceReflectedText = Color(0xFF6A4DFF)
+private val FinanceReviewBackground = Color(0xFFFFFBEB)
+private val FinanceReviewBorder = Color(0xFFF6C453)
+private val FinanceReviewText = Color(0xFFB97711)
+private val FinanceTodayBackground = Color(0xFFF1EDFF)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -616,22 +621,28 @@ private fun FinanceAdvanceBottomSheet(
                 FinanceAdvanceStatusCard(
                     label = "반영",
                     value = uiModel.reflectedCountText,
-                    borderColor = FinanceDivider,
-                    labelColor = FinanceTextMuted,
+                    borderColor = FinanceReflectedBorder,
+                    labelColor = FinanceReflectedText,
+                    valueColor = FinanceTextPrimary,
+                    backgroundColor = FinanceReflectedBackground,
                     modifier = Modifier.weight(1f)
                 )
                 FinanceAdvanceStatusCard(
                     label = "확인 필요",
                     value = uiModel.reviewCountText,
-                    borderColor = FinanceDivider,
-                    labelColor = FinanceTextMuted,
+                    borderColor = FinanceReviewBorder,
+                    labelColor = FinanceReviewText,
+                    valueColor = FinanceTextPrimary,
+                    backgroundColor = FinanceReviewBackground,
                     modifier = Modifier.weight(1f)
                 )
                 FinanceAdvanceStatusCard(
                     label = "미반영",
                     value = uiModel.unreflectedCountText,
-                    borderColor = FinanceDivider,
+                    borderColor = FinanceAdvanceSheetMutedBorder,
                     labelColor = FinanceTextMuted,
+                    valueColor = DawnText,
+                    backgroundColor = Color.White,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -851,24 +862,24 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
                 }
             } else {
                 FinanceKeyValueRow(label = "지급 상태", value = uiModel.payoutStatusText)
-                FinanceKeyValueRow(label = "요청 금액", value = uiModel.requestedAmountText)
-                FinanceKeyValueRow(label = "승인 금액", value = uiModel.approvedAmountText)
-                FinanceKeyValueRow(label = "수수료", value = uiModel.feeAmountText)
+                FinanceAmountKeyValueRow(label = "신청 금액", value = uiModel.requestedAmountText)
+                FinanceAmountKeyValueRow(label = "받은 금액", value = uiModel.approvedAmountText)
+                FinanceAmountKeyValueRow(label = "수수료", value = uiModel.feeAmountText)
                 FinanceKeyValueRow(label = "정산 상태", value = uiModel.settlementStatusText)
                 FinanceKeyValueRow(label = "급여 정산 예정일", value = uiModel.repaymentDueText)
                 uiModel.payoutTxHashText?.let { txHash ->
-                    FinanceKeyValueRow(label = "지급 TX", value = txHash)
+                    FinanceKeyValueRow(label = "거래 확인", value = txHash)
                 }
-                FinanceKeyValueRow(label = "생성 시각", value = uiModel.createdAtText)
+                FinanceKeyValueRow(label = "신청 시각", value = uiModel.createdAtText)
             }
         }
 
         if (!uiModel.isLoading && uiModel.errorMessage == null) {
             FinanceBottomSheetDivider()
             FinanceBottomSheetSection {
-                FinanceBottomSheetHeader(title = "신청 당시 기준")
-                FinanceKeyValueRow(label = "당시 가능 금액", value = uiModel.snapshotAvailableText)
-                FinanceKeyValueRow(label = "당시 최대 한도", value = uiModel.snapshotCapText)
+                FinanceBottomSheetHeader(title = "계산 기준")
+                FinanceAmountKeyValueRow(label = "당시 가능 금액", value = uiModel.snapshotAvailableText)
+                FinanceAmountKeyValueRow(label = "당시 최대 한도", value = uiModel.snapshotCapText)
                 FinanceKeyValueRow(label = "반영 근무", value = uiModel.snapshotReflectedText)
                 FinanceKeyValueRow(label = "확인 필요 기록", value = uiModel.snapshotReviewText)
             }
@@ -886,12 +897,12 @@ private fun FinanceAdvanceStatePanel(
 ) {
     val borderColor = when (surfaceState) {
         AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHeroBorder
-        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetWarningBorder
+        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBorder
         else -> FinanceDivider
     }
     val backgroundColor = when (surfaceState) {
         AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHero
-        AdvanceSurfaceState.BLOCKED -> Color(0xFFFFFBEB)
+        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBackground
         else -> FinanceSurfaceMuted
     }
 
@@ -923,12 +934,12 @@ private fun FinanceAdvanceHeroCard(
 ) {
     val borderColor = when (surfaceState) {
         AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHeroBorder
-        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetWarningBorder
+        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBorder
         else -> FinanceDivider
     }
     val backgroundColor = when (surfaceState) {
         AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHero
-        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetWarningBackground
+        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBackground
         else -> FinanceSurfaceMuted
     }
 
@@ -1025,8 +1036,8 @@ private fun FinanceAdvanceNoticePanel(
     body: String
 ) {
     FinanceSheetPanel(
-        backgroundColor = FinanceAdvanceSheetWarningBackground,
-        borderColor = FinanceAdvanceSheetWarningBorder
+        backgroundColor = FinanceAdvanceSheetMutedBackground,
+        borderColor = FinanceAdvanceSheetMutedBorder
     ) {
         Text(
             text = title,
@@ -1308,20 +1319,20 @@ private fun FinanceAdvanceCalendarGrid(days: List<FinanceAdvanceCalendarDayUiMod
             ) {
                 week.forEach { day ->
                     val backgroundColor = when (day.tone) {
-                        FinanceAdvanceCalendarTone.COMPLETE -> Color.White
-                        FinanceAdvanceCalendarTone.MODIFIED -> Color(0xFFFFFBEB)
-                        FinanceAdvanceCalendarTone.TODAY -> FinanceAdvanceSheetHero
+                        FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBackground
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBackground
+                        FinanceAdvanceCalendarTone.TODAY -> FinanceTodayBackground
                         FinanceAdvanceCalendarTone.DEFAULT -> Color.White
                     }
                     val borderColor = when (day.tone) {
-                        FinanceAdvanceCalendarTone.COMPLETE -> FinanceAdvanceSheetHeroBorder
-                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceAdvanceSheetWarningBorder
+                        FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBorder
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBorder
                         FinanceAdvanceCalendarTone.TODAY -> DawnPrimary
                         FinanceAdvanceCalendarTone.DEFAULT -> DawnBorder
                     }
                     val textColor = when (day.tone) {
-                        FinanceAdvanceCalendarTone.COMPLETE -> DawnText
-                        FinanceAdvanceCalendarTone.MODIFIED -> Color(0xFFB97711)
+                        FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedText
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewText
                         FinanceAdvanceCalendarTone.TODAY -> DawnPrimary
                         FinanceAdvanceCalendarTone.DEFAULT -> FinanceAdvanceSheetDefaultText
                     }
@@ -1377,11 +1388,13 @@ private fun FinanceAdvanceStatusCard(
     value: String,
     borderColor: Color,
     labelColor: Color,
+    valueColor: Color,
+    backgroundColor: Color,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .background(Color.White, RoundedCornerShape(18.dp))
+            .background(backgroundColor, RoundedCornerShape(18.dp))
             .border(1.dp, borderColor, RoundedCornerShape(18.dp))
             .padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -1394,7 +1407,7 @@ private fun FinanceAdvanceStatusCard(
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-            color = DawnText
+            color = valueColor
         )
     }
 }
