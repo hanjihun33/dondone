@@ -89,7 +89,7 @@ private const val VAULT_STATUS_POLL_DELAY_MS = 1500L
 private const val VAULT_STATUS_POLL_ATTEMPTS = 16
 private const val REMITTANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 송금 실연동 데이터를 불러옵니다."
 private const val VAULT_REMOTE_LOGIN_MESSAGE = "로그인 후 예치 실연동 데이터를 불러옵니다."
-private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 실연동 데이터를 불러옵니다."
+private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 근무 정보를 불러옵니다."
 private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
 private const val WAGE_REMOTE_LOGIN_MESSAGE = "로그인 후 급여 실연동 데이터를 불러옵니다."
 private const val ATOMIC_UNITS_PER_USDC = 1_000_000L
@@ -1290,7 +1290,7 @@ class DemoSessionViewModel(
         }
         val eligibility = _advanceRemoteState.value.eligibility ?: run {
             _advanceRequestUiState.value = AdvanceRequestUiState(
-                message = "실연동 한도를 다시 불러온 뒤 시도해 주세요.",
+                message = "근무 조건을 다시 확인한 뒤 시도해 주세요.",
                 isError = true
             )
             return

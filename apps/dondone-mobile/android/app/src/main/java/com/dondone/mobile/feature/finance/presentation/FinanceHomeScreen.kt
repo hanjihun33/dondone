@@ -82,7 +82,8 @@ fun FinanceHomeScreen(
     onClearVaultMessage: () -> Unit,
     onOpenAdvanceRequestDetail: (Long) -> Unit,
     onCloseAdvanceRequestDetail: () -> Unit,
-    onOpenWorkproof: () -> Unit
+    onOpenWorkproof: () -> Unit,
+    onOpenWorkerRegistrationCode: () -> Unit
 ) {
     val advanceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val advanceRequestDetailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -112,7 +113,8 @@ fun FinanceHomeScreen(
             FinanceAdvanceSection(
                 uiModel = uiModel.advance,
                 onOpenSheet = { showAdvanceSheet = true },
-                onOpenWorkproof = onOpenWorkproof
+                onOpenWorkproof = onOpenWorkproof,
+                onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode
             )
             FinanceSectionDivider()
             FinanceVaultSection(
@@ -206,7 +208,8 @@ fun FinanceHomeScreen(
 private fun FinanceAdvanceSection(
     uiModel: FinanceAdvanceUiModel,
     onOpenSheet: () -> Unit,
-    onOpenWorkproof: () -> Unit
+    onOpenWorkproof: () -> Unit,
+    onOpenWorkerRegistrationCode: () -> Unit
 ) {
     FinanceBlockSection(
         title = "미리받기",
@@ -219,11 +222,13 @@ private fun FinanceAdvanceSection(
             }
         }
     ) {
-        Text(
-            text = uiModel.sourceLabelText,
-            style = MaterialTheme.typography.labelSmall,
-            color = FinanceTextMuted
-        )
+        if (uiModel.sourceLabelText.isNotBlank()) {
+            Text(
+                text = uiModel.sourceLabelText,
+                style = MaterialTheme.typography.labelSmall,
+                color = FinanceTextMuted
+            )
+        }
         FinanceAdvanceHeroCard(
             surfaceState = uiModel.surfaceState,
             title = uiModel.stateTitleText,
@@ -266,7 +271,11 @@ private fun FinanceAdvanceSection(
         FinancePrimaryButton(
             text = uiModel.actionText,
             modifier = Modifier.fillMaxWidth(),
-            onClick = onOpenSheet
+            onClick = if (uiModel.primaryActionOpensWorkerRegistration) {
+                onOpenWorkerRegistrationCode
+            } else {
+                onOpenSheet
+            }
         )
         if (uiModel.secondaryActionText != null) {
             FinanceSoftButton(
@@ -858,11 +867,7 @@ private fun FinanceAdvanceHeroCard(
                 style = MaterialTheme.typography.labelLarge,
                 color = FinanceTextMuted
             )
-            Text(
-                text = amountText,
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                color = FinanceTextPrimary
-            )
+            FinanceAdvanceHeroAmount(amountText = amountText)
         }
         HorizontalDivider(color = borderColor)
         Row(
@@ -879,6 +884,28 @@ private fun FinanceAdvanceHeroCard(
                 text = repaymentDueText,
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
                 color = FinanceTextPrimary
+            )
+        }
+    }
+}
+
+@Composable
+private fun FinanceAdvanceHeroAmount(amountText: String) {
+    val parts = amountText.split(" · 약 ", limit = 2)
+    val primaryAmount = parts.firstOrNull().orEmpty()
+    val referenceAmount = parts.getOrNull(1)
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = primaryAmount,
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary
+        )
+        if (!referenceAmount.isNullOrBlank()) {
+            Text(
+                text = "약 $referenceAmount",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = FinanceTextMuted
             )
         }
     }

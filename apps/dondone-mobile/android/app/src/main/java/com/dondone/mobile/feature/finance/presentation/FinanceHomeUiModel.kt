@@ -124,6 +124,7 @@ data class FinanceAdvanceDetailUiModel(
 data class FinanceAdvanceUiModel(
     val surfaceState: AdvanceSurfaceState,
     val hasCurrentRequest: Boolean,
+    val primaryActionOpensWorkerRegistration: Boolean,
     val heroAmountLabel: String,
     val heroAmountText: String,
     val availableText: String,
@@ -273,7 +274,7 @@ fun DemoState.toFinanceHomeUiModel(
     }
     val remoteRepaymentDueText = when {
         advanceContractState.repaymentDateOverride != null -> advanceContractState.repaymentDateOverride
-        usesRemoteAdvance -> "실연동 확인 필요"
+        usesRemoteAdvance -> "확인 필요"
         else -> repaymentDueText
     }
     val advanceProgress = if (usesRemoteAdvance) {
@@ -301,9 +302,9 @@ fun DemoState.toFinanceHomeUiModel(
             requests = remoteRequests,
             emptyMessage = when (advanceContractState.surfaceState) {
                 AdvanceSurfaceState.LOADING -> "이력도 함께 불러오는 중이에요."
-                AdvanceSurfaceState.EMPTY -> "이번 달 실연동 미리받기 이력이 없어요."
+                AdvanceSurfaceState.EMPTY -> "이번 달 미리받기 이력이 없어요."
                 AdvanceSurfaceState.ERROR -> "이력을 다시 불러온 뒤 확인해 주세요."
-                AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "이번 달 실연동 미리받기 이력이 없어요."
+                AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "이번 달 미리받기 이력이 없어요."
             }
         )
     } else {
@@ -318,26 +319,26 @@ fun DemoState.toFinanceHomeUiModel(
     val detailCalendarSummaryText = if (usesRemoteAdvance) {
         when (advanceContractState.surfaceState) {
             AdvanceSurfaceState.SUCCESS, AdvanceSurfaceState.BLOCKED ->
-                "실연동 기준 한도와 신청 이력을 표시합니다."
+                "현재 근무 기준 한도와 신청 이력을 표시합니다."
 
             AdvanceSurfaceState.LOADING ->
-                "실연동 근거를 불러오는 중이에요."
+                "근무 기준을 불러오는 중이에요."
 
             AdvanceSurfaceState.EMPTY ->
-                "실연동 계정에서는 아직 미리받기 근거가 열리지 않았어요."
+                "근무 정보가 확인되면 미리받기 근거를 확인할 수 있어요."
 
             AdvanceSurfaceState.ERROR ->
-                "실연동 근거를 다시 확인해야 해요."
+                "근무 기준을 다시 확인해야 해요."
         }
     } else {
         "${advanceSnapshot.verifiedDays}일 · ${formatHours(verifiedSnapshot.verifiedHours)} · ${formatKrw(verifiedSnapshot.verifiedAmount)}"
     }
     val detailUpdatedAtText = if (usesRemoteAdvance) {
         when (advanceContractState.surfaceState) {
-            AdvanceSurfaceState.LOADING -> "실연동 확인 중"
-            AdvanceSurfaceState.EMPTY -> "실연동 비어 있음"
-            AdvanceSurfaceState.ERROR -> "실연동 재확인 필요"
-            AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "실연동 최신 기준"
+            AdvanceSurfaceState.LOADING -> "근무 정보 확인 중"
+            AdvanceSurfaceState.EMPTY -> "근무 정보 필요"
+            AdvanceSurfaceState.ERROR -> "근무 정보 재확인 필요"
+            AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "근무 정보 최신 기준"
         }
     } else {
         "${demo.year}-$formattedMonth-${lastReflectedDay.toString().padStart(2, '0')}"
@@ -636,6 +637,7 @@ fun DemoState.toFinanceHomeUiModel(
         advance = FinanceAdvanceUiModel(
             surfaceState = advanceContractState.surfaceState,
             hasCurrentRequest = hasCurrentAdvanceRequest,
+            primaryActionOpensWorkerRegistration = !hasCurrentAdvanceRequest && advanceContractState.actionOpensWorkerRegistration,
             heroAmountLabel = advanceHeroAmountLabel,
             heroAmountText = advanceHeroAmountText,
             availableText = if (usesRemoteAdvance) {
@@ -655,7 +657,9 @@ fun DemoState.toFinanceHomeUiModel(
             stateBodyText = advanceHeroStateBodyText,
             noticeTitleText = advanceContractState.noticeTitleText,
             noticeBodyText = advanceContractState.noticeBodyText,
-            showProgress = !hasCurrentAdvanceRequest,
+            showProgress = !hasCurrentAdvanceRequest &&
+                advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
+                advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
             actionText = if (hasCurrentAdvanceRequest) "이번 달 내역 보기" else advanceContractState.actionText,
@@ -1043,7 +1047,7 @@ private fun buildRemoteAdvanceHistoryItems(
         return listOf(
             FinanceAdvanceHistoryUiModel(
                 requestId = null,
-                title = "실연동 미리받기 이력 없음",
+                title = "미리받기 이력 없음",
                 metaText = emptyMessage,
                 valueText = "-",
                 clickable = false

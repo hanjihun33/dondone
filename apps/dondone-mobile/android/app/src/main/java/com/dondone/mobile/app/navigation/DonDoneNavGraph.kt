@@ -214,7 +214,8 @@ fun DonDoneNavGraph(
                     navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target ->
                         navController.navigate(target)
                     }
-                }
+                },
+                onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode
             )
         }
         composable(Route.WAGE) {
