@@ -645,14 +645,7 @@ private fun FinanceAdvanceBottomSheet(
         if (uiModel.historyItems.isNotEmpty()) {
             FinanceBottomSheetDivider()
             FinanceBottomSheetSection {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FinanceBottomSheetHeader(title = "이번 달 이력")
-                    FinanceCapsule(text = uiModel.tierText)
-                }
+                FinanceBottomSheetHeader(title = "이번 달 이력")
                 uiModel.historyItems.forEach { item ->
                     Row(
                         modifier = Modifier
@@ -1486,7 +1479,7 @@ private fun FinanceAdvanceTierGuideSheet(
                         color = FinanceTextPrimary
                     )
                     Text(
-                        text = "반영된 근무 기록이 쌓일수록 미리받기 한도가 올라가요.",
+                        text = "반영된 근무가 늘수록 신청 가능 한도가 올라가요.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = FinanceTextMuted
                     )
@@ -1497,10 +1490,10 @@ private fun FinanceAdvanceTierGuideSheet(
 
         FinanceBottomSheetDivider()
         FinanceBottomSheetSection {
-            FinanceTierGuideRow(title = "0~4일", body = "아직 신청할 수 없어요.")
-            FinanceTierGuideRow(title = "5일 이상", body = "최대 10%, 5만원까지 가능해요.")
-            FinanceTierGuideRow(title = "10일 이상", body = "최대 20%, 15만원까지 가능해요.")
-            FinanceTierGuideRow(title = "20일 이상", body = "최대 30%, 30만원까지 가능해요.")
+            FinanceTierGuideRow(title = "반영 근무 0~4일", body = "아직 신청할 수 없어요.")
+            FinanceTierGuideRow(title = "반영 근무 5일 이상", body = "최대 10%, 5만원까지 가능해요.")
+            FinanceTierGuideRow(title = "반영 근무 10일 이상", body = "최대 20%, 15만원까지 가능해요.")
+            FinanceTierGuideRow(title = "반영 근무 20일 이상", body = "최대 30%, 30만원까지 가능해요.")
         }
 
         Spacer(modifier = Modifier.height(24.dp))

@@ -108,7 +108,6 @@ data class FinanceAdvanceDetailUiModel(
     val requestAmountText: String,
     val receiveAmountText: String,
     val feeText: String,
-    val tierText: String,
     val blockReasonTexts: List<String>,
     val disclaimerText: String,
     val canRequest: Boolean,
@@ -247,9 +246,9 @@ fun DemoState.toFinanceHomeUiModel(
     val unreflectedDays = max(0, wage.workDays - advanceSnapshot.verifiedDays)
     val recordedDays = visibleRecords.associateBy { it.day }
     val advanceProgressHintText = if (advanceSnapshot.nextTierInDays > 0) {
-        "다음 구간까지 ${advanceSnapshot.nextTierInDays}일 · 예상 증가 ${formatKrw(advanceSnapshot.nextTierGain)}"
+        "다음 구간까지 ${advanceSnapshot.nextTierInDays}일 남았어요."
     } else {
-        "이번 달 최고 구간에 도달했어요."
+        "지금은 최고 한도 구간이에요."
     }
     val usesRemoteAdvance = remoteState != null
     val remoteMode = remoteState?.mode
@@ -293,7 +292,7 @@ fun DemoState.toFinanceHomeUiModel(
         } else if (remainingDays > 0) {
             "다음 구간까지 ${remainingDays}일 남았어요."
         } else {
-            "현재 한도 구간이 모두 반영됐어요."
+            "지금은 최고 한도 구간이에요."
         }
     } else {
         advanceProgressHintText
@@ -705,7 +704,6 @@ fun DemoState.toFinanceHomeUiModel(
                 requestAmountText = selectedRequestText,
                 receiveAmountText = selectedReceiveText,
                 feeText = selectedFeeText,
-                tierText = advanceContractState.repaymentTier,
                 blockReasonTexts = advanceContractState.blockReasonTexts,
                 disclaimerText = advanceContractState.disclaimerText,
                 canRequest = !hasCurrentAdvanceRequest && advanceContractState.canRequest && !advanceRequestUiState.isSubmitting,
