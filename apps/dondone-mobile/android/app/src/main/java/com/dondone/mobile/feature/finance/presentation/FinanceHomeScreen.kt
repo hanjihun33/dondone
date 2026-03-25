@@ -576,7 +576,7 @@ private fun FinanceAdvanceBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 6.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -595,13 +595,27 @@ private fun FinanceAdvanceBottomSheet(
                 }
                 FinanceLinkButton(text = "닫기", onClick = onDismiss)
             }
-            FinanceAmountKeyValueRow(label = uiModel.summaryAmountLabel, value = uiModel.summaryAmountText)
-            if (uiModel.hasCurrentRequest) {
-                FinanceAmountKeyValueRow(label = "지금 추가 신청 가능 금액", value = uiModel.availableText)
-            } else {
-                FinanceAmountKeyValueRow(label = "지금 신청 가능 금액", value = uiModel.availableText)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                FinanceSummaryAmountCard(
+                    label = uiModel.summaryAmountLabel,
+                    value = uiModel.summaryAmountText,
+                    modifier = Modifier.weight(1f)
+                )
+                FinanceSummaryAmountCard(
+                    label = if (uiModel.hasCurrentRequest) "추가 가능" else "신청 가능",
+                    value = uiModel.availableText,
+                    modifier = Modifier.weight(1f)
+                )
             }
-            FinanceKeyValueRow(label = "정산일", value = uiModel.repaymentDueText)
+            FinanceSummaryMetricCard(
+                label = "정산일",
+                value = uiModel.repaymentDueText,
+                modifier = Modifier.fillMaxWidth()
+            )
             FinanceAdvanceStatePanel(
                 surfaceState = uiModel.surfaceState,
                 title = uiModel.stateTitleText,
@@ -841,6 +855,7 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
                 }
                 FinanceLinkButton(text = "닫기", onClick = onDismiss)
             }
+            Spacer(modifier = Modifier.height(8.dp))
 
             if (uiModel.isLoading) {
                 Text(
@@ -862,7 +877,7 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
             } else {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     FinanceSummaryAmountCard(
                         label = "받은 금액",
@@ -870,14 +885,14 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
                         modifier = Modifier.weight(1f)
                     )
                     FinanceSummaryAmountCard(
-                        label = "추가 가능 금액",
+                        label = "추가 가능",
                         value = uiModel.snapshotAvailableText,
                         modifier = Modifier.weight(1f)
                     )
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     FinanceSummaryMetricCard(
                         label = "정산일",
@@ -1527,17 +1542,17 @@ private fun FinanceSummaryMetricCard(
         modifier = modifier
             .background(FinanceAdvanceSheetMutedBackground, RoundedCornerShape(24.dp))
             .border(1.dp, FinanceAdvanceSheetMutedBorder, RoundedCornerShape(24.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
             color = DawnTextSubtle
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
     }
@@ -1557,17 +1572,17 @@ private fun FinanceSummaryAmountCard(
         modifier = modifier
             .background(Color.White, RoundedCornerShape(24.dp))
             .border(1.dp, FinanceAdvanceSheetMutedBorder, RoundedCornerShape(24.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
             color = DawnTextSubtle
         )
         Text(
             text = primaryValue,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
             color = DawnText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1575,7 +1590,7 @@ private fun FinanceSummaryAmountCard(
         if (!secondaryValue.isNullOrBlank()) {
             Text(
                 text = secondaryValue,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = FinanceTextMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

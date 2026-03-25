@@ -418,9 +418,9 @@ fun DemoState.toFinanceHomeUiModel(
         else -> formatKrw(advanceSnapshot.fee)
     }
     val currentRequestSummaryAmountLabel = when {
-        latestRemoteRequest?.approvedAmountAtomic != null -> "최근 받은 금액"
-        latestRemoteRequest != null -> "최근 신청 금액"
-        else -> "이번 달 받은 금액"
+        latestRemoteRequest?.approvedAmountAtomic != null -> "받은 금액"
+        latestRemoteRequest != null -> "신청 금액"
+        else -> "받은 금액"
     }
     val currentRequestSummaryAmountText = when {
         latestRemoteRequest?.approvedAmountAtomic != null -> detailReceiveAmountText
