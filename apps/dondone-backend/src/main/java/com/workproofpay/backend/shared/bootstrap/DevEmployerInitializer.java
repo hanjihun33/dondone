@@ -20,7 +20,6 @@ import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.employerauth.model.EmployerSignupCode;
 import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
 import com.workproofpay.backend.employerauth.service.EmployerSignupCodeCryptoService;
-import com.workproofpay.backend.remittance.repo.UserWalletRepository;
 import com.workproofpay.backend.workproof.api.dto.request.WorkProofAttachmentMetadataRequest;
 import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.model.WorkProof;
@@ -37,11 +36,10 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.math.BigDecimal;
 
 @Profile("demo")
 @Component
@@ -61,12 +59,6 @@ public class DevEmployerInitializer implements CommandLineRunner {
     private static final double WORKPLACE_LONGITUDE = 127.039585;
     private static final int WORKPLACE_RADIUS_METERS = 300;
     private static final LocalDate MEMBERSHIP_START_DATE = LocalDate.of(2026, 1, 1);
-    private static final List<String> SEEDED_WORKER_EMAILS = List.of(
-            "worker.complete@acme.test",
-            "worker.working@acme.test",
-            "worker.review@acme.test",
-            "worker.norecord@acme.test"
-    );
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -81,7 +73,6 @@ public class DevEmployerInitializer implements CommandLineRunner {
     private final CorrectionRequestRepository correctionRequestRepository;
     private final CorrectionDecisionAuditRepository correctionDecisionAuditRepository;
     private final WorkProofAuditLogRepository workProofAuditLogRepository;
-    private final UserWalletRepository userWalletRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -98,8 +89,9 @@ public class DevEmployerInitializer implements CommandLineRunner {
         employerUser.updateProfile(EMPLOYER_DISPLAY_NAME, null);
         userRepository.save(employerUser);
 
-        employerProfileRepository.findByAccountId(employerUser.getId())
-                .ifPresent(profile -> resetExistingSeedScope(profile));
+        if (employerProfileRepository.findByAccountId(employerUser.getId()).isPresent()) {
+            return;
+        }
 
         seedEmployerWorkspace(employerUser);
     }
@@ -110,55 +102,6 @@ public class DevEmployerInitializer implements CommandLineRunner {
                 passwordEncoder.encode(EMPLOYER_PASSWORD),
                 EMPLOYER_DISPLAY_NAME
         ));
-    }
-
-    private void resetExistingSeedScope(EmployerProfile employerProfile) {
-        Long companyId = employerProfile.getCompanyId();
-        Long workplaceId = employerProfile.getDefaultWorkplaceId();
-
-        List<CorrectionRequest> correctionRequests = correctionRequestRepository
-                .findByCompanyIdAndWorkplaceIdOrderByCreatedAtDescIdDesc(companyId, workplaceId);
-        for (CorrectionRequest correctionRequest : correctionRequests) {
-            correctionDecisionAuditRepository.deleteAll(
-                    correctionDecisionAuditRepository.findByCorrectionRequestIdOrderByCreatedAtDesc(correctionRequest.getId())
-            );
-        }
-        correctionRequestRepository.deleteAll(correctionRequests);
-
-        List<User> seededWorkers = loadSeededWorkers();
-        List<Long> seededWorkerIds = seededWorkers.stream()
-                .map(User::getId)
-                .toList();
-        List<WorkProof> workProofs = workProofRepository.findByWorkplaceId(workplaceId);
-        if (!workProofs.isEmpty()) {
-            workProofAuditLogRepository.deleteAll(
-                    workProofAuditLogRepository.findByWorkProofIdInOrderByCreatedAtDesc(
-                            workProofs.stream().map(WorkProof::getId).toList()
-                    )
-            );
-            workProofRepository.deleteAll(workProofs);
-        }
-
-        employmentMembershipRepository.deleteAll(
-                employmentMembershipRepository.findByCompanyIdAndWorkplaceId(companyId, workplaceId)
-        );
-        workContractRepository.deleteAll(workContractRepository.findByWorkplaceId(workplaceId));
-        employerSignupCodeRepository.deleteAll(
-                employerSignupCodeRepository.findByCompanyIdAndDefaultWorkplaceId(companyId, workplaceId)
-        );
-        userWalletRepository.deleteAllById(seededWorkerIds);
-        employerProfileRepository.delete(employerProfile);
-        workplaceRepository.findById(workplaceId).ifPresent(workplaceRepository::delete);
-        companyRepository.findById(companyId).ifPresent(companyRepository::delete);
-        userRepository.deleteAll(seededWorkers);
-    }
-
-    private List<User> loadSeededWorkers() {
-        List<User> workers = new ArrayList<>();
-        for (String email : SEEDED_WORKER_EMAILS) {
-            userRepository.findByEmailIgnoreCase(email).ifPresent(workers::add);
-        }
-        return workers;
     }
 
     private void seedEmployerWorkspace(User employerUser) {

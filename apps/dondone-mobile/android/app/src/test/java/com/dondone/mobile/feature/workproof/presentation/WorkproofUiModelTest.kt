@@ -1,7 +1,11 @@
 package com.dondone.mobile.feature.workproof.presentation
 
+import com.dondone.mobile.app.session.WorkproofCurrentLocationStatus
+import com.dondone.mobile.app.session.WorkproofCurrentLocationUiState
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
+import com.dondone.mobile.data.workproof.WorkproofWorkplacePayload
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -82,5 +86,51 @@ class WorkproofUiModelTest {
         assertEquals("가상 예시 데이터", uiModel.fallbackNoticeTitle)
         assertFalse(uiModel.summary.canClockIn)
         assertFalse(uiModel.summary.canClockOut)
+    }
+
+    @Test
+    fun `authenticated remote workproof disables punch actions until current location is ready`() {
+        val uiModel = DemoSeedFactory.create().toWorkproofUiModel(
+            remoteState = remoteContentState(),
+            isAuthenticated = true,
+            currentLocationUiState = WorkproofCurrentLocationUiState(
+                status = WorkproofCurrentLocationStatus.PERMISSION_REQUIRED
+            )
+        )
+
+        assertFalse(uiModel.summary.canClockIn)
+        assertFalse(uiModel.summary.canClockOut)
+        assertEquals(WorkproofCurrentLocationStatus.PERMISSION_REQUIRED, uiModel.summary.currentLocationStatus)
+        assertFalse(uiModel.summary.isWithinWorkplaceRadius)
+    }
+
+    @Test
+    fun `authenticated remote workproof enables punch action when current location is ready`() {
+        val uiModel = DemoSeedFactory.create().toWorkproofUiModel(
+            remoteState = remoteContentState(),
+            isAuthenticated = true,
+            currentLocationUiState = WorkproofCurrentLocationUiState(
+                status = WorkproofCurrentLocationStatus.READY
+            )
+        )
+
+        assertTrue(uiModel.summary.canClockIn)
+        assertEquals(null, uiModel.summary.currentLocationStatus)
+    }
+
+    private fun remoteContentState(): WorkproofRemoteState {
+        return WorkproofRemoteState.content(
+            WorkproofRemotePayload(
+                workplace = WorkproofWorkplacePayload(
+                    workplaceId = 1L,
+                    name = "DonDone Cafe",
+                    address = "서울시 강남구 테헤란로",
+                    latitude = 37.5013,
+                    longitude = 127.0396,
+                    allowedRadiusMeters = 100
+                ),
+                records = emptyList()
+            )
+        )
     }
 }

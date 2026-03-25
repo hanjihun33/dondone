@@ -19,4 +19,22 @@
     <string name="workproof_action_edit">수정</string>
     <string name="workproof_empty_audit_title">아직 쌓인 변경 기록이 없어요.</string>
     <string name="workproof_empty_audit_description">수정이 생기면 사유와 첨부 여부가 여기에 먼저 표시돼요.</string>
+    <string name="workproof_location_banner_title">현재 위치</string>
+    <string name="workproof_location_section_title">위치</string>
+    <string name="workproof_location_legend_current">현재 내 위치</string>
+    <string name="workproof_location_legend_workplace">근무지 위치</string>
+    <string name="workproof_location_move_pin">현재 내 위치로 핀 이동</string>
+    <string name="workproof_location_status_loading">현재 위치를 확인 중이에요.</string>
+    <string name="workproof_location_status_permission_required">위치 권한을 허용하면 현재 위치를 확인할 수 있어요.</string>
+    <string name="workproof_location_status_service_unavailable">위치 서비스를 사용할 수 없어요.</string>
+    <string name="workproof_location_status_disabled">위치 서비스가 꺼져 있어 현재 위치를 확인할 수 없어요.</string>
+    <string name="workproof_location_status_error">현재 위치를 확인하지 못했어요. 위치 서비스와 GPS를 확인해 주세요.</string>
+    <string name="workproof_location_status_try_again">현재 위치를 확인한 뒤 다시 시도해 주세요.</string>
+    <string name="workproof_map_fallback_missing_key">KAKAO_NATIVE_APP_KEY를 설정하면 지도가 표시돼요.</string>
+    <string name="workproof_map_fallback_runtime_unsupported">현재 실행 환경에서는 카카오 지도를 지원하지 않아 지도 없이 표시돼요.</string>
+    <string name="workproof_map_fallback_default">지도를 불러올 수 없어요.</string>
+    <string name="workproof_map_error_title">지도를 불러오지 못했어요</string>
+    <string name="workproof_map_error_message_default">잠시 후 다시 시도해 주세요.</string>
+    <string name="workproof_map_retry">다시 시도</string>
+    <string name="workproof_map_error_initialize">카카오 지도 초기화에 실패했습니다.</string>
 </resources>
