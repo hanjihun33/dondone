@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -285,7 +286,7 @@ private fun FinanceAdvanceSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "다음 한도 구간",
+                            text = uiModel.progressTitle,
                             style = MaterialTheme.typography.labelLarge,
                             color = FinanceTextMuted
                         )
@@ -541,6 +542,80 @@ private fun FinanceAmountKeyValueRow(
 }
 
 @Composable
+private fun FinanceDetailKeyValueRow(
+    label: String,
+    value: String,
+    valueColor: Color = FinanceTextPrimary
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(0.34f),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = DawnTextSubtle
+        )
+        Text(
+            text = value,
+            modifier = Modifier.weight(0.66f),
+            textAlign = TextAlign.End,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+            color = valueColor
+        )
+    }
+}
+
+@Composable
+private fun FinanceDetailAmountRow(
+    label: String,
+    value: String
+) {
+    val parts = value.split("·", limit = 2).map { it.trim() }
+    val primaryValue = parts.firstOrNull().orEmpty()
+    val secondaryValue = parts.getOrNull(1)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(0.34f),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = DawnTextSubtle
+        )
+        Column(
+            modifier = Modifier.weight(0.66f),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = primaryValue,
+                textAlign = TextAlign.End,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+                color = FinanceTextPrimary
+            )
+            if (!secondaryValue.isNullOrBlank()) {
+                Text(
+                    text = secondaryValue,
+                    textAlign = TextAlign.End,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = FinanceTextMuted
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun FinanceVaultStatusBanner(
     title: String,
     body: String,
@@ -596,31 +671,44 @@ private fun FinanceAdvanceBottomSheet(
                 FinanceLinkButton(text = "닫기", onClick = onDismiss)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                FinanceSummaryAmountCard(
-                    label = uiModel.summaryAmountLabel,
-                    value = uiModel.summaryAmountText,
-                    modifier = Modifier.weight(1f)
-                )
-                FinanceSummaryAmountCard(
-                    label = if (uiModel.hasCurrentRequest) "추가 가능" else "신청 가능",
-                    value = uiModel.availableText,
-                    modifier = Modifier.weight(1f)
+            if (uiModel.hasCurrentRequest) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    FinanceSummaryAmountCard(
+                        label = "이번 달 받은 금액",
+                        value = uiModel.summaryAmountText,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    FinanceSummaryAmountCard(
+                        label = "추가 신청 가능 금액",
+                        value = uiModel.availableText,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    FinanceSummaryMetricCard(
+                        label = "정산일",
+                        value = uiModel.repaymentDueText,
+                        modifier = Modifier.weight(1f)
+                    )
+                    FinanceSummaryMetricCard(
+                        label = "지급 상태",
+                        value = uiModel.summaryStatusText,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                FinanceAdvanceStatePanel(
+                    surfaceState = uiModel.surfaceState,
+                    title = uiModel.stateTitleText,
+                    body = uiModel.stateBodyText
                 )
             }
-            FinanceSummaryMetricCard(
-                label = "정산일",
-                value = uiModel.repaymentDueText,
-                modifier = Modifier.fillMaxWidth()
-            )
-            FinanceAdvanceStatePanel(
-                surfaceState = uiModel.surfaceState,
-                title = uiModel.stateTitleText,
-                body = uiModel.stateBodyText
-            )
             if (uiModel.noticeTitleText != null && uiModel.noticeBodyText != null) {
                 FinanceAdvanceNoticePanel(
                     title = uiModel.noticeTitleText,
@@ -731,59 +819,85 @@ private fun FinanceAdvanceBottomSheet(
                 FinanceBottomSheetHeader(title = "이번 달 이력")
                 uiModel.historyItems.forEachIndexed { index, item ->
                     if (item.isEmptyState) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FinanceSheetPanel(
+                            backgroundColor = FinanceSurfaceMuted,
+                            borderColor = FinanceDivider
+                        ) {
                             Text(
                                 text = item.title,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
                                 color = FinanceTextPrimary
                             )
                             Text(
                                 text = item.metaText,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = FinanceTextMuted
                             )
+                            if (!item.detailText.isNullOrBlank()) {
+                                Text(
+                                    text = item.detailText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = FinanceTextMuted
+                                )
+                            }
                         }
                     } else {
-                        Column(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(RoundedCornerShape(24.dp))
                                 .clickable(
                                     enabled = item.clickable && item.requestId != null,
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = rememberDonDoneGrayRipple(bounded = true)
                                 ) {
                                     item.requestId?.let(onOpenHistoryDetail)
-                                },
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                }
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.Top
+                            FinanceSheetPanel(
+                                backgroundColor = Color.White,
+                                borderColor = FinanceDivider
                             ) {
-                                Text(
-                                    text = item.title,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-                                    color = FinanceTextPrimary
-                                )
-                                if (item.valueText.isNotBlank() && item.valueText != "-") {
-                                    Text(
-                                        text = item.valueText,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-                                        color = FinanceTextPrimary
-                                    )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = item.title,
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                                            color = FinanceTextPrimary
+                                        )
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(
+                                                text = item.metaText,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                color = DawnTextSubtle
+                                            )
+                                            if (!item.detailText.isNullOrBlank()) {
+                                                Text(
+                                                    text = item.detailText,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = FinanceTextMuted
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (item.valueText.isNotBlank() && item.valueText != "-") {
+                                        FinanceHistoryAmountSummary(
+                                            value = item.valueText
+                                        )
+                                    }
                                 }
                             }
-                            Text(
-                                text = item.metaText,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = FinanceTextMuted
-                            )
-                            if (index < uiModel.historyItems.lastIndex) {
-                                FinanceBottomSheetDivider()
-                            }
                         }
+                    }
+                    if (index < uiModel.historyItems.lastIndex) {
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
             }
@@ -822,6 +936,35 @@ private fun FinanceAdvanceBottomSheet(
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun FinanceHistoryAmountSummary(value: String) {
+    val parts = value.split("·", limit = 2).map { it.trim() }
+    val primaryValue = parts.firstOrNull().orEmpty()
+    val secondaryValue = parts.getOrNull(1)
+
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = primaryValue,
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (!secondaryValue.isNullOrBlank()) {
+            Text(
+                text = secondaryValue,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = FinanceTextMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -873,46 +1016,15 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
                         style = MaterialTheme.typography.bodyMedium,
                         color = FinanceTextPrimary
                     )
-                }
+                    }
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    FinanceSummaryAmountCard(
-                        label = "받은 금액",
-                        value = uiModel.approvedAmountText,
-                        modifier = Modifier.weight(1f)
-                    )
-                    FinanceSummaryAmountCard(
-                        label = "추가 가능",
-                        value = uiModel.snapshotAvailableText,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    FinanceSummaryMetricCard(
-                        label = "정산일",
-                        value = uiModel.repaymentDueText,
-                        modifier = Modifier.weight(1f)
-                    )
-                    FinanceSummaryMetricCard(
-                        label = "지급 상태",
-                        value = uiModel.payoutStatusText,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                HorizontalDivider(color = FinanceDivider)
-                FinanceAmountKeyValueRow(label = "신청 금액", value = uiModel.requestedAmountText)
-                FinanceAmountKeyValueRow(label = "수수료", value = uiModel.feeAmountText)
-                FinanceKeyValueRow(label = "정산 상태", value = uiModel.settlementStatusText)
+                FinanceDetailAmountRow(label = "신청 금액", value = uiModel.requestedAmountText)
+                FinanceDetailAmountRow(label = "수수료", value = uiModel.feeAmountText)
+                FinanceDetailKeyValueRow(label = "정산 상태", value = uiModel.settlementStatusText)
                 uiModel.payoutTxHashText?.let { txHash ->
-                    FinanceKeyValueRow(label = "거래 확인", value = txHash)
+                    FinanceDetailKeyValueRow(label = "거래 확인", value = "블록체인 거래 확인")
                 }
-                FinanceKeyValueRow(label = "신청 시각", value = uiModel.createdAtText)
+                FinanceDetailKeyValueRow(label = "신청 시각", value = uiModel.createdAtText)
             }
         }
 
@@ -920,10 +1032,10 @@ private fun FinanceAdvanceRequestDetailBottomSheet(
             FinanceBottomSheetDivider()
             FinanceBottomSheetSection {
                 FinanceBottomSheetHeader(title = "계산 기준")
-                FinanceAmountKeyValueRow(label = "당시 가능 금액", value = uiModel.snapshotAvailableText)
-                FinanceAmountKeyValueRow(label = "당시 최대 한도", value = uiModel.snapshotCapText)
-                FinanceKeyValueRow(label = "반영 근무", value = uiModel.snapshotReflectedText)
-                FinanceKeyValueRow(label = "확인 필요 기록", value = uiModel.snapshotReviewText)
+                FinanceDetailAmountRow(label = "당시 가능 금액", value = uiModel.snapshotAvailableText)
+                FinanceDetailAmountRow(label = "당시 최대 한도", value = uiModel.snapshotCapText)
+                FinanceDetailKeyValueRow(label = "반영 근무", value = uiModel.snapshotReflectedText)
+                FinanceDetailKeyValueRow(label = "확인 필요 기록", value = uiModel.snapshotReviewText)
             }
         }
 
