@@ -146,6 +146,14 @@ function getStatusHint(request: AdminAdvanceRequestItemResponse) {
   }
 }
 
+function getStatusDetail(request: AdminAdvanceRequestItemResponse) {
+  if (request.payoutTxHash) {
+    return `tx ${request.payoutTxHash.slice(0, 18)}...`;
+  }
+
+  return getStatusHint(request);
+}
+
 function canApproveOrReject(status: AdminAdvanceRequestItemResponse["status"]) {
   return status === "SUBMITTED";
 }
@@ -445,26 +453,6 @@ export function AdminAdvanceRequestSection() {
                         )}
                       </strong>
                       <p className="admin-cell-sub">{formatReferenceKrw(request.requestedDisplayKrwAmount)}</p>
-                      <p className="admin-cell-sub">
-                        승인 금액{" "}
-                        {request.approvedAmountAtomic == null
-                          ? "대기"
-                          : formatAssetAmount(
-                              request.approvedAmountAtomic,
-                              request.assetSymbol,
-                              request.assetDecimals
-                            )}
-                      </p>
-                      <p className="admin-cell-sub">
-                        {request.approvedDisplayKrwAmount == null
-                          ? "-"
-                          : formatReferenceKrw(request.approvedDisplayKrwAmount)}
-                      </p>
-                      <p className="admin-cell-sub">
-                        수수료{" "}
-                        {formatAssetAmount(request.feeAmountAtomic, request.assetSymbol, request.assetDecimals)}
-                      </p>
-                      <p className="admin-cell-sub">{formatReferenceKrw(request.feeDisplayKrwAmount)}</p>
                     </div>
                   </td>
                   <td>
@@ -480,11 +468,19 @@ export function AdminAdvanceRequestSection() {
                   </td>
                   <td>
                     <div className="admin-metric-stack">
-                      <strong>신청 {formatDateTime(request.requestedAt)}</strong>
+                      {request.reviewedAt ? (
+                        <p className="admin-cell-sub">신청 {formatDateTime(request.requestedAt)}</p>
+                      ) : (
+                        <strong>신청 {formatDateTime(request.requestedAt)}</strong>
+                      )}
                       <p className="admin-cell-sub">
                         급여 정산 예정 {formatDate(request.settlementDueDate ?? request.repaymentDueDate)}
                       </p>
-                      <p className="admin-cell-sub">처리 {formatDateTime(request.reviewedAt)}</p>
+                      {request.reviewedAt ? (
+                        <strong>처리 {formatDateTime(request.reviewedAt)}</strong>
+                      ) : (
+                        <p className="admin-cell-sub">처리 -</p>
+                      )}
                     </div>
                   </td>
                   <td>
@@ -492,10 +488,7 @@ export function AdminAdvanceRequestSection() {
                       <span className={`admin-status ${STATUS_CLASS_NAMES[request.status]}`}>
                         {STATUS_LABELS[request.status]}
                       </span>
-                      <p className="admin-cell-sub">{getStatusHint(request)}</p>
-                      {request.payoutTxHash ? (
-                        <p className="admin-cell-sub">tx {request.payoutTxHash.slice(0, 18)}...</p>
-                      ) : null}
+                      <p className="admin-cell-sub">{getStatusDetail(request)}</p>
                     </div>
                   </td>
                   <td>
