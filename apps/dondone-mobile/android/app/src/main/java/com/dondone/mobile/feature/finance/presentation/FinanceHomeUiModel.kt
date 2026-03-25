@@ -147,6 +147,10 @@ data class FinanceAdvanceUiModel(
     val progressTitle: String,
     val progress: Float,
     val progressHintText: String,
+    val progressPrimaryMetricLabel: String?,
+    val progressPrimaryMetricText: String?,
+    val progressSecondaryMetricLabel: String?,
+    val progressSecondaryMetricText: String?,
     val actionText: String,
     val secondaryActionText: String?,
     val detail: FinanceAdvanceDetailUiModel,
@@ -312,7 +316,7 @@ fun DemoState.toFinanceHomeUiModel(
     val advanceProgress = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         val totalAmountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic
         if (totalAmountAtomic > 0L) {
-            remoteUsedAmountAtomic.toFloat() / totalAmountAtomic.toFloat()
+            remoteAvailableAmountAtomic.toFloat() / totalAmountAtomic.toFloat()
         } else {
             0f
         }
@@ -325,7 +329,7 @@ fun DemoState.toFinanceHomeUiModel(
     }
     val effectiveProgressHintText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         if (remoteAvailableAmountAtomic > 0L) {
-            "남은 추가 신청 가능 금액 ${formatAdvanceAmount(
+            "남은 한도 ${formatAdvanceAmount(
                 amountAtomic = remoteAvailableAmountAtomic,
                 displayKrwAmount = remoteAvailableDisplayKrwAmount,
                 assetDecimals = remoteAssetDecimals,
@@ -346,6 +350,36 @@ fun DemoState.toFinanceHomeUiModel(
         }
     } else {
         advanceProgressHintText
+    }
+    val progressPrimaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
+        "이번 달 받은 금액"
+    } else {
+        null
+    }
+    val progressPrimaryMetricText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
+        formatAdvanceAmount(
+            amountAtomic = remoteUsedAmountAtomic,
+            displayKrwAmount = remoteUsedDisplayKrwAmount,
+            assetDecimals = remoteAssetDecimals,
+            assetSymbol = remoteAssetSymbol
+        )
+    } else {
+        null
+    }
+    val progressSecondaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
+        "이번 달 한도"
+    } else {
+        null
+    }
+    val progressSecondaryMetricText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
+        formatAdvanceAmount(
+            amountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic,
+            displayKrwAmount = remoteUsedDisplayKrwAmount + remoteAvailableDisplayKrwAmount,
+            assetDecimals = remoteAssetDecimals,
+            assetSymbol = remoteAssetSymbol
+        )
+    } else {
+        null
     }
     val effectiveHistoryItems = if (usesRemoteAdvance) {
         buildRemoteAdvanceHistoryItems(
@@ -737,9 +771,13 @@ fun DemoState.toFinanceHomeUiModel(
             showProgress =
                 advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
                     advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
-            progressTitle = if (hasCurrentAdvanceRequest) "이번 달 한도" else "다음 한도 구간",
+            progressTitle = if (hasCurrentAdvanceRequest) "이번 달 남은 한도" else "다음 한도 구간",
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
+            progressPrimaryMetricLabel = progressPrimaryMetricLabel,
+            progressPrimaryMetricText = progressPrimaryMetricText,
+            progressSecondaryMetricLabel = progressSecondaryMetricLabel,
+            progressSecondaryMetricText = progressSecondaryMetricText,
             actionText = when {
                 canRequestAdditional -> "추가 신청"
                 hasCurrentAdvanceRequest -> "내역 보기"

@@ -301,9 +301,32 @@ private fun FinanceAdvanceSection(
                 DonDoneProgressBar(progress = uiModel.progress)
                 Text(
                     text = uiModel.progressHintText,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = FinanceTextMuted
                 )
+                if (
+                    uiModel.progressPrimaryMetricLabel != null &&
+                    uiModel.progressPrimaryMetricText != null &&
+                    uiModel.progressSecondaryMetricLabel != null &&
+                    uiModel.progressSecondaryMetricText != null
+                ) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        FinanceProgressMetric(
+                            label = uiModel.progressPrimaryMetricLabel,
+                            value = uiModel.progressPrimaryMetricText,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FinanceProgressMetric(
+                            label = uiModel.progressSecondaryMetricLabel,
+                            value = uiModel.progressSecondaryMetricText,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
         }
         FinancePrimaryButton(
@@ -1764,6 +1787,44 @@ private fun FinanceInnerPanel(content: @Composable () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         content()
+    }
+}
+
+@Composable
+private fun FinanceProgressMetric(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    val parts = value.split("·", limit = 2).map { it.trim() }
+    val primaryValue = parts.firstOrNull().orEmpty()
+    val secondaryValue = parts.getOrNull(1)
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = FinanceTextMuted
+        )
+        Text(
+            text = primaryValue,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (!secondaryValue.isNullOrBlank()) {
+            Text(
+                text = secondaryValue,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = FinanceTextMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
