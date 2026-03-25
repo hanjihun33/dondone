@@ -94,6 +94,7 @@ data class FinanceAdvanceCalendarDayUiModel(
 data class FinanceAdvanceDetailUiModel(
     val surfaceState: AdvanceSurfaceState,
     val hasCurrentRequest: Boolean,
+    val canRequestAdditional: Boolean,
     val subtitleText: String,
     val stateTitleText: String,
     val stateBodyText: String,
@@ -128,6 +129,7 @@ data class FinanceAdvanceDetailUiModel(
 data class FinanceAdvanceUiModel(
     val surfaceState: AdvanceSurfaceState,
     val hasCurrentRequest: Boolean,
+    val canRequestAdditional: Boolean,
     val primaryActionOpensWorkerRegistration: Boolean,
     val heroAmountLabel: String,
     val heroAmountText: String,
@@ -274,10 +276,24 @@ fun DemoState.toFinanceHomeUiModel(
     val remoteUsedDisplayKrwAmount = remoteRequests.sumOf { it.approvedDisplayKrwAmount ?: 0L }
     val remoteAvailableAmountAtomic = remoteEligibility?.availableAmountAtomic ?: 0L
     val remoteAvailableDisplayKrwAmount = remoteEligibility?.availableDisplayKrwAmount ?: 0L
+    val hasOutstandingAdvanceRequest = if (usesRemoteAdvance) {
+        remoteRequests.any { request ->
+            request.status == "SUBMITTED" ||
+                request.status == "APPROVED" ||
+                request.status == "PAYING"
+        }
+    } else {
+        false
+    }
     val hasCurrentAdvanceRequest = if (usesRemoteAdvance) {
         latestRemoteRequest != null
     } else {
         advanceSnapshot.used > 0
+    }
+    val canRequestAdditional = if (usesRemoteAdvance) {
+        !hasOutstandingAdvanceRequest && advanceContractState.canRequest && !advanceRequestUiState.isSubmitting
+    } else {
+        !hasCurrentAdvanceRequest && advanceContractState.canRequest && !advanceRequestUiState.isSubmitting
     }
     val remoteAvailableAmount = if (usesRemoteAdvance) {
         remoteEligibility?.availableAmountInWholeAssetUnits?.toLong() ?: 0L
@@ -417,7 +433,9 @@ fun DemoState.toFinanceHomeUiModel(
         )
         else -> formatKrw(advanceSnapshot.used)
     }
-    val advanceHeroStateTitleText = if (hasCurrentAdvanceRequest) {
+    val advanceHeroStateTitleText = if (hasCurrentAdvanceRequest && canRequestAdditional) {
+        "추가 신청이 가능해요"
+    } else if (hasCurrentAdvanceRequest) {
         when (latestRemoteRequest?.status) {
             "PAID" -> "이번 회차 지급이 완료됐어요"
             "PAYING", "APPROVED", "SUBMITTED" -> "이번 회차 지급이 진행 중이에요"
@@ -428,7 +446,9 @@ fun DemoState.toFinanceHomeUiModel(
     } else {
         advanceContractState.stateTitleText
     }
-    val advanceHeroStateBodyText = if (hasCurrentAdvanceRequest) {
+    val advanceHeroStateBodyText = if (hasCurrentAdvanceRequest && canRequestAdditional) {
+        "받은 금액과 남은 한도를 확인한 뒤 추가로 신청할 수 있어요."
+    } else if (hasCurrentAdvanceRequest) {
         when (latestRemoteRequest?.status) {
             "PAID" -> ""
             "PAYING", "APPROVED", "SUBMITTED" -> "지급 상태와 정산 예정일을 확인할 수 있어요."
@@ -655,6 +675,7 @@ fun DemoState.toFinanceHomeUiModel(
         advance = FinanceAdvanceUiModel(
             surfaceState = advanceContractState.surfaceState,
             hasCurrentRequest = hasCurrentAdvanceRequest,
+            canRequestAdditional = canRequestAdditional,
             primaryActionOpensWorkerRegistration = !hasCurrentAdvanceRequest && advanceContractState.actionOpensWorkerRegistration,
             heroAmountLabel = advanceHeroAmountLabel,
             heroAmountText = advanceHeroAmountText,
@@ -680,11 +701,16 @@ fun DemoState.toFinanceHomeUiModel(
                 advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
-            actionText = if (hasCurrentAdvanceRequest) "내역 보기" else advanceContractState.actionText,
+            actionText = when {
+                canRequestAdditional -> "추가 신청"
+                hasCurrentAdvanceRequest -> "내역 보기"
+                else -> advanceContractState.actionText
+            },
             secondaryActionText = advanceContractState.secondaryActionText,
             detail = FinanceAdvanceDetailUiModel(
                 surfaceState = advanceContractState.surfaceState,
                 hasCurrentRequest = hasCurrentAdvanceRequest,
+                canRequestAdditional = canRequestAdditional,
                 subtitleText = "근무 기록 기반 한도로 급여일 전에 일부를 먼저 받습니다.",
                 stateTitleText = advanceHeroStateTitleText,
                 stateBodyText = advanceHeroStateBodyText,
@@ -724,24 +750,25 @@ fun DemoState.toFinanceHomeUiModel(
                 feeText = selectedFeeText,
                 blockReasonTexts = if (hasCurrentAdvanceRequest) emptyList() else advanceContractState.blockReasonTexts,
                 disclaimerText = advanceContractState.disclaimerText,
-                canRequest = !hasCurrentAdvanceRequest && advanceContractState.canRequest && !advanceRequestUiState.isSubmitting,
+                canRequest = canRequestAdditional,
                 requestButtonText = when {
                     advanceRequestUiState.isSubmitting -> "신청 중..."
-                    !hasCurrentAdvanceRequest && advanceContractState.canRequest -> "미리받기 신청"
+                    canRequestAdditional && hasCurrentAdvanceRequest -> "추가 신청"
+                    canRequestAdditional -> "미리받기 신청"
                     !hasCurrentAdvanceRequest -> "닫기"
                     else -> advanceContractState.actionText
                 },
                 secondaryActionText = advanceContractState.secondaryActionText,
                 requestFeedbackText = advanceRequestUiState.message,
                 requestFeedbackIsError = advanceRequestUiState.isError,
-                amountOptions = if (!hasCurrentAdvanceRequest && usesRemoteAdvance) {
+                amountOptions = if (canRequestAdditional && usesRemoteAdvance) {
                     buildAmountOptions(
                         available = remoteAvailableAmount.toInt(),
                         selected = effectiveSelectedAdvanceAmount,
                         presets = listOf(10, 25, 50, 100),
                         labelFormatter = { amount -> "$amount $remoteAssetSymbol" }
                     )
-                } else if (!hasCurrentAdvanceRequest) {
+                } else if (canRequestAdditional) {
                     advanceAmountOptions
                 } else {
                     emptyList()

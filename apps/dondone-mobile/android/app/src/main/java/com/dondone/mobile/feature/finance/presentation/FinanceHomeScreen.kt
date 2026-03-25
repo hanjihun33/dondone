@@ -674,7 +674,7 @@ private fun FinanceAdvanceBottomSheet(
         }
 
         FinanceBottomSheetDivider()
-        if (!uiModel.hasCurrentRequest && uiModel.amountOptions.isNotEmpty()) {
+        if (uiModel.canRequestAdditional && uiModel.amountOptions.isNotEmpty()) {
             FinanceBottomSheetSection {
                 FinanceBottomSheetHeader(title = "받을 금액")
                 FinanceAmountOptionGrid(
@@ -695,8 +695,8 @@ private fun FinanceAdvanceBottomSheet(
             }
         }
 
-        if (uiModel.blockReasonTexts.isNotEmpty()) {
-            if (!uiModel.hasCurrentRequest && uiModel.amountOptions.isNotEmpty()) {
+        if (!uiModel.canRequestAdditional && uiModel.blockReasonTexts.isNotEmpty()) {
+            if (uiModel.canRequestAdditional && uiModel.amountOptions.isNotEmpty()) {
                 FinanceBottomSheetDivider()
             }
             FinanceBottomSheetSection {
@@ -775,10 +775,10 @@ private fun FinanceAdvanceBottomSheet(
             }
         }
 
-        if (!uiModel.hasCurrentRequest || uiModel.secondaryActionText != null || uiModel.requestFeedbackText != null) {
+        if (uiModel.canRequestAdditional || !uiModel.hasCurrentRequest || uiModel.secondaryActionText != null || uiModel.requestFeedbackText != null) {
             FinanceBottomSheetDivider()
             FinanceBottomSheetSection {
-                if (!uiModel.hasCurrentRequest && uiModel.requestFeedbackText != null) {
+                if (uiModel.canRequestAdditional && uiModel.requestFeedbackText != null) {
                     FinanceSheetPanel(
                         backgroundColor = if (uiModel.requestFeedbackIsError) Color(0xFFFFF5F5) else FinanceAdvanceSheetHero,
                         borderColor = if (uiModel.requestFeedbackIsError) Color(0xFFFECACA) else FinanceAdvanceSheetHeroBorder
@@ -790,7 +790,7 @@ private fun FinanceAdvanceBottomSheet(
                         )
                     }
                 }
-                if (!uiModel.hasCurrentRequest) {
+                if (uiModel.canRequestAdditional || !uiModel.hasCurrentRequest) {
                     FinancePrimaryButton(
                         text = uiModel.requestButtonText,
                         modifier = Modifier.fillMaxWidth(),
