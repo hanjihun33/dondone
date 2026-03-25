@@ -54,7 +54,7 @@ class DevEmployerInitializerIntegrationTest {
     private WorkProofRepository workProofRepository;
 
     @Test
-    void rerunDeletesWorkplaceScopedProofsBeforeDeletingContracts() {
+    void rerunPreservesExistingEmployerWorkspace() {
         User employer = userRepository.findByEmailIgnoreCase(EMPLOYER_EMAIL).orElseThrow();
         EmployerProfile employerProfile = employerProfileRepository.findByAccountId(employer.getId()).orElseThrow();
         Workplace workplace = workplaceRepository.findById(employerProfile.getDefaultWorkplaceId()).orElseThrow();
@@ -87,10 +87,18 @@ class DevEmployerInitializerIntegrationTest {
 
         assertThatCode(() -> devEmployerInitializer.run()).doesNotThrowAnyException();
 
-        EmployerProfile reseededProfile = employerProfileRepository.findByAccountId(employer.getId()).orElseThrow();
-        Workplace reseededWorkplace = workplaceRepository.findById(reseededProfile.getDefaultWorkplaceId()).orElseThrow();
+        EmployerProfile rerunProfile = employerProfileRepository.findByAccountId(employer.getId()).orElseThrow();
+        Workplace rerunWorkplace = workplaceRepository.findById(rerunProfile.getDefaultWorkplaceId()).orElseThrow();
+        WorkContract rerunContract = workContractRepository
+                .findFirstByWorkplaceIdAndEffectiveToIsNullOrderByEffectiveFromDesc(rerunWorkplace.getId())
+                .orElseThrow();
 
-        assertThat(workProofRepository.findByWorkplaceId(reseededWorkplace.getId())).hasSize(6);
+        assertThat(rerunProfile.getId()).isEqualTo(employerProfile.getId());
+        assertThat(rerunProfile.getCompanyId()).isEqualTo(employerProfile.getCompanyId());
+        assertThat(rerunProfile.getDefaultWorkplaceId()).isEqualTo(employerProfile.getDefaultWorkplaceId());
+        assertThat(rerunWorkplace.getId()).isEqualTo(workplace.getId());
+        assertThat(rerunContract.getId()).isEqualTo(contract.getId());
+        assertThat(workProofRepository.findByWorkplaceId(rerunWorkplace.getId())).hasSize(7);
         assertThat(userRepository.findByEmailIgnoreCase(EXTRA_WORKER_EMAIL)).isPresent();
     }
 }
