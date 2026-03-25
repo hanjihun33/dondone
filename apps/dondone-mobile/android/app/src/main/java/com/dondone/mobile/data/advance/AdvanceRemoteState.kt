@@ -12,12 +12,18 @@ data class AdvanceEligibilityPayload(
     val availableDisplayKrwAmount: Long,
     val maxCapAmountAtomic: Long,
     val maxCapDisplayKrwAmount: Long,
+    val currentTierName: String,
+    val nextTierName: String? = null,
+    val progressToNextTier: BigDecimal? = null,
+    val remainingWorkDaysToNextTier: Int = 0,
+    val nextTierExpectedCapDisplayKrw: Long? = null,
     val repaymentTier: String,
     val blockReasonCodes: List<String>,
     val noticeReasonCodes: List<String>,
     val estimatedFeeAmountAtomic: Long,
     val estimatedFeeDisplayKrwAmount: Long,
     val estimatedRepaymentDate: String,
+    val settlementDueDate: String? = null,
     val disclaimer: String,
     val needsReviewRecordCount: Int
 ) {
@@ -26,6 +32,9 @@ data class AdvanceEligibilityPayload(
 
     val availableAmountInWholeAssetUnits: Int
         get() = availableAmountAtomic.toWholeAssetUnits(assetDecimals)
+
+    val effectiveSettlementDueDate: String
+        get() = settlementDueDate ?: estimatedRepaymentDate
 }
 
 data class AdvanceRequestItemPayload(
@@ -42,6 +51,8 @@ data class AdvanceRequestItemPayload(
     val requestStatus: String,
     val payoutStatus: String?,
     val payoutTxHash: String?,
+    val settlementStatus: String? = null,
+    val settlementDueDate: String? = null,
     val repaymentDueDate: String,
     val requestedAt: String
 ) {
@@ -50,6 +61,9 @@ data class AdvanceRequestItemPayload(
 
     val approvedAmount: Long?
         get() = approvedDisplayKrwAmount
+
+    val effectiveSettlementDueDate: String
+        get() = settlementDueDate ?: repaymentDueDate
 }
 
 enum class AdvanceRemoteMode {

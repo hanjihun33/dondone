@@ -14,6 +14,8 @@ data class AdvanceCreateResult(
     val approvedDisplayKrwAmount: Long?,
     val feeAmountAtomic: Long,
     val feeDisplayKrwAmount: Long,
+    val settlementStatus: String? = null,
+    val settlementDueDate: String? = null,
     val repaymentDueDate: String,
     val eligibilitySnapshot: AdvanceEligibilitySnapshotPayload
 ) {
@@ -22,6 +24,9 @@ data class AdvanceCreateResult(
 
     val feeAmount: Long
         get() = feeDisplayKrwAmount
+
+    val effectiveSettlementDueDate: String
+        get() = settlementDueDate ?: repaymentDueDate
 }
 
 class AdvanceUnauthorizedException(

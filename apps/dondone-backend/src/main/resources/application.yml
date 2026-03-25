@@ -81,6 +81,15 @@ vault:
     approval-receipt-timeout-seconds: ${VAULT_APPROVAL_RECEIPT_TIMEOUT_SECONDS:60}
     network: ${VAULT_NETWORK:sepolia}
 
+workproof:
+  default-contract:
+    enabled: ${WORKPROOF_DEFAULT_CONTRACT_ENABLED:true}
+    pay-unit: ${WORKPROOF_DEFAULT_CONTRACT_PAY_UNIT:HOURLY}
+    base-pay-amount: ${WORKPROOF_DEFAULT_CONTRACT_BASE_PAY_AMOUNT:12000}
+    daily-work-minutes: ${WORKPROOF_DEFAULT_CONTRACT_DAILY_WORK_MINUTES:480}
+    monthly-work-minutes: ${WORKPROOF_DEFAULT_CONTRACT_MONTHLY_WORK_MINUTES:12540}
+    effective-from-offset-days: ${WORKPROOF_DEFAULT_CONTRACT_EFFECTIVE_FROM_OFFSET_DAYS:0}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

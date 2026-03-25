@@ -26,6 +26,7 @@ fun resolveScreenChrome(
             showRootTabs = true,
             showSettingsAction = false,
             showDate = route != Route.HOME && route != Route.MENU &&
+                route != Route.FINANCE_HOME &&
                 !(route == Route.WORKPROOF && isWorkproofDetailVisible)
         )
     } else {

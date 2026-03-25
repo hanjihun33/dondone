@@ -1,5 +1,7 @@
 package com.workproofpay.backend.advance.api.dto.response;
 
+import com.workproofpay.backend.advance.model.AdvanceSettlementStatus;
+
 import java.time.LocalDate;
 
 public record AdvanceRequestResponse(
@@ -14,6 +16,8 @@ public record AdvanceRequestResponse(
         Long approvedDisplayKrwAmount,
         Long feeAmountAtomic,
         Long feeDisplayKrwAmount,
+        AdvanceSettlementStatus settlementStatus,
+        LocalDate settlementDueDate,
         LocalDate repaymentDueDate,
         AdvanceEligibilitySnapshotResponse eligibilitySnapshot
 ) {

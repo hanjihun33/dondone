@@ -3,12 +3,16 @@ package com.workproofpay.backend.advance.service;
 import com.workproofpay.backend.advance.api.dto.request.CreateAdvanceRequest;
 import com.workproofpay.backend.advance.api.dto.response.*;
 import com.workproofpay.backend.advance.model.AdvancePayout;
+import com.workproofpay.backend.advance.model.AdvancePayoutStatus;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.model.AdvanceRequestStatus;
+import com.workproofpay.backend.advance.model.AdvanceSettlementStatus;
 import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.employer.model.EmploymentMembershipStatus;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
@@ -22,9 +26,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -37,8 +43,10 @@ public class AdvanceService {
     private final UserRepository userRepository;
     private final WorkplaceRepository workplaceRepository;
     private final WorkContractRepository workContractRepository;
+    private final EmploymentMembershipRepository employmentMembershipRepository;
     private final WorkProofRepository workProofRepository;
     private final WorkProofLane1Service workProofLane1Service;
+    private final AdvancePolicyResolver advancePolicyResolver;
     private final AdvancePolicyEngine advancePolicyEngine;
     private final AdvanceRequestViewStatusResolver advanceRequestViewStatusResolver;
 
@@ -82,7 +90,7 @@ public class AdvanceService {
                 toDisplayKrwAmount(request.requestedAmountAtomic(), eligibility.response().exchangeRateSnapshot(), eligibility.response().assetDecimals()),
                 eligibility.response().estimatedFeeAmountAtomic(),
                 eligibility.response().estimatedFeeDisplayKrwAmount(),
-                eligibility.response().estimatedRepaymentDate(),
+                eligibility.response().settlementDueDate(),
                 request.requestedAt(),
                 eligibility.response().availableAmountAtomic(),
                 eligibility.response().availableDisplayKrwAmount(),
@@ -120,26 +128,30 @@ public class AdvanceService {
     }
 
     private AdvanceEligibilityResult evaluateEligibility(Long userId, Long workplaceId) {
-        Workplace workplace = workplaceRepository.findByIdAndUserId(workplaceId, userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        Workplace workplace = getAccessibleWorkplace(userId, workplaceId);
         WorkContract contract = workContractRepository
-                .findFirstByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId, userId)
+                .findFirstByWorkplaceIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId)
                 .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_CONTRACT_REQUIRED));
 
-        YearMonth targetMonth = resolveTargetMonth(userId, workplaceId);
+        var policy = advancePolicyResolver.resolve();
+        YearMonth targetMonth = resolveTargetMonth(userId, workplaceId, policy);
         WorkProofMonthlySummaryContractResponse summary = toMonthlySummary(userId, workplaceId, targetMonth);
-        boolean hasOpenAdvanceRequest = advanceRequestRepository.existsByUserIdAndWorkplaceIdAndYearMonthAndStatusIn(
-                userId,
-                workplaceId,
-                targetMonth.toString(),
-                List.of(AdvanceRequestStatus.SUBMITTED, AdvanceRequestStatus.APPROVED)
+        AdvanceCycleUsage cycleUsage = summarizeCycleUsage(
+                advanceRequestRepository.findByUserIdAndWorkplaceIdAndYearMonthOrderByRequestedAtDescCreatedAtDesc(
+                        userId,
+                        workplaceId,
+                        targetMonth.toString()
+                )
         );
 
         AdvanceEligibilityResponse response = advancePolicyEngine.evaluate(
+                policy,
                 workplaceId,
                 contract,
                 summary,
-                hasOpenAdvanceRequest,
+                cycleUsage.alreadyAdvancedAmountAtomic(),
+                cycleUsage.alreadyAdvancedDisplayKrwAmount(),
+                cycleUsage.hasOutstandingAdvance(),
                 java.time.LocalDate.now(),
                 targetMonth
         );
@@ -153,15 +165,80 @@ public class AdvanceService {
         );
     }
 
+    private AdvanceCycleUsage summarizeCycleUsage(List<AdvanceRequest> cycleRequests) {
+        if (cycleRequests.isEmpty()) {
+            return new AdvanceCycleUsage(0L, 0L, false);
+        }
+        Map<Long, AdvancePayout> payoutsByRequestId = mapPayoutsByRequestId(
+                cycleRequests.stream().map(AdvanceRequest::getId).toList()
+        );
+
+        long alreadyAdvancedAmountAtomic = 0L;
+        long alreadyAdvancedDisplayKrwAmount = 0L;
+        boolean hasOutstandingAdvance = false;
+        for (AdvanceRequest request : cycleRequests) {
+            if (request.getStatus() == AdvanceRequestStatus.SUBMITTED) {
+                hasOutstandingAdvance = true;
+                continue;
+            }
+            if (request.getStatus() != AdvanceRequestStatus.APPROVED) {
+                continue;
+            }
+
+            AdvancePayout payout = payoutsByRequestId.get(request.getId());
+            if (payout == null || isActivePayout(payout.getStatus())) {
+                hasOutstandingAdvance = true;
+                continue;
+            }
+            if (payout.getStatus() == AdvancePayoutStatus.CONFIRMED) {
+                alreadyAdvancedAmountAtomic += nullSafe(request.getApprovedAmountAtomic());
+                alreadyAdvancedDisplayKrwAmount += nullSafe(request.getApprovedDisplayKrwAmount());
+            }
+        }
+        return new AdvanceCycleUsage(alreadyAdvancedAmountAtomic, alreadyAdvancedDisplayKrwAmount, hasOutstandingAdvance);
+    }
+
+    private boolean isActivePayout(AdvancePayoutStatus status) {
+        return status == AdvancePayoutStatus.REQUESTED
+                || status == AdvancePayoutStatus.SIGNED
+                || status == AdvancePayoutStatus.BROADCASTED;
+    }
+
+    private long nullSafe(Long value) {
+        return value == null ? 0L : value;
+    }
+
     private WorkProofMonthlySummaryContractResponse toMonthlySummary(Long userId, Long workplaceId, YearMonth targetMonth) {
         return workProofLane1Service.getMonthlySummary(userId, targetMonth.toString(), workplaceId);
     }
 
-    private YearMonth resolveTargetMonth(Long userId, Long workplaceId) {
+    private YearMonth resolveTargetMonth(Long userId, Long workplaceId, com.workproofpay.backend.advance.model.AdvancePolicy policy) {
         YearMonth latestWorkedMonth = workProofRepository.findFirstByUserIdAndWorkplaceIdOrderByWorkDateDescClockInAtDesc(userId, workplaceId)
                 .map(workProof -> YearMonth.from(workProof.getWorkDate()))
                 .orElse(null);
-        return advancePolicyEngine.resolveTargetMonth(java.time.LocalDate.now(), latestWorkedMonth);
+        return advancePolicyEngine.resolveTargetMonth(policy, java.time.LocalDate.now(), latestWorkedMonth);
+    }
+
+    private Workplace getAccessibleWorkplace(Long userId, Long workplaceId) {
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        if (Objects.equals(workplace.getUser().getId(), userId) || hasActiveMembership(userId, workplace)) {
+            return workplace;
+        }
+        throw new ApiException(ErrorCode.WORKPLACE_NOT_FOUND);
+    }
+
+    private boolean hasActiveMembership(Long userId, Workplace workplace) {
+        if (workplace.getCompanyId() == null) {
+            return false;
+        }
+        return !employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                userId,
+                workplace.getCompanyId(),
+                workplace.getId(),
+                EmploymentMembershipStatus.ACTIVE,
+                LocalDate.now()
+        ).isEmpty();
     }
 
     private User findUser(Long userId) {
@@ -192,6 +269,8 @@ public class AdvanceService {
                 request.getApprovedDisplayKrwAmount(),
                 request.getFeeAmountAtomic(),
                 request.getFeeDisplayKrwAmount(),
+                toSettlementStatus(request),
+                toSettlementDueDate(request),
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request)
         );
@@ -213,6 +292,8 @@ public class AdvanceService {
                 viewStatus.requestStatus(),
                 viewStatus.payoutStatus(),
                 payout != null ? payout.getTxHash() : null,
+                toSettlementStatus(request),
+                toSettlementDueDate(request),
                 request.getRepaymentDueDate(),
                 request.getRequestedAt()
         );
@@ -236,10 +317,22 @@ public class AdvanceService {
                 viewStatus.requestStatus(),
                 viewStatus.payoutStatus(),
                 payout != null ? payout.getTxHash() : null,
+                toSettlementStatus(request),
+                toSettlementDueDate(request),
                 request.getRepaymentDueDate(),
                 toSnapshotResponse(request),
                 request.getCreatedAt()
         );
+    }
+
+    private AdvanceSettlementStatus toSettlementStatus(AdvanceRequest request) {
+        return request.getStatus() == AdvanceRequestStatus.REJECTED
+                ? null
+                : AdvanceSettlementStatus.SCHEDULED_FOR_PAYDAY;
+    }
+
+    private java.time.LocalDate toSettlementDueDate(AdvanceRequest request) {
+        return toSettlementStatus(request) == null ? null : request.getRepaymentDueDate();
     }
 
     private Map<Long, AdvancePayout> mapPayoutsByRequestId(List<Long> requestIds) {
@@ -274,5 +367,12 @@ public class AdvanceService {
                 .multiply(exchangeRate)
                 .divide(java.math.BigDecimal.TEN.pow(assetDecimals), 0, java.math.RoundingMode.DOWN)
                 .longValue();
+    }
+
+    private record AdvanceCycleUsage(
+            long alreadyAdvancedAmountAtomic,
+            long alreadyAdvancedDisplayKrwAmount,
+            boolean hasOutstandingAdvance
+    ) {
     }
 }

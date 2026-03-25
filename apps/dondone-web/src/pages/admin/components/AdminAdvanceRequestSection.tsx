@@ -481,7 +481,9 @@ export function AdminAdvanceRequestSection() {
                   <td>
                     <div className="admin-metric-stack">
                       <strong>신청 {formatDateTime(request.requestedAt)}</strong>
-                      <p className="admin-cell-sub">상환 예정 {formatDate(request.repaymentDueDate)}</p>
+                      <p className="admin-cell-sub">
+                        급여 정산 예정 {formatDate(request.settlementDueDate ?? request.repaymentDueDate)}
+                      </p>
                       <p className="admin-cell-sub">처리 {formatDateTime(request.reviewedAt)}</p>
                     </div>
                   </td>

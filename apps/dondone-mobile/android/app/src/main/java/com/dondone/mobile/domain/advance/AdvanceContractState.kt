@@ -34,6 +34,7 @@ data class AdvanceContractState(
     val stateTitleText: String,
     val stateBodyText: String,
     val actionText: String,
+    val actionOpensWorkerRegistration: Boolean = false,
     val secondaryActionText: String? = null,
     val canRequest: Boolean,
     val availableAmountOverride: Long? = null,
@@ -47,7 +48,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
             AdvanceRemoteMode.LOADING -> {
                 return AdvanceContractState(
                     surfaceState = AdvanceSurfaceState.LOADING,
-                    sourceLabelText = "실연동 준비 중",
+                    sourceLabelText = "근무 정보 확인 중",
                     pendingMinutes = 0,
                     needsReviewRecordCount = 0,
                     repaymentTier = "-",
@@ -56,8 +57,8 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     noticeTitleText = null,
                     noticeBodyText = null,
                     disclaimerText = ADVANCE_DISCLAIMER,
-                    stateTitleText = "실연동 한도를 불러오는 중이에요",
-                    stateBodyText = "저장된 세션으로 근무지와 미리받기 상태를 확인하고 있어요.",
+                    stateTitleText = "근무 정보를 확인하는 중이에요",
+                    stateBodyText = "잠시만 기다려 주세요.",
                     actionText = "불러오는 중",
                     secondaryActionText = null,
                     canRequest = false,
@@ -68,7 +69,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
             AdvanceRemoteMode.EMPTY -> {
                 return AdvanceContractState(
                     surfaceState = AdvanceSurfaceState.EMPTY,
-                    sourceLabelText = "실연동",
+                    sourceLabelText = "근무 정보 필요",
                     pendingMinutes = 0,
                     needsReviewRecordCount = 0,
                     repaymentTier = "-",
@@ -77,9 +78,10 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     noticeTitleText = null,
                     noticeBodyText = null,
                     disclaimerText = ADVANCE_DISCLAIMER,
-                    stateTitleText = "실연동 계정에서는 아직 열리지 않았어요",
-                    stateBodyText = remoteState.errorMessage ?: "연결된 근무지나 신청 가능한 한도가 아직 없어요.",
-                    actionText = "근거 보기",
+                    stateTitleText = "아직 신청할 수 없어요",
+                    stateBodyText = remoteState.errorMessage ?: "근무 정보가 없어 아직 미리받기를 신청할 수 없어요.",
+                    actionText = "근로자 등록",
+                    actionOpensWorkerRegistration = true,
                     secondaryActionText = null,
                     canRequest = false,
                     availableAmountOverride = 0L
@@ -89,7 +91,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
             AdvanceRemoteMode.ERROR -> {
                 return AdvanceContractState(
                     surfaceState = AdvanceSurfaceState.ERROR,
-                    sourceLabelText = "실연동 오류",
+                    sourceLabelText = "",
                     pendingMinutes = 0,
                     needsReviewRecordCount = 0,
                     repaymentTier = "-",
@@ -98,9 +100,10 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     noticeTitleText = null,
                     noticeBodyText = null,
                     disclaimerText = ADVANCE_DISCLAIMER,
-                    stateTitleText = "실연동 상태를 다시 확인해야 해요",
-                    stateBodyText = remoteState.errorMessage ?: "백엔드 응답을 다시 불러온 뒤 시도해 주세요.",
-                    actionText = "다시 시도",
+                    stateTitleText = "아직 신청할 수 없어요",
+                    stateBodyText = remoteState.errorMessage ?: "근무 정보가 없어 아직 미리받기를 신청할 수 없어요.",
+                    actionText = "근로자 등록",
+                    actionOpensWorkerRegistration = true,
                     secondaryActionText = null,
                     canRequest = false,
                     availableAmountOverride = 0L
@@ -111,7 +114,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                 val remoteEligibility = remoteState.eligibility
                     ?: return AdvanceContractState(
                         surfaceState = AdvanceSurfaceState.EMPTY,
-                        sourceLabelText = "실연동",
+                        sourceLabelText = "근무 정보 필요",
                         pendingMinutes = 0,
                         needsReviewRecordCount = 0,
                         repaymentTier = "-",
@@ -120,9 +123,10 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                         noticeTitleText = null,
                         noticeBodyText = null,
                         disclaimerText = ADVANCE_DISCLAIMER,
-                        stateTitleText = "실연동 계정에서는 아직 열리지 않았어요",
-                        stateBodyText = "근무 반영이 더 쌓이면 실연동 한도를 다시 확인할 수 있어요.",
-                        actionText = "근거 보기",
+                        stateTitleText = "아직 신청 조건이 충분하지 않아요",
+                        stateBodyText = "근무 정보가 없어 아직 미리받기를 신청할 수 없어요.",
+                        actionText = "근로자 등록",
+                        actionOpensWorkerRegistration = true,
                         secondaryActionText = null,
                         canRequest = false,
                         availableAmountOverride = 0L
@@ -132,9 +136,9 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                 val isBlocked = remoteEligibility.availableAmountAtomic <= 0
                 val isClosedToday = remoteEligibility.blockReasonCodes.contains("ADVANCE_WINDOW_CLOSED_TODAY")
                 val hasPendingReview = remoteEligibility.noticeReasonCodes.contains("PENDING_WORKPROOF_REVIEW")
-                val isNextCycle = isNextRepaymentCycle(remoteEligibility.estimatedRepaymentDate)
+                val isNextCycle = isNextRepaymentCycle(remoteEligibility.effectiveSettlementDueDate)
                 val noticeTitleText = if (hasPendingReview) {
-                    "확인 필요한 기록이 남아 있어요"
+                    "아직 반영되지 않은 기록이 있어요"
                 } else {
                     null
                 }
@@ -143,23 +147,23 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                         .takeIf { it > 0 }
                         ?.let { count -> count.toString() + "건" }
                     if (reviewCountText != null) {
-                        "확인 필요한 기록 ${reviewCountText}이 남아 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+                        "${reviewCountText}은 아직 확인 중이라 지금 가능 금액에 반영되지 않았어요."
                     } else {
-                        "아직 반영되지 않은 기록이 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+                        "확인 중인 기록은 지금 가능 금액에 반영되지 않았어요."
                     }
                 } else {
                     null
                 }
                 val stateTitleText = when {
-                    isBlocked && isClosedToday -> "오늘은 신청이 마감됐어요"
+                    isBlocked && isClosedToday -> "오늘은 신청할 수 없어요"
                     isBlocked -> "지금은 미리받기를 신청할 수 없어요"
                     else -> "미리받기를 신청할 수 있어요"
                 }
                 val stateBodyText = when {
                     isBlocked && isClosedToday && isNextCycle ->
-                        "오늘 회차는 마감됐어요. 내일부터 다음 달 급여 회차 기준으로 확인할 수 있어요."
+                        "급여 정산일에는 신청할 수 없어요. 다음 회차는 내일부터 확인할 수 있어요."
                     isBlocked && isClosedToday ->
-                        "오늘은 신청이 마감됐어요. 다음 회차는 마감 이후 기준으로 확인해 주세요."
+                        "급여 정산일에는 신청할 수 없어요."
                     blockReasonTexts.isNotEmpty() ->
                         blockReasonTexts.joinToString(" · ")
                     isNextCycle ->
@@ -175,11 +179,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                 }
                 return AdvanceContractState(
                     surfaceState = if (isBlocked) AdvanceSurfaceState.BLOCKED else AdvanceSurfaceState.SUCCESS,
-                    sourceLabelText = if (remoteState.workplaceName != null) {
-                        "실연동 · ${remoteState.workplaceName}"
-                    } else {
-                        "실연동"
-                    },
+                    sourceLabelText = "",
                     pendingMinutes = 0,
                     needsReviewRecordCount = remoteEligibility.needsReviewRecordCount,
                     repaymentTier = remoteEligibility.repaymentTier,
@@ -191,17 +191,17 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     stateTitleText = stateTitleText,
                     stateBodyText = stateBodyText,
                     actionText = actionText,
-                    secondaryActionText = if (hasPendingReview) "기록 확인" else null,
+                    secondaryActionText = null,
                     canRequest = !isBlocked,
                     availableAmountOverride = remoteEligibility.availableDisplayKrwAmount,
-                    repaymentDateOverride = remoteEligibility.estimatedRepaymentDate
+                    repaymentDateOverride = remoteEligibility.effectiveSettlementDueDate
                 )
             }
 
             AdvanceRemoteMode.UNAUTHENTICATED -> {
                 return AdvanceContractState(
                     surfaceState = AdvanceSurfaceState.ERROR,
-                    sourceLabelText = "실연동 필요",
+                    sourceLabelText = "",
                     pendingMinutes = 0,
                     needsReviewRecordCount = 0,
                     repaymentTier = "-",
@@ -263,7 +263,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
         AdvanceSurfaceState.ERROR -> "다시 시도"
     }
     val noticeTitleText = if (hasPendingReview) {
-        "확인 필요한 기록이 남아 있어요"
+        "아직 반영되지 않은 기록이 있어요"
     } else {
         null
     }
@@ -272,9 +272,9 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
             .takeIf { it > 0 }
             ?.let { count -> count.toString() + "건" }
         if (reviewCountText != null) {
-            "확인 필요한 기록 ${reviewCountText}이 남아 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+            "${reviewCountText}은 아직 확인 중이라 지금 가능 금액에 반영되지 않았어요."
         } else {
-            "아직 반영되지 않은 기록이 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+            "확인 중인 기록은 지금 가능 금액에 반영되지 않았어요."
         }
     } else {
         null
@@ -294,7 +294,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
         stateTitleText = stateTitleText,
         stateBodyText = stateBodyText,
         actionText = actionText,
-        secondaryActionText = if (hasPendingReview) "기록 확인" else null,
+        secondaryActionText = null,
         canRequest = surfaceState == AdvanceSurfaceState.SUCCESS
     )
 }

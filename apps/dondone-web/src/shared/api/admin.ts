@@ -106,6 +106,8 @@ export type AdminAdvanceRequestItemResponse = {
     | null;
   payoutTxHash: string | null;
   payoutFailureReason: string | null;
+  settlementStatus: "SCHEDULED_FOR_PAYDAY" | "SETTLED" | "FAILED" | null;
+  settlementDueDate: string | null;
   repaymentDueDate: string;
   requestedAt: string;
   reflectedWorkDays: number;

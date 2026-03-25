@@ -16,6 +16,7 @@ import com.dondone.mobile.data.vault.VaultRemoteState
 import com.dondone.mobile.data.vault.VaultSummaryPayload
 import com.dondone.mobile.data.vault.VaultTransactionDetailPayload
 import com.dondone.mobile.data.wage.WageRemoteState
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.calculator.AdvanceCalculator
 import com.dondone.mobile.domain.calculator.VaultCalculator
 import com.dondone.mobile.domain.calculator.WageEstimator
@@ -58,7 +59,8 @@ data class FinanceAdvanceHistoryUiModel(
     val title: String,
     val metaText: String,
     val valueText: String,
-    val clickable: Boolean
+    val clickable: Boolean,
+    val isEmptyState: Boolean = false
 )
 
 data class FinanceAdvanceRequestDetailUiModel(
@@ -71,6 +73,7 @@ data class FinanceAdvanceRequestDetailUiModel(
     val requestedAmountText: String,
     val approvedAmountText: String,
     val feeAmountText: String,
+    val settlementStatusText: String,
     val repaymentDueText: String,
     val createdAtText: String,
     val snapshotAvailableText: String,
@@ -87,6 +90,7 @@ data class FinanceAdvanceCalendarDayUiModel(
 
 data class FinanceAdvanceDetailUiModel(
     val surfaceState: AdvanceSurfaceState,
+    val hasCurrentRequest: Boolean,
     val subtitleText: String,
     val stateTitleText: String,
     val stateBodyText: String,
@@ -94,6 +98,8 @@ data class FinanceAdvanceDetailUiModel(
     val noticeBodyText: String?,
     val availableText: String,
     val usedText: String,
+    val summaryAmountLabel: String,
+    val summaryAmountText: String,
     val repaymentDueText: String,
     val calendarSummaryText: String,
     val updatedAtText: String,
@@ -104,7 +110,6 @@ data class FinanceAdvanceDetailUiModel(
     val requestAmountText: String,
     val receiveAmountText: String,
     val feeText: String,
-    val tierText: String,
     val blockReasonTexts: List<String>,
     val disclaimerText: String,
     val canRequest: Boolean,
@@ -119,6 +124,10 @@ data class FinanceAdvanceDetailUiModel(
 
 data class FinanceAdvanceUiModel(
     val surfaceState: AdvanceSurfaceState,
+    val hasCurrentRequest: Boolean,
+    val primaryActionOpensWorkerRegistration: Boolean,
+    val heroAmountLabel: String,
+    val heroAmountText: String,
     val availableText: String,
     val repaymentDueText: String,
     val statusText: String,
@@ -127,6 +136,7 @@ data class FinanceAdvanceUiModel(
     val stateBodyText: String,
     val noticeTitleText: String?,
     val noticeBodyText: String?,
+    val showProgress: Boolean,
     val progress: Float,
     val progressHintText: String,
     val actionText: String,
@@ -207,6 +217,7 @@ data class FinanceHomeUiModel(
 fun DemoState.toFinanceHomeUiModel(
     remoteState: AdvanceRemoteState? = null,
     wageRemoteState: WageRemoteState? = null,
+    workproofRemoteState: WorkproofRemoteState? = null,
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
     vaultRemoteState: VaultRemoteState? = null,
     selectedAdvanceAmount: Int? = null,
@@ -238,47 +249,59 @@ fun DemoState.toFinanceHomeUiModel(
     val unreflectedDays = max(0, wage.workDays - advanceSnapshot.verifiedDays)
     val recordedDays = visibleRecords.associateBy { it.day }
     val advanceProgressHintText = if (advanceSnapshot.nextTierInDays > 0) {
-        "다음 구간까지 ${advanceSnapshot.nextTierInDays}일 · 예상 증가 ${formatKrw(advanceSnapshot.nextTierGain)}"
+        "다음 구간까지 ${advanceSnapshot.nextTierInDays}일 남았어요."
     } else {
-        "이번 달 최고 구간에 도달했어요."
+        "지금은 최고 한도 구간이에요."
     }
     val usesRemoteAdvance = remoteState != null
     val remoteMode = remoteState?.mode
     val remoteRequests = if (remoteMode == AdvanceRemoteMode.CONTENT) remoteState.requests else emptyList()
     val latestRemoteRequest = remoteRequests.maxByOrNull { it.requestId }
     val remoteEligibility = remoteState?.eligibility
-    val remoteAssetSymbol = remoteEligibility?.assetSymbol ?: latestRemoteRequest?.assetSymbol.orEmpty()
+    val remoteWorkproofRecords = workproofRemoteState?.payload?.records.orEmpty()
+    val reflectedRemoteRecords = remoteWorkproofRecords.filter { it.reflectionStatus == "REFLECTED" }
+    val reviewRemoteRecords = remoteWorkproofRecords.filter { it.reflectionStatus == "NEEDS_REVIEW" }
+    val unreflectedRemoteRecords = remoteWorkproofRecords.filter {
+        it.reflectionStatus != "REFLECTED" && it.reflectionStatus != "NEEDS_REVIEW"
+    }
+    val remoteAssetSymbol = remoteEligibility?.assetSymbol ?: latestRemoteRequest?.assetSymbol ?: "dUSDC"
     val remoteAssetDecimals = remoteEligibility?.assetDecimals ?: latestRemoteRequest?.assetDecimals ?: 6
     val remoteUsedAmountAtomic = remoteRequests.sumOf { it.approvedAmountAtomic ?: 0L }
     val remoteUsedDisplayKrwAmount = remoteRequests.sumOf { it.approvedDisplayKrwAmount ?: 0L }
     val remoteAvailableAmountAtomic = remoteEligibility?.availableAmountAtomic ?: 0L
     val remoteAvailableDisplayKrwAmount = remoteEligibility?.availableDisplayKrwAmount ?: 0L
+    val hasCurrentAdvanceRequest = if (usesRemoteAdvance) {
+        latestRemoteRequest != null
+    } else {
+        advanceSnapshot.used > 0
+    }
     val remoteAvailableAmount = if (usesRemoteAdvance) {
         remoteEligibility?.availableAmountInWholeAssetUnits?.toLong() ?: 0L
     } else {
         advanceSnapshot.available.toLong()
     }
+    val remoteProgressToNextTier = remoteEligibility?.progressToNextTier?.toFloat()?.coerceIn(0f, 1f) ?: 0f
     val remoteRepaymentDueText = when {
         advanceContractState.repaymentDateOverride != null -> advanceContractState.repaymentDateOverride
-        usesRemoteAdvance -> "실연동 확인 필요"
+        usesRemoteAdvance -> "확인 필요"
         else -> repaymentDueText
     }
     val advanceProgress = if (usesRemoteAdvance) {
-        when (advanceContractState.surfaceState) {
-            AdvanceSurfaceState.SUCCESS -> 1f
-            AdvanceSurfaceState.BLOCKED -> 0.2f
-            else -> 0f
-        }
+        remoteProgressToNextTier
     } else if (advanceSnapshot.progressTargetDays == 0) {
         1f
     } else {
         advanceSnapshot.verifiedDays / advanceSnapshot.progressTargetDays.toFloat()
     }
     val effectiveProgressHintText = if (usesRemoteAdvance) {
-        if (advanceContractState.noticeTitleText != null) {
-            "반영 완료 기록 기준으로 다음 구간 진행도를 계산했어요."
+        val remainingDays = remoteEligibility?.remainingWorkDaysToNextTier ?: 0
+        val nextTierCap = remoteEligibility?.nextTierExpectedCapDisplayKrw
+        if (remainingDays > 0 && nextTierCap != null) {
+            "다음 구간까지 ${remainingDays}일 · 최대 ${formatKrw(nextTierCap.toInt())}"
+        } else if (remainingDays > 0) {
+            "다음 구간까지 ${remainingDays}일 남았어요."
         } else {
-            "반영된 근무 기준으로 다음 구간까지 보여줘요."
+            "지금은 최고 한도 구간이에요."
         }
     } else {
         advanceProgressHintText
@@ -288,9 +311,9 @@ fun DemoState.toFinanceHomeUiModel(
             requests = remoteRequests,
             emptyMessage = when (advanceContractState.surfaceState) {
                 AdvanceSurfaceState.LOADING -> "이력도 함께 불러오는 중이에요."
-                AdvanceSurfaceState.EMPTY -> "이번 달 실연동 미리받기 이력이 없어요."
+                AdvanceSurfaceState.EMPTY -> "이번 달 미리받기 이력이 없어요."
                 AdvanceSurfaceState.ERROR -> "이력을 다시 불러온 뒤 확인해 주세요."
-                AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "이번 달 실연동 미리받기 이력이 없어요."
+                AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "이번 달 미리받기 이력이 없어요."
             }
         )
     } else {
@@ -305,32 +328,37 @@ fun DemoState.toFinanceHomeUiModel(
     val detailCalendarSummaryText = if (usesRemoteAdvance) {
         when (advanceContractState.surfaceState) {
             AdvanceSurfaceState.SUCCESS, AdvanceSurfaceState.BLOCKED ->
-                "실연동 기준 한도와 신청 이력을 표시합니다."
+                if (remoteWorkproofRecords.isNotEmpty()) {
+                    "실제 근무 기록 기준으로 반영 현황을 보여줘요."
+                } else {
+                    "근무 기록을 아직 불러오지 못했어요."
+                }
 
             AdvanceSurfaceState.LOADING ->
-                "실연동 근거를 불러오는 중이에요."
+                "근무 기준을 불러오는 중이에요."
 
             AdvanceSurfaceState.EMPTY ->
-                "실연동 계정에서는 아직 미리받기 근거가 열리지 않았어요."
+                "근무 정보가 확인되면 미리받기 근거를 확인할 수 있어요."
 
             AdvanceSurfaceState.ERROR ->
-                "실연동 근거를 다시 확인해야 해요."
+                "근무 기준을 다시 확인해야 해요."
         }
     } else {
         "${advanceSnapshot.verifiedDays}일 · ${formatHours(verifiedSnapshot.verifiedHours)} · ${formatKrw(verifiedSnapshot.verifiedAmount)}"
     }
     val detailUpdatedAtText = if (usesRemoteAdvance) {
         when (advanceContractState.surfaceState) {
-            AdvanceSurfaceState.LOADING -> "실연동 확인 중"
-            AdvanceSurfaceState.EMPTY -> "실연동 비어 있음"
-            AdvanceSurfaceState.ERROR -> "실연동 재확인 필요"
-            AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "실연동 최신 기준"
+            AdvanceSurfaceState.LOADING -> "근무 정보 확인 중"
+            AdvanceSurfaceState.EMPTY -> "근무 정보 필요"
+            AdvanceSurfaceState.ERROR -> "근무 정보 재확인 필요"
+            AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "근무 정보 최신 기준"
         }
     } else {
         "${demo.year}-$formattedMonth-${lastReflectedDay.toString().padStart(2, '0')}"
     }
-    val detailReflectedCountText = if (usesRemoteAdvance) "-" else "${advanceSnapshot.verifiedDays}일"
-    val detailUnreflectedCountText = if (usesRemoteAdvance) "-" else "${unreflectedDays}일"
+    val detailReflectedCountText = if (usesRemoteAdvance) "${reflectedRemoteRecords.size}건" else "${advanceSnapshot.verifiedDays}일"
+    val detailReviewCountText = if (usesRemoteAdvance) "${reviewRemoteRecords.size}건" else "${advanceContractState.needsReviewRecordCount}건"
+    val detailUnreflectedCountText = if (usesRemoteAdvance) "${unreflectedRemoteRecords.size}건" else "${unreflectedDays}일"
     val detailRequestAmountText = when {
         latestRemoteRequest != null -> formatAdvanceAmount(
             amountAtomic = latestRemoteRequest.requestedAmountAtomic,
@@ -368,6 +396,61 @@ fun DemoState.toFinanceHomeUiModel(
 
         usesRemoteAdvance -> "-"
         else -> formatKrw(advanceSnapshot.fee)
+    }
+    val currentRequestSummaryAmountLabel = when {
+        latestRemoteRequest?.approvedAmountAtomic != null -> "이번 회차 받은 금액"
+        latestRemoteRequest != null -> "이번 회차 신청 금액"
+        else -> "이번 회차 이미 받은 금액"
+    }
+    val currentRequestSummaryAmountText = when {
+        latestRemoteRequest?.approvedAmountAtomic != null -> detailReceiveAmountText
+        latestRemoteRequest != null -> detailRequestAmountText
+        usesRemoteAdvance -> formatAdvanceAmount(
+            amountAtomic = remoteUsedAmountAtomic,
+            displayKrwAmount = remoteUsedDisplayKrwAmount,
+            assetDecimals = remoteAssetDecimals,
+            assetSymbol = remoteAssetSymbol
+        )
+        else -> formatKrw(advanceSnapshot.used)
+    }
+    val advanceHeroStateTitleText = if (hasCurrentAdvanceRequest) {
+        when (latestRemoteRequest?.status) {
+            "PAID" -> "이번 회차 지급이 완료됐어요"
+            "PAYING", "APPROVED", "SUBMITTED" -> "이번 회차 지급이 진행 중이에요"
+            "PAYOUT_FAILED" -> "이번 회차 지급을 다시 확인해 주세요"
+            "REJECTED" -> "이번 회차 요청이 반려됐어요"
+            else -> "이번 회차 상태를 확인할 수 있어요"
+        }
+    } else {
+        advanceContractState.stateTitleText
+    }
+    val advanceHeroStateBodyText = if (hasCurrentAdvanceRequest) {
+        when (latestRemoteRequest?.status) {
+            "PAID" -> "지급 내역과 급여 정산 예정일을 확인할 수 있어요."
+            "PAYING", "APPROVED", "SUBMITTED" -> "지급 상태와 정산 예정일을 확인할 수 있어요."
+            "PAYOUT_FAILED" -> "지급 상태를 다시 확인해 주세요."
+            "REJECTED" -> "요청 결과를 다시 확인해 주세요."
+            else -> "이번 회차 상태를 확인할 수 있어요."
+        }
+    } else {
+        advanceContractState.stateBodyText
+    }
+    val advanceHeroAmountLabel = if (hasCurrentAdvanceRequest) {
+        currentRequestSummaryAmountLabel
+    } else {
+        "지금 신청 가능 금액"
+    }
+    val advanceHeroAmountText = if (hasCurrentAdvanceRequest) {
+        currentRequestSummaryAmountText
+    } else if (usesRemoteAdvance) {
+        formatAdvanceAmount(
+            amountAtomic = remoteAvailableAmountAtomic,
+            displayKrwAmount = remoteAvailableDisplayKrwAmount,
+            assetDecimals = remoteAssetDecimals,
+            assetSymbol = remoteAssetSymbol
+        )
+    } else {
+        formatKrw(remoteAvailableAmount.toInt())
     }
 
     val effectiveSelectedAdvanceAmount = if (usesRemoteAdvance) {
@@ -567,6 +650,10 @@ fun DemoState.toFinanceHomeUiModel(
         ),
         advance = FinanceAdvanceUiModel(
             surfaceState = advanceContractState.surfaceState,
+            hasCurrentRequest = hasCurrentAdvanceRequest,
+            primaryActionOpensWorkerRegistration = !hasCurrentAdvanceRequest && advanceContractState.actionOpensWorkerRegistration,
+            heroAmountLabel = advanceHeroAmountLabel,
+            heroAmountText = advanceHeroAmountText,
             availableText = if (usesRemoteAdvance) {
                 formatAdvanceAmount(
                     amountAtomic = remoteAvailableAmountAtomic,
@@ -580,19 +667,23 @@ fun DemoState.toFinanceHomeUiModel(
             repaymentDueText = remoteRepaymentDueText,
             statusText = advanceContractState.repaymentTier,
             sourceLabelText = advanceContractState.sourceLabelText,
-            stateTitleText = advanceContractState.stateTitleText,
-            stateBodyText = advanceContractState.stateBodyText,
+            stateTitleText = advanceHeroStateTitleText,
+            stateBodyText = advanceHeroStateBodyText,
             noticeTitleText = advanceContractState.noticeTitleText,
             noticeBodyText = advanceContractState.noticeBodyText,
+            showProgress = !hasCurrentAdvanceRequest &&
+                advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
+                advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
-            actionText = advanceContractState.actionText,
+            actionText = if (hasCurrentAdvanceRequest) "이번 달 내역 보기" else advanceContractState.actionText,
             secondaryActionText = advanceContractState.secondaryActionText,
             detail = FinanceAdvanceDetailUiModel(
                 surfaceState = advanceContractState.surfaceState,
+                hasCurrentRequest = hasCurrentAdvanceRequest,
                 subtitleText = "근무 기록 기반 한도로 급여일 전에 일부를 먼저 받습니다.",
-                stateTitleText = advanceContractState.stateTitleText,
-                stateBodyText = advanceContractState.stateBodyText,
+                stateTitleText = advanceHeroStateTitleText,
+                stateBodyText = advanceHeroStateBodyText,
                 noticeTitleText = advanceContractState.noticeTitleText,
                 noticeBodyText = advanceContractState.noticeBodyText,
                 availableText = if (usesRemoteAdvance) {
@@ -615,48 +706,65 @@ fun DemoState.toFinanceHomeUiModel(
                 } else {
                     formatKrw(advanceSnapshot.used)
                 },
+                summaryAmountLabel = currentRequestSummaryAmountLabel,
+                summaryAmountText = currentRequestSummaryAmountText,
                 repaymentDueText = remoteRepaymentDueText,
                 calendarSummaryText = detailCalendarSummaryText,
                 updatedAtText = detailUpdatedAtText,
                 reflectedCountText = detailReflectedCountText,
-                reviewCountText = "${advanceContractState.needsReviewRecordCount}건",
+                reviewCountText = detailReviewCountText,
                 unreflectedCountText = detailUnreflectedCountText,
                 progressHintText = effectiveProgressHintText,
                 requestAmountText = selectedRequestText,
                 receiveAmountText = selectedReceiveText,
                 feeText = selectedFeeText,
-                tierText = advanceContractState.repaymentTier,
                 blockReasonTexts = advanceContractState.blockReasonTexts,
                 disclaimerText = advanceContractState.disclaimerText,
-                canRequest = advanceContractState.canRequest && !advanceRequestUiState.isSubmitting,
+                canRequest = !hasCurrentAdvanceRequest && advanceContractState.canRequest && !advanceRequestUiState.isSubmitting,
                 requestButtonText = when {
                     advanceRequestUiState.isSubmitting -> "신청 중..."
-                    advanceContractState.canRequest -> "미리받기 신청"
+                    !hasCurrentAdvanceRequest && advanceContractState.canRequest -> "미리받기 신청"
+                    !hasCurrentAdvanceRequest -> "닫기"
                     else -> advanceContractState.actionText
                 },
                 secondaryActionText = advanceContractState.secondaryActionText,
                 requestFeedbackText = advanceRequestUiState.message,
                 requestFeedbackIsError = advanceRequestUiState.isError,
-                amountOptions = if (usesRemoteAdvance) {
+                amountOptions = if (!hasCurrentAdvanceRequest && usesRemoteAdvance) {
                     buildAmountOptions(
                         available = remoteAvailableAmount.toInt(),
                         selected = effectiveSelectedAdvanceAmount,
                         presets = listOf(10, 25, 50, 100),
                         labelFormatter = { amount -> "$amount $remoteAssetSymbol" }
                     )
-                } else {
+                } else if (!hasCurrentAdvanceRequest) {
                     advanceAmountOptions
+                } else {
+                    emptyList()
                 },
                 historyItems = effectiveHistoryItems,
-                calendarDays = (1..demo.monthLength).map { day ->
-                    val record = recordedDays[day]
-                    val tone = when {
-                        day == demo.asOfDay -> FinanceAdvanceCalendarTone.TODAY
-                        record?.modified == true -> FinanceAdvanceCalendarTone.MODIFIED
-                        record != null && record.outTime != "-" -> FinanceAdvanceCalendarTone.COMPLETE
-                        else -> FinanceAdvanceCalendarTone.DEFAULT
+                calendarDays = if (usesRemoteAdvance) {
+                    (1..demo.monthLength).map { day ->
+                        val record = remoteWorkproofRecords.firstOrNull { it.workDate.dayOfMonth == day }
+                        val tone = when {
+                            day == demo.asOfDay -> FinanceAdvanceCalendarTone.TODAY
+                            record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.MODIFIED
+                            record?.reflectionStatus == "REFLECTED" -> FinanceAdvanceCalendarTone.COMPLETE
+                            else -> FinanceAdvanceCalendarTone.DEFAULT
+                        }
+                        FinanceAdvanceCalendarDayUiModel(day = day, tone = tone)
                     }
-                    FinanceAdvanceCalendarDayUiModel(day = day, tone = tone)
+                } else {
+                    (1..demo.monthLength).map { day ->
+                        val record = recordedDays[day]
+                        val tone = when {
+                            day == demo.asOfDay -> FinanceAdvanceCalendarTone.TODAY
+                            record?.modified == true -> FinanceAdvanceCalendarTone.MODIFIED
+                            record != null && record.outTime != "-" -> FinanceAdvanceCalendarTone.COMPLETE
+                            else -> FinanceAdvanceCalendarTone.DEFAULT
+                        }
+                        FinanceAdvanceCalendarDayUiModel(day = day, tone = tone)
+                    }
                 }
             ),
             requestDetail = advanceRequestDetailUiState.toUiModel()
@@ -932,7 +1040,7 @@ private fun buildAdvanceHistoryItems(
         items += FinanceAdvanceHistoryUiModel(
             requestId = null,
             title = "${month}월 1차 미리받기",
-            metaText = "상환 예정 $repaymentDueText",
+            metaText = "급여 정산 예정 $repaymentDueText",
             valueText = formatKrw(used),
             clickable = false
         )
@@ -940,19 +1048,20 @@ private fun buildAdvanceHistoryItems(
     if (previousRepaymentGood) {
         items += FinanceAdvanceHistoryUiModel(
             requestId = null,
-            title = "이전 회차 상환",
+            title = "이전 회차 정산",
             metaText = "보너스 한도 ${formatKrw(bonusLimit)} 반영",
-            valueText = "정상 상환",
+            valueText = "정산 완료",
             clickable = false
         )
     }
     if (items.isEmpty()) {
         items += FinanceAdvanceHistoryUiModel(
             requestId = null,
-            title = "이번 달 미리받기 이력 없음",
-            metaText = "근무 반영이 쌓이면 바로 신청할 수 있어요.",
+            title = "이번 달 이력이 없어요",
+            metaText = "신청 내역이 생기면 여기에서 볼 수 있어요.",
             valueText = "-",
-            clickable = false
+            clickable = false,
+            isEmptyState = true
         )
     }
     return items
@@ -966,10 +1075,11 @@ private fun buildRemoteAdvanceHistoryItems(
         return listOf(
             FinanceAdvanceHistoryUiModel(
                 requestId = null,
-                title = "실연동 미리받기 이력 없음",
+                title = "이번 달 이력이 없어요",
                 metaText = emptyMessage,
                 valueText = "-",
-                clickable = false
+                clickable = false,
+                isEmptyState = true
             )
         )
     }
@@ -983,8 +1093,8 @@ private fun buildRemoteAdvanceHistoryItems(
                 title = "요청 #${request.requestId}",
                 metaText = buildString {
                     append(formatAdvanceStatusLabel(request.status, request.payoutStatus))
-                    append(" · 상환 예정 ")
-                    append(request.repaymentDueDate)
+                    append(" · 급여 정산 예정 ")
+                    append(request.effectiveSettlementDueDate)
                     request.payoutTxHash?.takeIf { it.isNotBlank() }?.let { txHash ->
                         append("\nTX ")
                         append(txHash.take(10))
@@ -1042,7 +1152,8 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
                 assetSymbol = it.assetSymbol
             )
         } ?: "-",
-        repaymentDueText = detailValue?.repaymentDueDate ?: "-",
+        settlementStatusText = detailValue?.settlementStatus?.let(::formatAdvanceSettlementStatusLabel) ?: "-",
+        repaymentDueText = detailValue?.effectiveSettlementDueDate ?: "-",
         createdAtText = detailValue?.createdAt ?: "-",
         snapshotAvailableText = detailValue?.eligibilitySnapshot?.let {
             formatAdvanceAmount(
@@ -1195,6 +1306,13 @@ private fun formatAdvanceStatusLabel(status: String, payoutStatus: String?): Str
     "PAYOUT_FAILED" -> "지급실패"
     "REJECTED" -> "반려됨"
     "NEEDS_REVIEW" -> "확인 필요"
+    else -> status
+}
+
+private fun formatAdvanceSettlementStatusLabel(status: String): String = when (status) {
+    "SCHEDULED_FOR_PAYDAY" -> "급여일 자동 정산 예정"
+    "SETTLED" -> "정산 완료"
+    "FAILED" -> "정산 실패"
     else -> status
 }
 

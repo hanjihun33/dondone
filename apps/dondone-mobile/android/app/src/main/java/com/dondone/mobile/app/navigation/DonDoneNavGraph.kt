@@ -192,6 +192,7 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toFinanceHomeUiModel(
                     remoteState = advanceRemoteState,
                     wageRemoteState = wageRemoteState,
+                    workproofRemoteState = workproofRemoteState,
                     remittanceRemoteState = remittanceRemoteState,
                     vaultRemoteState = vaultRemoteState,
                     selectedAdvanceAmount = selectedAdvanceAmount,
@@ -214,7 +215,8 @@ fun DonDoneNavGraph(
                     navigateWithinApp(Route.WORKPROOF, onNavigateToRootTab) { target ->
                         navController.navigate(target)
                     }
-                }
+                },
+                onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode
             )
         }
         composable(Route.WAGE) {

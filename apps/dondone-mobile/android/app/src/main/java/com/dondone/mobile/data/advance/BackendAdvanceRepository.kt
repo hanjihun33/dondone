@@ -24,11 +24,11 @@ class BackendAdvanceRepository(
 
     override suspend fun load(accessToken: String): AdvanceRemoteState = withContext(Dispatchers.IO) {
         if (accessToken.isBlank()) {
-            return@withContext AdvanceRemoteState.unauthenticated("로그인 후 실연동 데이터를 불러옵니다.")
+            return@withContext AdvanceRemoteState.unauthenticated("로그인 후 근무 정보를 불러옵니다.")
         }
         runCatching {
             val workplace = fetchPrimaryWorkplace(accessToken) ?: return@withContext AdvanceRemoteState.empty(
-                "연결된 근무지가 없어 미리받기 실연동을 표시할 수 없어요."
+                "연결된 근무지가 없어 아직 미리받기를 확인할 수 없어요."
             )
             val eligibility = fetchEligibility(accessToken, workplace.id)
             val requests = fetchRequests(accessToken)
@@ -75,7 +75,7 @@ class BackendAdvanceRepository(
                     throw AdvanceUnauthorizedException()
                 }
                 throw BackendApiException(
-                    parseBackendErrorMessage(
+                    parseAdvanceErrorMessage(
                         responseBody = responseBody,
                         fallbackMessage = "미리받기 신청에 실패했어요. 잠시 후 다시 시도해 주세요."
                     )
@@ -95,6 +95,8 @@ class BackendAdvanceRepository(
                 approvedDisplayKrwAmount = data.optLongOrNull("approvedDisplayKrwAmount"),
                 feeAmountAtomic = data.getLong("feeAmountAtomic"),
                 feeDisplayKrwAmount = data.getLong("feeDisplayKrwAmount"),
+                settlementStatus = data.optStringOrNull("settlementStatus"),
+                settlementDueDate = data.optStringOrNull("settlementDueDate"),
                 repaymentDueDate = data.getString("repaymentDueDate"),
                 eligibilitySnapshot = toEligibilitySnapshotPayload(data.getJSONObject("eligibilitySnapshot"))
             )
@@ -122,7 +124,7 @@ class BackendAdvanceRepository(
                     throw AdvanceUnauthorizedException()
                 }
                 throw BackendApiException(
-                    parseBackendErrorMessage(
+                    parseAdvanceErrorMessage(
                         responseBody = responseBody,
                         fallbackMessage = "미리받기 상세를 불러오지 못했어요."
                     )
@@ -140,13 +142,19 @@ class BackendAdvanceRepository(
             .build()
 
         client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 if (response.code == 401 || response.code == 403) {
                     throw AdvanceUnauthorizedException()
                 }
-                throw BackendApiException("근무지 조회 실패: ${response.code}")
+                throw BackendApiException(
+                    parseAdvanceErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "근무지 정보를 다시 확인해 주세요."
+                    )
+                )
             }
-            val workplaces = JSONObject(response.body?.string().orEmpty())
+            val workplaces = JSONObject(responseBody.ifBlank { "{}" })
                 .getJSONObject("data")
                 .getJSONArray("workplaces")
             if (workplaces.length() == 0) return null
@@ -178,13 +186,19 @@ class BackendAdvanceRepository(
             .build()
 
         client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 if (response.code == 401 || response.code == 403) {
                     throw AdvanceUnauthorizedException()
                 }
-                throw BackendApiException("미리받기 적격성 조회 실패: ${response.code}")
+                throw BackendApiException(
+                    parseAdvanceErrorMessage(
+                        responseBody = responseBody,
+                        fallbackMessage = "근무 조건을 다시 확인해 주세요."
+                    )
+                )
             }
-            val data = JSONObject(response.body?.string().orEmpty()).getJSONObject("data")
+            val data = JSONObject(responseBody.ifBlank { "{}" }).getJSONObject("data")
             val blockReasonsJson = data.getJSONArray("blockReasonCodes")
             val blockReasons = buildList {
                 for (index in 0 until blockReasonsJson.length()) {
@@ -208,12 +222,20 @@ class BackendAdvanceRepository(
                 availableDisplayKrwAmount = data.getLong("availableDisplayKrwAmount"),
                 maxCapAmountAtomic = data.getLong("maxCapAmountAtomic"),
                 maxCapDisplayKrwAmount = data.getLong("maxCapDisplayKrwAmount"),
+                currentTierName = data.optStringOrNull("currentTierName")
+                    ?: data.optStringOrNull("repaymentTier")
+                    ?: "현재 구간",
+                nextTierName = data.optStringOrNull("nextTierName"),
+                progressToNextTier = data.optBigDecimalOrNull("progressToNextTier"),
+                remainingWorkDaysToNextTier = data.optInt("remainingWorkDaysToNextTier", 0),
+                nextTierExpectedCapDisplayKrw = data.optLongOrNull("nextTierExpectedCapDisplayKrw"),
                 repaymentTier = data.getString("repaymentTier"),
                 blockReasonCodes = blockReasons,
                 noticeReasonCodes = noticeReasons,
                 estimatedFeeAmountAtomic = data.getLong("estimatedFeeAmountAtomic"),
                 estimatedFeeDisplayKrwAmount = data.getLong("estimatedFeeDisplayKrwAmount"),
                 estimatedRepaymentDate = data.getString("estimatedRepaymentDate"),
+                settlementDueDate = data.optStringOrNull("settlementDueDate"),
                 disclaimer = data.getString("disclaimer"),
                 needsReviewRecordCount = data.getInt("needsReviewRecordCount")
             )
@@ -236,13 +258,19 @@ class BackendAdvanceRepository(
                 .build()
 
             client.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     if (response.code == 401 || response.code == 403) {
                         throw AdvanceUnauthorizedException()
                     }
-                    throw BackendApiException("미리받기 이력 조회 실패: ${response.code}")
+                    throw BackendApiException(
+                        parseAdvanceErrorMessage(
+                            responseBody = responseBody,
+                            fallbackMessage = "미리받기 이력을 다시 불러와 주세요."
+                        )
+                    )
                 }
-                val requests = JSONObject(response.body?.string().orEmpty())
+                val requests = JSONObject(responseBody.ifBlank { "{}" })
                     .getJSONObject("data")
                     .getJSONArray("requests")
 
@@ -262,6 +290,8 @@ class BackendAdvanceRepository(
                         requestStatus = item.getString("requestStatus"),
                         payoutStatus = item.optStringOrNull("payoutStatus"),
                         payoutTxHash = item.optStringOrNull("payoutTxHash"),
+                        settlementStatus = item.optStringOrNull("settlementStatus"),
+                        settlementDueDate = item.optStringOrNull("settlementDueDate"),
                         repaymentDueDate = item.getString("repaymentDueDate"),
                         requestedAt = item.getString("requestedAt")
                     )
@@ -290,6 +320,8 @@ class BackendAdvanceRepository(
             requestStatus = data.getString("requestStatus"),
             payoutStatus = data.optStringOrNull("payoutStatus"),
             payoutTxHash = data.optStringOrNull("payoutTxHash"),
+            settlementStatus = data.optStringOrNull("settlementStatus"),
+            settlementDueDate = data.optStringOrNull("settlementDueDate"),
             repaymentDueDate = data.getString("repaymentDueDate"),
             eligibilitySnapshot = toEligibilitySnapshotPayload(data.getJSONObject("eligibilitySnapshot")),
             createdAt = data.getString("createdAt")
@@ -334,3 +366,38 @@ private fun JSONObject.optStringOrNull(key: String): String? {
 
 private fun JSONObject.getBigDecimalCompat(key: String): BigDecimal =
     BigDecimal(get(key).toString())
+
+private fun JSONObject.optBigDecimalOrNull(key: String): BigDecimal? {
+    if (!has(key) || isNull(key)) {
+        return null
+    }
+    return BigDecimal(get(key).toString())
+}
+
+private fun parseAdvanceErrorMessage(
+    responseBody: String,
+    fallbackMessage: String
+): String {
+    val json = runCatching { JSONObject(responseBody.ifBlank { "{}" }) }.getOrNull()
+    val code = json?.optString("code").orEmpty()
+    val message = json?.optString("message").orEmpty()
+
+    return when {
+        code == "ACTIVE_CONTRACT_REQUIRED" || message == "Active contract is required" ->
+            "근무 정보가 없어 아직 미리받기를 신청할 수 없어요."
+
+        code == "WORKPLACE_NOT_FOUND" || message == "Workplace not found" ->
+            "근무 정보가 없어 아직 미리받기를 신청할 수 없어요."
+
+        code == "ADVANCE_NOT_ELIGIBLE" || message == "Advance is not eligible" ->
+            "현재 근무 조건으로는 미리받기를 신청할 수 없어요."
+
+        code == "INVALID_TOKEN" || code == "UNAUTHORIZED" ->
+            SESSION_EXPIRED_MESSAGE
+
+        else -> parseBackendErrorMessage(
+            responseBody = responseBody,
+            fallbackMessage = fallbackMessage
+        )
+    }
+}

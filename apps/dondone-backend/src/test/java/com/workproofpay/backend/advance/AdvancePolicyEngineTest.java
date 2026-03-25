@@ -1,6 +1,7 @@
 package com.workproofpay.backend.advance;
 
 import com.workproofpay.backend.advance.api.dto.response.AdvanceEligibilityResponse;
+import com.workproofpay.backend.advance.service.AdvancePolicyDefaults;
 import com.workproofpay.backend.advance.service.AdvancePolicyEngine;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
 import com.workproofpay.backend.workproof.model.WorkContract;
@@ -26,13 +27,17 @@ class AdvancePolicyEngineTest {
     private static final long FEE_REFERENCE_KRW = 5_000L;
 
     private final AdvancePolicyEngine engine = new AdvancePolicyEngine();
+    private final com.workproofpay.backend.advance.model.AdvancePolicy policy = AdvancePolicyDefaults.createDefault();
 
     @Test
     void blocksEligibilityWhenVerifiedWorkIsMissing() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(12_000),
                 summary(0, 0, 0, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -47,9 +52,12 @@ class AdvancePolicyEngineTest {
     @Test
     void calculatesAvailableAmountFromTierRatioAndCap() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -59,10 +67,17 @@ class AdvancePolicyEngineTest {
         assertThat(response.assetSymbol()).isEqualTo("dUSDC");
         assertThat(response.assetDecimals()).isEqualTo(6);
         assertThat(response.exchangeRateSnapshot()).isEqualByComparingTo("1450");
+        assertThat(response.reflectedEarnedDisplayKrwAmount()).isEqualTo(960_000L);
+        assertThat(response.alreadyAdvancedDisplayKrwAmount()).isZero();
         assertThat(response.availableAmountAtomic()).isEqualTo(AVAILABLE_B_ATOMIC);
         assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
         assertThat(response.estimatedFeeAmountAtomic()).isEqualTo(FEE_ATOMIC);
         assertThat(response.estimatedFeeDisplayKrwAmount()).isEqualTo(FEE_REFERENCE_KRW);
+        assertThat(response.currentTierName()).isEqualTo("B");
+        assertThat(response.nextTierName()).isEqualTo("A");
+        assertThat(response.progressToNextTier()).isEqualByComparingTo("0.6000");
+        assertThat(response.remainingWorkDaysToNextTier()).isEqualTo(8);
+        assertThat(response.nextTierExpectedCapDisplayKrw()).isEqualTo(300_000L);
         assertThat(response.blockReasonCodes()).isEmpty();
         assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isFalse();
@@ -71,9 +86,12 @@ class AdvancePolicyEngineTest {
     @Test
     void exposesPendingReviewAsNoticeInsteadOfBlockReason() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 120, 1),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -89,9 +107,12 @@ class AdvancePolicyEngineTest {
     @Test
     void blocksEligibilityWhenOutstandingAdvanceExists() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 true,
                 LocalDate.of(2026, 3, 16),
                 YearMonth.of(2026, 3)
@@ -107,9 +128,12 @@ class AdvancePolicyEngineTest {
     @Test
     void blocksEligibilityOnlyOnRepaymentDate() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 25),
                 YearMonth.of(2026, 3)
@@ -125,9 +149,12 @@ class AdvancePolicyEngineTest {
     @Test
     void doesNotBlockDayBeforeRepaymentDate() {
         AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
                 1L,
                 contractWithHourlyWage(10_000),
                 summary(12, 5_760, 5_760, 0, 0),
+                0L,
+                0L,
                 false,
                 LocalDate.of(2026, 3, 24),
                 YearMonth.of(2026, 3)
@@ -140,8 +167,49 @@ class AdvancePolicyEngineTest {
     }
 
     @Test
+    void deductsAlreadyAdvancedAmountFromAvailableAmount() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(12, 5_760, 5_760, 0, 0),
+                34_482_758L,
+                50_000L,
+                false,
+                LocalDate.of(2026, 3, 16),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.alreadyAdvancedAmountAtomic()).isEqualTo(34_482_758L);
+        assertThat(response.alreadyAdvancedDisplayKrwAmount()).isEqualTo(50_000L);
+        assertThat(response.availableAmountAtomic()).isEqualTo(68_965_517L);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(100_000L);
+    }
+
+    @Test
+    void marksTopTierAsFullyProgressedWithoutNextTier() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(20, 9_600, 9_600, 0, 0),
+                0L,
+                0L,
+                false,
+                LocalDate.of(2026, 3, 16),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.currentTierName()).isEqualTo("A");
+        assertThat(response.nextTierName()).isNull();
+        assertThat(response.progressToNextTier()).isEqualByComparingTo("1");
+        assertThat(response.remainingWorkDaysToNextTier()).isZero();
+    }
+
+    @Test
     void rollsTargetMonthForwardAfterPayday() {
         YearMonth targetMonth = engine.resolveTargetMonth(
+                policy,
                 LocalDate.of(2026, 3, 26),
                 YearMonth.of(2026, 3)
         );
@@ -152,6 +220,7 @@ class AdvancePolicyEngineTest {
     @Test
     void keepsFutureWorkedMonthWhenItIsAlreadyNextCycle() {
         YearMonth targetMonth = engine.resolveTargetMonth(
+                policy,
                 LocalDate.of(2026, 3, 26),
                 YearMonth.of(2026, 4)
         );
