@@ -418,9 +418,9 @@ fun DemoState.toFinanceHomeUiModel(
         else -> formatKrw(advanceSnapshot.fee)
     }
     val currentRequestSummaryAmountLabel = when {
-        latestRemoteRequest?.approvedAmountAtomic != null -> "받은 금액"
-        latestRemoteRequest != null -> "이번 회차 신청 금액"
-        else -> "이번 회차 이미 받은 금액"
+        latestRemoteRequest?.approvedAmountAtomic != null -> "최근 받은 금액"
+        latestRemoteRequest != null -> "최근 신청 금액"
+        else -> "이번 달 받은 금액"
     }
     val currentRequestSummaryAmountText = when {
         latestRemoteRequest?.approvedAmountAtomic != null -> detailReceiveAmountText
@@ -437,11 +437,11 @@ fun DemoState.toFinanceHomeUiModel(
         "추가 신청이 가능해요"
     } else if (hasCurrentAdvanceRequest) {
         when (latestRemoteRequest?.status) {
-            "PAID" -> "이번 회차 지급이 완료됐어요"
-            "PAYING", "APPROVED", "SUBMITTED" -> "이번 회차 지급이 진행 중이에요"
-            "PAYOUT_FAILED" -> "이번 회차 지급을 다시 확인해 주세요"
-            "REJECTED" -> "이번 회차 요청이 반려됐어요"
-            else -> "이번 회차 상태를 확인할 수 있어요"
+            "PAID" -> "이번 달 지급이 완료됐어요"
+            "PAYING", "APPROVED", "SUBMITTED" -> "지급이 진행 중이에요"
+            "PAYOUT_FAILED" -> "지급 상태를 다시 확인해 주세요"
+            "REJECTED" -> "최근 요청이 반려됐어요"
+            else -> "최근 신청 상태를 확인할 수 있어요"
         }
     } else {
         advanceContractState.stateTitleText
@@ -711,7 +711,7 @@ fun DemoState.toFinanceHomeUiModel(
                 surfaceState = advanceContractState.surfaceState,
                 hasCurrentRequest = hasCurrentAdvanceRequest,
                 canRequestAdditional = canRequestAdditional,
-                subtitleText = "근무 기록 기반 한도로 급여일 전에 일부를 먼저 받습니다.",
+                subtitleText = "이번 달 지급 내역과 남은 한도를 확인할 수 있어요.",
                 stateTitleText = advanceHeroStateTitleText,
                 stateBodyText = advanceHeroStateBodyText,
                 noticeTitleText = advanceContractState.noticeTitleText,
