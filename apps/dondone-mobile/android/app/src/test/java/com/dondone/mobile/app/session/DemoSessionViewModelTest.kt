@@ -36,6 +36,9 @@ import com.dondone.mobile.data.workproof.WorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofCorrectionRequestMutation
 import com.dondone.mobile.data.workproof.WorkproofCorrectionSubmitResult
 import com.dondone.mobile.data.workproof.WorkproofWorkplacePayload
+import com.dondone.mobile.core.location.CurrentLocationProvider
+import com.dondone.mobile.core.location.CurrentLocationResult
+import com.dondone.mobile.core.location.CurrentLocationSnapshot
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.WorkproofData
 import com.dondone.mobile.feature.home.presentation.toHomeUiModel
@@ -258,6 +261,85 @@ class DemoSessionViewModelTest {
         assertNull(viewModel.authUiState.value.session)
         assertEquals("로그인 후 실연동 데이터를 불러옵니다.", viewModel.advanceRemoteState.value.errorMessage)
         assertTrue(authRepository.logoutCalled)
+    }
+
+    @Test
+    fun `refresh current location updates workproof coordinates`() = runTest {
+        val locationProvider = FakeCurrentLocationProvider(
+            result = CurrentLocationResult.Success(CurrentLocationSnapshot(35.1234, 128.5678))
+        )
+        val viewModel = DemoSessionViewModel(
+            advanceRepository = FakeAdvanceRepository(),
+            authRepository = FakeAuthRepository(),
+            currentLocationProvider = locationProvider
+        )
+
+        advanceUntilIdle()
+        viewModel.refreshWorkproofCurrentLocation()
+        advanceUntilIdle()
+
+        assertEquals(35.1234, viewModel.uiState.value.workproof.currentLatitude, 0.0)
+        assertEquals(128.5678, viewModel.uiState.value.workproof.currentLongitude, 0.0)
+        assertEquals(WorkproofCurrentLocationStatus.READY, viewModel.workproofCurrentLocationUiState.value.status)
+        assertEquals(1, locationProvider.fetchCount)
+    }
+
+    @Test
+    fun `clock in refreshes current location before remote request`() = runTest {
+        val session = testSession()
+        val locationProvider = FakeCurrentLocationProvider(
+            result = CurrentLocationResult.Success(CurrentLocationSnapshot(35.2031, 126.8083))
+        )
+        val workproofRepository = FakeWorkproofRepository()
+        val viewModel = DemoSessionViewModel(
+            authRepository = FakeAuthRepository(restoredSession = session),
+            advanceRepository = FakeAdvanceRepository(),
+            workproofRepository = workproofRepository,
+            currentLocationProvider = locationProvider
+        )
+
+        advanceUntilIdle()
+        workproofRepository.clockInRequests.clear()
+
+        viewModel.clockIn()
+        advanceUntilIdle()
+
+        val submittedWorkproof = requireNotNull(workproofRepository.clockInRequests.singleOrNull())
+        assertEquals(35.2031, submittedWorkproof.currentLatitude, 0.0)
+        assertEquals(126.8083, submittedWorkproof.currentLongitude, 0.0)
+        assertEquals(WorkproofCurrentLocationStatus.READY, viewModel.workproofCurrentLocationUiState.value.status)
+    }
+
+    @Test
+    fun `clock in stops when current location permission is missing`() = runTest {
+        val session = testSession()
+        val locationProvider = FakeCurrentLocationProvider(
+            result = CurrentLocationResult.PermissionRequired
+        )
+        val workproofRepository = FakeWorkproofRepository()
+        val viewModel = DemoSessionViewModel(
+            authRepository = FakeAuthRepository(restoredSession = session),
+            advanceRepository = FakeAdvanceRepository(),
+            workproofRepository = workproofRepository,
+            currentLocationProvider = locationProvider
+        )
+
+        advanceUntilIdle()
+        workproofRepository.clockInRequests.clear()
+
+        viewModel.clockIn()
+        advanceUntilIdle()
+
+        assertTrue(workproofRepository.clockInRequests.isEmpty())
+        assertEquals(
+            "위치 권한을 허용하면 현재 위치를 확인할 수 있어요.",
+            viewModel.workproofActionUiState.value.message
+        )
+        assertTrue(viewModel.workproofActionUiState.value.isError)
+        assertEquals(
+            WorkproofCurrentLocationStatus.PERMISSION_REQUIRED,
+            viewModel.workproofCurrentLocationUiState.value.status
+        )
     }
 
     @Test
@@ -1663,6 +1745,8 @@ class DemoSessionViewModelTest {
         private val workplaceName: String = "DonDone Cafe"
     ) : WorkproofRepository {
         val loadedTokens = mutableListOf<String>()
+        val clockInRequests = mutableListOf<WorkproofData>()
+        val clockOutRequests = mutableListOf<WorkproofData>()
 
         override suspend fun load(accessToken: String): WorkproofRemoteState {
             loadedTokens += accessToken
@@ -1682,10 +1766,12 @@ class DemoSessionViewModelTest {
         }
 
         override suspend fun clockIn(accessToken: String, workproof: WorkproofData): WorkproofRemoteState {
+            clockInRequests += workproof
             return load(accessToken)
         }
 
         override suspend fun clockOut(accessToken: String, workproof: WorkproofData): WorkproofRemoteState {
+            clockOutRequests += workproof
             return load(accessToken)
         }
 
@@ -1693,6 +1779,17 @@ class DemoSessionViewModelTest {
             accessToken: String,
             request: WorkproofCorrectionRequestMutation
         ): WorkproofCorrectionSubmitResult = error("not used")
+    }
+
+    private class FakeCurrentLocationProvider(
+        private val result: CurrentLocationResult
+    ) : CurrentLocationProvider {
+        var fetchCount: Int = 0
+
+        override suspend fun fetch(): CurrentLocationResult {
+            fetchCount += 1
+            return result
+        }
     }
 
     private class FakeWageRepository : WageRepository {
