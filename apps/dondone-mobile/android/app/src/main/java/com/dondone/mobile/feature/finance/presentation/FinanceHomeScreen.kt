@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,9 +41,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimary
@@ -88,9 +93,11 @@ fun FinanceHomeScreen(
     val advanceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val advanceRequestDetailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val vaultSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val advanceTierGuideSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showAdvanceSheet by remember { mutableStateOf(false) }
     var showAdvanceRequestDetailSheet by remember { mutableStateOf(false) }
     var showVaultSheet by remember { mutableStateOf(false) }
+    var showAdvanceTierGuideSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiModel.vault.shouldDismissDetailSheet) {
         if (uiModel.vault.shouldDismissDetailSheet) {
@@ -114,7 +121,8 @@ fun FinanceHomeScreen(
                 uiModel = uiModel.advance,
                 onOpenSheet = { showAdvanceSheet = true },
                 onOpenWorkproof = onOpenWorkproof,
-                onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode
+                onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode,
+                onOpenTierGuide = { showAdvanceTierGuideSheet = true }
             )
             FinanceSectionDivider()
             FinanceVaultSection(
@@ -202,6 +210,20 @@ fun FinanceHomeScreen(
             )
         }
     }
+
+    if (showAdvanceTierGuideSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAdvanceTierGuideSheet = false },
+            sheetState = advanceTierGuideSheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+            dragHandle = null
+        ) {
+            FinanceAdvanceTierGuideSheet(
+                onDismiss = { showAdvanceTierGuideSheet = false }
+            )
+        }
+    }
 }
 
 @Composable
@@ -209,18 +231,12 @@ private fun FinanceAdvanceSection(
     uiModel: FinanceAdvanceUiModel,
     onOpenSheet: () -> Unit,
     onOpenWorkproof: () -> Unit,
-    onOpenWorkerRegistrationCode: () -> Unit
+    onOpenWorkerRegistrationCode: () -> Unit,
+    onOpenTierGuide: () -> Unit
 ) {
     FinanceBlockSection(
         title = "미리받기",
-        description = "",
-        trailing = {
-            if (uiModel.statusText != "-") {
-                FinanceCapsule(text = "구간 ${uiModel.statusText}")
-            } else {
-                Spacer(modifier = Modifier.height(1.dp))
-            }
-        }
+        description = ""
     ) {
         if (uiModel.sourceLabelText.isNotBlank()) {
             Text(
@@ -247,13 +263,20 @@ private fun FinanceAdvanceSection(
             FinanceInnerPanel {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "다음 한도 구간",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = FinanceTextMuted
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "다음 한도 구간",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = FinanceTextMuted
+                        )
+                        FinanceHelpButton(onClick = onOpenTierGuide)
+                    }
                     Text(
                         text = "${(uiModel.progress * 100).toInt()}%",
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
@@ -398,17 +421,17 @@ private fun FinanceSectionSurface(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 6.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content
     )
 }
 
 @Composable
 private fun FinanceSectionDivider() {
-    Spacer(modifier = Modifier.height(14.dp))
+    Spacer(modifier = Modifier.height(10.dp))
     HorizontalDivider(color = FinanceDivider)
-    Spacer(modifier = Modifier.height(14.dp))
+    Spacer(modifier = Modifier.height(10.dp))
 }
 
 @Composable
@@ -857,10 +880,9 @@ private fun FinanceAdvanceHeroCard(
         )
         Text(
             text = body,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = FinanceTextMuted
         )
-        Spacer(modifier = Modifier.height(4.dp))
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = amountLabel,
@@ -894,11 +916,34 @@ private fun FinanceAdvanceHeroAmount(amountText: String) {
     val parts = amountText.split(" · 약 ", limit = 2)
     val primaryAmount = parts.firstOrNull().orEmpty()
     val referenceAmount = parts.getOrNull(1)
+    val amountParts = primaryAmount.split(" ", limit = 2)
+    val amountValue = amountParts.firstOrNull().orEmpty()
+    val amountUnit = amountParts.getOrNull(1)
 
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            text = primaryAmount,
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+            text = buildAnnotatedString {
+                withStyle(
+                    SpanStyle(
+                        fontWeight = FontWeight.Black,
+                        fontSize = MaterialTheme.typography.displaySmall.fontSize
+                    )
+                ) {
+                    append(amountValue)
+                }
+                if (!amountUnit.isNullOrBlank()) {
+                    append(" ")
+                    withStyle(
+                        SpanStyle(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 22.sp
+                        )
+                    ) {
+                        append(amountUnit)
+                    }
+                }
+            },
+            style = MaterialTheme.typography.displaySmall,
             color = FinanceTextPrimary
         )
         if (!referenceAmount.isNullOrBlank()) {
@@ -1257,7 +1302,7 @@ private fun FinanceSheetPanel(
             .background(backgroundColor, RoundedCornerShape(24.dp))
             .border(1.dp, borderColor, RoundedCornerShape(24.dp))
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         content()
     }
@@ -1387,9 +1432,100 @@ private fun FinanceInnerPanel(content: @Composable () -> Unit) {
             .fillMaxWidth()
             .background(FinanceSurfaceMuted, RoundedCornerShape(18.dp))
             .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         content()
+    }
+}
+
+@Composable
+private fun FinanceHelpButton(onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
+        modifier = Modifier
+            .size(18.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.White)
+            .border(1.dp, FinanceDivider, RoundedCornerShape(999.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberDonDoneGrayRipple(bounded = false),
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "?",
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextMuted
+        )
+    }
+}
+
+@Composable
+private fun FinanceAdvanceTierGuideSheet(
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        FinanceBottomSheetSection {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "한도 구간 안내",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                        color = FinanceTextPrimary
+                    )
+                    Text(
+                        text = "반영된 근무 기록이 쌓일수록 미리받기 한도가 올라가요.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FinanceTextMuted
+                    )
+                }
+                FinanceLinkButton(text = "닫기", onClick = onDismiss)
+            }
+        }
+
+        FinanceBottomSheetDivider()
+        FinanceBottomSheetSection {
+            FinanceTierGuideRow(title = "0~4일", body = "아직 신청할 수 없어요.")
+            FinanceTierGuideRow(title = "5일 이상", body = "최대 10%, 5만원까지 가능해요.")
+            FinanceTierGuideRow(title = "10일 이상", body = "최대 20%, 15만원까지 가능해요.")
+            FinanceTierGuideRow(title = "20일 이상", body = "최대 30%, 30만원까지 가능해요.")
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun FinanceTierGuideRow(
+    title: String,
+    body: String
+) {
+    FinanceSheetPanel(
+        backgroundColor = FinanceSurfaceMuted,
+        borderColor = FinanceDivider
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary
+        )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodySmall,
+            color = FinanceTextMuted
+        )
     }
 }
 

@@ -256,7 +256,7 @@ fun DemoState.toFinanceHomeUiModel(
     val remoteRequests = if (remoteMode == AdvanceRemoteMode.CONTENT) remoteState.requests else emptyList()
     val latestRemoteRequest = remoteRequests.maxByOrNull { it.requestId }
     val remoteEligibility = remoteState?.eligibility
-    val remoteAssetSymbol = remoteEligibility?.assetSymbol ?: latestRemoteRequest?.assetSymbol.orEmpty()
+    val remoteAssetSymbol = remoteEligibility?.assetSymbol ?: latestRemoteRequest?.assetSymbol ?: "dUSDC"
     val remoteAssetDecimals = remoteEligibility?.assetDecimals ?: latestRemoteRequest?.assetDecimals ?: 6
     val remoteUsedAmountAtomic = remoteRequests.sumOf { it.approvedAmountAtomic ?: 0L }
     val remoteUsedDisplayKrwAmount = remoteRequests.sumOf { it.approvedDisplayKrwAmount ?: 0L }
@@ -290,9 +290,9 @@ fun DemoState.toFinanceHomeUiModel(
     }
     val effectiveProgressHintText = if (usesRemoteAdvance) {
         if (advanceContractState.noticeTitleText != null) {
-            "반영 완료 기록 기준으로 다음 구간 진행도를 계산했어요."
+            "반영된 근무 기준으로 계산해요."
         } else {
-            "반영된 근무 기준으로 다음 구간까지 보여줘요."
+            "반영된 근무 기준으로 보여줘요."
         }
     } else {
         advanceProgressHintText

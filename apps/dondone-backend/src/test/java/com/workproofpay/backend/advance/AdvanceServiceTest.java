@@ -9,6 +9,7 @@ import com.workproofpay.backend.advance.service.AdvanceCreateResult;
 import com.workproofpay.backend.advance.service.AdvanceRequestViewStatusResolver;
 import com.workproofpay.backend.advance.service.AdvanceService;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.repo.WorkContractRepository;
@@ -41,6 +42,7 @@ class AdvanceServiceTest {
     private final UserRepository userRepository = mock(UserRepository.class);
     private final WorkplaceRepository workplaceRepository = mock(WorkplaceRepository.class);
     private final WorkContractRepository workContractRepository = mock(WorkContractRepository.class);
+    private final EmploymentMembershipRepository employmentMembershipRepository = mock(EmploymentMembershipRepository.class);
     private final WorkProofRepository workProofRepository = mock(WorkProofRepository.class);
     private final WorkProofLane1Service workProofLane1Service = mock(WorkProofLane1Service.class);
     private final AdvancePolicyResolver advancePolicyResolver = mock(AdvancePolicyResolver.class);
@@ -53,6 +55,7 @@ class AdvanceServiceTest {
             userRepository,
             workplaceRepository,
             workContractRepository,
+            employmentMembershipRepository,
             workProofRepository,
             workProofLane1Service,
             advancePolicyResolver,

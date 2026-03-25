@@ -14,6 +14,7 @@ import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.employer.repo.WorkerRegistrationCodeRepository;
 import com.workproofpay.backend.employerauth.api.dto.request.EmployerSignupRequest;
 import com.workproofpay.backend.employerauth.repo.EmployerSignupCodeRepository;
+import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.repo.WorkContractRepository;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,6 +160,7 @@ class WorkerCompanyRegistrationIntegrationTest {
         assertThat(memberships).hasSize(1);
         assertThat(memberships.get(0).getCompanyId()).isEqualTo(fixture.companyId());
         assertThat(memberships.get(0).getWorkplaceId()).isEqualTo(fixture.workplaceId());
+        assertThat(workContractRepository.findByWorkplaceId(fixture.workplaceId())).hasSize(1);
 
         mockMvc.perform(post("/api/auth/me/worker-registration-code")
                         .header("Authorization", bearer(workerToken))
@@ -168,6 +170,39 @@ class WorkerCompanyRegistrationIntegrationTest {
                 .andExpect(jsonPath("$.data.companyCode").value("DN-SEOUL-4101"));
 
         assertThat(employmentMembershipRepository.findAll()).hasSize(1);
+        assertThat(workContractRepository.findByWorkplaceId(fixture.workplaceId())).hasSize(1);
+    }
+
+    @Test
+    void redeemCreatesDefaultContractWhenWorkplaceHasNoActiveContract() throws Exception {
+        String adminToken = createAdminAndLogin();
+        CreatedCompanyFixture fixture = createCompanyAndEmployer(adminToken, "Contract Logistics", "DN-SEOUL-4106");
+        String workerToken = createWorkerAndLogin("worker6@dondone.test", "01012121212");
+
+        workContractRepository.deleteAll();
+        assertThat(workContractRepository.findByWorkplaceId(fixture.workplaceId())).isEmpty();
+
+        String registrationCode = objectMapper.readTree(mockMvc.perform(post("/api/employer/worker-registration-codes")
+                        .header("Authorization", bearer(fixture.employerToken())))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString())
+                .path("data")
+                .path("registrationCode")
+                .asText();
+
+        mockMvc.perform(post("/api/auth/me/worker-registration-code")
+                        .header("Authorization", bearer(workerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RedeemWorkerRegistrationCodeRequest(registrationCode))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.membershipStatus").value("ACTIVE"));
+
+        List<WorkContract> contracts = workContractRepository.findByWorkplaceId(fixture.workplaceId());
+        assertThat(contracts).hasSize(1);
+        assertThat(contracts.get(0).getBasePayAmount()).isEqualByComparingTo("12000");
+        assertThat(contracts.get(0).isActive()).isTrue();
     }
 
     @Test
@@ -208,6 +243,13 @@ class WorkerCompanyRegistrationIntegrationTest {
                 .andExpect(jsonPath("$.data.payUnit").value("HOURLY"))
                 .andExpect(jsonPath("$.data.basePayAmount").value(12000))
                 .andExpect(jsonPath("$.data.isActive").value(true));
+
+        mockMvc.perform(get("/api/advance/eligibility")
+                        .header("Authorization", bearer(workerToken))
+                        .param("workplaceId", Long.toString(fixture.workplaceId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assetSymbol").value("dUSDC"))
+                .andExpect(jsonPath("$.data.availableAmountAtomic").value(0));
     }
 
     @Test

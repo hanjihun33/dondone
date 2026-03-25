@@ -17,6 +17,7 @@ import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.model.Workplace;
 import com.workproofpay.backend.workproof.repo.WorkplaceRepository;
+import com.workproofpay.backend.workproof.service.WorkContractProvisioner;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class WorkerCompanyRegistrationService {
     private final CompanyRepository companyRepository;
     private final WorkplaceRepository workplaceRepository;
     private final EmploymentMembershipRepository employmentMembershipRepository;
+    private final WorkContractProvisioner workContractProvisioner;
 
     @Transactional
     public WorkerCompanyRegistrationResponse redeem(Long userId, RedeemWorkerRegistrationCodeRequest request) {
@@ -78,6 +80,8 @@ public class WorkerCompanyRegistrationService {
                         workplace.getId(),
                         today
                 )));
+
+        workContractProvisioner.ensureActiveContract(workplace, today);
 
         return new WorkerCompanyRegistrationResponse(
                 company.getId(),

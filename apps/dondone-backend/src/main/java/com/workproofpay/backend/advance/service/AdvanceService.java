@@ -11,6 +11,8 @@ import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.employer.model.EmploymentMembershipStatus;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.api.dto.response.WorkProofMonthlySummaryContractResponse;
@@ -24,9 +26,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -39,6 +43,7 @@ public class AdvanceService {
     private final UserRepository userRepository;
     private final WorkplaceRepository workplaceRepository;
     private final WorkContractRepository workContractRepository;
+    private final EmploymentMembershipRepository employmentMembershipRepository;
     private final WorkProofRepository workProofRepository;
     private final WorkProofLane1Service workProofLane1Service;
     private final AdvancePolicyResolver advancePolicyResolver;
@@ -123,10 +128,9 @@ public class AdvanceService {
     }
 
     private AdvanceEligibilityResult evaluateEligibility(Long userId, Long workplaceId) {
-        Workplace workplace = workplaceRepository.findByIdAndUserId(workplaceId, userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        Workplace workplace = getAccessibleWorkplace(userId, workplaceId);
         WorkContract contract = workContractRepository
-                .findFirstByWorkplaceIdAndWorkplaceUserIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId, userId)
+                .findFirstByWorkplaceIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId)
                 .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_CONTRACT_REQUIRED));
 
         var policy = advancePolicyResolver.resolve();
@@ -213,6 +217,28 @@ public class AdvanceService {
                 .map(workProof -> YearMonth.from(workProof.getWorkDate()))
                 .orElse(null);
         return advancePolicyEngine.resolveTargetMonth(policy, java.time.LocalDate.now(), latestWorkedMonth);
+    }
+
+    private Workplace getAccessibleWorkplace(Long userId, Long workplaceId) {
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        if (Objects.equals(workplace.getUser().getId(), userId) || hasActiveMembership(userId, workplace)) {
+            return workplace;
+        }
+        throw new ApiException(ErrorCode.WORKPLACE_NOT_FOUND);
+    }
+
+    private boolean hasActiveMembership(Long userId, Workplace workplace) {
+        if (workplace.getCompanyId() == null) {
+            return false;
+        }
+        return !employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                userId,
+                workplace.getCompanyId(),
+                workplace.getId(),
+                EmploymentMembershipStatus.ACTIVE,
+                LocalDate.now()
+        ).isEmpty();
     }
 
     private User findUser(Long userId) {
