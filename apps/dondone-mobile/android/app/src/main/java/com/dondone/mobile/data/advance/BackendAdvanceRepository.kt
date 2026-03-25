@@ -222,7 +222,9 @@ class BackendAdvanceRepository(
                 availableDisplayKrwAmount = data.getLong("availableDisplayKrwAmount"),
                 maxCapAmountAtomic = data.getLong("maxCapAmountAtomic"),
                 maxCapDisplayKrwAmount = data.getLong("maxCapDisplayKrwAmount"),
-                currentTierName = data.getString("currentTierName"),
+                currentTierName = data.optStringOrNull("currentTierName")
+                    ?: data.optStringOrNull("repaymentTier")
+                    ?: "현재 구간",
                 nextTierName = data.optStringOrNull("nextTierName"),
                 progressToNextTier = data.optBigDecimalOrNull("progressToNextTier"),
                 remainingWorkDaysToNextTier = data.optInt("remainingWorkDaysToNextTier", 0),

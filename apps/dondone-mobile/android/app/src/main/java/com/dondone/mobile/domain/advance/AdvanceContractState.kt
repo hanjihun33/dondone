@@ -138,7 +138,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                 val hasPendingReview = remoteEligibility.noticeReasonCodes.contains("PENDING_WORKPROOF_REVIEW")
                 val isNextCycle = isNextRepaymentCycle(remoteEligibility.effectiveSettlementDueDate)
                 val noticeTitleText = if (hasPendingReview) {
-                    "확인 필요한 기록이 남아 있어요"
+                    "아직 반영되지 않은 기록이 있어요"
                 } else {
                     null
                 }
@@ -147,9 +147,9 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                         .takeIf { it > 0 }
                         ?.let { count -> count.toString() + "건" }
                     if (reviewCountText != null) {
-                        "확인 필요한 기록 ${reviewCountText}이 남아 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+                        "${reviewCountText}은 아직 확인 중이라 지금 가능 금액에 반영되지 않았어요."
                     } else {
-                        "아직 반영되지 않은 기록이 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+                        "확인 중인 기록은 지금 가능 금액에 반영되지 않았어요."
                     }
                 } else {
                     null
@@ -191,7 +191,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     stateTitleText = stateTitleText,
                     stateBodyText = stateBodyText,
                     actionText = actionText,
-                    secondaryActionText = if (hasPendingReview) "기록 확인" else null,
+                    secondaryActionText = null,
                     canRequest = !isBlocked,
                     availableAmountOverride = remoteEligibility.availableDisplayKrwAmount,
                     repaymentDateOverride = remoteEligibility.effectiveSettlementDueDate
@@ -263,7 +263,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
         AdvanceSurfaceState.ERROR -> "다시 시도"
     }
     val noticeTitleText = if (hasPendingReview) {
-        "확인 필요한 기록이 남아 있어요"
+        "아직 반영되지 않은 기록이 있어요"
     } else {
         null
     }
@@ -272,9 +272,9 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
             .takeIf { it > 0 }
             ?.let { count -> count.toString() + "건" }
         if (reviewCountText != null) {
-            "확인 필요한 기록 ${reviewCountText}이 남아 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+            "${reviewCountText}은 아직 확인 중이라 지금 가능 금액에 반영되지 않았어요."
         } else {
-            "아직 반영되지 않은 기록이 있어 현재 가능 금액은 반영 완료 기록 기준으로 계산됐어요."
+            "확인 중인 기록은 지금 가능 금액에 반영되지 않았어요."
         }
     } else {
         null
@@ -294,7 +294,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
         stateTitleText = stateTitleText,
         stateBodyText = stateBodyText,
         actionText = actionText,
-        secondaryActionText = if (hasPendingReview) "기록 확인" else null,
+        secondaryActionText = null,
         canRequest = surfaceState == AdvanceSurfaceState.SUCCESS
     )
 }
