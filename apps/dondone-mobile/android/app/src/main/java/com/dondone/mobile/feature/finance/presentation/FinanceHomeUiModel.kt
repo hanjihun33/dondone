@@ -272,27 +272,28 @@ fun DemoState.toFinanceHomeUiModel(
     } else {
         advanceSnapshot.available.toLong()
     }
+    val remoteProgressToNextTier = remoteEligibility?.progressToNextTier?.toFloat()?.coerceIn(0f, 1f) ?: 0f
     val remoteRepaymentDueText = when {
         advanceContractState.repaymentDateOverride != null -> advanceContractState.repaymentDateOverride
         usesRemoteAdvance -> "확인 필요"
         else -> repaymentDueText
     }
     val advanceProgress = if (usesRemoteAdvance) {
-        when (advanceContractState.surfaceState) {
-            AdvanceSurfaceState.SUCCESS -> 1f
-            AdvanceSurfaceState.BLOCKED -> 0.2f
-            else -> 0f
-        }
+        remoteProgressToNextTier
     } else if (advanceSnapshot.progressTargetDays == 0) {
         1f
     } else {
         advanceSnapshot.verifiedDays / advanceSnapshot.progressTargetDays.toFloat()
     }
     val effectiveProgressHintText = if (usesRemoteAdvance) {
-        if (advanceContractState.noticeTitleText != null) {
-            "반영된 근무 기준으로 계산해요."
+        val remainingDays = remoteEligibility?.remainingWorkDaysToNextTier ?: 0
+        val nextTierCap = remoteEligibility?.nextTierExpectedCapDisplayKrw
+        if (remainingDays > 0 && nextTierCap != null) {
+            "다음 구간까지 ${remainingDays}일 · 최대 ${formatKrw(nextTierCap.toInt())}"
+        } else if (remainingDays > 0) {
+            "다음 구간까지 ${remainingDays}일 남았어요."
         } else {
-            "반영된 근무 기준으로 보여줘요."
+            "현재 한도 구간이 모두 반영됐어요."
         }
     } else {
         advanceProgressHintText

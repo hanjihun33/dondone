@@ -222,6 +222,11 @@ class BackendAdvanceRepository(
                 availableDisplayKrwAmount = data.getLong("availableDisplayKrwAmount"),
                 maxCapAmountAtomic = data.getLong("maxCapAmountAtomic"),
                 maxCapDisplayKrwAmount = data.getLong("maxCapDisplayKrwAmount"),
+                currentTierName = data.getString("currentTierName"),
+                nextTierName = data.optStringOrNull("nextTierName"),
+                progressToNextTier = data.optBigDecimalOrNull("progressToNextTier"),
+                remainingWorkDaysToNextTier = data.optInt("remainingWorkDaysToNextTier", 0),
+                nextTierExpectedCapDisplayKrw = data.optLongOrNull("nextTierExpectedCapDisplayKrw"),
                 repaymentTier = data.getString("repaymentTier"),
                 blockReasonCodes = blockReasons,
                 noticeReasonCodes = noticeReasons,
@@ -359,6 +364,13 @@ private fun JSONObject.optStringOrNull(key: String): String? {
 
 private fun JSONObject.getBigDecimalCompat(key: String): BigDecimal =
     BigDecimal(get(key).toString())
+
+private fun JSONObject.optBigDecimalOrNull(key: String): BigDecimal? {
+    if (!has(key) || isNull(key)) {
+        return null
+    }
+    return BigDecimal(get(key).toString())
+}
 
 private fun parseAdvanceErrorMessage(
     responseBody: String,
