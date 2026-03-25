@@ -155,15 +155,15 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                     null
                 }
                 val stateTitleText = when {
-                    isBlocked && isClosedToday -> "오늘은 신청이 마감됐어요"
+                    isBlocked && isClosedToday -> "오늘은 신청할 수 없어요"
                     isBlocked -> "지금은 미리받기를 신청할 수 없어요"
                     else -> "미리받기를 신청할 수 있어요"
                 }
                 val stateBodyText = when {
                     isBlocked && isClosedToday && isNextCycle ->
-                        "오늘 회차는 마감됐어요. 내일부터 다음 달 급여 회차 기준으로 확인할 수 있어요."
+                        "급여 정산일에는 신청할 수 없어요. 다음 회차는 내일부터 확인할 수 있어요."
                     isBlocked && isClosedToday ->
-                        "오늘은 신청이 마감됐어요. 다음 회차는 마감 이후 기준으로 확인해 주세요."
+                        "급여 정산일에는 신청할 수 없어요."
                     blockReasonTexts.isNotEmpty() ->
                         blockReasonTexts.joinToString(" · ")
                     isNextCycle ->
@@ -179,11 +179,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
                 }
                 return AdvanceContractState(
                     surfaceState = if (isBlocked) AdvanceSurfaceState.BLOCKED else AdvanceSurfaceState.SUCCESS,
-                    sourceLabelText = if (remoteState.workplaceName != null) {
-                        remoteState.workplaceName
-                    } else {
-                        "근무 정보"
-                    },
+                    sourceLabelText = "",
                     pendingMinutes = 0,
                     needsReviewRecordCount = remoteEligibility.needsReviewRecordCount,
                     repaymentTier = remoteEligibility.repaymentTier,
