@@ -85,9 +85,27 @@ public class AdvancePolicyEngine {
         long estimatedFeeDisplayKrwAmount = estimateFeeDisplayKrwAmount(policy, availableDisplayKrwAmount);
 
         Integer nextTierDays = tier.nextMinimumDays();
+        AdvanceRepaymentTier nextTier = nextTierDays == null
+                ? null
+                : AdvanceRepaymentTier.fromReflectedDays(nextTierDays);
+        int remainingWorkDaysToNextTier = nextTierDays == null
+                ? 0
+                : Math.max(0, nextTierDays - reflectedWorkDays);
         long nextTierRemainingMinutes = nextTierDays == null
                 ? 0L
                 : Math.max(0L, (long) nextTierDays * STANDARD_WORKDAY_MINUTES - reflectedWorkMinutes);
+        BigDecimal progressToNextTier = nextTierDays == null
+                ? BigDecimal.ONE
+                : BigDecimal.valueOf(reflectedWorkDays)
+                .divide(BigDecimal.valueOf(nextTierDays), 4, RoundingMode.HALF_UP)
+                .max(BigDecimal.ZERO)
+                .min(BigDecimal.ONE);
+        long nextTierExpectedCapDisplayKrw = nextTier == null
+                ? maxAvailableBeforeUsageDisplayKrwAmount
+                : Math.min(
+                Math.min(nextTier.capAmount(), paydayCapKrw),
+                policy.getMaxCapDisplayKrwAmount()
+        );
 
         return new AdvanceEligibilityResponse(
                 workplaceId,
@@ -103,6 +121,11 @@ public class AdvancePolicyEngine {
                 toAtomic(policy, maxCapDisplayKrwAmount),
                 maxCapDisplayKrwAmount,
                 tier.ratio(),
+                tier.code(),
+                nextTier != null ? nextTier.code() : null,
+                progressToNextTier,
+                remainingWorkDaysToNextTier,
+                nextTierExpectedCapDisplayKrw,
                 tier.code(),
                 reflectedWorkDays,
                 reflectedWorkMinutes,

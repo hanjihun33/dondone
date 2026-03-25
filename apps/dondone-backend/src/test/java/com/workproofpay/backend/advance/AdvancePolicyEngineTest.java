@@ -73,6 +73,11 @@ class AdvancePolicyEngineTest {
         assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
         assertThat(response.estimatedFeeAmountAtomic()).isEqualTo(FEE_ATOMIC);
         assertThat(response.estimatedFeeDisplayKrwAmount()).isEqualTo(FEE_REFERENCE_KRW);
+        assertThat(response.currentTierName()).isEqualTo("B");
+        assertThat(response.nextTierName()).isEqualTo("A");
+        assertThat(response.progressToNextTier()).isEqualByComparingTo("0.6000");
+        assertThat(response.remainingWorkDaysToNextTier()).isEqualTo(8);
+        assertThat(response.nextTierExpectedCapDisplayKrw()).isEqualTo(300_000L);
         assertThat(response.blockReasonCodes()).isEmpty();
         assertThat(response.noticeReasonCodes()).isEmpty();
         assertThat(engine.isHardBlocked(response)).isFalse();
@@ -179,6 +184,26 @@ class AdvancePolicyEngineTest {
         assertThat(response.alreadyAdvancedDisplayKrwAmount()).isEqualTo(50_000L);
         assertThat(response.availableAmountAtomic()).isEqualTo(68_965_517L);
         assertThat(response.availableDisplayKrwAmount()).isEqualTo(100_000L);
+    }
+
+    @Test
+    void marksTopTierAsFullyProgressedWithoutNextTier() {
+        AdvanceEligibilityResponse response = engine.evaluate(
+                policy,
+                1L,
+                contractWithHourlyWage(10_000),
+                summary(20, 9_600, 9_600, 0, 0),
+                0L,
+                0L,
+                false,
+                LocalDate.of(2026, 3, 16),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(response.currentTierName()).isEqualTo("A");
+        assertThat(response.nextTierName()).isNull();
+        assertThat(response.progressToNextTier()).isEqualByComparingTo("1");
+        assertThat(response.remainingWorkDaysToNextTier()).isZero();
     }
 
     @Test
