@@ -402,7 +402,7 @@ fun DemoState.toFinanceHomeUiModel(
         else -> formatKrw(advanceSnapshot.fee)
     }
     val currentRequestSummaryAmountLabel = when {
-        latestRemoteRequest?.approvedAmountAtomic != null -> "이번 회차 받은 금액"
+        latestRemoteRequest?.approvedAmountAtomic != null -> "받은 금액"
         latestRemoteRequest != null -> "이번 회차 신청 금액"
         else -> "이번 회차 이미 받은 금액"
     }
@@ -430,7 +430,7 @@ fun DemoState.toFinanceHomeUiModel(
     }
     val advanceHeroStateBodyText = if (hasCurrentAdvanceRequest) {
         when (latestRemoteRequest?.status) {
-            "PAID" -> "지급 내역과 급여 정산 예정일을 확인할 수 있어요."
+            "PAID" -> ""
             "PAYING", "APPROVED", "SUBMITTED" -> "지급 상태와 정산 예정일을 확인할 수 있어요."
             "PAYOUT_FAILED" -> "지급 상태를 다시 확인해 주세요."
             "REJECTED" -> "요청 결과를 다시 확인해 주세요."
@@ -680,7 +680,7 @@ fun DemoState.toFinanceHomeUiModel(
                 advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
-            actionText = if (hasCurrentAdvanceRequest) "이번 달 내역 보기" else advanceContractState.actionText,
+            actionText = if (hasCurrentAdvanceRequest) "내역 보기" else advanceContractState.actionText,
             secondaryActionText = advanceContractState.secondaryActionText,
             detail = FinanceAdvanceDetailUiModel(
                 surfaceState = advanceContractState.surfaceState,
@@ -722,7 +722,7 @@ fun DemoState.toFinanceHomeUiModel(
                 requestAmountText = selectedRequestText,
                 receiveAmountText = selectedReceiveText,
                 feeText = selectedFeeText,
-                blockReasonTexts = advanceContractState.blockReasonTexts,
+                blockReasonTexts = if (hasCurrentAdvanceRequest) emptyList() else advanceContractState.blockReasonTexts,
                 disclaimerText = advanceContractState.disclaimerText,
                 canRequest = !hasCurrentAdvanceRequest && advanceContractState.canRequest && !advanceRequestUiState.isSubmitting,
                 requestButtonText = when {
