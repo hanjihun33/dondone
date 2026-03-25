@@ -57,6 +57,7 @@ fun DonDoneNavGraph(
     val remittanceCompletionNoticeUiState by viewModel.remittanceCompletionNoticeUiState.collectAsStateWithLifecycle()
     val vaultActionUiState by viewModel.vaultActionUiState.collectAsStateWithLifecycle()
     val workproofActionUiState by viewModel.workproofActionUiState.collectAsStateWithLifecycle()
+    val workproofCurrentLocationUiState by viewModel.workproofCurrentLocationUiState.collectAsStateWithLifecycle()
     val workproofPdfPreviewUiState by viewModel.workproofPdfPreviewUiState.collectAsStateWithLifecycle()
     val workproofPdfCreateUiState by viewModel.workproofPdfCreateUiState.collectAsStateWithLifecycle()
     val workproofPdfFileUiState by viewModel.workproofPdfFileUiState.collectAsStateWithLifecycle()
@@ -166,13 +167,15 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toWorkproofUiModel(
                     actionUiState = workproofActionUiState,
                     remoteState = workproofRemoteState,
-                    isAuthenticated = authUiState.isAuthenticated
+                    isAuthenticated = authUiState.isAuthenticated,
+                    currentLocationUiState = workproofCurrentLocationUiState
                 ),
                 pdfPreviewUiState = workproofPdfPreviewUiState,
                 pdfCreateUiState = workproofPdfCreateUiState,
                 pdfFileUiState = workproofPdfFileUiState,
                 onClockIn = viewModel::clockIn,
                 onClockOut = viewModel::clockOut,
+                onRefreshCurrentLocation = viewModel::refreshWorkproofCurrentLocation,
                 onSaveEdit = viewModel::saveWorkproofEdit,
                 onRefreshPdfPreview = viewModel::previewWorkproofPdf,
                 onClearPdfPreview = viewModel::clearWorkproofPdfPreview,

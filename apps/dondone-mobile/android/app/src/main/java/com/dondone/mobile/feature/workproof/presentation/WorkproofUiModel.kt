@@ -1,6 +1,8 @@
 package com.dondone.mobile.feature.workproof.presentation
 
 import com.dondone.mobile.app.session.WorkproofActionUiState
+import com.dondone.mobile.app.session.WorkproofCurrentLocationStatus
+import com.dondone.mobile.app.session.WorkproofCurrentLocationUiState
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
@@ -34,7 +36,9 @@ data class WorkproofSummaryUiModel(
     val currentLatitude: Double,
     val currentLongitude: Double,
     val workplaceRadiusMeters: Int,
-    val isWithinWorkplaceRadius: Boolean
+    val isWithinWorkplaceRadius: Boolean,
+    val isCurrentLocationLoading: Boolean,
+    val currentLocationStatus: WorkproofCurrentLocationStatus?
 )
 
 data class WorkproofCalendarCellUiModel(
@@ -77,20 +81,25 @@ data class WorkproofUiModel(
 fun DemoState.toWorkproofUiModel(
     actionUiState: WorkproofActionUiState? = null,
     remoteState: WorkproofRemoteState = WorkproofRemoteState.unauthenticated(""),
-    isAuthenticated: Boolean = false
+    isAuthenticated: Boolean = false,
+    currentLocationUiState: WorkproofCurrentLocationUiState = WorkproofCurrentLocationUiState()
 ): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val workplaceRadiusMeters = workproof.allowedRadiusMeters
     val canSubmitAction = actionUiState?.isSubmitting != true
     val usesFallbackData = remoteState.mode != WorkproofRemoteMode.CONTENT
     val allowRemoteActions = !isAuthenticated || remoteState.mode == WorkproofRemoteMode.CONTENT
-    val isWithinWorkplaceRadius = isWithinWorkplaceRadius(
+    val requiresLiveCurrentLocation = isAuthenticated && remoteState.mode == WorkproofRemoteMode.CONTENT
+    val hasUsableCurrentLocation = !requiresLiveCurrentLocation || currentLocationUiState.hasUsableLocation
+    val isWithinWorkplaceRadius = hasUsableCurrentLocation && isWithinWorkplaceRadius(
         startLatitude = workproof.currentLatitude,
         startLongitude = workproof.currentLongitude,
         endLatitude = workproof.workplaceLatitude,
         endLongitude = workproof.workplaceLongitude,
         radiusMeters = workplaceRadiusMeters
     )
+    val currentLocationStatus = currentLocationUiState.status
+        .takeIf { requiresLiveCurrentLocation && it != WorkproofCurrentLocationStatus.READY && it != WorkproofCurrentLocationStatus.IDLE }
     val dayTones = (1..demo.monthLength).associateWith { day ->
         when {
             day > demo.asOfDay -> WorkproofCalendarTone.UNAVAILABLE
@@ -140,17 +149,20 @@ fun DemoState.toWorkproofUiModel(
         calendarCurrentDay = demo.asOfDay,
         calendarDayTones = dayTones,
         summary = WorkproofSummaryUiModel(
-            canClockIn = allowRemoteActions && workproof.today.clockIn == null && canSubmitAction,
+            canClockIn = allowRemoteActions && workproof.today.clockIn == null && canSubmitAction && hasUsableCurrentLocation,
             canClockOut = allowRemoteActions &&
                 workproof.today.clockIn != null &&
                 workproof.today.clockOut == null &&
-                canSubmitAction,
+                canSubmitAction &&
+                hasUsableCurrentLocation,
             workplaceLatitude = workproof.workplaceLatitude,
             workplaceLongitude = workproof.workplaceLongitude,
             currentLatitude = workproof.currentLatitude,
             currentLongitude = workproof.currentLongitude,
             workplaceRadiusMeters = workplaceRadiusMeters,
-            isWithinWorkplaceRadius = isWithinWorkplaceRadius
+            isWithinWorkplaceRadius = isWithinWorkplaceRadius,
+            isCurrentLocationLoading = currentLocationUiState.status == WorkproofCurrentLocationStatus.LOADING,
+            currentLocationStatus = currentLocationStatus
         ),
         recentRecords = recentRecords,
         audits = auditItems,

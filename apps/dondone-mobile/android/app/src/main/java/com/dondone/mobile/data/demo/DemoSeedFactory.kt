@@ -22,17 +22,25 @@ import com.dondone.mobile.domain.model.WorkproofData
 import java.time.LocalDate
 import java.time.LocalDateTime
 
+private const val DEMO_WORKPLACE_NAME = "Green Farm"
+private const val DEMO_WORKPLACE_ADDRESS = "경상북도 구미시 농장로 18"
+private const val DEMO_WORKPLACE_LATITUDE = 36.1195
+private const val DEMO_WORKPLACE_LONGITUDE = 128.3446
+private const val DEMO_CURRENT_LATITUDE = 36.1211
+private const val DEMO_CURRENT_LONGITUDE = 128.3418
+private const val DEMO_ALLOWED_RADIUS_METERS = 100
+
 object DemoSeedFactory {
     fun create(): DemoState {
         return DemoState(
             demo = DemoInfo(year = 2026, month = 3, monthLength = 31, asOfDay = 28),
             workproof = WorkproofData(
-                workplaceName = "Green Farm",
-                workplaceAddress = "경상북도 구미시 농장로 18",
-                workplaceLatitude = 36.1195,
-                workplaceLongitude = 128.3446,
-                currentLatitude = 36.1211,
-                currentLongitude = 128.3418,
+                workplaceName = DEMO_WORKPLACE_NAME,
+                workplaceAddress = DEMO_WORKPLACE_ADDRESS,
+                workplaceLatitude = DEMO_WORKPLACE_LATITUDE,
+                workplaceLongitude = DEMO_WORKPLACE_LONGITUDE,
+                currentLatitude = DEMO_CURRENT_LATITUDE,
+                currentLongitude = DEMO_CURRENT_LONGITUDE,
                 today = TodayWork(clockIn = null, clockOut = null),
                 records = listOf(
                     WorkRecord("WP-0327-01", LocalDate.of(2026, 3, 27), 27, "09:01", "18:03", false, 0),
@@ -50,7 +58,7 @@ object DemoSeedFactory {
                     )
                 ),
                 workplaceId = null,
-                allowedRadiusMeters = 100
+                allowedRadiusMeters = DEMO_ALLOWED_RADIUS_METERS
             ),
             wage = WageData(
                 workDays = 18,

@@ -1,14 +1,19 @@
 package com.dondone.mobile.feature.workproof.presentation
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.activity.compose.BackHandler
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,12 +70,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.dondone.mobile.app.session.WorkproofCurrentLocationStatus
 import com.dondone.mobile.app.session.WorkproofLaunchRequest
 import com.dondone.mobile.app.session.WorkproofLaunchTarget
 import com.dondone.mobile.BuildConfig
@@ -96,8 +103,6 @@ import com.kakao.vectormap.MapLifeCycleCallback
 import com.kakao.vectormap.MapView
 import com.kakao.vectormap.camera.CameraUpdateFactory
 import com.kakao.vectormap.label.LabelOptions
-import com.kakao.vectormap.label.LabelStyle
-import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.shape.DotPoints
 import com.kakao.vectormap.shape.PolygonOptions
 import com.kakao.vectormap.shape.PolygonStyles
@@ -142,6 +147,7 @@ fun WorkproofScreen(
     pdfFileUiState: WorkproofPdfFileUiState,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
+    onRefreshCurrentLocation: () -> Unit,
     onSaveEdit: (String, String, String, String, String, Boolean) -> Unit,
     onRefreshPdfPreview: (LocalDate, LocalDate) -> Unit,
     onClearPdfPreview: () -> Unit,
@@ -492,6 +498,7 @@ fun WorkproofScreen(
                     uiModel = uiModel.summary,
                     onClockIn = onClockIn,
                     onClockOut = onClockOut,
+                    onRefreshCurrentLocation = onRefreshCurrentLocation,
                     onToggleDetails = { showDetails = true }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
@@ -510,6 +517,7 @@ private fun WorkproofPunchCard(
     uiModel: WorkproofSummaryUiModel,
     onClockIn: () -> Unit,
     onClockOut: () -> Unit,
+    onRefreshCurrentLocation: () -> Unit,
     onToggleDetails: () -> Unit
 ) {
     val context = LocalContext.current
@@ -569,8 +577,17 @@ private fun WorkproofPunchCard(
                     )
                 }
             }
+            uiModel.currentLocationStatus?.let { status ->
+                DonDoneNoticeBanner(
+                    title = stringResource(R.string.workproof_location_banner_title),
+                    message = workproofCurrentLocationStatusMessage(status)
+                )
+            }
             HorizontalDivider(color = WorkproofDivider)
-            WorkproofWorkplaceMapCard(uiModel = uiModel)
+            WorkproofWorkplaceMapCard(
+                uiModel = uiModel,
+                onRefreshCurrentLocation = onRefreshCurrentLocation
+            )
         }
     }
 }
@@ -598,7 +615,8 @@ private fun WorkproofActionButtonWithFeedback(
 
 @Composable
 private fun WorkproofWorkplaceMapCard(
-    uiModel: WorkproofSummaryUiModel
+    uiModel: WorkproofSummaryUiModel,
+    onRefreshCurrentLocation: () -> Unit
 ) {
     val isKakaoMapAvailable = remember {
         KakaoMapSupport.isMapAvailable(BuildConfig.KAKAO_NATIVE_APP_KEY)
@@ -606,7 +624,7 @@ private fun WorkproofWorkplaceMapCard(
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
-            text = "위치",
+            text = stringResource(R.string.workproof_location_section_title),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
@@ -622,18 +640,20 @@ private fun WorkproofWorkplaceMapCard(
                 workplaceLongitude = uiModel.workplaceLongitude,
                 currentLatitude = uiModel.currentLatitude,
                 currentLongitude = uiModel.currentLongitude,
-                workplaceRadiusMeters = uiModel.workplaceRadiusMeters
+                workplaceRadiusMeters = uiModel.workplaceRadiusMeters,
+                currentLocationStatus = uiModel.currentLocationStatus,
+                onRefreshCurrentLocation = onRefreshCurrentLocation
             )
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             WorkproofMapLegendItem(
                 color = WorkproofMapCurrentPin,
-                label = "현재 내 위치"
+                label = stringResource(R.string.workproof_location_legend_current)
             )
             WorkproofMapLegendItem(
                 color = WorkproofMapWorkplacePin,
-                label = "근무지 위치"
+                label = stringResource(R.string.workproof_location_legend_workplace)
             )
         }
     }
@@ -644,10 +664,11 @@ private fun WorkproofMapFallbackCard(
     hasApiKey: Boolean,
     isRuntimeSupported: Boolean
 ) {
+    val fallbackBackground = colorResource(R.color.workproof_map_fallback_background)
     val message = when {
-        !hasApiKey -> "KAKAO_NATIVE_APP_KEY를 설정하면 지도가 표시돼요."
-        !isRuntimeSupported -> "현재 실행 환경에서는 카카오 지도를 지원하지 않아 지도 없이 표시돼요."
-        else -> "지도를 불러올 수 없어요."
+        !hasApiKey -> stringResource(R.string.workproof_map_fallback_missing_key)
+        !isRuntimeSupported -> stringResource(R.string.workproof_map_fallback_runtime_unsupported)
+        else -> stringResource(R.string.workproof_map_fallback_default)
     }
 
     Box(
@@ -655,7 +676,7 @@ private fun WorkproofMapFallbackCard(
             .fillMaxWidth()
             .height(210.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(Color(0xFFF7F9FC))
+            .background(fallbackBackground)
             .border(1.dp, DawnBorder, RoundedCornerShape(28.dp))
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center
@@ -674,21 +695,83 @@ private fun KakaoWorkplaceMapView(
     workplaceLongitude: Double,
     currentLatitude: Double,
     currentLongitude: Double,
-    workplaceRadiusMeters: Int
+    workplaceRadiusMeters: Int,
+    currentLocationStatus: WorkproofCurrentLocationStatus?,
+    onRefreshCurrentLocation: () -> Unit
 ) {
+    val context = LocalContext.current
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        onRefreshCurrentLocation()
+    }
     var retryToken by rememberSaveable { mutableIntStateOf(0) }
-    val mapView = rememberKakaoMapViewWithLifecycle(retryToken)
+    val mapIdentity = remember(retryToken) { "workproof-map-$retryToken" }
+    val mapView = rememberKakaoMapViewWithLifecycle(mapIdentity)
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
-    var isCameraInitialized by rememberSaveable { mutableStateOf(false) }
-    var isWorkplacePinAdded by rememberSaveable { mutableStateOf(false) }
-    var isCurrentPinAdded by rememberSaveable { mutableStateOf(false) }
-    var isRadiusCircleAdded by rememberSaveable { mutableStateOf(false) }
-    var mapErrorMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var mapErrorMessage by rememberSaveable(mapIdentity) { mutableStateOf<String?>(null) }
+    var shouldFocusCurrentLocationAfterRefresh by rememberSaveable { mutableStateOf(false) }
+    var hasStartedRefreshForFocus by rememberSaveable { mutableStateOf(false) }
     val workplacePosition = remember(workplaceLatitude, workplaceLongitude) {
         LatLng.from(workplaceLatitude, workplaceLongitude)
     }
     val currentPosition = remember(currentLatitude, currentLongitude) {
         LatLng.from(currentLatitude, currentLongitude)
+    }
+    val isRefreshingCurrentLocation = currentLocationStatus == WorkproofCurrentLocationStatus.LOADING
+
+    LaunchedEffect(
+        kakaoMap,
+        workplaceLatitude,
+        workplaceLongitude,
+        currentLatitude,
+        currentLongitude,
+        workplaceRadiusMeters
+    ) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        addWorkproofMapMarkers(
+            map = map,
+            context = context,
+            workplacePosition = workplacePosition,
+            currentPosition = currentPosition,
+            workplaceRadiusMeters = workplaceRadiusMeters
+        )
+    }
+
+    LaunchedEffect(
+        kakaoMap,
+        shouldFocusCurrentLocationAfterRefresh,
+        hasStartedRefreshForFocus,
+        currentLocationStatus,
+        currentLatitude,
+        currentLongitude
+    ) {
+        if (!shouldFocusCurrentLocationAfterRefresh) {
+            return@LaunchedEffect
+        }
+        when (currentLocationStatus) {
+            WorkproofCurrentLocationStatus.LOADING -> {
+                hasStartedRefreshForFocus = true
+            }
+
+            WorkproofCurrentLocationStatus.IDLE -> Unit
+            WorkproofCurrentLocationStatus.READY,
+            null -> {
+                if (!hasStartedRefreshForFocus) {
+                    return@LaunchedEffect
+                }
+                kakaoMap?.moveCamera(
+                    CameraUpdateFactory.newCenterPosition(currentPosition)
+                )
+                shouldFocusCurrentLocationAfterRefresh = false
+                hasStartedRefreshForFocus = false
+            }
+
+            else -> {
+                shouldFocusCurrentLocationAfterRefresh = false
+                hasStartedRefreshForFocus = false
+            }
+        }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -701,16 +784,12 @@ private fun KakaoWorkplaceMapView(
         ) {
             if (mapErrorMessage != null) {
                 DonDoneErrorPanel(
-                    title = "지도를 불러오지 못했어요",
-                    message = mapErrorMessage ?: "잠시 후 다시 시도해 주세요.",
-                    actionLabel = "다시 시도",
+                    title = stringResource(R.string.workproof_map_error_title),
+                    message = mapErrorMessage ?: stringResource(R.string.workproof_map_error_message_default),
+                    actionLabel = stringResource(R.string.workproof_map_retry),
                     onAction = {
                         mapErrorMessage = null
                         kakaoMap = null
-                        isCameraInitialized = false
-                        isWorkplacePinAdded = false
-                        isCurrentPinAdded = false
-                        isRadiusCircleAdded = false
                         retryToken += 1
                     },
                     modifier = Modifier.padding(16.dp)
@@ -724,71 +803,17 @@ private fun KakaoWorkplaceMapView(
                                     override fun onMapDestroy() = Unit
 
                                     override fun onMapError(error: Exception) {
-                                        mapErrorMessage = error.message ?: "카카오 지도 초기화에 실패했습니다."
+                                        mapErrorMessage = error.message
+                                            ?: context.getString(R.string.workproof_map_error_initialize)
                                     }
                                 },
                                 object : KakaoMapReadyCallback() {
                                     override fun onMapReady(map: KakaoMap) {
                                         mapErrorMessage = null
                                         kakaoMap = map
-                                        if (!isWorkplacePinAdded) {
-                                            map.labelManager?.let { labelManager ->
-                                                val labelStyles = labelManager.addLabelStyles(
-                                                    LabelStyles.from(
-                                                        LabelStyle.from(R.drawable.ic_workplace_pin)
-                                                    )
-                                                )
-                                                labelManager.layer?.let { labelLayer ->
-                                                    labelLayer.addLabel(
-                                                        LabelOptions.from(workplacePosition)
-                                                            .setStyles(labelStyles)
-                                                    )
-                                                    isWorkplacePinAdded = true
-                                                }
-                                            }
-                                        }
-                                        if (!isCurrentPinAdded) {
-                                            map.labelManager?.let { labelManager ->
-                                                val currentLabelStyles = labelManager.addLabelStyles(
-                                                    LabelStyles.from(
-                                                        LabelStyle.from(R.drawable.ic_current_location_pin)
-                                                    )
-                                                )
-                                                labelManager.layer?.let { labelLayer ->
-                                                    labelLayer.addLabel(
-                                                        LabelOptions.from(currentPosition)
-                                                            .setStyles(currentLabelStyles)
-                                                    )
-                                                    isCurrentPinAdded = true
-                                                }
-                                            }
-                                        }
-                                        if (!isRadiusCircleAdded) {
-                                            val radiusStyles = PolygonStylesSet.from(
-                                                PolygonStyles.from(
-                                                    android.graphics.Color.parseColor("#1A7B68EE"),
-                                                    1.0f,
-                                                    android.graphics.Color.parseColor("#7B68EE")
-                                                )
-                                            )
-                                            map.shapeManager?.layer?.let { shapeLayer ->
-                                                shapeLayer.addPolygon(
-                                                    PolygonOptions.from(
-                                                        DotPoints.fromCircle(
-                                                            workplacePosition,
-                                                            workplaceRadiusMeters.toFloat()
-                                                        )
-                                                    ).setStylesSet(radiusStyles)
-                                                )
-                                                isRadiusCircleAdded = true
-                                            }
-                                        }
-                                        if (!isCameraInitialized) {
-                                            map.moveCamera(
-                                                CameraUpdateFactory.newCenterPosition(workplacePosition)
-                                            )
-                                            isCameraInitialized = true
-                                        }
+                                        map.moveCamera(
+                                            CameraUpdateFactory.newCenterPosition(workplacePosition)
+                                        )
                                     }
                                 }
                             )
@@ -805,21 +830,116 @@ private fun KakaoWorkplaceMapView(
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color.White)
                 .border(1.dp, DawnBorder, RoundedCornerShape(16.dp))
-                .clickable {
-                    kakaoMap?.moveCamera(
-                        CameraUpdateFactory.newCenterPosition(currentPosition)
-                    )
+                .clickable(enabled = !isRefreshingCurrentLocation) {
+                    // 최신 위치 조회가 끝난 뒤 카메라를 한 번만 이동시킨다.
+                    shouldFocusCurrentLocationAfterRefresh = true
+                    hasStartedRefreshForFocus = false
+                    if (hasWorkproofLocationPermission(context)) {
+                        onRefreshCurrentLocation()
+                    } else {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
                 }
                 .padding(vertical = 16.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "현재 내 위치로 핀 이동",
+                text = if (isRefreshingCurrentLocation) {
+                    stringResource(R.string.workproof_location_status_loading)
+                } else {
+                    stringResource(R.string.workproof_location_move_pin)
+                },
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                color = DawnTextSubtle
+                color = if (isRefreshingCurrentLocation) DawnTextSubtle.copy(alpha = 0.7f) else DawnTextSubtle
             )
         }
     }
+}
+
+@Composable
+private fun workproofCurrentLocationStatusMessage(
+    status: WorkproofCurrentLocationStatus
+): String {
+    val stringRes = when (status) {
+        WorkproofCurrentLocationStatus.LOADING -> R.string.workproof_location_status_loading
+        WorkproofCurrentLocationStatus.PERMISSION_REQUIRED -> R.string.workproof_location_status_permission_required
+        WorkproofCurrentLocationStatus.SERVICE_UNAVAILABLE -> R.string.workproof_location_status_service_unavailable
+        WorkproofCurrentLocationStatus.LOCATION_DISABLED -> R.string.workproof_location_status_disabled
+        WorkproofCurrentLocationStatus.ERROR -> R.string.workproof_location_status_error
+        WorkproofCurrentLocationStatus.IDLE,
+        WorkproofCurrentLocationStatus.READY -> R.string.workproof_location_status_try_again
+    }
+    return stringResource(stringRes)
+}
+
+private fun addWorkproofMapMarkers(
+    map: KakaoMap,
+    context: Context,
+    workplacePosition: LatLng,
+    currentPosition: LatLng,
+    workplaceRadiusMeters: Int
+) {
+    val workplacePinBitmap = createMapPinBitmap(context, R.drawable.ic_workplace_pin)
+    val currentPinBitmap = createMapPinBitmap(context, R.drawable.ic_current_location_pin)
+    val radiusStyles = PolygonStylesSet.from(
+        PolygonStyles.from(
+            ContextCompat.getColor(context, R.color.workproof_map_radius_fill),
+            1.0f,
+            ContextCompat.getColor(context, R.color.workproof_map_radius_stroke)
+        )
+    )
+    map.shapeManager?.layer?.let { shapeLayer ->
+        shapeLayer.removeAll()
+        shapeLayer.addPolygon(
+            PolygonOptions.from(
+                DotPoints.fromCircle(
+                    workplacePosition,
+                    workplaceRadiusMeters.toFloat()
+                )
+            ).setStylesSet(radiusStyles)
+        )
+    }
+
+    map.labelManager?.let { labelManager ->
+        labelManager.layer?.let { labelLayer ->
+            labelLayer.removeAll()
+            labelLayer.addLabel(
+                LabelOptions.from(workplacePosition)
+                    .apply {
+                        if (workplacePinBitmap != null) setStyles(workplacePinBitmap) else setStyles(R.drawable.ic_workplace_pin)
+                    }
+                    .setRank(2000L)
+                    .setVisible(true)
+            )
+            labelLayer.addLabel(
+                LabelOptions.from(currentPosition)
+                    .apply {
+                        if (currentPinBitmap != null) setStyles(currentPinBitmap) else setStyles(R.drawable.ic_current_location_pin)
+                    }
+                    .setRank(1000L)
+                    .setVisible(true)
+            )
+        }
+    }
+}
+
+private fun createMapPinBitmap(
+    context: Context,
+    drawableResId: Int
+): Bitmap? {
+    val drawable = ContextCompat.getDrawable(context, drawableResId) ?: return null
+    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: return null
+    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: return null
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    return bitmap
 }
 
 @Composable
@@ -847,11 +967,11 @@ private fun WorkproofMapLegendItem(
 
 @Composable
 private fun rememberKakaoMapViewWithLifecycle(
-    retryToken: Int
+    mapIdentity: String
 ): MapView {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val mapView = remember(retryToken) { MapView(context) }
+    val mapView = remember(mapIdentity) { MapView(context) }
 
     DisposableEffect(lifecycle, mapView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -870,6 +990,18 @@ private fun rememberKakaoMapViewWithLifecycle(
     }
 
     return mapView
+}
+
+private fun hasWorkproofLocationPermission(context: Context): Boolean {
+    val fineGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    val coarseGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    return fineGranted || coarseGranted
 }
 
 @Composable

@@ -5,6 +5,12 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dondone.mobile.R
+import com.dondone.mobile.core.location.AndroidCurrentLocationProvider
+import com.dondone.mobile.core.location.CurrentLocationErrorReason
+import com.dondone.mobile.core.location.CurrentLocationProvider
+import com.dondone.mobile.core.location.CurrentLocationResult
+import com.dondone.mobile.core.location.UnavailableCurrentLocationProvider
 import com.dondone.mobile.core.ui.phoneDigits
 import com.dondone.mobile.data.auth.AuthUnauthorizedException
 import com.dondone.mobile.data.advance.AdvanceRemoteMode
@@ -98,6 +104,12 @@ private const val DOCUMENT_STATUS_NOT_CREATED = "NOT_CREATED"
 private const val DOCUMENT_ID_PROOF = "PROOF"
 private const val DOCUMENT_ID_CLAIM = "CLAIM"
 private const val DEMO_SESSION_VIEW_MODEL_TAG = "DemoSessionViewModel"
+private const val WORKPROOF_LOCATION_LOADING_FALLBACK = "현재 위치를 확인 중이에요."
+private const val WORKPROOF_LOCATION_PERMISSION_REQUIRED_FALLBACK = "위치 권한을 허용하면 현재 위치를 확인할 수 있어요."
+private const val WORKPROOF_LOCATION_SERVICE_UNAVAILABLE_FALLBACK = "위치 서비스를 사용할 수 없어요."
+private const val WORKPROOF_LOCATION_DISABLED_FALLBACK = "위치 서비스가 꺼져 있어 현재 위치를 확인할 수 없어요."
+private const val WORKPROOF_LOCATION_ERROR_FALLBACK = "현재 위치를 확인하지 못했어요. 위치 서비스와 GPS를 확인해 주세요."
+private const val WORKPROOF_LOCATION_TRY_AGAIN_FALLBACK = "현재 위치를 확인한 뒤 다시 시도해 주세요."
 
 private enum class RemittanceRemoteLoadMode {
     INITIAL,
@@ -118,7 +130,9 @@ class DemoSessionViewModel(
     private val remittanceRepository: RemittanceRepository = BackendRemittanceRepository(),
     private val remittanceCompletionNoticeStore: RemittanceCompletionNoticeStore = InMemoryRemittanceCompletionNoticeStore(),
     private val vaultRepository: VaultRepository = BackendVaultRepository(),
-    private val wageRepository: WageRepository = BackendWageRepository()
+    private val wageRepository: WageRepository = BackendWageRepository(),
+    private val currentLocationProvider: CurrentLocationProvider = appContext?.let(::AndroidCurrentLocationProvider)
+        ?: UnavailableCurrentLocationProvider()
 ) : ViewModel() {
     private val initialState = DemoSeedFactory.create()
     private var transferCompletionJob: Job? = null
@@ -152,6 +166,9 @@ class DemoSessionViewModel(
     val vaultRemoteState: StateFlow<VaultRemoteState> = _vaultRemoteState.asStateFlow()
     private val _workproofActionUiState = MutableStateFlow(WorkproofActionUiState())
     val workproofActionUiState: StateFlow<WorkproofActionUiState> = _workproofActionUiState.asStateFlow()
+    private val _workproofCurrentLocationUiState = MutableStateFlow(WorkproofCurrentLocationUiState())
+    val workproofCurrentLocationUiState: StateFlow<WorkproofCurrentLocationUiState> =
+        _workproofCurrentLocationUiState.asStateFlow()
     private val _workproofPdfPreviewUiState = MutableStateFlow(WorkproofPdfPreviewUiState())
     val workproofPdfPreviewUiState: StateFlow<WorkproofPdfPreviewUiState> = _workproofPdfPreviewUiState.asStateFlow()
     private val _workproofPdfCreateUiState = MutableStateFlow(WorkproofPdfCreateUiState())
@@ -451,6 +468,15 @@ class DemoSessionViewModel(
         _recipientPhoneSearchUiState.value = RecipientPhoneSearchUiState()
     }
 
+    fun refreshWorkproofCurrentLocation() {
+        if (_workproofCurrentLocationUiState.value.status == WorkproofCurrentLocationStatus.LOADING) {
+            return
+        }
+        viewModelScope.launch {
+            refreshWorkproofCurrentLocationInternal()
+        }
+    }
+
     fun clockIn() {
         submitWorkproofAction(
             fallback = { state -> DemoSessionReducer.clockIn(state) },
@@ -484,6 +510,13 @@ class DemoSessionViewModel(
         viewModelScope.launch {
             _workproofActionUiState.value = WorkproofActionUiState(isSubmitting = true)
             try {
+                if (!refreshWorkproofCurrentLocationInternal()) {
+                    _workproofActionUiState.value = WorkproofActionUiState(
+                        message = currentLocationStatusMessage(_workproofCurrentLocationUiState.value.status),
+                        isError = true
+                    )
+                    return@launch
+                }
                 val remoteState = remoteCall(session)
                 if (remoteState.mode != WorkproofRemoteMode.CONTENT) {
                     _workproofRemoteState.value = remoteState
@@ -508,6 +541,73 @@ class DemoSessionViewModel(
                 )
             }
         }
+    }
+
+    private suspend fun refreshWorkproofCurrentLocationInternal(): Boolean {
+        _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
+            status = WorkproofCurrentLocationStatus.LOADING
+        )
+
+        return when (val result = currentLocationProvider.fetch()) {
+            is CurrentLocationResult.Success -> {
+                _uiState.update { state ->
+                    state.copy(
+                        workproof = state.workproof.copy(
+                            currentLatitude = result.location.latitude,
+                            currentLongitude = result.location.longitude
+                        )
+                    )
+                }
+                _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
+                    status = WorkproofCurrentLocationStatus.READY
+                )
+                true
+            }
+
+            CurrentLocationResult.PermissionRequired -> {
+                _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
+                    status = WorkproofCurrentLocationStatus.PERMISSION_REQUIRED
+                )
+                false
+            }
+
+            is CurrentLocationResult.Error -> {
+                _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
+                    status = result.reason.toUiStatus()
+                )
+                false
+            }
+        }
+    }
+
+    private fun CurrentLocationErrorReason.toUiStatus(): WorkproofCurrentLocationStatus {
+        return when (this) {
+            CurrentLocationErrorReason.SERVICE_UNAVAILABLE -> WorkproofCurrentLocationStatus.SERVICE_UNAVAILABLE
+            CurrentLocationErrorReason.LOCATION_DISABLED -> WorkproofCurrentLocationStatus.LOCATION_DISABLED
+            CurrentLocationErrorReason.UNKNOWN -> WorkproofCurrentLocationStatus.ERROR
+        }
+    }
+
+    private fun currentLocationStatusMessage(status: WorkproofCurrentLocationStatus): String {
+        val stringRes = when (status) {
+            WorkproofCurrentLocationStatus.LOADING -> R.string.workproof_location_status_loading
+            WorkproofCurrentLocationStatus.PERMISSION_REQUIRED -> R.string.workproof_location_status_permission_required
+            WorkproofCurrentLocationStatus.SERVICE_UNAVAILABLE -> R.string.workproof_location_status_service_unavailable
+            WorkproofCurrentLocationStatus.LOCATION_DISABLED -> R.string.workproof_location_status_disabled
+            WorkproofCurrentLocationStatus.ERROR -> R.string.workproof_location_status_error
+            WorkproofCurrentLocationStatus.IDLE,
+            WorkproofCurrentLocationStatus.READY -> R.string.workproof_location_status_try_again
+        }
+        return appContext?.getString(stringRes)
+            ?: when (status) {
+                WorkproofCurrentLocationStatus.LOADING -> WORKPROOF_LOCATION_LOADING_FALLBACK
+                WorkproofCurrentLocationStatus.PERMISSION_REQUIRED -> WORKPROOF_LOCATION_PERMISSION_REQUIRED_FALLBACK
+                WorkproofCurrentLocationStatus.SERVICE_UNAVAILABLE -> WORKPROOF_LOCATION_SERVICE_UNAVAILABLE_FALLBACK
+                WorkproofCurrentLocationStatus.LOCATION_DISABLED -> WORKPROOF_LOCATION_DISABLED_FALLBACK
+                WorkproofCurrentLocationStatus.ERROR -> WORKPROOF_LOCATION_ERROR_FALLBACK
+                WorkproofCurrentLocationStatus.IDLE,
+                WorkproofCurrentLocationStatus.READY -> WORKPROOF_LOCATION_TRY_AGAIN_FALLBACK
+            }
     }
 
     fun submitTransfer() {
@@ -867,6 +967,7 @@ class DemoSessionViewModel(
         _advanceRequestUiState.value = AdvanceRequestUiState()
         _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
         _workproofActionUiState.value = WorkproofActionUiState()
+        _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState()
         _workproofPdfPreviewUiState.value = WorkproofPdfPreviewUiState()
         _workproofPdfCreateUiState.value = WorkproofPdfCreateUiState()
         _workproofPdfFileUiState.value = WorkproofPdfFileUiState()
