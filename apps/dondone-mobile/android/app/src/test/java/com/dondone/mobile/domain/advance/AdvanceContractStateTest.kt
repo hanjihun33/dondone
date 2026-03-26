@@ -145,7 +145,7 @@ class AdvanceContractStateTest {
         assertEquals(AdvanceSurfaceState.BLOCKED, state.surfaceState)
         assertEquals("지금은 미리받기를 신청할 수 없어요", state.stateTitleText)
         assertEquals("이미 진행 중인 미리받기가 있어요", state.stateBodyText)
-        assertEquals("신청 조건 보기", state.actionText)
+        assertEquals("상세 조회", state.actionText)
         assertEquals(null, state.noticeTitleText)
         assertEquals(null, state.noticeBodyText)
         assertFalse(state.canRequest)

@@ -146,6 +146,7 @@ data class FinanceAdvanceUiModel(
     val noticeBodyText: String?,
     val showProgress: Boolean,
     val progressTitle: String,
+    val progressValueText: String,
     val progress: Float,
     val progressHintText: String,
     val progressPrimaryMetricLabel: String?,
@@ -262,11 +263,6 @@ fun DemoState.toFinanceHomeUiModel(
     val lastReflectedDay = visibleRecords.maxOfOrNull { it.day } ?: demo.asOfDay
     val unreflectedDays = max(0, wage.workDays - advanceSnapshot.verifiedDays)
     val recordedDays = visibleRecords.associateBy { it.day }
-    val advanceProgressHintText = if (advanceSnapshot.nextTierInDays > 0) {
-        "다음 구간까지 ${advanceSnapshot.nextTierInDays}일 남았어요."
-    } else {
-        "지금은 최고 한도 구간이에요."
-    }
     val usesRemoteAdvance = remoteState != null
     val remoteMode = remoteState?.mode
     val remoteRequests = if (remoteMode == AdvanceRemoteMode.CONTENT) remoteState.requests else emptyList()
@@ -308,7 +304,6 @@ fun DemoState.toFinanceHomeUiModel(
     } else {
         advanceSnapshot.available.toLong()
     }
-    val remoteProgressToNextTier = remoteEligibility?.progressToNextTier?.toFloat()?.coerceIn(0f, 1f) ?: 0f
     val remoteRepaymentDueText = when {
         advanceContractState.repaymentDateOverride != null -> advanceContractState.repaymentDateOverride
         usesRemoteAdvance -> "확인 필요"
@@ -316,20 +311,13 @@ fun DemoState.toFinanceHomeUiModel(
     }
     val remoteCurrentLimitAmountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic
     val remoteCurrentLimitDisplayKrwAmount = remoteUsedDisplayKrwAmount + remoteAvailableDisplayKrwAmount
-    val advanceProgress = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        val totalAmountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic
-        if (totalAmountAtomic > 0L) {
-            1f - (remoteUsedAmountAtomic.toFloat() / totalAmountAtomic.toFloat())
-        } else {
-            0f
-        }
-    } else if (usesRemoteAdvance) {
-        remoteProgressToNextTier
-    } else if (advanceSnapshot.progressTargetDays == 0) {
-        1f
+    val progressAttendanceDays = if (usesRemoteAdvance) {
+        reflectedRemoteRecords.size
     } else {
-        advanceSnapshot.verifiedDays / advanceSnapshot.progressTargetDays.toFloat()
+        advanceSnapshot.verifiedDays
     }
+    val progressTargetDays = nextAdvanceProgressTargetDays(progressAttendanceDays)
+    val advanceProgress = progressAttendanceDays.coerceAtMost(progressTargetDays) / progressTargetDays.toFloat()
     val effectiveProgressHintText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         if (remoteAvailableAmountAtomic > 0L) {
             "남은 추가 신청 가능 금액 ${formatAdvanceAmount(
@@ -339,51 +327,15 @@ fun DemoState.toFinanceHomeUiModel(
                 assetSymbol = remoteAssetSymbol
             )} · 출근 기록이 더 반영되면 한도가 늘어날 수 있어요."
         } else {
-            "현재 한도를 모두 사용했어요. 출근 기록이 더 반영되면 한도가 다시 늘어날 수 있어요."
-        }
-    } else if (usesRemoteAdvance) {
-        val remainingDays = remoteEligibility?.remainingWorkDaysToNextTier ?: 0
-        val nextTierCap = remoteEligibility?.nextTierExpectedCapDisplayKrw
-        if (remainingDays > 0 && nextTierCap != null) {
-            "다음 구간까지 ${remainingDays}일 · 최대 ${formatKrw(nextTierCap.toInt())}"
-        } else if (remainingDays > 0) {
-            "다음 구간까지 ${remainingDays}일 남았어요."
-        } else {
-            "지금은 최고 한도 구간이에요."
+            "출근 기록이 더 반영되면 한도가 다시 늘어나요."
         }
     } else {
-        advanceProgressHintText
+        ""
     }
-    val progressPrimaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        "남은 한도"
-    } else {
-        null
-    }
-    val progressPrimaryMetricText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        formatAdvanceAmount(
-            amountAtomic = remoteAvailableAmountAtomic,
-            displayKrwAmount = remoteAvailableDisplayKrwAmount,
-            assetDecimals = remoteAssetDecimals,
-            assetSymbol = remoteAssetSymbol
-        )
-    } else {
-        null
-    }
-    val progressSecondaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        "최대"
-    } else {
-        null
-    }
-    val progressSecondaryMetricText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        formatAdvanceAmount(
-            amountAtomic = remoteCurrentLimitAmountAtomic,
-            displayKrwAmount = remoteCurrentLimitDisplayKrwAmount,
-            assetDecimals = remoteAssetDecimals,
-            assetSymbol = remoteAssetSymbol
-        )
-    } else {
-        null
-    }
+    val progressPrimaryMetricLabel: String? = null
+    val progressPrimaryMetricText: String? = null
+    val progressSecondaryMetricLabel: String? = null
+    val progressSecondaryMetricText: String? = null
     val effectiveHistoryItems = if (usesRemoteAdvance) {
         buildRemoteAdvanceHistoryItems(
             requests = remoteRequests,
@@ -776,6 +728,8 @@ fun DemoState.toFinanceHomeUiModel(
                 advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
                     advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
             progressTitle = if (hasCurrentAdvanceRequest) "미리받기 잔액" else "다음 한도 구간",
+            progressValueText =
+                "${progressAttendanceDays.coerceAtMost(progressTargetDays.coerceAtLeast(1))} / ${progressTargetDays.coerceAtLeast(1)} 일",
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
             progressPrimaryMetricLabel = progressPrimaryMetricLabel,
@@ -1101,6 +1055,12 @@ fun DemoState.toFinanceHomeUiModel(
             )
         )
     )
+}
+
+private fun nextAdvanceProgressTargetDays(attendanceDays: Int): Int = when {
+    attendanceDays < 5 -> 5
+    attendanceDays < 10 -> 10
+    else -> 20
 }
 
 private fun buildAmountOptions(
