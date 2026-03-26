@@ -28,7 +28,7 @@ private const val DEMO_WORKPLACE_LATITUDE = 36.1195
 private const val DEMO_WORKPLACE_LONGITUDE = 128.3446
 private const val DEMO_CURRENT_LATITUDE = 36.1211
 private const val DEMO_CURRENT_LONGITUDE = 128.3418
-private const val DEMO_ALLOWED_RADIUS_METERS = 100
+private const val DEMO_ALLOWED_RADIUS_METERS = 1000
 
 object DemoSeedFactory {
     fun create(): DemoState {

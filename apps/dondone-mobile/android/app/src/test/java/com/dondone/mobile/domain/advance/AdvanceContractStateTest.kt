@@ -3,6 +3,7 @@ package com.dondone.mobile.domain.advance
 import com.dondone.mobile.data.advance.AdvanceEligibilityPayload
 import com.dondone.mobile.data.advance.AdvanceRemoteState
 import com.dondone.mobile.data.demo.DemoSeedFactory
+import java.math.BigDecimal
 import java.time.YearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -84,10 +85,19 @@ class AdvanceContractStateTest {
             workplaceName = "실연동 · SSAFY",
             eligibility = AdvanceEligibilityPayload(
                 workplaceId = 1L,
-                availableAmount = 0L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
+                availableAmountAtomic = 0L,
+                availableDisplayKrwAmount = 0L,
+                maxCapAmountAtomic = 500_000L * 1_000_000L,
+                maxCapDisplayKrwAmount = 500_000L,
+                currentTierName = "C",
                 repaymentTier = "C",
                 blockReasonCodes = listOf("ADVANCE_WINDOW_CLOSED_TODAY"),
                 noticeReasonCodes = emptyList(),
+                estimatedFeeAmountAtomic = 0L,
+                estimatedFeeDisplayKrwAmount = 0L,
                 estimatedRepaymentDate = "2026-03-25",
                 disclaimer = "demo",
                 needsReviewRecordCount = 0
@@ -110,10 +120,19 @@ class AdvanceContractStateTest {
             workplaceName = "실연동 · SSAFY",
             eligibility = AdvanceEligibilityPayload(
                 workplaceId = 1L,
-                availableAmount = 0L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
+                availableAmountAtomic = 0L,
+                availableDisplayKrwAmount = 0L,
+                maxCapAmountAtomic = 500_000L * 1_000_000L,
+                maxCapDisplayKrwAmount = 500_000L,
+                currentTierName = "C",
                 repaymentTier = "C",
                 blockReasonCodes = listOf("EXISTING_OUTSTANDING_ADVANCE"),
                 noticeReasonCodes = emptyList(),
+                estimatedFeeAmountAtomic = 0L,
+                estimatedFeeDisplayKrwAmount = 0L,
                 estimatedRepaymentDate = YearMonth.now().atDay(25).toString(),
                 disclaimer = "demo",
                 needsReviewRecordCount = 0
@@ -139,10 +158,19 @@ class AdvanceContractStateTest {
             workplaceName = "실연동 · SSAFY",
             eligibility = AdvanceEligibilityPayload(
                 workplaceId = 1L,
-                availableAmount = 50_000L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
+                availableAmountAtomic = 50_000L * 1_000_000L,
+                availableDisplayKrwAmount = 50_000L,
+                maxCapAmountAtomic = 500_000L * 1_000_000L,
+                maxCapDisplayKrwAmount = 500_000L,
+                currentTierName = "C",
                 repaymentTier = "C",
                 blockReasonCodes = emptyList(),
                 noticeReasonCodes = emptyList(),
+                estimatedFeeAmountAtomic = 0L,
+                estimatedFeeDisplayKrwAmount = 0L,
                 estimatedRepaymentDate = nextCycleDate,
                 disclaimer = "demo",
                 needsReviewRecordCount = 0
@@ -165,10 +193,19 @@ class AdvanceContractStateTest {
             workplaceName = "실연동 · SSAFY",
             eligibility = AdvanceEligibilityPayload(
                 workplaceId = 1L,
-                availableAmount = 50_000L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
+                availableAmountAtomic = 50_000L * 1_000_000L,
+                availableDisplayKrwAmount = 50_000L,
+                maxCapAmountAtomic = 500_000L * 1_000_000L,
+                maxCapDisplayKrwAmount = 500_000L,
+                currentTierName = "C",
                 repaymentTier = "C",
                 blockReasonCodes = emptyList(),
                 noticeReasonCodes = listOf("PENDING_WORKPROOF_REVIEW"),
+                estimatedFeeAmountAtomic = 0L,
+                estimatedFeeDisplayKrwAmount = 0L,
                 estimatedRepaymentDate = YearMonth.now().atDay(25).toString(),
                 disclaimer = "demo",
                 needsReviewRecordCount = 1

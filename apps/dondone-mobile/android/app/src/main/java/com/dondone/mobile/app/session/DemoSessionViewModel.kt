@@ -5,11 +5,8 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dondone.mobile.R
 import com.dondone.mobile.core.location.AndroidCurrentLocationProvider
-import com.dondone.mobile.core.location.CurrentLocationErrorReason
 import com.dondone.mobile.core.location.CurrentLocationProvider
-import com.dondone.mobile.core.location.CurrentLocationResult
 import com.dondone.mobile.core.location.UnavailableCurrentLocationProvider
 import com.dondone.mobile.core.ui.phoneDigits
 import com.dondone.mobile.data.auth.AuthUnauthorizedException
@@ -18,20 +15,17 @@ import com.dondone.mobile.data.advance.AdvanceRequestDetailPayload
 import com.dondone.mobile.data.advance.AdvanceRequestItemPayload
 import com.dondone.mobile.data.advance.AdvanceRemoteState
 import com.dondone.mobile.data.advance.AdvanceRepository
-import com.dondone.mobile.data.advance.AdvanceUnauthorizedException
 import com.dondone.mobile.data.advance.BackendAdvanceRepository
 import com.dondone.mobile.data.auth.AuthRepository
 import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.data.documents.BackendWorkproofDocumentRepository
-import com.dondone.mobile.data.documents.WorkproofDocumentPreviewPayload
 import com.dondone.mobile.data.documents.WorkproofDocumentRepository
 import com.dondone.mobile.data.documents.WorkproofDocumentUnauthorizedException
 import com.dondone.mobile.data.remittance.BackendRemittanceRepository
 import com.dondone.mobile.data.remittance.InMemoryRemittanceCompletionNoticeStore
 import com.dondone.mobile.data.remittance.RemittanceCompletionNoticeStore
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
-import com.dondone.mobile.data.remittance.RemittanceRemotePayload
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
 import com.dondone.mobile.data.remittance.RemittanceRepository
 import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
@@ -41,28 +35,23 @@ import com.dondone.mobile.data.vault.BackendVaultRepository
 import com.dondone.mobile.data.vault.VaultActionType
 import com.dondone.mobile.data.vault.VaultCreateTransactionPayload
 import com.dondone.mobile.data.vault.VaultRemoteMode
-import com.dondone.mobile.data.vault.VaultRemotePayload
 import com.dondone.mobile.data.vault.VaultRemoteState
 import com.dondone.mobile.data.vault.VaultRepository
 import com.dondone.mobile.data.vault.VaultSummaryPayload
 import com.dondone.mobile.data.vault.VaultTransactionDetailPayload
 import com.dondone.mobile.data.vault.VaultUnauthorizedException
 import com.dondone.mobile.data.wage.BackendWageRepository
-import com.dondone.mobile.data.wage.WageRemotePayload
 import com.dondone.mobile.data.wage.WageRemoteState
 import com.dondone.mobile.data.wage.WageRepository
 import com.dondone.mobile.data.wage.WageUnauthorizedException
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofCorrectionRequestMutation
-import com.dondone.mobile.data.workproof.WorkproofCorrectionStatus
-import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
+import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.data.workproof.WorkproofRepository
 import com.dondone.mobile.data.workproof.WorkproofUnauthorizedException
 import com.dondone.mobile.domain.model.DemoState
-import com.dondone.mobile.domain.model.Recipient
-import com.dondone.mobile.domain.model.TodayWork
 import com.dondone.mobile.domain.model.TransactionCategory
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
@@ -70,9 +59,7 @@ import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileAction
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileUiState
-import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiModel
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfPreviewUiState
-import com.dondone.mobile.domain.model.WorkRecord
 import com.dondone.mobile.domain.model.remittanceRelationCodeToLabel
 import java.io.File
 import java.io.IOException
@@ -84,9 +71,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
 
 private const val TRANSFER_CONFIRMATION_DELAY_MS = 1800L
 private const val REMITTANCE_STATUS_POLL_DELAY_MS = 1500L
@@ -99,17 +84,7 @@ private const val ADVANCE_REMOTE_LOGIN_MESSAGE = "로그인 후 근무 정보를
 private const val WORKPROOF_REMOTE_LOGIN_MESSAGE = "로그인 후 출퇴근 실연동을 불러옵니다."
 private const val WAGE_REMOTE_LOGIN_MESSAGE = "로그인 후 급여 실연동 데이터를 불러옵니다."
 private const val ATOMIC_UNITS_PER_USDC = 1_000_000L
-private const val DOCUMENT_STATUS_READY = "READY"
-private const val DOCUMENT_STATUS_NOT_CREATED = "NOT_CREATED"
-private const val DOCUMENT_ID_PROOF = "PROOF"
-private const val DOCUMENT_ID_CLAIM = "CLAIM"
 private const val DEMO_SESSION_VIEW_MODEL_TAG = "DemoSessionViewModel"
-private const val WORKPROOF_LOCATION_LOADING_FALLBACK = "현재 위치를 확인 중이에요."
-private const val WORKPROOF_LOCATION_PERMISSION_REQUIRED_FALLBACK = "위치 권한을 허용하면 현재 위치를 확인할 수 있어요."
-private const val WORKPROOF_LOCATION_SERVICE_UNAVAILABLE_FALLBACK = "위치 서비스를 사용할 수 없어요."
-private const val WORKPROOF_LOCATION_DISABLED_FALLBACK = "위치 서비스가 꺼져 있어 현재 위치를 확인할 수 없어요."
-private const val WORKPROOF_LOCATION_ERROR_FALLBACK = "현재 위치를 확인하지 못했어요. 위치 서비스와 GPS를 확인해 주세요."
-private const val WORKPROOF_LOCATION_TRY_AGAIN_FALLBACK = "현재 위치를 확인한 뒤 다시 시도해 주세요."
 
 private enum class RemittanceRemoteLoadMode {
     INITIAL,
@@ -206,6 +181,32 @@ class DemoSessionViewModel(
     private var nextMenuLaunchRequestId = 1L
     private var nextRemittanceLaunchRequestId = 1L
     private var nextWorkproofLaunchRequestId = 1L
+    private val advanceHandlers = DemoSessionAdvanceHandlers(
+        scope = viewModelScope,
+        advanceRepository = advanceRepository,
+        authUiStateFlow = _authUiState,
+        advanceRemoteStateFlow = _advanceRemoteState,
+        selectedAdvanceAmountFlow = _selectedAdvanceAmount,
+        advanceRequestUiStateFlow = _advanceRequestUiState,
+        advanceRequestDetailUiStateFlow = _advanceRequestDetailUiState,
+        unauthenticatedMessage = ADVANCE_REMOTE_LOGIN_MESSAGE,
+        loadAdvanceRemoteState = ::loadAdvanceRemoteState,
+        mergeAdvanceRequestDetail = ::mergeAdvanceRequestDetail,
+        expireSession = ::expireSession
+    )
+    private val workproofHandlers = DemoSessionWorkproofHandlers(
+        appContext = appContext,
+        scope = viewModelScope,
+        currentLocationProvider = currentLocationProvider,
+        workproofRepository = workproofRepository,
+        uiStateFlow = _uiState,
+        authUiStateFlow = _authUiState,
+        workproofRemoteStateFlow = _workproofRemoteState,
+        workproofActionUiStateFlow = _workproofActionUiState,
+        workproofCurrentLocationUiStateFlow = _workproofCurrentLocationUiState,
+        applyWorkproofRemoteState = ::applyWorkproofRemoteState,
+        expireSession = ::expireSession
+    )
 
     init {
         restoreAuthSession()
@@ -469,145 +470,15 @@ class DemoSessionViewModel(
     }
 
     fun refreshWorkproofCurrentLocation() {
-        if (_workproofCurrentLocationUiState.value.status == WorkproofCurrentLocationStatus.LOADING) {
-            return
-        }
-        viewModelScope.launch {
-            refreshWorkproofCurrentLocationInternal()
-        }
+        workproofHandlers.refreshWorkproofCurrentLocation()
     }
 
     fun clockIn() {
-        submitWorkproofAction(
-            fallback = { state -> DemoSessionReducer.clockIn(state) },
-            remoteCall = { session -> workproofRepository.clockIn(session.accessToken, _uiState.value.workproof) },
-            successMessage = "출근 기록이 백엔드에 저장됐어요.",
-            failureMessage = "출근 기록을 저장하지 못했어요."
-        )
+        workproofHandlers.clockIn()
     }
 
     fun clockOut() {
-        submitWorkproofAction(
-            fallback = { state -> DemoSessionReducer.clockOut(state) },
-            remoteCall = { session -> workproofRepository.clockOut(session.accessToken, _uiState.value.workproof) },
-            successMessage = "퇴근 기록이 백엔드에 저장됐어요.",
-            failureMessage = "퇴근 기록을 저장하지 못했어요."
-        )
-    }
-
-    private fun submitWorkproofAction(
-        fallback: (DemoState) -> DemoState,
-        remoteCall: suspend (AuthSession) -> WorkproofRemoteState,
-        successMessage: String,
-        failureMessage: String
-    ) {
-        val session = _authUiState.value.session
-        if (session == null) {
-            _uiState.update { state -> fallback(state) }
-            return
-        }
-
-        viewModelScope.launch {
-            _workproofActionUiState.value = WorkproofActionUiState(isSubmitting = true)
-            try {
-                if (!refreshWorkproofCurrentLocationInternal()) {
-                    _workproofActionUiState.value = WorkproofActionUiState(
-                        message = currentLocationStatusMessage(_workproofCurrentLocationUiState.value.status),
-                        isError = true
-                    )
-                    return@launch
-                }
-                val remoteState = remoteCall(session)
-                if (remoteState.mode != WorkproofRemoteMode.CONTENT) {
-                    _workproofRemoteState.value = remoteState
-                    _workproofActionUiState.value = WorkproofActionUiState(
-                        message = remoteState.errorMessage ?: failureMessage,
-                        isError = true
-                    )
-                    return@launch
-                }
-                applyWorkproofRemoteState(remoteState)
-                _workproofActionUiState.value = WorkproofActionUiState(message = successMessage)
-            } catch (error: WorkproofUnauthorizedException) {
-                expireSession(error.message)
-                _workproofActionUiState.value = WorkproofActionUiState(
-                    message = error.message,
-                    isError = true
-                )
-            } catch (error: Exception) {
-                _workproofActionUiState.value = WorkproofActionUiState(
-                    message = error.message ?: failureMessage,
-                    isError = true
-                )
-            }
-        }
-    }
-
-    private suspend fun refreshWorkproofCurrentLocationInternal(): Boolean {
-        _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
-            status = WorkproofCurrentLocationStatus.LOADING
-        )
-
-        return when (val result = currentLocationProvider.fetch()) {
-            is CurrentLocationResult.Success -> {
-                _uiState.update { state ->
-                    state.copy(
-                        workproof = state.workproof.copy(
-                            currentLatitude = result.location.latitude,
-                            currentLongitude = result.location.longitude
-                        )
-                    )
-                }
-                _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
-                    status = WorkproofCurrentLocationStatus.READY
-                )
-                true
-            }
-
-            CurrentLocationResult.PermissionRequired -> {
-                _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
-                    status = WorkproofCurrentLocationStatus.PERMISSION_REQUIRED
-                )
-                false
-            }
-
-            is CurrentLocationResult.Error -> {
-                _workproofCurrentLocationUiState.value = WorkproofCurrentLocationUiState(
-                    status = result.reason.toUiStatus()
-                )
-                false
-            }
-        }
-    }
-
-    private fun CurrentLocationErrorReason.toUiStatus(): WorkproofCurrentLocationStatus {
-        return when (this) {
-            CurrentLocationErrorReason.SERVICE_UNAVAILABLE -> WorkproofCurrentLocationStatus.SERVICE_UNAVAILABLE
-            CurrentLocationErrorReason.LOCATION_DISABLED -> WorkproofCurrentLocationStatus.LOCATION_DISABLED
-            CurrentLocationErrorReason.UNKNOWN -> WorkproofCurrentLocationStatus.ERROR
-        }
-    }
-
-    private fun currentLocationStatusMessage(status: WorkproofCurrentLocationStatus): String {
-        val stringRes = when (status) {
-            WorkproofCurrentLocationStatus.LOADING -> R.string.workproof_location_status_loading
-            WorkproofCurrentLocationStatus.PERMISSION_REQUIRED -> R.string.workproof_location_status_permission_required
-            WorkproofCurrentLocationStatus.SERVICE_UNAVAILABLE -> R.string.workproof_location_status_service_unavailable
-            WorkproofCurrentLocationStatus.LOCATION_DISABLED -> R.string.workproof_location_status_disabled
-            WorkproofCurrentLocationStatus.ERROR -> R.string.workproof_location_status_error
-            WorkproofCurrentLocationStatus.IDLE,
-            WorkproofCurrentLocationStatus.READY -> R.string.workproof_location_status_try_again
-        }
-        return appContext?.getString(stringRes)
-            ?: when (status) {
-                WorkproofCurrentLocationStatus.LOADING -> WORKPROOF_LOCATION_LOADING_FALLBACK
-                WorkproofCurrentLocationStatus.PERMISSION_REQUIRED -> WORKPROOF_LOCATION_PERMISSION_REQUIRED_FALLBACK
-                WorkproofCurrentLocationStatus.SERVICE_UNAVAILABLE -> WORKPROOF_LOCATION_SERVICE_UNAVAILABLE_FALLBACK
-                WorkproofCurrentLocationStatus.LOCATION_DISABLED -> WORKPROOF_LOCATION_DISABLED_FALLBACK
-                WorkproofCurrentLocationStatus.ERROR -> WORKPROOF_LOCATION_ERROR_FALLBACK
-                WorkproofCurrentLocationStatus.IDLE,
-                WorkproofCurrentLocationStatus.READY -> WORKPROOF_LOCATION_TRY_AGAIN_FALLBACK
-            }
+        workproofHandlers.clockOut()
     }
 
     fun submitTransfer() {
@@ -1332,127 +1203,27 @@ class DemoSessionViewModel(
     }
 
     fun selectAdvanceAmount(amount: Int) {
-        _selectedAdvanceAmount.value = amount
-        if (_advanceRequestUiState.value.message != null) {
-            _advanceRequestUiState.value = AdvanceRequestUiState()
-        }
+        advanceHandlers.selectAdvanceAmount(amount)
     }
 
     fun clearAdvanceRequestMessage() {
-        if (!_advanceRequestUiState.value.isSubmitting && _advanceRequestUiState.value.message != null) {
-            _advanceRequestUiState.value = AdvanceRequestUiState()
-        }
+        advanceHandlers.clearAdvanceRequestMessage()
     }
 
     fun openAdvanceRequestDetail(requestId: Long) {
-        val cached = _advanceRemoteState.value.requestDetailsById[requestId]
-        if (cached != null) {
-            _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(detail = cached)
-            return
-        }
-
-        val session = _authUiState.value.session ?: run {
-            _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(
-                errorMessage = "로그인 후 다시 시도해 주세요."
-            )
-            return
-        }
-
-        viewModelScope.launch {
-            _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(isLoading = true)
-            try {
-                val detail = advanceRepository.getRequestDetail(session.accessToken, requestId)
-                mergeAdvanceRequestDetail(detail)
-                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(detail = detail)
-            } catch (error: AdvanceUnauthorizedException) {
-                expireSession(error.message)
-                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(
-                    errorMessage = error.message ?: "세션이 만료되어 다시 로그인해 주세요."
-                )
-            } catch (error: Exception) {
-                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(
-                    errorMessage = error.message ?: "미리받기 상세를 불러오지 못했어요."
-                )
-            }
-        }
+        advanceHandlers.openAdvanceRequestDetail(requestId)
     }
 
     fun closeAdvanceRequestDetail() {
-        _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState()
+        advanceHandlers.closeAdvanceRequestDetail()
     }
 
     fun requestAdvance() {
-        val session = _authUiState.value.session ?: run {
-            _advanceRequestUiState.value = AdvanceRequestUiState(
-                message = "로그인 후 다시 시도해 주세요.",
-                isError = true
-            )
-            return
-        }
-        val eligibility = _advanceRemoteState.value.eligibility ?: run {
-            _advanceRequestUiState.value = AdvanceRequestUiState(
-                message = "근무 조건을 다시 확인한 뒤 시도해 주세요.",
-                isError = true
-            )
-            return
-        }
-        val availableAmount = eligibility.availableAmountInWholeAssetUnits
-        val requestedAmount = (_selectedAdvanceAmount.value ?: availableAmount)
-            .coerceAtMost(availableAmount)
-        if (requestedAmount <= 0) {
-            _advanceRequestUiState.value = AdvanceRequestUiState(
-                message = "신청 가능한 금액이 없어요.",
-                isError = true
-            )
-            return
-        }
-
-        viewModelScope.launch {
-            _advanceRequestUiState.value = AdvanceRequestUiState(isSubmitting = true)
-            try {
-                val result = advanceRepository.createRequest(
-                    accessToken = session.accessToken,
-                    workplaceId = eligibility.workplaceId,
-                    requestedAmountAtomic = requestedAmount.toAtomicAmount(eligibility.assetDecimals)
-                )
-                val detail = advanceRepository.getRequestDetail(session.accessToken, result.requestId)
-                loadAdvanceRemoteState(session)
-                mergeAdvanceRequestDetail(detail)
-                _advanceRequestDetailUiState.value = AdvanceRequestDetailUiState(detail = detail)
-                val successMessage = if (result.status == "SUBMITTED") {
-                    "미리받기 신청이 접수되었어요. 관리자 승인 후 금액이 확정됩니다."
-                } else {
-                    "미리받기 신청이 반영되었어요. ${result.status} · ${result.approvedAmount ?: 0L}원"
-                }
-                _advanceRequestUiState.value = AdvanceRequestUiState(
-                    message = successMessage,
-                    isError = false
-                )
-            } catch (error: AdvanceUnauthorizedException) {
-                expireSession(error.message)
-                _advanceRequestUiState.value = AdvanceRequestUiState(
-                    message = error.message,
-                    isError = true
-                )
-            } catch (error: Exception) {
-                _advanceRequestUiState.value = AdvanceRequestUiState(
-                    message = error.message ?: "미리받기 신청에 실패했어요. 잠시 후 다시 시도해 주세요.",
-                    isError = true
-                )
-            }
-        }
+        advanceHandlers.requestAdvance()
     }
 
     fun refreshAdvanceRemoteState() {
-        val session = _authUiState.value.session
-        if (session == null) {
-            _advanceRemoteState.value = AdvanceRemoteState.unauthenticated(ADVANCE_REMOTE_LOGIN_MESSAGE)
-            return
-        }
-
-        viewModelScope.launch {
-            loadAdvanceRemoteState(session)
-        }
+        advanceHandlers.refreshAdvanceRemoteState()
     }
 
     fun refreshWorkproofRemoteState() {
@@ -1764,7 +1535,19 @@ class DemoSessionViewModel(
         _workproofRemoteState.value = remoteState
         val payload = remoteState.payload ?: return
         syncAuthenticatedOrganization(payload)
-        _uiState.update { current -> current.syncRemoteWorkproof(payload) }
+        _uiState.update { current ->
+            val synced = current.syncRemoteWorkproof(payload)
+            if (_workproofCurrentLocationUiState.value.status == WorkproofCurrentLocationStatus.IDLE) {
+                synced.copy(
+                    workproof = synced.workproof.copy(
+                        currentLatitude = payload.workplace.latitude,
+                        currentLongitude = payload.workplace.longitude
+                    )
+                )
+            } else {
+                synced
+            }
+        }
     }
 
     private fun syncAuthenticatedOrganization(payload: WorkproofRemotePayload) {
@@ -2407,152 +2190,6 @@ class DemoSessionViewModel(
         }
     }
 
-    private fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): DemoState {
-        val systemToday = java.time.LocalDate.now()
-        val activeRecord = payload.records.firstOrNull { record ->
-            record.status == "CHECKED_IN" && record.checkOutDeviceAt == null
-        }
-        val selectedTodayRecord = activeRecord
-            ?: payload.records.firstOrNull { it.workDate == systemToday }
-            ?: payload.records.firstOrNull()
-        val selectedDate = selectedTodayRecord?.workDate ?: systemToday
-        val nextRecords = payload.records
-            .sortedByDescending { it.workDate }
-            .map { record ->
-                val actualClockIn = record.checkInDeviceAt.toLocalTime().toString().take(5)
-                val actualClockOut = record.checkOutDeviceAt?.toLocalTime()?.toString()?.take(5) ?: "-"
-                WorkRecord(
-                    id = record.recordId.toString(),
-                    workDate = record.workDate,
-                    day = record.workDate.dayOfMonth,
-                    inTime = actualClockIn,
-                    outTime = actualClockOut,
-                    modified = record.modified || record.reflectionStatus != "PENDING",
-                    attachments = 0,
-                    reflectionStatus = record.reflectionStatus,
-                    recognizedInTime = record.recognizedClockInAt?.toLocalTime()?.toString()?.take(5)
-                        ?: actualClockIn,
-                    recognizedOutTime = record.recognizedClockOutAt?.toLocalTime()?.toString()?.take(5)
-                        ?: actualClockOut.takeUnless { it == "-" }
-                )
-            }
-
-        return copy(
-            demo = demo.copy(
-                year = selectedDate.year,
-                month = selectedDate.monthValue,
-                monthLength = selectedDate.lengthOfMonth(),
-                asOfDay = selectedDate.dayOfMonth
-            ),
-            workproof = workproof.copy(
-                workplaceName = payload.workplace.name,
-                workplaceAddress = payload.workplace.address,
-                workplaceLatitude = payload.workplace.latitude,
-                workplaceLongitude = payload.workplace.longitude,
-                today = TodayWork(
-                    clockIn = selectedTodayRecord?.checkInDeviceAt?.toLocalTime()?.toString()?.take(5),
-                    clockOut = selectedTodayRecord?.checkOutDeviceAt?.toLocalTime()?.toString()?.take(5)
-                ),
-                records = nextRecords,
-                audit = emptyList(),
-                workplaceId = payload.workplace.workplaceId,
-                allowedRadiusMeters = payload.workplace.allowedRadiusMeters
-            )
-        )
-    }
-
-    private fun WorkproofDocumentPreviewPayload.toUiModel(): WorkproofPdfPreviewUiModel {
-        return WorkproofPdfPreviewUiModel(
-            workplaceName = workplaceName,
-            periodText = "${startDate.format(WorkproofPdfPreviewDateFormatter)} - ${endDate.format(WorkproofPdfPreviewDateFormatter)}",
-            totalRecordCountText = "${totalRecordCount}건",
-            editedCountText = "${editedCount}건",
-            attachmentCountText = "${attachmentCount}건",
-            totalWorkedHoursText = totalWorkedHoursText,
-            sectionSummaryText = "출퇴근 기록, 수정 이력, 기간 요약"
-        )
-    }
-
-    private fun DemoState.syncRemoteWage(payload: WageRemotePayload): DemoState {
-        val actualDepositAmount = payload.summary.actualDepositAmount?.toInt()
-        return copy(
-            wage = wage.copy(
-                workDays = payload.summary.workDays,
-                totalHours = (payload.summary.totalWorkedMinutes / 60L).toInt(),
-                overtimeHours = (payload.summary.overtimeMinutes / 60L).toInt(),
-                nightHours = (payload.summary.nightMinutes / 60L).toInt(),
-                hourly = payload.monthlySummary.normalizedHourlyWage.toInt(),
-                deductionsKnown = payload.summary.deductionsKnown,
-                actualDepositRecordedDay = payload.summary.actualDepositRecordedDate?.dayOfMonth
-                    ?: payload.summary.actualDepositRecordedDay,
-                actualDeposit = actualDepositAmount ?: wage.actualDeposit,
-                paydayDay = payload.summary.paydayDay
-            ),
-            workproof = workproof.copy(
-                workplaceId = payload.workplaceId,
-                workplaceName = payload.workplaceName
-            ),
-            documents = documents.syncWageDocuments(
-                year = demo.year,
-                month = demo.month,
-                day = demo.asOfDay,
-                latestVerification = payload.latestVerification
-            )
-        )
-    }
-
-    private fun DemoState.syncRemoteRemittance(payload: RemittanceRemotePayload): DemoState {
-        val latestTransfer = payload.activeTransfer
-        val inFlightTransfer = latestTransfer?.takeUnless { it.isTerminalStatus() }
-        val shouldShowTerminalTracker =
-            latestTransfer?.isTerminalStatus() == true &&
-                remittance.status in setOf(
-                    TransferStatus.SUBMITTED,
-                    TransferStatus.CONFIRMED,
-                    TransferStatus.FAILED
-                )
-        val nextRecipients = payload.recipients.map { recipient ->
-            Recipient(
-                id = recipient.recipientId,
-                name = recipient.alias,
-                relationship = remittanceRelationCodeToLabel(recipient.relation),
-                address = recipient.walletAddress
-            )
-        }
-        val selectedRecipientId = when {
-            nextRecipients.isEmpty() -> remittance.selectedRecipientId
-            nextRecipients.any { it.id == remittance.selectedRecipientId } -> remittance.selectedRecipientId
-            else -> nextRecipients.first().id
-        }
-
-        return copy(
-            remittance = remittance.copy(
-                recipients = nextRecipients,
-                selectedRecipientId = selectedRecipientId,
-                destinationMode = TransferDestinationMode.WALLET,
-                txHash = when {
-                    inFlightTransfer != null -> inFlightTransfer.txHash ?: remittance.txHash
-                    shouldShowTerminalTracker -> latestTransfer?.txHash ?: remittance.txHash
-                    else -> remittance.txHash
-                },
-                status = when {
-                    inFlightTransfer != null -> inFlightTransfer.toUiTransferStatus()
-                    shouldShowTerminalTracker -> latestTransfer?.toUiTransferStatus() ?: remittance.status
-                    else -> remittance.status
-                }
-            )
-        )
-    }
-
-    private fun DemoState.syncTransferStatus(detail: RemittanceTransferDetailPayload): DemoState {
-        return copy(
-            remittance = remittance.copy(
-                txHash = detail.txHash ?: remittance.txHash,
-                status = detail.toUiTransferStatus()
-            )
-        )
-    }
-
     private fun currentWageMonth(): YearMonth =
         YearMonth.of(_uiState.value.demo.year, _uiState.value.demo.month)
 
@@ -2562,177 +2199,4 @@ class DemoSessionViewModel(
             _uiState.value.demo.month,
             _uiState.value.demo.asOfDay
         )
-
-    private fun String.toWorkproofReasonLabel(): String {
-        return when (this) {
-            "LATE_BUTTON_PRESS" -> "퇴근 버튼을 늦게 눌렀어요."
-            "LATE_CLOCK_IN" -> "출근 시간을 다시 인정해 주세요."
-            "EARLY_CLOCK_OUT" -> "퇴근 시간을 다시 인정해 주세요."
-            else -> "기타 사유로 수정 요청해요."
-        }
-    }
 }
-
-private fun String.toWorkproofLocalTimeOrNull(): LocalTime? {
-    return runCatching { LocalTime.parse(this.trim()) }.getOrNull()
-}
-
-private fun WorkproofCorrectionStatus.toWorkproofSuccessMessage(): String {
-    return when (this) {
-        WorkproofCorrectionStatus.APPROVED -> "수정 요청이 바로 반영됐어요."
-        WorkproofCorrectionStatus.PENDING -> "수정 요청이 검토 대기열에 등록됐어요."
-        WorkproofCorrectionStatus.REJECTED -> "수정 요청이 반려됐어요."
-    }
-}
-
-private fun List<com.dondone.mobile.domain.model.DocumentItem>.syncWageDocuments(
-    year: Int,
-    month: Int,
-    day: Int,
-    latestVerification: com.dondone.mobile.data.wage.WageVerificationDetailPayload?
-): List<com.dondone.mobile.domain.model.DocumentItem> {
-    if (latestVerification == null) return this
-
-    val relatedActions = latestVerification.relatedActions
-    val fallbackUpdatedAt = "$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} 18:00"
-
-    return map { document ->
-        when {
-            document.id.contains(DOCUMENT_ID_PROOF) -> document.copy(
-                status = if (relatedActions.proofPackDocumentId != null) DOCUMENT_STATUS_READY else DOCUMENT_STATUS_NOT_CREATED,
-                updatedAt = if (relatedActions.proofPackDocumentId != null) document.updatedAt ?: fallbackUpdatedAt else null
-            )
-
-            document.id.contains(DOCUMENT_ID_CLAIM) -> document.copy(
-                status = if (relatedActions.claimKitDocumentId != null) DOCUMENT_STATUS_READY else DOCUMENT_STATUS_NOT_CREATED,
-                updatedAt = if (relatedActions.claimKitDocumentId != null) document.updatedAt ?: fallbackUpdatedAt else null
-            )
-
-            else -> document
-        }
-    }
-}
-
-private fun RemittanceTransferDetailPayload.toUiTransferStatus(): TransferStatus = when (status) {
-    "CONFIRMED" -> TransferStatus.CONFIRMED
-    "FAILED", "TIMED_OUT" -> TransferStatus.FAILED
-    else -> TransferStatus.SUBMITTED
-}
-
-private fun RemittanceTransferDetailPayload.isTerminalStatus(): Boolean =
-    status == "CONFIRMED" || status == "FAILED" || status == "TIMED_OUT"
-
-private fun RemittanceTransferDetailPayload.toCompletionNoticeUiState(): RemittanceCompletionNoticeUiState =
-    RemittanceCompletionNoticeUiState(
-        transferId = transferId,
-        status = toUiTransferStatus(),
-        recipientName = recipientAlias,
-        amountAtomic = amountAtomic,
-        assetSymbol = assetSymbol,
-        txHash = txHash
-    )
-
-private fun RemittanceTransferDetailPayload.toCompletionToastMessage(): String =
-    when (toUiTransferStatus()) {
-        TransferStatus.CONFIRMED -> "송금이 완료됐어요."
-        TransferStatus.FAILED -> "송금이 실패했어요."
-        else -> "송금 상태를 확인하고 있어요."
-    }
-
-private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload?.requiresHighAmountConfirmation(): Boolean =
-    this?.policyCode == "HIGH_AMOUNT_CONFIRMATION_REQUIRED"
-
-private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload.isConfirmable(): Boolean =
-    policyCode == "RECENT_RECIPIENT_CONFIRMATION_REQUIRED" || policyCode == "HIGH_AMOUNT_CONFIRMATION_REQUIRED"
-
-private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload.resolveBlockedMessage(): String {
-    return when (policyCode) {
-        "INSUFFICIENT_WALLET_BALANCE" -> "송금 지갑 잔액이 부족해요. 잠시 후 다시 확인해 주세요."
-        "RECIPIENT_NOT_ALLOWED" -> "허용된 수신자만 송금할 수 있어요."
-        "TRANSFER_ALREADY_IN_PROGRESS" -> "진행 중인 송금이 있어 잠시 후 다시 시도해 주세요."
-        "SELF_TRANSFER_NOT_ALLOWED" -> "내 지갑으로는 송금할 수 없어요."
-        else -> "현재는 이 송금을 진행할 수 없어요."
-    }
-}
-
-private fun VaultActionType.toSubmittingAction(): VaultSubmittingAction =
-    when (this) {
-        VaultActionType.DEPOSIT -> VaultSubmittingAction.DEPOSIT_CREATE
-        VaultActionType.WITHDRAW -> VaultSubmittingAction.WITHDRAW_CREATE
-    }
-
-private fun VaultActionType.toCreateFailureMessage(): String =
-    when (this) {
-        VaultActionType.DEPOSIT -> "예치 요청을 보내지 못했어요."
-        VaultActionType.WITHDRAW -> "출금 요청을 보내지 못했어요."
-    }
-
-private fun VaultActionType.toCreateSuccessMessage(): String =
-    when (this) {
-        VaultActionType.DEPOSIT -> "예치 요청을 접수했어요."
-        VaultActionType.WITHDRAW -> "출금 요청을 접수했어요."
-    }
-
-private fun VaultSummaryPayload.availableAmountFor(actionType: VaultActionType): Int =
-    when (actionType) {
-        VaultActionType.DEPOSIT -> availableToStoreAmountAtomic.toWholeAssetUnits(assetDecimals)
-        VaultActionType.WITHDRAW -> storedAmountAtomic.toWholeAssetUnits(assetDecimals)
-    }
-
-private fun String.toWholeAssetUnits(decimals: Int): Int {
-    val sanitized = trim().ifBlank { return 0 }
-    if (sanitized == "0") return 0
-    if (decimals <= 0) {
-        return sanitized.toLongOrNull()
-            ?.coerceIn(0L, Int.MAX_VALUE.toLong())
-            ?.toInt()
-            ?: 0
-    }
-    val wholePart = if (sanitized.length > decimals) {
-        sanitized.dropLast(decimals)
-    } else {
-        "0"
-    }
-    return wholePart.toLongOrNull()
-        ?.coerceIn(0L, Int.MAX_VALUE.toLong())
-        ?.toInt()
-        ?: 0
-}
-
-private fun Int.toAtomicAmount(decimals: Int): Long {
-    var scale = 1L
-    repeat(decimals) {
-        scale *= 10L
-    }
-    return toLong() * scale
-}
-
-private fun pickDefaultVaultAmount(availableAmount: Int): Int {
-    val presets = listOf(10, 25, 50, 100)
-    return presets.lastOrNull { it in 1..availableAmount }
-        ?: availableAmount
-}
-
-private fun VaultTransactionDetailPayload.isTerminalStatus(): Boolean =
-    status == "CONFIRMED" || status == "FAILED" || status == "TIMED_OUT"
-
-private fun VaultTransactionDetailPayload.toCompletionUiState(): VaultActionUiState {
-    return when (status) {
-        "CONFIRMED" -> VaultActionUiState(
-            message = if (txType == "WITHDRAW") "출금이 완료됐어요." else "예치가 완료됐어요.",
-            messagePresentation = VaultMessagePresentation.TOAST_ONLY
-        )
-
-        else -> VaultActionUiState(
-            message = if (txType == "WITHDRAW") {
-                "출금이 완료되지 않았어요. 상태를 다시 확인해 주세요."
-            } else {
-                "예치가 완료되지 않았어요. 상태를 다시 확인해 주세요."
-            },
-            isError = true,
-            messagePresentation = VaultMessagePresentation.TOAST_ONLY
-        )
-    }
-}
-
-private val WorkproofPdfPreviewDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")

@@ -48,16 +48,16 @@ public class DevEmployerInitializer implements CommandLineRunner {
 
     private static final String EMPLOYER_EMAIL = "manager@gmail.com";
     private static final String EMPLOYER_PASSWORD = "qweqwe123";
-    private static final String EMPLOYER_DISPLAY_NAME = "돈던 관리자";
-    private static final String COMPANY_NAME = "돈던 물류";
-    private static final String COMPANY_CODE = "DN-SEOUL-2914";
-    private static final String EMPLOYER_SIGNUP_CODE = "EMPLOYER-SEOUL-2026";
-    private static final String WORKPLACE_NAME = "서울 허브";
-    private static final String WORKPLACE_ADDRESS = "서울특별시 강남구 테헤란로 212";
+    private static final String EMPLOYER_DISPLAY_NAME = "돈돈 관리자";
+    private static final String COMPANY_NAME = "돈돈 물류";
+    private static final String COMPANY_CODE = "DN-GWANGJU-2914";
+    private static final String EMPLOYER_SIGNUP_CODE = "EMPLOYER-GWANGJU-2026";
+    private static final String WORKPLACE_NAME = "돈돈 물류 광주";
+    private static final String WORKPLACE_ADDRESS = "광주광역시 광산구 하남산단6번로 107";
     private static final String WORKPLACE_DETAIL = "1층 정문";
-    private static final double WORKPLACE_LATITUDE = 37.501274;
-    private static final double WORKPLACE_LONGITUDE = 127.039585;
-    private static final int WORKPLACE_RADIUS_METERS = 300;
+    private static final double WORKPLACE_LATITUDE = 35.2031092d;
+    private static final double WORKPLACE_LONGITUDE = 126.8083831d;
+    private static final int WORKPLACE_RADIUS_METERS = 1000;
     private static final LocalDate MEMBERSHIP_START_DATE = LocalDate.of(2026, 1, 1);
 
     private final UserRepository userRepository;

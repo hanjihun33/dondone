@@ -42,6 +42,7 @@ import com.dondone.mobile.core.location.CurrentLocationSnapshot
 import com.dondone.mobile.domain.model.TransferStatus
 import com.dondone.mobile.domain.model.WorkproofData
 import com.dondone.mobile.feature.home.presentation.toHomeUiModel
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
@@ -285,6 +286,26 @@ class DemoSessionViewModelTest {
     }
 
     @Test
+    fun `refresh current location reuses in-flight fetch`() = runTest {
+        val locationProvider = FakeCurrentLocationProvider(
+            result = CurrentLocationResult.Success(CurrentLocationSnapshot(35.1234, 128.5678)),
+            fetchDelayMillis = 1_000L
+        )
+        val viewModel = DemoSessionViewModel(
+            advanceRepository = FakeAdvanceRepository(),
+            authRepository = FakeAuthRepository(),
+            currentLocationProvider = locationProvider
+        )
+
+        advanceUntilIdle()
+        viewModel.refreshWorkproofCurrentLocation()
+        viewModel.refreshWorkproofCurrentLocation()
+        advanceUntilIdle()
+
+        assertEquals(1, locationProvider.fetchCount)
+    }
+
+    @Test
     fun `clock in refreshes current location before remote request`() = runTest {
         val session = testSession()
         val locationProvider = FakeCurrentLocationProvider(
@@ -308,6 +329,53 @@ class DemoSessionViewModelTest {
         assertEquals(35.2031, submittedWorkproof.currentLatitude, 0.0)
         assertEquals(126.8083, submittedWorkproof.currentLongitude, 0.0)
         assertEquals(WorkproofCurrentLocationStatus.READY, viewModel.workproofCurrentLocationUiState.value.status)
+    }
+
+    @Test
+    fun `clock in joins in-flight current location refresh`() = runTest {
+        val session = testSession()
+        val locationProvider = FakeCurrentLocationProvider(
+            result = CurrentLocationResult.Success(CurrentLocationSnapshot(35.2031, 126.8083)),
+            fetchDelayMillis = 1_000L
+        )
+        val workproofRepository = FakeWorkproofRepository()
+        val viewModel = DemoSessionViewModel(
+            authRepository = FakeAuthRepository(restoredSession = session),
+            advanceRepository = FakeAdvanceRepository(),
+            workproofRepository = workproofRepository,
+            currentLocationProvider = locationProvider
+        )
+
+        advanceUntilIdle()
+        workproofRepository.clockInRequests.clear()
+        viewModel.refreshWorkproofCurrentLocation()
+        viewModel.clockIn()
+        advanceUntilIdle()
+
+        assertEquals(1, locationProvider.fetchCount)
+        val submittedWorkproof = requireNotNull(workproofRepository.clockInRequests.singleOrNull())
+        assertEquals(35.2031, submittedWorkproof.currentLatitude, 0.0)
+        assertEquals(126.8083, submittedWorkproof.currentLongitude, 0.0)
+    }
+
+    @Test
+    fun `refresh current location aligns last known accuracy with policy radius`() = runTest {
+        val session = testSession()
+        val locationProvider = FakeCurrentLocationProvider(
+            result = CurrentLocationResult.Success(CurrentLocationSnapshot(35.2031, 126.8083))
+        )
+        val viewModel = DemoSessionViewModel(
+            authRepository = FakeAuthRepository(restoredSession = session),
+            advanceRepository = FakeAdvanceRepository(),
+            workproofRepository = FakeWorkproofRepository(allowedRadiusMeters = 1_500),
+            currentLocationProvider = locationProvider
+        )
+
+        advanceUntilIdle()
+        viewModel.refreshWorkproofCurrentLocation()
+        advanceUntilIdle()
+
+        assertEquals(1_000f, locationProvider.requestedMaxLastKnownAccuracyMeters ?: -1f, 0f)
     }
 
     @Test
@@ -369,10 +437,19 @@ class DemoSessionViewModelTest {
             workplaceName = "DonDone Cafe",
             eligibility = com.dondone.mobile.data.advance.AdvanceEligibilityPayload(
                 workplaceId = 1L,
-                availableAmount = 180_000L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
+                availableAmountAtomic = 180_000L * 1_000_000L,
+                availableDisplayKrwAmount = 180_000L,
+                maxCapAmountAtomic = 500_000L * 1_000_000L,
+                maxCapDisplayKrwAmount = 500_000L,
+                currentTierName = "T2",
                 repaymentTier = "T2",
                 blockReasonCodes = emptyList(),
                 noticeReasonCodes = emptyList(),
+                estimatedFeeAmountAtomic = 0L,
+                estimatedFeeDisplayKrwAmount = 0L,
                 estimatedRepaymentDate = "2026-03-25",
                 disclaimer = "데모 시뮬레이션",
                 needsReviewRecordCount = 0
@@ -391,7 +468,10 @@ class DemoSessionViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf(session.accessToken, session.accessToken), advanceRepository.loadedTokens)
-        assertEquals(listOf(Triple(session.accessToken, 1L, 100_000L)), advanceRepository.createCalls)
+        assertEquals(
+            listOf(Triple(session.accessToken, 1L, 100_000L * 1_000_000L)),
+            advanceRepository.createCalls
+        )
         assertEquals("미리받기 신청이 반영되었어요. APPROVED · 100000원", viewModel.advanceRequestUiState.value.message)
         assertFalse(viewModel.advanceRequestUiState.value.isError)
         assertEquals(1L, viewModel.advanceRequestDetailUiState.value.detail?.requestId)
@@ -1680,10 +1760,19 @@ class DemoSessionViewModelTest {
             workplaceName = "DonDone Cafe",
             eligibility = com.dondone.mobile.data.advance.AdvanceEligibilityPayload(
                 workplaceId = 1L,
-                availableAmount = 180_000L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
+                availableAmountAtomic = 180_000L * 1_000_000L,
+                availableDisplayKrwAmount = 180_000L,
+                maxCapAmountAtomic = 500_000L * 1_000_000L,
+                maxCapDisplayKrwAmount = 500_000L,
+                currentTierName = "T2",
                 repaymentTier = "T2",
                 blockReasonCodes = emptyList(),
                 noticeReasonCodes = emptyList(),
+                estimatedFeeAmountAtomic = 0L,
+                estimatedFeeDisplayKrwAmount = 0L,
                 estimatedRepaymentDate = "2026-03-25",
                 disclaimer = "데모 시뮬레이션",
                 needsReviewRecordCount = 0
@@ -1703,15 +1792,35 @@ class DemoSessionViewModelTest {
         override suspend fun createRequest(
             accessToken: String,
             workplaceId: Long,
-            requestedAmount: Long
+            requestedAmountAtomic: Long
         ): AdvanceCreateResult {
-            createCalls += Triple(accessToken, workplaceId, requestedAmount)
+            createCalls += Triple(accessToken, workplaceId, requestedAmountAtomic)
             return AdvanceCreateResult(
                 requestId = 1L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
                 status = "APPROVED",
-                approvedAmount = requestedAmount,
-                feeAmount = 0L,
-                repaymentDueDate = "2026-03-25"
+                requestStatus = "APPROVED",
+                payoutStatus = "READY",
+                approvedAmountAtomic = requestedAmountAtomic,
+                approvedDisplayKrwAmount = requestedAmountAtomic / 1_000_000L,
+                feeAmountAtomic = 0L,
+                feeDisplayKrwAmount = 0L,
+                repaymentDueDate = "2026-03-25",
+                eligibilitySnapshot = com.dondone.mobile.data.advance.AdvanceEligibilitySnapshotPayload(
+                    assetSymbol = "USDC",
+                    assetDecimals = 6,
+                    exchangeRateSnapshot = BigDecimal("1350"),
+                    availableAmountAtomic = 180_000L * 1_000_000L,
+                    availableDisplayKrwAmount = 180_000L,
+                    maxCapAmountAtomic = 500_000L * 1_000_000L,
+                    maxCapDisplayKrwAmount = 500_000L,
+                    policyRate = "0.35",
+                    reflectedWorkDays = 5,
+                    reflectedWorkMinutes = 2_400L,
+                    needsReviewRecordCount = 0
+                )
             )
         }
 
@@ -1723,14 +1832,28 @@ class DemoSessionViewModelTest {
             return AdvanceRequestDetailPayload(
                 requestId = requestId,
                 workplaceId = 1L,
-                requestedAmount = 100_000L,
-                approvedAmount = 100_000L,
-                feeAmount = 0L,
+                assetSymbol = "USDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1350"),
+                requestedAmountAtomic = 100_000L * 1_000_000L,
+                requestedDisplayKrwAmount = 100_000L,
+                approvedAmountAtomic = 100_000L * 1_000_000L,
+                approvedDisplayKrwAmount = 100_000L,
+                feeAmountAtomic = 0L,
+                feeDisplayKrwAmount = 0L,
                 status = "APPROVED",
+                requestStatus = "APPROVED",
+                payoutStatus = "READY",
+                payoutTxHash = null,
                 repaymentDueDate = "2026-03-25",
                 eligibilitySnapshot = com.dondone.mobile.data.advance.AdvanceEligibilitySnapshotPayload(
-                    availableAmount = 180_000L,
-                    maxCap = 500_000L,
+                    assetSymbol = "USDC",
+                    assetDecimals = 6,
+                    exchangeRateSnapshot = BigDecimal("1350"),
+                    availableAmountAtomic = 180_000L * 1_000_000L,
+                    availableDisplayKrwAmount = 180_000L,
+                    maxCapAmountAtomic = 500_000L * 1_000_000L,
+                    maxCapDisplayKrwAmount = 500_000L,
                     policyRate = "0.35",
                     reflectedWorkDays = 5,
                     reflectedWorkMinutes = 2_400L,
@@ -1742,7 +1865,8 @@ class DemoSessionViewModelTest {
     }
 
     private class FakeWorkproofRepository(
-        private val workplaceName: String = "DonDone Cafe"
+        private val workplaceName: String = "DonDone Cafe",
+        private val allowedRadiusMeters: Int = 100
     ) : WorkproofRepository {
         val loadedTokens = mutableListOf<String>()
         val clockInRequests = mutableListOf<WorkproofData>()
@@ -1758,7 +1882,7 @@ class DemoSessionViewModelTest {
                         address = "서울시 강남구 테헤란로",
                         latitude = 37.5013,
                         longitude = 127.0396,
-                        allowedRadiusMeters = 100
+                        allowedRadiusMeters = allowedRadiusMeters
                     ),
                     records = emptyList()
                 )
@@ -1782,12 +1906,18 @@ class DemoSessionViewModelTest {
     }
 
     private class FakeCurrentLocationProvider(
-        private val result: CurrentLocationResult
+        private val result: CurrentLocationResult,
+        private val fetchDelayMillis: Long = 0L
     ) : CurrentLocationProvider {
         var fetchCount: Int = 0
+        var requestedMaxLastKnownAccuracyMeters: Float? = null
 
-        override suspend fun fetch(): CurrentLocationResult {
+        override suspend fun fetch(maxLastKnownAccuracyMeters: Float): CurrentLocationResult {
             fetchCount += 1
+            requestedMaxLastKnownAccuracyMeters = maxLastKnownAccuracyMeters
+            if (fetchDelayMillis > 0L) {
+                delay(fetchDelayMillis)
+            }
             return result
         }
     }

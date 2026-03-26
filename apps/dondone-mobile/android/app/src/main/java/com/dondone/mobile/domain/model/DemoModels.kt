@@ -47,7 +47,7 @@ data class WorkproofData(
     val records: List<WorkRecord>,
     val audit: List<WorkAudit>,
     val workplaceId: Long? = null,
-    val allowedRadiusMeters: Int = 100
+    val allowedRadiusMeters: Int = 1000
 )
 
 data class WageData(
