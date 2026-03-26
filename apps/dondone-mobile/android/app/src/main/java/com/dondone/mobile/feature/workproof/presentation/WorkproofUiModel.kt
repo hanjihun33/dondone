@@ -3,6 +3,7 @@ package com.dondone.mobile.feature.workproof.presentation
 import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.app.session.WorkproofCurrentLocationStatus
 import com.dondone.mobile.app.session.WorkproofCurrentLocationUiState
+import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
@@ -31,6 +32,11 @@ enum class WorkproofRecordTone {
 data class WorkproofSummaryUiModel(
     val canClockIn: Boolean,
     val canClockOut: Boolean,
+    val dateText: String,
+    val statusText: String,
+    val statusTone: BadgeTone,
+    val clockInText: String,
+    val clockOutText: String,
     val workplaceLatitude: Double,
     val workplaceLongitude: Double,
     val currentLatitude: Double,
@@ -87,6 +93,19 @@ fun DemoState.toWorkproofUiModel(
 ): WorkproofUiModel {
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val workplaceRadiusMeters = workproof.allowedRadiusMeters
+    val currentDateText = "${demo.year}-${formatTwoDigits(demo.month)}-${formatTwoDigits(demo.asOfDay)}"
+    val clockInText = workproof.today.clockIn?.let { "$currentDateText · $it" } ?: UnrecordedTime
+    val clockOutText = workproof.today.clockOut?.let { "$currentDateText · $it" } ?: UnrecordedTime
+    val workStatusText = when {
+        workproof.today.clockOut != null -> "완료"
+        workproof.today.clockIn != null -> "출근만 기록"
+        else -> "준비됨"
+    }
+    val workStatusTone = when (workStatusText) {
+        "완료" -> BadgeTone.Success
+        "출근만 기록" -> BadgeTone.Warning
+        else -> BadgeTone.Info
+    }
     val canSubmitAction = actionUiState?.isSubmitting != true
     val usesFallbackData = remoteState.mode != WorkproofRemoteMode.CONTENT
     val allowRemoteActions = !isAuthenticated || remoteState.mode == WorkproofRemoteMode.CONTENT
@@ -156,6 +175,11 @@ fun DemoState.toWorkproofUiModel(
                 workproof.today.clockOut == null &&
                 canSubmitAction &&
                 hasUsableCurrentLocation,
+            dateText = currentDateText,
+            statusText = workStatusText,
+            statusTone = workStatusTone,
+            clockInText = clockInText,
+            clockOutText = clockOutText,
             workplaceLatitude = workproof.workplaceLatitude,
             workplaceLongitude = workproof.workplaceLongitude,
             currentLatitude = workproof.currentLatitude,

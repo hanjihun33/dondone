@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.view.MotionEvent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,6 +41,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -286,7 +288,18 @@ private fun KakaoWorkplaceMapView(
                             )
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInteropFilter { event ->
+                            when (event.actionMasked) {
+                                MotionEvent.ACTION_DOWN,
+                                MotionEvent.ACTION_MOVE -> mapView.parent?.requestDisallowInterceptTouchEvent(true)
+
+                                MotionEvent.ACTION_UP,
+                                MotionEvent.ACTION_CANCEL -> mapView.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false
+                        }
                 )
             }
         }
