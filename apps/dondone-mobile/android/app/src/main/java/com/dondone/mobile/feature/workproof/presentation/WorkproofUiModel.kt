@@ -38,7 +38,8 @@ data class WorkproofSummaryUiModel(
     val workplaceRadiusMeters: Int,
     val isWithinWorkplaceRadius: Boolean,
     val isCurrentLocationLoading: Boolean,
-    val currentLocationStatus: WorkproofCurrentLocationStatus?
+    val currentLocationStatus: WorkproofCurrentLocationStatus?,
+    val isUsingFallbackCoordinates: Boolean
 )
 
 data class WorkproofCalendarCellUiModel(
@@ -99,7 +100,7 @@ fun DemoState.toWorkproofUiModel(
         radiusMeters = workplaceRadiusMeters
     )
     val currentLocationStatus = currentLocationUiState.status
-        .takeIf { requiresLiveCurrentLocation && it != WorkproofCurrentLocationStatus.READY && it != WorkproofCurrentLocationStatus.IDLE }
+        .takeIf { isAuthenticated && it != WorkproofCurrentLocationStatus.READY && it != WorkproofCurrentLocationStatus.IDLE }
     val dayTones = (1..demo.monthLength).associateWith { day ->
         when {
             day > demo.asOfDay -> WorkproofCalendarTone.UNAVAILABLE
@@ -162,7 +163,8 @@ fun DemoState.toWorkproofUiModel(
             workplaceRadiusMeters = workplaceRadiusMeters,
             isWithinWorkplaceRadius = isWithinWorkplaceRadius,
             isCurrentLocationLoading = currentLocationUiState.status == WorkproofCurrentLocationStatus.LOADING,
-            currentLocationStatus = currentLocationStatus
+            currentLocationStatus = currentLocationStatus,
+            isUsingFallbackCoordinates = isAuthenticated && usesFallbackData
         ),
         recentRecords = recentRecords,
         audits = auditItems,
