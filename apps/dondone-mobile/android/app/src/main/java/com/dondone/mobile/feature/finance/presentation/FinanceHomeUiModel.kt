@@ -729,7 +729,7 @@ fun DemoState.toFinanceHomeUiModel(
                     advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
             progressTitle = if (hasCurrentAdvanceRequest) "미리받기 잔액" else "다음 한도 구간",
             progressValueText =
-                "(${progressAttendanceDays.coerceAtMost(progressTargetDays.coerceAtLeast(1))} / ${progressTargetDays.coerceAtLeast(1)})",
+                "${progressAttendanceDays.coerceAtMost(progressTargetDays.coerceAtLeast(1))} / ${progressTargetDays.coerceAtLeast(1)} 일",
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
             progressPrimaryMetricLabel = progressPrimaryMetricLabel,
