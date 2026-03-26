@@ -86,7 +86,7 @@ data class WageUiModel(
 fun DemoState.toWageUiModel(
     remoteState: WageRemoteState? = null,
     actionUiState: WageActionUiState = WageActionUiState(),
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage = AppLanguage.KOREAN
 ): WageUiModel {
     val surfaceState = when (remoteState?.mode) {
         WageRemoteMode.LOADING -> WageSurfaceState.LOADING

@@ -52,7 +52,7 @@ fun DemoState.toAccountManageUiModel(
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
     isAuthenticated: Boolean = false,
     recipientPhoneSearchUiState: RecipientPhoneSearchUiState = RecipientPhoneSearchUiState(),
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage = AppLanguage.KOREAN
 ): AccountManageUiModel {
     if (isAuthenticated) {
         val remotePayload = remittanceRemoteState.payload

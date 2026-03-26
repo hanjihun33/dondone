@@ -110,7 +110,7 @@ fun WorkproofScreen(
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        selectedAttachmentName = uri?.let { resolveAttachmentName(context, it) }
+        selectedAttachmentName = uri?.let { resolveAttachmentName(context, it, language) }
     }
     val displayedMonth = remember(baseMonth, monthOffset) {
         baseMonth.plusMonths(monthOffset.toLong())
@@ -194,8 +194,8 @@ fun WorkproofScreen(
         val action = pdfFileUiState.pendingAction ?: return@LaunchedEffect
         val uri = Uri.parse(fileUri)
         when (action) {
-            WorkproofPdfFileAction.OPEN -> openWorkproofPdfFile(context, uri)
-            WorkproofPdfFileAction.SHARE -> shareWorkproofPdfFile(context, uri, pdfFileUiState.fileName)
+            WorkproofPdfFileAction.OPEN -> openWorkproofPdfFile(context, uri, language)
+            WorkproofPdfFileAction.SHARE -> shareWorkproofPdfFile(context, uri, pdfFileUiState.fileName, language)
         }
         onClearPdfFileState()
     }
@@ -508,7 +508,7 @@ private fun WorkproofPunchCard(
                 WorkproofActionButtonWithFeedback(
                     enabled = canClockIn,
                     showDisabledFeedback = showClockInRadiusFeedback,
-                    onDisabledClick = { showWorkproofRadiusToast(context) },
+                    onDisabledClick = { showWorkproofRadiusToast(context, language) },
                     modifier = Modifier.weight(1f)
                 ) {
                     PrimaryActionButton(
@@ -521,7 +521,7 @@ private fun WorkproofPunchCard(
                 WorkproofActionButtonWithFeedback(
                     enabled = canClockOut,
                     showDisabledFeedback = false,
-                    onDisabledClick = { showWorkproofRadiusToast(context) },
+                    onDisabledClick = { showWorkproofRadiusToast(context, language) },
                     modifier = Modifier.weight(1f)
                 ) {
                     SecondaryActionButton(
@@ -612,7 +612,7 @@ private fun formatMonthText(month: YearMonth): String {
     val monthValue = month.monthValue.toString().padStart(2, '0')
     return "$year.$monthValue"
 }
-private fun resolveAttachmentName(context: Context, uri: Uri): String {
+private fun resolveAttachmentName(context: Context, uri: Uri, language: AppLanguage): String {
     val cursor = context.contentResolver.query(
         uri,
         arrayOf(OpenableColumns.DISPLAY_NAME),
@@ -626,13 +626,13 @@ private fun resolveAttachmentName(context: Context, uri: Uri): String {
             return it.getString(nameIndex)
         }
     }
-    return uri.lastPathSegment ?: AppLanguage.fromDefault().text("workproof_selected_attachment")
+    return uri.lastPathSegment ?: language.text("workproof_selected_attachment")
 }
 
-private fun showWorkproofRadiusToast(context: Context) {
+private fun showWorkproofRadiusToast(context: Context, language: AppLanguage) {
     Toast.makeText(
         context,
-        AppLanguage.fromDefault().text("workproof_outside_workplace_radius"),
+        language.text("workproof_outside_workplace_radius"),
         Toast.LENGTH_SHORT
     ).show()
 }

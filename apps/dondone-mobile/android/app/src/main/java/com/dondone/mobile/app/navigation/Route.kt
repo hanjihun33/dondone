@@ -63,7 +63,7 @@ fun shouldResetWorkproofUiState(
 
 fun routeTitle(
     route: String,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage = AppLanguage.KOREAN
 ): String = when (route) {
     Route.WAGE -> language.text(AppTextKeys.WAGE_REVIEW)
     Route.TRANSFER -> language.text(AppTextKeys.TRANSFER)

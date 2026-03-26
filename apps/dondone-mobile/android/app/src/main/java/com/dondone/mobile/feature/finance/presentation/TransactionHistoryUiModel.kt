@@ -104,7 +104,7 @@ data class TransactionHistoryEditUiModel(
 fun DemoState.toTransactionHistoryMainUiModel(
     accountId: String,
     remittanceRemoteState: RemittanceRemoteState,
-    language: AppLanguage = AppLanguage.fromDefault(),
+    language: AppLanguage = AppLanguage.KOREAN,
     isAuthenticated: Boolean,
     overrides: Map<String, TransactionMetadataOverride>
 ): TransactionHistoryMainUiModel {
@@ -145,7 +145,7 @@ fun DemoState.toTransactionHistoryDetailUiModel(
     accountId: String,
     transactionId: String,
     remittanceRemoteState: RemittanceRemoteState,
-    language: AppLanguage = AppLanguage.fromDefault(),
+    language: AppLanguage = AppLanguage.KOREAN,
     isAuthenticated: Boolean,
     overrides: Map<String, TransactionMetadataOverride>
 ): TransactionHistoryDetailUiModel? {
@@ -178,7 +178,7 @@ fun DemoState.toTransactionHistoryEditUiModel(
     accountId: String,
     transactionId: String,
     remittanceRemoteState: RemittanceRemoteState,
-    language: AppLanguage = AppLanguage.fromDefault(),
+    language: AppLanguage = AppLanguage.KOREAN,
     isAuthenticated: Boolean,
     overrides: Map<String, TransactionMetadataOverride>
 ): TransactionHistoryEditUiModel? {

@@ -5,14 +5,14 @@ import com.dondone.mobile.core.i18n.numberFormat
 import com.dondone.mobile.domain.model.DemoInfo
 import kotlin.math.abs
 
-fun formatKrw(value: Int): String = formatKrw(value, AppLanguage.fromDefault())
+fun formatKrw(value: Int): String = formatKrw(value, AppLanguage.KOREAN)
 
 fun formatKrw(
     value: Int,
     language: AppLanguage
 ): String = "₩${language.numberFormat().format(value)}"
 
-fun formatSignedKrw(value: Int): String = formatSignedKrw(value, AppLanguage.fromDefault())
+fun formatSignedKrw(value: Int): String = formatSignedKrw(value, AppLanguage.KOREAN)
 
 fun formatSignedKrw(
     value: Int,
@@ -23,7 +23,7 @@ fun formatSignedKrw(
 }
 
 fun DemoInfo.formatAsOfLabel(
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage = AppLanguage.KOREAN
 ): String {
     val monthText = month.toString().padStart(2, '0')
     val dayText = asOfDay.toString().padStart(2, '0')

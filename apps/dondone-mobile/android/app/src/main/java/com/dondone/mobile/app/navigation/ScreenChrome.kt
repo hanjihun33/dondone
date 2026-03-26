@@ -18,7 +18,7 @@ fun resolveScreenChrome(
     transferStep: TransferFlowStep,
     transferStatus: TransferStatus,
     isWorkproofDetailVisible: Boolean,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage = AppLanguage.KOREAN
 ): ScreenChrome {
     return if (isRootRoute(route)) {
         ScreenChrome(
