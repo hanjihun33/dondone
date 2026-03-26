@@ -59,7 +59,7 @@ class AdvancePolicyEngineTest {
                 0L,
                 0L,
                 false,
-                LocalDate.of(2026, 3, 16),
+                LocalDate.of(2026, 3, 1),
                 YearMonth.of(2026, 3)
         );
 
@@ -93,7 +93,7 @@ class AdvancePolicyEngineTest {
                 0L,
                 0L,
                 false,
-                LocalDate.of(2026, 3, 16),
+                LocalDate.of(2026, 3, 1),
                 YearMonth.of(2026, 3)
         );
 
@@ -135,7 +135,7 @@ class AdvancePolicyEngineTest {
                 0L,
                 0L,
                 false,
-                LocalDate.of(2026, 3, 25),
+                LocalDate.of(2026, 3, AdvancePolicyDefaults.DEFAULT_PAYDAY_DAY),
                 YearMonth.of(2026, 3)
         );
 
@@ -156,7 +156,7 @@ class AdvancePolicyEngineTest {
                 0L,
                 0L,
                 false,
-                LocalDate.of(2026, 3, 24),
+                LocalDate.of(2026, 3, AdvancePolicyDefaults.DEFAULT_PAYDAY_DAY - 1),
                 YearMonth.of(2026, 3)
         );
 
@@ -176,7 +176,7 @@ class AdvancePolicyEngineTest {
                 34_482_758L,
                 50_000L,
                 false,
-                LocalDate.of(2026, 3, 16),
+                LocalDate.of(2026, 3, 1),
                 YearMonth.of(2026, 3)
         );
 
