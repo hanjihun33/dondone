@@ -300,7 +300,7 @@ fun DemoState.toAdvanceContractState(remoteState: AdvanceRemoteState? = null): A
 }
 
 private fun toReasonText(code: String): String = when (code) {
-    "INSUFFICIENT_VERIFIED_WORK" -> "반영된 근무가 더 필요해요"
+    "INSUFFICIENT_VERIFIED_WORK" -> ""
     "EXISTING_OUTSTANDING_ADVANCE" -> "이미 진행 중인 미리받기가 있어요"
     "ADVANCE_WINDOW_CLOSED_TODAY" -> "오늘은 신청이 마감됐어요"
     "PENDING_WORKPROOF_REVIEW" -> "확인 필요한 기록이 남아 있어요"

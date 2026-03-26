@@ -277,12 +277,16 @@ private fun FinanceAdvanceSection(
             )
         }
         if (uiModel.showProgress) {
-            FinanceInnerPanel {
-                val showSummaryMetrics =
-                    uiModel.progressPrimaryMetricLabel != null &&
-                        uiModel.progressPrimaryMetricText != null &&
-                        uiModel.progressSecondaryMetricLabel != null &&
-                        uiModel.progressSecondaryMetricText != null
+            HorizontalDivider(color = FinanceDivider)
+            val showSummaryMetrics =
+                uiModel.progressPrimaryMetricLabel != null &&
+                    uiModel.progressPrimaryMetricText != null &&
+                    uiModel.progressSecondaryMetricLabel != null &&
+                    uiModel.progressSecondaryMetricText != null
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -300,13 +304,13 @@ private fun FinanceAdvanceSection(
                         FinanceHelpButton(onClick = onOpenTierGuide)
                     }
                     Text(
-                        text = "${(uiModel.progress * 100).toInt()}%",
+                        text = uiModel.progressValueText,
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                         color = FinanceTextPrimary
                     )
                 }
                 DonDoneProgressBar(progress = uiModel.progress)
-                if (!showSummaryMetrics) {
+                if (!showSummaryMetrics && uiModel.progressHintText.isNotBlank()) {
                     Text(
                         text = uiModel.progressHintText,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
