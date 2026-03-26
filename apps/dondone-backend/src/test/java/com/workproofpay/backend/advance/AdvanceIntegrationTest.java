@@ -7,6 +7,7 @@ import com.workproofpay.backend.advance.model.AdvancePayoutStatus;
 import com.workproofpay.backend.advance.model.AdvanceRequest;
 import com.workproofpay.backend.advance.repo.AdvancePayoutRepository;
 import com.workproofpay.backend.advance.repo.AdvanceRequestRepository;
+import com.workproofpay.backend.advance.service.AdvancePolicyDefaults;
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.shared.security.JwtTokenProvider;
@@ -121,8 +122,8 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.noticeReasonCodes[0]").value("PENDING_WORKPROOF_REVIEW"))
                 .andExpect(jsonPath("$.data.needsReviewRecordCount").value(1))
                 .andExpect(jsonPath("$.data.pendingRecordCount").value(1))
-                .andExpect(jsonPath("$.data.settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()))
-                .andExpect(jsonPath("$.data.estimatedRepaymentDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
+                .andExpect(jsonPath("$.data.settlementDueDate").value(currentSettlementDueDate().toString()))
+                .andExpect(jsonPath("$.data.estimatedRepaymentDate").value(currentSettlementDueDate().toString()));
 
         String requestJson = """
                 {
@@ -147,7 +148,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.feeAmountAtomic").value(3448275))
                 .andExpect(jsonPath("$.data.feeDisplayKrwAmount").value(5000))
                 .andExpect(jsonPath("$.data.settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
-                .andExpect(jsonPath("$.data.settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()))
+                .andExpect(jsonPath("$.data.settlementDueDate").value(currentSettlementDueDate().toString()))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmountAtomic").value(ELIGIBLE_AVAILABLE_ATOMIC))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.availableDisplayKrwAmount").value(ELIGIBLE_AVAILABLE_DISPLAY_KRW))
                 .andReturn()
@@ -167,7 +168,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
-                .andExpect(jsonPath("$.data.settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
+                .andExpect(jsonPath("$.data.settlementDueDate").value(currentSettlementDueDate().toString()));
 
         mockMvc.perform(get("/api/advance/requests")
                         .header("Authorization", bearer(token))
@@ -181,7 +182,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.requests[0].approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[0].approvedDisplayKrwAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.requests[0].settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
-                .andExpect(jsonPath("$.data.requests[0].settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()));
+                .andExpect(jsonPath("$.data.requests[0].settlementDueDate").value(currentSettlementDueDate().toString()));
 
         mockMvc.perform(get("/api/advance/requests/{requestId}", requestId)
                         .header("Authorization", bearer(token)))
@@ -194,7 +195,7 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.approvedAmountAtomic").value(nullValue()))
                 .andExpect(jsonPath("$.data.approvedDisplayKrwAmount").value(nullValue()))
                 .andExpect(jsonPath("$.data.settlementStatus").value("SCHEDULED_FOR_PAYDAY"))
-                .andExpect(jsonPath("$.data.settlementDueDate").value(currentAdvanceCycleMonth().atDay(25).toString()))
+                .andExpect(jsonPath("$.data.settlementDueDate").value(currentSettlementDueDate().toString()))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.exchangeRateSnapshot").value(1450))
                 .andExpect(jsonPath("$.data.eligibilitySnapshot.needsReviewRecordCount").value(1));
     }
@@ -368,6 +369,92 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.availableAmountAtomic").value(68_965_517L))
                 .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(100_000L))
                 .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty());
+    }
+
+    @Test
+    void allowsAdditionalAdvanceRequestWithinSameCycleAfterConfirmedPayoutWhenLimitRemains() throws Exception {
+        User user = userRepository.save(User.register("advance-repeat@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long workplaceId = seedAdvanceEligibleScenario(user, 10, false);
+
+        long firstRequestId = createAdvanceRequest(token, workplaceId, REDUCED_CAP_ATOMIC, "2030-01-10T09:00:00", "advance-repeat-1");
+        approveRequest(firstRequestId);
+        attachPayout(firstRequestId, user.getId(), REDUCED_CAP_ATOMIC, AdvancePayoutStatus.CONFIRMED);
+
+        String secondRequestJson = """
+                {
+                  "workplaceId": %d,
+                  "requestedAmountAtomic": %d,
+                  "requestedAt": "2030-01-11T09:00:00"
+                }
+                """.formatted(workplaceId, 20_000_000L);
+
+        mockMvc.perform(post("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "advance-repeat-2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(secondRequestJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableAmountAtomic").value(68_965_517L))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableDisplayKrwAmount").value(100_000L));
+
+        mockMvc.perform(get("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .param("month", currentAdvanceCycleMonth().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requests.length()").value(2))
+                .andExpect(jsonPath("$.data.requests[0].status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.requests[1].status").value("PAID"));
+    }
+
+    @Test
+    void recalculatesSameCycleAvailabilityWhenMoreReflectedWorkIsAddedAfterPaidAdvance() throws Exception {
+        User user = userRepository.save(User.register("advance-recalc@test.com", "hashed", "Advance"));
+        String token = tokenFor(user);
+        Long workplaceId = seedAdvanceEligibleScenario(user, 5, false);
+
+        long firstRequestId = createAdvanceRequest(token, workplaceId, REDUCED_CAP_ATOMIC, "2030-01-10T09:00:00", "advance-recalc-1");
+        approveRequest(firstRequestId);
+        attachPayout(firstRequestId, user.getId(), REDUCED_CAP_ATOMIC, AdvancePayoutStatus.CONFIRMED);
+
+        mockMvc.perform(get("/api/advance/eligibility")
+                        .header("Authorization", bearer(token))
+                        .param("workplaceId", workplaceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.repaymentTier").value("C"))
+                .andExpect(jsonPath("$.data.reflectedWorkDays").value(5))
+                .andExpect(jsonPath("$.data.alreadyAdvancedDisplayKrwAmount").value(50_000L))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(0L));
+
+        addReflectedWorkRecords(user, workplaceId, 6, 10);
+
+        mockMvc.perform(get("/api/advance/eligibility")
+                        .header("Authorization", bearer(token))
+                        .param("workplaceId", workplaceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.repaymentTier").value("B"))
+                .andExpect(jsonPath("$.data.reflectedWorkDays").value(10))
+                .andExpect(jsonPath("$.data.alreadyAdvancedDisplayKrwAmount").value(50_000L))
+                .andExpect(jsonPath("$.data.availableDisplayKrwAmount").value(100_000L))
+                .andExpect(jsonPath("$.data.blockReasonCodes").isEmpty());
+
+        String secondRequestJson = """
+                {
+                  "workplaceId": %d,
+                  "requestedAmountAtomic": %d,
+                  "requestedAt": "2030-01-12T09:00:00"
+                }
+                """.formatted(workplaceId, 30_000_000L);
+
+        mockMvc.perform(post("/api/advance/requests")
+                        .header("Authorization", bearer(token))
+                        .header("Idempotency-Key", "advance-recalc-2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(secondRequestJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.eligibilitySnapshot.availableDisplayKrwAmount").value(100_000L));
     }
 
     @Test
@@ -594,6 +681,36 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
         return workplace.getId();
     }
 
+    private void addReflectedWorkRecords(User user, Long workplaceId, int fromDayInclusive, int toDayInclusive) {
+        Workplace workplace = workplaceRepository.findById(workplaceId).orElseThrow();
+        WorkContract contract = workContractRepository
+                .findFirstByWorkplaceIdAndEffectiveToIsNullOrderByEffectiveFromDesc(workplaceId)
+                .orElseThrow();
+
+        for (int day = fromDayInclusive; day <= toDayInclusive; day++) {
+            LocalDateTime checkIn = currentAdvanceCycleMonth().atDay(day).atTime(9, 0);
+            WorkProof record = WorkProof.checkIn(
+                    user,
+                    workplace,
+                    contract,
+                    checkIn,
+                    checkIn.minusMinutes(1),
+                    36.1,
+                    128.3,
+                    "Front gate"
+            );
+            record.completeCheckOut(
+                    checkIn.plusHours(8),
+                    checkIn.plusHours(8).plusMinutes(1),
+                    36.1,
+                    128.3,
+                    "Front gate",
+                    false
+            );
+            workProofRepository.save(record);
+        }
+    }
+
     private Long readId(String json, String fieldName) throws Exception {
         JsonNode root = objectMapper.readTree(json);
         return root.path("data").path(fieldName).asLong();
@@ -672,7 +789,11 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
     private YearMonth currentAdvanceCycleMonth() {
         LocalDate today = LocalDate.now();
         YearMonth cycleMonth = YearMonth.from(today);
-        return today.getDayOfMonth() > 25 ? cycleMonth.plusMonths(1) : cycleMonth;
+        return today.getDayOfMonth() > AdvancePolicyDefaults.DEFAULT_PAYDAY_DAY ? cycleMonth.plusMonths(1) : cycleMonth;
+    }
+
+    private LocalDate currentSettlementDueDate() {
+        return currentAdvanceCycleMonth().atDay(AdvancePolicyDefaults.DEFAULT_PAYDAY_DAY);
     }
 
     private String tokenFor(User user) {

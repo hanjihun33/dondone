@@ -56,7 +56,7 @@ public class AdvancePolicyEngine {
                 ? 0L
                 : daysUntilRepayment <= policy.getReducedCapDaysBeforePayday()
                 ? policy.getNearPaydayMaxCapDisplayKrwAmount()
-                : policy.getMaxCapDisplayKrwAmount();
+                : Long.MAX_VALUE;
 
         List<String> blockReasonCodes = new ArrayList<>();
         List<String> noticeReasonCodes = new ArrayList<>();
@@ -77,11 +77,12 @@ public class AdvancePolicyEngine {
             noticeReasonCodes.add(AdvanceBlockReasonCode.PENDING_WORKPROOF_REVIEW.name());
         }
 
-        long maxAvailableBeforeUsageDisplayKrwAmount = Math.min(Math.min(baseLimit, tier.capAmount()), Math.min(paydayCapKrw, policy.getMaxCapDisplayKrwAmount()));
+        long currentTierCapDisplayKrwAmount = Math.min(tier.capAmount(), paydayCapKrw);
+        long maxAvailableBeforeUsageDisplayKrwAmount = Math.min(baseLimit, currentTierCapDisplayKrwAmount);
         long availableDisplayKrwAmount = hardBlocked
                 ? 0L
                 : Math.max(0L, maxAvailableBeforeUsageDisplayKrwAmount - alreadyAdvancedDisplayKrwAmount);
-        long maxCapDisplayKrwAmount = policy.getMaxCapDisplayKrwAmount();
+        long maxCapDisplayKrwAmount = currentTierCapDisplayKrwAmount;
         long estimatedFeeDisplayKrwAmount = estimateFeeDisplayKrwAmount(policy, availableDisplayKrwAmount);
 
         Integer nextTierDays = tier.nextMinimumDays();
@@ -102,10 +103,7 @@ public class AdvancePolicyEngine {
                 .min(BigDecimal.ONE);
         long nextTierExpectedCapDisplayKrw = nextTier == null
                 ? maxAvailableBeforeUsageDisplayKrwAmount
-                : Math.min(
-                Math.min(nextTier.capAmount(), paydayCapKrw),
-                policy.getMaxCapDisplayKrwAmount()
-        );
+                : Math.min(nextTier.capAmount(), paydayCapKrw);
 
         return new AdvanceEligibilityResponse(
                 workplaceId,
