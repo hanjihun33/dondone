@@ -261,11 +261,9 @@ private fun FinanceAdvanceSection(
                 color = FinanceTextMuted
             )
         }
-        FinanceAdvanceHeroCard(
-            surfaceState = uiModel.surfaceState,
+        FinanceAdvanceSuccessSummary(
             title = uiModel.stateTitleText,
             body = uiModel.stateBodyText,
-            amountLabel = uiModel.heroAmountLabel,
             amountText = uiModel.heroAmountText,
             repaymentDueText = uiModel.repaymentDueText
         )
@@ -462,17 +460,17 @@ private fun FinanceSectionSurface(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 6.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         content = content
     )
 }
 
 @Composable
 private fun FinanceSectionDivider() {
-    Spacer(modifier = Modifier.height(10.dp))
+    Spacer(modifier = Modifier.height(14.dp))
     HorizontalDivider(color = FinanceDivider)
-    Spacer(modifier = Modifier.height(10.dp))
+    Spacer(modifier = Modifier.height(14.dp))
 }
 
 @Composable
@@ -1186,7 +1184,7 @@ private fun FinanceAdvanceStatePanel(
         else -> FinanceDivider
     }
     val backgroundColor = when (surfaceState) {
-        AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHero
+        AdvanceSurfaceState.SUCCESS -> Color.White
         AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBackground
         else -> FinanceSurfaceMuted
     }
@@ -1211,6 +1209,52 @@ private fun FinanceAdvanceStatePanel(
 }
 
 @Composable
+private fun FinanceAdvanceSuccessSummary(
+    title: String,
+    body: String = "",
+    amountText: String,
+    repaymentDueText: String
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = FinanceTextPrimary
+            )
+            if (body.isNotBlank()) {
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FinanceTextMuted
+                )
+            }
+        }
+        FinanceAdvanceHeroAmount(amountText = amountText)
+        HorizontalDivider(color = FinanceDivider)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "정산일",
+                style = MaterialTheme.typography.labelLarge,
+                color = FinanceTextMuted
+            )
+            Text(
+                text = repaymentDueText,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                color = FinanceTextPrimary
+            )
+        }
+    }
+}
+
+@Composable
 private fun FinanceAdvanceHeroCard(
     surfaceState: AdvanceSurfaceState,
     title: String,
@@ -1219,20 +1263,13 @@ private fun FinanceAdvanceHeroCard(
     amountText: String,
     repaymentDueText: String
 ) {
-    val borderColor = when (surfaceState) {
-        AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHeroBorder
-        AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBorder
-        else -> FinanceDivider
-    }
     val backgroundColor = when (surfaceState) {
-        AdvanceSurfaceState.SUCCESS -> FinanceAdvanceSheetHero
         AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBackground
         else -> FinanceSurfaceMuted
     }
-
     FinanceSheetPanel(
         backgroundColor = backgroundColor,
-        borderColor = borderColor
+        borderColor = Color.Transparent
     ) {
         Text(
             text = title,
@@ -1246,15 +1283,8 @@ private fun FinanceAdvanceHeroCard(
                 color = FinanceTextMuted
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = amountLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = FinanceTextMuted
-            )
-            FinanceAdvanceHeroAmount(amountText = amountText)
-        }
-        HorizontalDivider(color = borderColor)
+        FinanceAdvanceHeroAmount(amountText = amountText)
+        HorizontalDivider(color = FinanceDivider)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1283,7 +1313,11 @@ private fun FinanceAdvanceHeroAmount(amountText: String) {
     val amountValue = amountParts.firstOrNull().orEmpty()
     val amountUnit = amountParts.getOrNull(1)
 
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom
+    ) {
         Text(
             text = buildAnnotatedString {
                 withStyle(
