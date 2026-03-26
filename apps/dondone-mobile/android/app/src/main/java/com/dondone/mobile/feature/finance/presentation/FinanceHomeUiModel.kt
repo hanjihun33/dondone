@@ -46,6 +46,7 @@ data class FinanceAccountUiModel(
 
 enum class FinanceAdvanceCalendarTone {
     DEFAULT,
+    PARTIAL,
     COMPLETE,
     MODIFIED,
     TODAY
@@ -318,7 +319,7 @@ fun DemoState.toFinanceHomeUiModel(
     val advanceProgress = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         val totalAmountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic
         if (totalAmountAtomic > 0L) {
-            remoteUsedAmountAtomic.toFloat() / totalAmountAtomic.toFloat()
+            1f - (remoteUsedAmountAtomic.toFloat() / totalAmountAtomic.toFloat())
         } else {
             0f
         }
@@ -354,14 +355,14 @@ fun DemoState.toFinanceHomeUiModel(
         advanceProgressHintText
     }
     val progressPrimaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        "받은 금액"
+        "남은 한도"
     } else {
         null
     }
     val progressPrimaryMetricText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         formatAdvanceAmount(
-            amountAtomic = remoteUsedAmountAtomic,
-            displayKrwAmount = remoteUsedDisplayKrwAmount,
+            amountAtomic = remoteAvailableAmountAtomic,
+            displayKrwAmount = remoteAvailableDisplayKrwAmount,
             assetDecimals = remoteAssetDecimals,
             assetSymbol = remoteAssetSymbol
         )
@@ -369,7 +370,7 @@ fun DemoState.toFinanceHomeUiModel(
         null
     }
     val progressSecondaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        "현재 한도"
+        "최대"
     } else {
         null
     }
@@ -503,7 +504,7 @@ fun DemoState.toFinanceHomeUiModel(
         "지금 추가 신청할 수 있어요"
     } else if (hasCurrentAdvanceRequest) {
         when (latestRemoteRequest?.status) {
-            "PAID" -> "이번 달 지급이 완료됐어요"
+            "PAID" -> "이번 달 받은 금액"
             "PAYING", "APPROVED", "SUBMITTED" -> "지급이 진행 중이에요"
             "PAYOUT_FAILED" -> "지급 상태를 다시 확인해 주세요"
             "REJECTED" -> "최근 요청이 반려됐어요"
@@ -774,7 +775,7 @@ fun DemoState.toFinanceHomeUiModel(
             showProgress =
                 advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
                     advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
-            progressTitle = if (hasCurrentAdvanceRequest) "현재 한도" else "다음 한도 구간",
+            progressTitle = if (hasCurrentAdvanceRequest) "미리받기 잔액" else "다음 한도 구간",
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
             progressPrimaryMetricLabel = progressPrimaryMetricLabel,
@@ -863,6 +864,7 @@ fun DemoState.toFinanceHomeUiModel(
                                 FinanceAdvanceCalendarTone.TODAY
                             record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.MODIFIED
                             record?.reflectionStatus == "REFLECTED" -> FinanceAdvanceCalendarTone.COMPLETE
+                            record != null -> FinanceAdvanceCalendarTone.PARTIAL
                             else -> FinanceAdvanceCalendarTone.DEFAULT
                         }
                         FinanceAdvanceCalendarDayUiModel(day = day, tone = tone)
@@ -874,6 +876,7 @@ fun DemoState.toFinanceHomeUiModel(
                             day == demo.asOfDay -> FinanceAdvanceCalendarTone.TODAY
                             record?.modified == true -> FinanceAdvanceCalendarTone.MODIFIED
                             record != null && record.outTime != "-" -> FinanceAdvanceCalendarTone.COMPLETE
+                            record != null -> FinanceAdvanceCalendarTone.PARTIAL
                             else -> FinanceAdvanceCalendarTone.DEFAULT
                         }
                         FinanceAdvanceCalendarDayUiModel(day = day, tone = tone)

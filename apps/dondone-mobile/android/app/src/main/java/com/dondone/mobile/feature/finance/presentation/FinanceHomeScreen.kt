@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -77,6 +78,9 @@ private val FinanceAdvanceSheetHeroBorder = Color(0xFFE9DFFF)
 private val FinanceAdvanceSheetMutedBackground = Color(0xFFF8FAFC)
 private val FinanceAdvanceSheetMutedBorder = Color(0xFFE2E8F0)
 private val FinanceAdvanceSheetDefaultText = Color(0xFF94A3B8)
+private val FinancePartialBackground = Color(0xFFEEE5FF)
+private val FinancePartialBorder = Color(0xFFC3A6FF)
+private val FinancePartialText = Color(0xFF6F42D9)
 private val FinanceReflectedBackground = Color(0xFFE9DEFF)
 private val FinanceReflectedBorder = Color(0xFFB89BFF)
 private val FinanceReflectedText = Color(0xFF5E3CC5)
@@ -129,7 +133,7 @@ fun FinanceHomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 28.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             FinanceAdvanceSection(
@@ -264,8 +268,7 @@ private fun FinanceAdvanceSection(
         FinanceAdvanceSuccessSummary(
             title = uiModel.stateTitleText,
             body = uiModel.stateBodyText,
-            amountText = uiModel.heroAmountText,
-            repaymentDueText = uiModel.repaymentDueText
+            amountText = uiModel.heroAmountText
         )
         if (uiModel.noticeTitleText != null && uiModel.noticeBodyText != null) {
             FinanceAdvanceNoticePanel(
@@ -311,19 +314,23 @@ private fun FinanceAdvanceSection(
                     )
                 }
                 if (showSummaryMetrics) {
+                    val primaryShort = uiModel.progressPrimaryMetricText
+                        .orEmpty().split("·", limit = 2).first().trim()
+                    val secondaryShort = uiModel.progressSecondaryMetricText
+                        .orEmpty().split("·", limit = 2).first().trim()
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        FinanceProgressMetric(
-                            label = uiModel.progressPrimaryMetricLabel,
-                            value = uiModel.progressPrimaryMetricText,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = primaryShort,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = FinanceTextMuted
                         )
-                        FinanceProgressMetric(
-                            label = uiModel.progressSecondaryMetricLabel,
-                            value = uiModel.progressSecondaryMetricText,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = secondaryShort,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            color = FinanceTextPrimary
                         )
                     }
                 }
@@ -740,32 +747,20 @@ private fun FinanceAdvanceBottomSheet(
             }
             Spacer(modifier = Modifier.height(6.dp))
             if (uiModel.hasCurrentRequest) {
-                FinanceSummaryAmountCard(
+                FinanceSheetDetailRow(
                     label = "이번 달 받은 금액",
-                    value = uiModel.summaryAmountText,
-                    modifier = Modifier.fillMaxWidth()
+                    value = uiModel.summaryAmountText
                 )
                 HorizontalDivider(color = FinanceDivider)
-                FinanceSummaryAmountCard(
+                FinanceSheetDetailRow(
                     label = "추가 신청 가능 금액",
-                    value = uiModel.availableText,
-                    modifier = Modifier.fillMaxWidth()
+                    value = uiModel.availableText
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    FinanceSummaryMetricCard(
-                        label = "정산일",
-                        value = uiModel.repaymentDueText,
-                        modifier = Modifier.weight(1f)
-                    )
-                    FinanceSummaryMetricCard(
-                        label = "지급 상태",
-                        value = uiModel.summaryStatusText,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                HorizontalDivider(color = FinanceDivider)
+                FinanceSheetDetailRow(
+                    label = "정산일",
+                    value = uiModel.repaymentDueText
+                )
             } else {
                 FinanceAdvanceStatePanel(
                     surfaceState = uiModel.surfaceState,
@@ -784,43 +779,6 @@ private fun FinanceAdvanceBottomSheet(
         FinanceBottomSheetDivider()
         FinanceBottomSheetSection {
             FinanceBottomSheetHeader(title = "근무 반영")
-            Text(
-                text = uiModel.calendarSummaryText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = FinanceTextMuted
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FinanceAdvanceStatusCard(
-                    label = "반영",
-                    value = uiModel.reflectedCountText,
-                    borderColor = FinanceReflectedBorder,
-                    labelColor = FinanceReflectedText,
-                    valueColor = FinanceTextPrimary,
-                    backgroundColor = FinanceReflectedBackground,
-                    modifier = Modifier.weight(1f)
-                )
-                FinanceAdvanceStatusCard(
-                    label = "확인 필요",
-                    value = uiModel.reviewCountText,
-                    borderColor = FinanceReviewBorder,
-                    labelColor = FinanceReviewText,
-                    valueColor = FinanceTextPrimary,
-                    backgroundColor = FinanceReviewBackground,
-                    modifier = Modifier.weight(1f)
-                )
-                FinanceAdvanceStatusCard(
-                    label = "미반영",
-                    value = uiModel.unreflectedCountText,
-                    borderColor = FinanceAdvanceSheetMutedBorder,
-                    labelColor = FinanceTextMuted,
-                    valueColor = DawnText,
-                    backgroundColor = Color.White,
-                    modifier = Modifier.weight(1f)
-                )
-            }
             FinanceSheetPanel(
                 backgroundColor = Color.White,
                 borderColor = FinanceDivider
@@ -834,6 +792,15 @@ private fun FinanceAdvanceBottomSheet(
                             style = MaterialTheme.typography.bodySmall,
                             color = FinanceTextMuted
                         )
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FinanceCalendarLegendItem(label = "미기록", background = Color.White, border = FinanceCalendarDefaultBorder)
+                        FinanceCalendarLegendItem(label = "출근만", background = FinancePartialBackground, border = FinancePartialBorder)
+                        FinanceCalendarLegendItem(label = "완료", background = FinanceReflectedBackground, border = FinanceReflectedBorder)
+                        FinanceCalendarLegendItem(label = "수정", background = FinanceReviewBackground, border = FinanceReviewBorder)
                     }
                 }
             }
@@ -1181,17 +1148,24 @@ private fun FinanceAdvanceRequestSummaryCard(
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = FinanceTextMuted
             )
-            Text(
-                text = primaryValue,
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Black),
-                color = FinanceTextPrimary
-            )
-            if (!secondaryValue.isNullOrBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
                 Text(
-                    text = secondaryValue,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = FinanceTextMuted
+                    text = primaryValue,
+                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Black),
+                    color = FinanceTextPrimary
                 )
+                if (!secondaryValue.isNullOrBlank()) {
+                    Text(
+                        text = secondaryValue,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = FinanceTextMuted,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
             }
         }
     }
@@ -1237,8 +1211,7 @@ private fun FinanceAdvanceStatePanel(
 private fun FinanceAdvanceSuccessSummary(
     title: String,
     body: String = "",
-    amountText: String,
-    repaymentDueText: String
+    amountText: String
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1259,23 +1232,6 @@ private fun FinanceAdvanceSuccessSummary(
             }
         }
         FinanceAdvanceHeroAmount(amountText = amountText)
-        HorizontalDivider(color = FinanceDivider)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "정산일",
-                style = MaterialTheme.typography.labelLarge,
-                color = FinanceTextMuted
-            )
-            Text(
-                text = repaymentDueText,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                color = FinanceTextPrimary
-            )
-        }
     }
 }
 
@@ -1710,24 +1666,28 @@ private fun FinanceAdvanceCalendarGrid(days: List<FinanceAdvanceCalendarDayUiMod
                         return@forEach
                     }
                     val backgroundColor = when (day.tone) {
+                        FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialBackground
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBackground
                         FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBackground
                         FinanceAdvanceCalendarTone.TODAY -> FinanceTodayBackground
                         FinanceAdvanceCalendarTone.DEFAULT -> Color.Transparent
                     }
                     val borderColor = when (day.tone) {
+                        FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialBorder
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBorder
                         FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBorder
                         FinanceAdvanceCalendarTone.TODAY -> FinanceTodayBorder
                         FinanceAdvanceCalendarTone.DEFAULT -> Color.Transparent
                     }
                     val textColor = when (day.tone) {
+                        FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialText
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedText
                         FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewText
                         FinanceAdvanceCalendarTone.TODAY -> DawnPrimary
                         FinanceAdvanceCalendarTone.DEFAULT -> if (day.day > today.dayOfMonth) FinanceCalendarInactiveText else FinanceAdvanceSheetDefaultText
                     }
                     val shape = when (day.tone) {
+                        FinanceAdvanceCalendarTone.PARTIAL,
                         FinanceAdvanceCalendarTone.COMPLETE,
                         FinanceAdvanceCalendarTone.MODIFIED,
                         FinanceAdvanceCalendarTone.TODAY -> CircleShape
@@ -1781,6 +1741,30 @@ private fun FinanceSheetPanel(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         content()
+    }
+}
+
+@Composable
+private fun FinanceCalendarLegendItem(
+    label: String,
+    background: Color,
+    border: Color
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(background, CircleShape)
+                .border(1.dp, border, CircleShape)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = FinanceTextMuted
+        )
     }
 }
 
@@ -1924,6 +1908,34 @@ private fun FinanceSummaryAmountCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun FinanceSheetDetailRow(
+    label: String,
+    value: String
+) {
+    val parts = value.split("·", limit = 2).map { it.trim() }
+    val primaryValue = parts.firstOrNull().orEmpty()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = FinanceTextMuted
+        )
+        Text(
+            text = primaryValue,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary
+        )
     }
 }
 
