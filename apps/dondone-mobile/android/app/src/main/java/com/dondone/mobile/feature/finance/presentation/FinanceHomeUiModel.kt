@@ -355,14 +355,14 @@ fun DemoState.toFinanceHomeUiModel(
         advanceProgressHintText
     }
     val progressPrimaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        "받은 금액"
+        "남은 한도"
     } else {
         null
     }
     val progressPrimaryMetricText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         formatAdvanceAmount(
-            amountAtomic = remoteUsedAmountAtomic,
-            displayKrwAmount = remoteUsedDisplayKrwAmount,
+            amountAtomic = remoteAvailableAmountAtomic,
+            displayKrwAmount = remoteAvailableDisplayKrwAmount,
             assetDecimals = remoteAssetDecimals,
             assetSymbol = remoteAssetSymbol
         )

@@ -133,7 +133,7 @@ fun FinanceHomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 28.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             FinanceAdvanceSection(
@@ -1911,12 +1911,11 @@ private fun FinanceSheetDetailRow(
 ) {
     val parts = value.split("·", limit = 2).map { it.trim() }
     val primaryValue = parts.firstOrNull().orEmpty()
-    val secondaryValue = parts.getOrNull(1)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp),
+            .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1925,24 +1924,11 @@ private fun FinanceSheetDetailRow(
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
             color = FinanceTextMuted
         )
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = primaryValue,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = FinanceTextPrimary
-            )
-            if (!secondaryValue.isNullOrBlank()) {
-                Text(
-                    text = secondaryValue,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FinanceTextMuted,
-                    modifier = Modifier.padding(bottom = 1.dp)
-                )
-            }
-        }
+        Text(
+            text = primaryValue,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+            color = FinanceTextPrimary
+        )
     }
 }
 
