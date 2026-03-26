@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -54,6 +55,7 @@ import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
+import com.dondone.mobile.core.designsystem.StatusBadge
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -466,6 +468,23 @@ private fun WorkproofPunchCard(
                     }
                 }
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = uiModel.dateText,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = DawnTextSubtle
+                )
+                StatusBadge(
+                    text = uiModel.statusText,
+                    tone = uiModel.statusTone
+                )
+            }
+            WorkproofKeyValueRow(label = "출근", value = uiModel.clockInText)
+            WorkproofKeyValueRow(label = "퇴근", value = uiModel.clockOutText)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
