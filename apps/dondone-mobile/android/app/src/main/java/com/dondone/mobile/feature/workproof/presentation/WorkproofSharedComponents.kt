@@ -66,6 +66,34 @@ internal fun String.isValidWorkproofTimeInput(): Boolean {
     return runCatching { LocalTime.parse(trim()) }.isSuccess
 }
 
+internal fun normalizeWorkproofTimeInput(
+    previousInput: String,
+    rawInput: String
+): String {
+    val sanitized = rawInput.filter { it.isDigit() || it == ':' }
+    val digitsOnly = sanitized.filter(Char::isDigit).take(4)
+    val isDeleting = sanitized.length < previousInput.length
+    val firstColonIndex = sanitized.indexOf(':')
+    if (firstColonIndex >= 0) {
+        if (isDeleting && digitsOnly.length < 4) {
+            return digitsOnly
+        }
+        val hour = sanitized.substring(0, firstColonIndex).filter(Char::isDigit).take(2)
+        val minute = sanitized.substring(firstColonIndex + 1).filter(Char::isDigit).take(2)
+        return when {
+            hour.isEmpty() && minute.isEmpty() -> ""
+            hour.isEmpty() -> minute
+            minute.isEmpty() -> "$hour:"
+            else -> "$hour:$minute"
+        }
+    }
+
+    return when {
+        digitsOnly.length < 4 -> digitsOnly
+        else -> digitsOnly.take(2) + ":" + digitsOnly.drop(2)
+    }
+}
+
 internal data class WorkproofEditReasonOption(
     val key: String,
     val label: String
