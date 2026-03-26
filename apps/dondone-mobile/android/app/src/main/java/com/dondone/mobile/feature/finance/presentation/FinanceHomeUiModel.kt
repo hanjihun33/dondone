@@ -60,6 +60,7 @@ data class FinanceAmountOptionUiModel(
 data class FinanceAdvanceHistoryUiModel(
     val requestId: Long?,
     val title: String,
+    val statusLabel: String = "",
     val metaText: String,
     val detailText: String? = null,
     val valueText: String,
@@ -390,7 +391,8 @@ fun DemoState.toFinanceHomeUiModel(
                 AdvanceSurfaceState.EMPTY -> "이번 달 미리받기 이력이 없어요."
                 AdvanceSurfaceState.ERROR -> "이력을 다시 불러온 뒤 확인해 주세요."
                 AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "이번 달 미리받기 이력이 없어요."
-            }
+            },
+            contractRepaymentDueDate = remoteRepaymentDueText
         )
     } else {
         buildAdvanceHistoryItems(
@@ -1183,7 +1185,8 @@ private fun buildAdvanceHistoryItems(
 
 private fun buildRemoteAdvanceHistoryItems(
     requests: List<com.dondone.mobile.data.advance.AdvanceRequestItemPayload>,
-    emptyMessage: String
+    emptyMessage: String,
+    contractRepaymentDueDate: String
 ): List<FinanceAdvanceHistoryUiModel> {
     if (requests.isEmpty()) {
         return listOf(
@@ -1206,8 +1209,9 @@ private fun buildRemoteAdvanceHistoryItems(
             FinanceAdvanceHistoryUiModel(
                 requestId = request.requestId,
                 title = formatAdvanceHistoryTitle(request.status, request.payoutStatus),
+                statusLabel = formatAdvanceHistoryStatusLabel(request.status),
                 metaText = formatAdvanceHistoryMeta(request),
-                detailText = formatAdvanceHistoryDetail(request),
+                detailText = formatAdvanceHistoryDetail(request, contractRepaymentDueDate),
                 valueText = request.approvedAmountAtomic?.let { approvedAmountAtomic ->
                     formatAdvanceAmount(
                         amountAtomic = approvedAmountAtomic,
@@ -1430,13 +1434,25 @@ private fun formatAdvanceHistoryMeta(request: com.dondone.mobile.data.advance.Ad
     }
 }
 
-private fun formatAdvanceHistoryDetail(request: com.dondone.mobile.data.advance.AdvanceRequestItemPayload): String? =
+private fun formatAdvanceHistoryDetail(
+    request: com.dondone.mobile.data.advance.AdvanceRequestItemPayload,
+    contractRepaymentDueDate: String
+): String? =
     when (request.status) {
-        "PAID" -> "정산일 ${request.effectiveSettlementDueDate}"
+        "PAID" -> "정산일 $contractRepaymentDueDate"
         "PAYING", "APPROVED", "SUBMITTED" -> formatAdvanceStatusLabel(request.status, request.payoutStatus)
         "REJECTED" -> "반려됨"
         "PAYOUT_FAILED" -> "지급 실패"
         else -> null
+}
+
+private fun formatAdvanceHistoryStatusLabel(status: String): String = when (status) {
+    "PAID" -> "지급완료"
+    "PAYING", "APPROVED" -> "지급중"
+    "SUBMITTED" -> "신청완료"
+    "REJECTED" -> "반려"
+    "PAYOUT_FAILED" -> "지급실패"
+    else -> ""
 }
 
 private fun formatAdvanceDetailTitle(status: String, payoutStatus: String?): String = when (status) {
