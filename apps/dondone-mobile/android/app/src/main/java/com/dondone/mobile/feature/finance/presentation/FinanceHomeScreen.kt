@@ -1148,17 +1148,24 @@ private fun FinanceAdvanceRequestSummaryCard(
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = FinanceTextMuted
             )
-            Text(
-                text = primaryValue,
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Black),
-                color = FinanceTextPrimary
-            )
-            if (!secondaryValue.isNullOrBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
                 Text(
-                    text = secondaryValue,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = FinanceTextMuted
+                    text = primaryValue,
+                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Black),
+                    color = FinanceTextPrimary
                 )
+                if (!secondaryValue.isNullOrBlank()) {
+                    Text(
+                        text = secondaryValue,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = FinanceTextMuted,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
             }
         }
     }
