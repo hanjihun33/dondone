@@ -81,7 +81,6 @@ data class FinanceAdvanceRequestDetailUiModel(
     val repaymentDueText: String,
     val createdAtText: String,
     val snapshotAvailableText: String,
-    val snapshotCapText: String,
     val snapshotReflectedText: String,
     val snapshotReviewText: String,
     val errorMessage: String?
@@ -313,10 +312,12 @@ fun DemoState.toFinanceHomeUiModel(
         usesRemoteAdvance -> "확인 필요"
         else -> repaymentDueText
     }
+    val remoteCurrentLimitAmountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic
+    val remoteCurrentLimitDisplayKrwAmount = remoteUsedDisplayKrwAmount + remoteAvailableDisplayKrwAmount
     val advanceProgress = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         val totalAmountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic
         if (totalAmountAtomic > 0L) {
-            remoteAvailableAmountAtomic.toFloat() / totalAmountAtomic.toFloat()
+            remoteUsedAmountAtomic.toFloat() / totalAmountAtomic.toFloat()
         } else {
             0f
         }
@@ -329,14 +330,14 @@ fun DemoState.toFinanceHomeUiModel(
     }
     val effectiveProgressHintText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         if (remoteAvailableAmountAtomic > 0L) {
-            "남은 한도 ${formatAdvanceAmount(
+            "남은 추가 신청 가능 금액 ${formatAdvanceAmount(
                 amountAtomic = remoteAvailableAmountAtomic,
                 displayKrwAmount = remoteAvailableDisplayKrwAmount,
                 assetDecimals = remoteAssetDecimals,
                 assetSymbol = remoteAssetSymbol
-            )}"
+            )} · 출근 기록이 더 반영되면 한도가 늘어날 수 있어요."
         } else {
-            "이번 달 한도를 모두 사용했어요."
+            "현재 한도를 모두 사용했어요. 출근 기록이 더 반영되면 한도가 다시 늘어날 수 있어요."
         }
     } else if (usesRemoteAdvance) {
         val remainingDays = remoteEligibility?.remainingWorkDaysToNextTier ?: 0
@@ -352,7 +353,7 @@ fun DemoState.toFinanceHomeUiModel(
         advanceProgressHintText
     }
     val progressPrimaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        "이번 달 받은 금액"
+        "받은 금액"
     } else {
         null
     }
@@ -367,14 +368,14 @@ fun DemoState.toFinanceHomeUiModel(
         null
     }
     val progressSecondaryMetricLabel = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
-        "이번 달 한도"
+        "현재 한도"
     } else {
         null
     }
     val progressSecondaryMetricText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         formatAdvanceAmount(
-            amountAtomic = remoteUsedAmountAtomic + remoteAvailableAmountAtomic,
-            displayKrwAmount = remoteUsedDisplayKrwAmount + remoteAvailableDisplayKrwAmount,
+            amountAtomic = remoteCurrentLimitAmountAtomic,
+            displayKrwAmount = remoteCurrentLimitDisplayKrwAmount,
             assetDecimals = remoteAssetDecimals,
             assetSymbol = remoteAssetSymbol
         )
@@ -771,7 +772,7 @@ fun DemoState.toFinanceHomeUiModel(
             showProgress =
                 advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
                     advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
-            progressTitle = if (hasCurrentAdvanceRequest) "이번 달 남은 한도" else "다음 한도 구간",
+            progressTitle = if (hasCurrentAdvanceRequest) "현재 한도" else "다음 한도 구간",
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
             progressPrimaryMetricLabel = progressPrimaryMetricLabel,
@@ -1265,14 +1266,6 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
             formatAdvanceAmount(
                 amountAtomic = it.availableAmountAtomic,
                 displayKrwAmount = it.availableDisplayKrwAmount,
-                assetDecimals = it.assetDecimals,
-                assetSymbol = it.assetSymbol
-            )
-        } ?: "-",
-        snapshotCapText = detailValue?.eligibilitySnapshot?.let {
-            formatAdvanceAmount(
-                amountAtomic = it.maxCapAmountAtomic,
-                displayKrwAmount = it.maxCapDisplayKrwAmount,
                 assetDecimals = it.assetDecimals,
                 assetSymbol = it.assetSymbol
             )
