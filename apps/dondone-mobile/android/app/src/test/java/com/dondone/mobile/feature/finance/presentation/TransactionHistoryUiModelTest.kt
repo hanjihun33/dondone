@@ -27,7 +27,7 @@ class TransactionHistoryUiModelTest {
                         direction = "OUTBOUND",
                         amountAtomic = 12_500_000L,
                         occurredAt = "2026-03-25T10:00:00",
-                        counterpartyLabel = "차지훈"
+                        counterpartyLabel = "찬호"
                     )
                 ),
                 transfers = listOf(
@@ -36,7 +36,7 @@ class TransactionHistoryUiModelTest {
                         direction = "EXPENSE",
                         amountAtomic = 12_500_000L,
                         updatedAt = "2026-03-25T10:00:00",
-                        recipientAlias = "차지훈",
+                        recipientAlias = "찬호",
                         recipientAddress = "0x2222222222222222222222222222222222222222"
                     )
                 )
@@ -49,7 +49,7 @@ class TransactionHistoryUiModelTest {
         assertEquals("지갑 송금", uiModel.items.single().methodLabel)
         assertEquals(TransactionDirection.EXPENSE, uiModel.items.single().direction)
         assertEquals("-12.5 dUSDC", uiModel.items.single().amountText)
-        assertEquals("차지훈", uiModel.items.single().counterpartyName)
+        assertEquals("찬호", uiModel.items.single().counterpartyName)
     }
 
     @Test
@@ -65,7 +65,7 @@ class TransactionHistoryUiModelTest {
                         amountAtomic = 34_000_000L,
                         occurredAt = "2026-03-25T11:00:00",
                         counterpartyLabel = "미리받기 지급",
-                        memo = "약 ₩50,000 상당"
+                        memo = "약 30,000원 상당"
                     )
                 )
             ),
@@ -78,7 +78,7 @@ class TransactionHistoryUiModelTest {
         assertEquals(TransactionDirection.INCOME, uiModel.items.single().direction)
         assertEquals("+34 dUSDC", uiModel.items.single().amountText)
         assertEquals("미리받기 지급", uiModel.items.single().counterpartyName)
-        assertEquals("약 ₩50,000 상당", uiModel.items.single().memo)
+        assertEquals("약 30,000원 상당", uiModel.items.single().memo)
     }
 
     @Test
@@ -93,7 +93,7 @@ class TransactionHistoryUiModelTest {
                         direction = "OUTBOUND",
                         amountAtomic = 12_500_000L,
                         occurredAt = "2026-03-25T10:00:00",
-                        counterpartyLabel = "차지훈"
+                        counterpartyLabel = "찬호"
                     ),
                     ledgerEntry(
                         entryId = "payout-newer",
@@ -110,7 +110,7 @@ class TransactionHistoryUiModelTest {
                         direction = "EXPENSE",
                         amountAtomic = 12_500_000L,
                         updatedAt = "2026-03-25T10:00:00",
-                        recipientAlias = "차지훈",
+                        recipientAlias = "찬호",
                         recipientAddress = "0x2222222222222222222222222222222222222222"
                     )
                 )
@@ -192,7 +192,7 @@ class TransactionHistoryUiModelTest {
             assetSymbol = "dUSDC",
             amountAtomic = amountAtomic,
             senderAddress = "0x1111111111111111111111111111111111111111",
-            senderName = "돈던 지갑",
+            senderName = "보낸 지갑",
             recipientId = "recipient-$transferId",
             recipientAlias = recipientAlias,
             recipientAddress = recipientAddress,

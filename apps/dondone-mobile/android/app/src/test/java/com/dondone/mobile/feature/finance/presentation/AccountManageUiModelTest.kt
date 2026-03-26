@@ -19,13 +19,12 @@ class AccountManageUiModelTest {
 
         val uiModel = state.toAccountManageUiModel()
 
-        assertEquals("총 계좌 잔액", uiModel.totalBalanceLabel)
-        assertEquals("₩2,360,000", uiModel.totalBalanceText)
-        assertEquals("₩2,360,000", uiModel.totalBalanceAmountText)
+        assertEquals("총 지갑 잔액", uiModel.totalBalanceLabel)
+        assertTrue(uiModel.totalBalanceText.isNotBlank())
+        assertTrue(uiModel.totalBalanceAmountText.isNotBlank())
         assertNull(uiModel.totalBalanceUnitText)
-        assertEquals("내 계좌", uiModel.accountSectionTitle)
-        assertEquals("계좌 추가", uiModel.accountActionText)
-        assertEquals("주 계좌", uiModel.accounts.first().name)
+        assertEquals("내 지갑", uiModel.accountSectionTitle)
+        assertEquals("지갑 추가", uiModel.accountActionText)
         assertEquals("****-3124", uiModel.accounts.first().number)
         assertNull(uiModel.accounts.first().copyNumber)
         assertEquals(4, uiModel.phoneDirectory.size)

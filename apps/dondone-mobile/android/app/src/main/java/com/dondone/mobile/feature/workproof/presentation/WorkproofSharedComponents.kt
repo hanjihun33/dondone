@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnPrimaryDeep
 import com.dondone.mobile.core.designsystem.DawnSurfaceAlt
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.translate
 import java.time.LocalTime
 
 @Composable
@@ -26,6 +28,7 @@ internal fun WorkproofStatusPill(
     text: String,
     tone: WorkproofRecordTone
 ) {
+    val language = LocalAppLanguage.current
     val background = when (tone) {
         WorkproofRecordTone.DEFAULT -> DawnSurfaceAlt
         WorkproofRecordTone.ACTIVE -> Color(0xFFFFF4DD)
@@ -54,7 +57,7 @@ internal fun WorkproofStatusPill(
                     .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
             )
             Text(
-                text = text,
+                text = language.translate(text),
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
                 color = color
             )

@@ -9,6 +9,7 @@ import com.dondone.mobile.data.auth.BackendAuthRepository
 import com.dondone.mobile.data.documents.BackendWorkproofDocumentRepository
 import com.dondone.mobile.data.remittance.SharedPreferencesRemittanceCompletionNoticeStore
 import com.dondone.mobile.data.remittance.BackendRemittanceRepository
+import com.dondone.mobile.data.settings.SharedPreferencesAppLanguageStore
 import com.dondone.mobile.data.vault.BackendVaultRepository
 import com.dondone.mobile.data.wage.BackendWageRepository
 import com.dondone.mobile.data.workproof.BackendWorkproofRepository
@@ -34,6 +35,7 @@ class DemoSessionViewModelFactory(
                 workproofDocumentRepository = BackendWorkproofDocumentRepository(client = client),
                 remittanceRepository = BackendRemittanceRepository(client = client),
                 remittanceCompletionNoticeStore = SharedPreferencesRemittanceCompletionNoticeStore(appContext),
+                appLanguageStore = SharedPreferencesAppLanguageStore(appContext),
                 vaultRepository = BackendVaultRepository(client = client),
                 wageRepository = BackendWageRepository(client = client)
             ) as T

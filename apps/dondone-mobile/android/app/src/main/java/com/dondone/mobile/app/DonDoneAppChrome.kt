@@ -46,6 +46,10 @@ import com.dondone.mobile.app.navigation.Route
 import com.dondone.mobile.app.navigation.mainTabs
 import com.dondone.mobile.core.designsystem.DonDoneWordmark
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
 
 private val ChromeTextStrong = Color(0xFF191F28)
 private val ChromeTextMuted = Color(0xFFB0B8C1)
@@ -122,9 +126,10 @@ internal fun resolveAppTopBarState(
 }
 
 internal fun NavDestination?.toRootTabUiStates(
-    currentRoute: String
+    currentRoute: String,
+    language: AppLanguage
 ): List<RootTabUiState> {
-    return mainTabs.map { tab ->
+    return mainTabs(language).map { tab ->
         val selected = isSelectedTab(
             rootRoute = tab.rootRoute,
             currentRoute = currentRoute
@@ -178,7 +183,6 @@ internal fun AppTopBar(
                 )
             }
         }
-
     }
 }
 
@@ -187,6 +191,8 @@ private fun RootTopBar(
     state: RootTopBarState,
     onMenuClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -215,7 +221,7 @@ private fun RootTopBar(
             IconButton(onClick = onMenuClick) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "설정",
+                    contentDescription = language.text(AppTextKeys.SETTINGS),
                     tint = ChromeTextMuted
                 )
             }
@@ -249,11 +255,12 @@ private fun ChildTopBar(
 private fun BackButton(
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-        contentDescription = "뒤로",
+        contentDescription = language.text(AppTextKeys.BACK),
         modifier = Modifier
             .size(32.dp)
             .clickable(

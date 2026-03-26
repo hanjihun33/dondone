@@ -64,6 +64,9 @@ import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.DonDoneProgressBar
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
+import com.dondone.mobile.core.i18n.translate
 import com.dondone.mobile.domain.advance.AdvanceSurfaceState
 import com.dondone.mobile.data.vault.VaultActionType
 
@@ -364,6 +367,7 @@ private fun FinanceVaultSection(
     uiModel: FinanceVaultUiModel,
     onOpenSheet: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     var dismissedStatusKey by rememberSaveable { mutableStateOf<String?>(null) }
     val showStatusBanner =
         uiModel.latestStatusText != null &&
@@ -371,26 +375,22 @@ private fun FinanceVaultSection(
             uiModel.latestStatusKey != dismissedStatusKey
     val description = when {
         showStatusBanner -> ""
-        uiModel.depositStatusText == "미신청" || uiModel.depositStatusText == "미예치" -> ""
+        !uiModel.showHelperText -> ""
         else -> uiModel.helperText
     }
 
     FinanceBlockSection(
-        title = "예치 이자",
+        title = language.text("finance_vault_yield"),
         description = description
     ) {
-        FinanceKeyValueRow(label = "예치 잔액", value = uiModel.depositStatusText)
-        FinanceKeyValueRow(label = "누적 이자(추정)", value = uiModel.accruedInterestText)
-        FinanceKeyValueRow(label = "예상 연이율", value = uiModel.aprText)
+        FinanceKeyValueRow(label = language.text("finance_vault_balance"), value = uiModel.depositStatusText)
+        FinanceKeyValueRow(label = language.text("finance_accrued_yield_est"), value = uiModel.accruedInterestText)
+        FinanceKeyValueRow(label = language.text("finance_estimated_apy"), value = uiModel.aprText)
         if (showStatusBanner) {
             FinanceVaultStatusBanner(
                 title = uiModel.latestStatusText,
                 body = uiModel.detail.statusBodyText ?: uiModel.helperText,
-                tone = when {
-                    uiModel.latestStatusIsError -> BadgeTone.Warning
-                    uiModel.latestStatusText.contains("완료") -> BadgeTone.Success
-                    else -> BadgeTone.Info
-                },
+                tone = uiModel.latestStatusTone,
                 onDismiss = { dismissedStatusKey = uiModel.latestStatusKey }
             )
         }
@@ -448,8 +448,9 @@ private fun FinanceBottomSheetSection(
 private fun FinanceBottomSheetHeader(
     title: String
 ) {
+    val language = LocalAppLanguage.current
     Text(
-        text = title,
+        text = language.translate(title),
         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
         color = FinanceTextPrimary
     )
@@ -488,13 +489,14 @@ private fun FinanceSectionHeader(
     title: String,
     trailing: @Composable () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = title,
+            text = language.translate(title),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
             color = FinanceTextPrimary
         )
@@ -508,6 +510,7 @@ private fun FinanceKeyValueRow(
     value: String,
     valueColor: Color = FinanceTextPrimary
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -516,7 +519,7 @@ private fun FinanceKeyValueRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelLarge,
             color = FinanceTextMuted
         )
@@ -535,6 +538,7 @@ private fun FinanceAmountKeyValueRow(
     label: String,
     value: String
 ) {
+    val language = LocalAppLanguage.current
     val parts = value.split("·", limit = 2).map { it.trim() }
     val primaryValue = parts.firstOrNull().orEmpty()
     val secondaryValue = parts.getOrNull(1)
@@ -547,7 +551,7 @@ private fun FinanceAmountKeyValueRow(
         verticalAlignment = Alignment.Top
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelLarge,
             color = FinanceTextMuted
         )
@@ -581,6 +585,7 @@ private fun FinanceDetailKeyValueRow(
     value: String,
     valueColor: Color = FinanceTextPrimary
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -589,7 +594,7 @@ private fun FinanceDetailKeyValueRow(
         verticalAlignment = Alignment.Top
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             modifier = Modifier.weight(0.34f),
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
             color = DawnTextSubtle
@@ -719,6 +724,7 @@ private fun FinanceAdvanceBottomSheet(
     onOpenWorkproof: () -> Unit,
     onOpenHistoryDetail: (Long) -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -742,27 +748,27 @@ private fun FinanceAdvanceBottomSheet(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "미리받기",
+                        text = language.text("finance_advance_title"),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
                         color = FinanceTextPrimary
                     )
                 }
-                FinanceLinkButton(text = "닫기", onClick = onDismiss)
+                FinanceLinkButton(text = language.text("finance_close"), onClick = onDismiss)
             }
             Spacer(modifier = Modifier.height(6.dp))
             if (uiModel.hasCurrentRequest) {
                 FinanceSheetDetailRow(
-                    label = "이번 달 받은 금액",
+                    label = language.text("amount_received_this_month"),
                     value = uiModel.summaryAmountText
                 )
                 HorizontalDivider(color = FinanceDivider)
                 FinanceSheetDetailRow(
-                    label = "추가 신청 가능 금액",
+                    label = language.text("additional_requestable_amount"),
                     value = uiModel.availableText
                 )
                 HorizontalDivider(color = FinanceDivider)
                 FinanceSheetDetailRow(
-                    label = "정산일",
+                    label = language.text("settlement_date"),
                     value = uiModel.repaymentDueText
                 )
             } else {
@@ -782,7 +788,7 @@ private fun FinanceAdvanceBottomSheet(
 
         FinanceBottomSheetDivider()
         FinanceBottomSheetSection {
-            FinanceBottomSheetHeader(title = "근무 반영")
+            FinanceBottomSheetHeader(title = language.text("attendance_reflection"))
             FinanceSheetPanel(
                 backgroundColor = Color.White,
                 borderColor = FinanceDivider
@@ -801,10 +807,10 @@ private fun FinanceAdvanceBottomSheet(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FinanceCalendarLegendItem(label = "미기록", background = Color.White, border = FinanceCalendarDefaultBorder)
-                        FinanceCalendarLegendItem(label = "출근만", background = FinancePartialBackground, border = FinancePartialBorder)
-                        FinanceCalendarLegendItem(label = "완료", background = FinanceReflectedBackground, border = FinanceReflectedBorder)
-                        FinanceCalendarLegendItem(label = "수정", background = FinanceReviewBackground, border = FinanceReviewBorder)
+                        FinanceCalendarLegendItem(label = language.text("not_recorded"), background = Color.White, border = FinanceCalendarDefaultBorder)
+                        FinanceCalendarLegendItem(label = language.text("clock_in_only"), background = FinancePartialBackground, border = FinancePartialBorder)
+                        FinanceCalendarLegendItem(label = language.text("completed"), background = FinanceReflectedBackground, border = FinanceReflectedBorder)
+                        FinanceCalendarLegendItem(label = language.text("edited"), background = FinanceReviewBackground, border = FinanceReviewBorder)
                     }
                 }
             }
@@ -813,7 +819,7 @@ private fun FinanceAdvanceBottomSheet(
         if (uiModel.canRequestAdditional && uiModel.amountOptions.isNotEmpty()) {
             FinanceBottomSheetDivider()
             FinanceBottomSheetSection {
-                FinanceBottomSheetHeader(title = "받을 금액")
+                FinanceBottomSheetHeader(title = language.text("receivable_amount"))
                 FinanceAmountOptionGrid(
                     options = uiModel.amountOptions,
                     onSelect = {
@@ -826,9 +832,9 @@ private fun FinanceAdvanceBottomSheet(
                     style = MaterialTheme.typography.bodyMedium,
                     color = FinanceTextMuted
                 )
-                FinanceKeyValueRow(label = "이번 수령 예정", value = uiModel.receiveAmountText)
-                FinanceKeyValueRow(label = "수수료", value = uiModel.feeText)
-                FinanceKeyValueRow(label = "선택 금액", value = uiModel.requestAmountText)
+                FinanceKeyValueRow(label = language.text("planned_payout"), value = uiModel.receiveAmountText)
+                FinanceKeyValueRow(label = language.text("fee"), value = uiModel.feeText)
+                FinanceKeyValueRow(label = language.text("selected_amount"), value = uiModel.requestAmountText)
             }
         }
 
@@ -1248,6 +1254,7 @@ private fun FinanceAdvanceHeroCard(
     amountText: String,
     repaymentDueText: String
 ) {
+    val language = LocalAppLanguage.current
     val backgroundColor = when (surfaceState) {
         AdvanceSurfaceState.BLOCKED -> FinanceAdvanceSheetMutedBackground
         else -> FinanceSurfaceMuted
@@ -1276,7 +1283,7 @@ private fun FinanceAdvanceHeroCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "정산일",
+                text = language.text("settlement_date"),
                 style = MaterialTheme.typography.labelLarge,
                 color = FinanceTextMuted
             )
@@ -1291,7 +1298,7 @@ private fun FinanceAdvanceHeroCard(
 
 @Composable
 private fun FinanceAdvanceHeroAmount(amountText: String) {
-    val parts = amountText.split(" · 약 ", limit = 2)
+    val parts = amountText.split(" · ", limit = 2)
     val primaryAmount = parts.firstOrNull().orEmpty()
     val referenceAmount = parts.getOrNull(1)
     val amountParts = primaryAmount.split(" ", limit = 2)
@@ -1330,7 +1337,7 @@ private fun FinanceAdvanceHeroAmount(amountText: String) {
         )
         if (!referenceAmount.isNullOrBlank()) {
             Text(
-                text = "약 $referenceAmount",
+                text = referenceAmount,
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 color = FinanceTextMuted
             )
@@ -1806,13 +1813,14 @@ private fun FinanceAdvanceStatusCard(
 
 @Composable
 private fun FinanceAdvanceLineItem(label: String, value: String) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelLarge,
             color = DawnTextSubtle
         )
@@ -1830,6 +1838,7 @@ private fun FinanceSummaryMetricCard(
     value: String,
     modifier: Modifier = Modifier
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = modifier
             .background(FinanceAdvanceSheetMutedBackground, RoundedCornerShape(14.dp))
@@ -1838,7 +1847,7 @@ private fun FinanceSummaryMetricCard(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelMedium,
             color = FinanceTextMuted
         )
@@ -1858,6 +1867,7 @@ private fun FinanceSummaryAmountCard(
     value: String,
     modifier: Modifier = Modifier
 ) {
+    val language = LocalAppLanguage.current
     val parts = value.split("·", limit = 2).map { it.trim() }
     val primaryValue = parts.firstOrNull().orEmpty()
     val secondaryValue = parts.getOrNull(1)
@@ -1870,7 +1880,7 @@ private fun FinanceSummaryAmountCard(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.bodyMedium,
             color = FinanceTextMuted
         )
@@ -1920,6 +1930,7 @@ private fun FinanceSheetDetailRow(
     label: String,
     value: String
 ) {
+    val language = LocalAppLanguage.current
     val parts = value.split("·", limit = 2).map { it.trim() }
     val primaryValue = parts.firstOrNull().orEmpty()
 
@@ -1931,7 +1942,7 @@ private fun FinanceSheetDetailRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
             color = FinanceTextMuted
         )
@@ -1949,13 +1960,14 @@ private fun FinanceRatioBar(
     value: String,
     progress: Float
 ) {
+    val language = LocalAppLanguage.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = label,
+                text = language.translate(label),
                 style = MaterialTheme.typography.labelMedium,
                 color = DawnTextSubtle
             )
@@ -2005,6 +2017,7 @@ private fun FinanceProgressMetric(
     value: String,
     modifier: Modifier = Modifier
 ) {
+    val language = LocalAppLanguage.current
     val parts = value.split("·", limit = 2).map { it.trim() }
     val primaryValue = parts.firstOrNull().orEmpty()
 
@@ -2016,7 +2029,7 @@ private fun FinanceProgressMetric(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelMedium,
             color = FinanceTextMuted
         )
@@ -2062,6 +2075,7 @@ private fun FinanceAdvanceTierGuideSheet(
     uiModel: FinanceAdvanceUiModel,
     onDismiss: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -2076,12 +2090,12 @@ private fun FinanceAdvanceTierGuideSheet(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "한도 구간 안내",
+                        text = language.text("limit_tier_guide"),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
                         color = FinanceTextPrimary
                     )
                 }
-                FinanceLinkButton(text = "닫기", onClick = onDismiss)
+                FinanceLinkButton(text = language.text("finance_close"), onClick = onDismiss)
             }
         }
 
@@ -2094,7 +2108,7 @@ private fun FinanceAdvanceTierGuideSheet(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "현재 내 한도",
+                        text = language.text("current_limit"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = FinanceTextPrimary
                     )
@@ -2104,7 +2118,7 @@ private fun FinanceAdvanceTierGuideSheet(
                         availableAmount = uiModel.availableText
                     )
                     Text(
-                        text = "출근 기록이 더 반영되면 같은 달에도 한도가 늘어날 수 있어요.",
+                        text = language.text("your_limit_can_increase_within_the_same_month_as_more_attendance_is_reflected"),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = FinanceTextMuted
                     )
@@ -2133,6 +2147,7 @@ private fun FinanceTierGuideRow(
     body: String,
     cap: String? = null
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -2146,20 +2161,20 @@ private fun FinanceTierGuideRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = title,
+                text = language.translate(title),
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                 color = FinanceTextPrimary
             )
             if (cap != null) {
                 Text(
-                    text = cap,
+                    text = language.translate(cap),
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                     color = FinanceAccent
                 )
             }
         }
         Text(
-            text = body,
+            text = language.translate(body),
             style = MaterialTheme.typography.bodyMedium,
             color = FinanceTextMuted
         )
@@ -2188,6 +2203,7 @@ private fun FinanceGuideMetricRow(
     value: String,
     showDivider: Boolean = true
 ) {
+    val language = LocalAppLanguage.current
     val parts = value.split("·", limit = 2).map { it.trim() }
     val primaryValue = parts.firstOrNull().orEmpty()
     val secondaryValue = parts.getOrNull(1)
@@ -2201,7 +2217,7 @@ private fun FinanceGuideMetricRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = label,
+                text = language.translate(label),
                 style = MaterialTheme.typography.bodyMedium,
                 color = FinanceTextMuted
             )
@@ -2231,8 +2247,9 @@ private fun FinanceGuideMetricRow(
 
 @Composable
 private fun FinanceCapsule(text: String) {
+    val language = LocalAppLanguage.current
     Text(
-        text = text,
+        text = language.translate(text),
         modifier = Modifier
             .background(FinanceSurfaceMuted, RoundedCornerShape(999.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -2254,10 +2271,11 @@ private fun FinanceLinkText(
     text: String,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     Text(
-        text = text,
+        text = language.translate(text),
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .pressableScale(
@@ -2282,6 +2300,7 @@ private fun FinancePrimaryButton(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -2302,7 +2321,7 @@ private fun FinancePrimaryButton(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Text(
-                text = text,
+                text = language.translate(text),
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
             )
         }
@@ -2315,6 +2334,7 @@ private fun FinanceSoftButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -2333,7 +2353,7 @@ private fun FinanceSoftButton(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Text(
-                text = text,
+                text = language.translate(text),
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
             )
         }
@@ -2348,6 +2368,7 @@ private fun FinanceActionToggleButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -2372,7 +2393,7 @@ private fun FinanceActionToggleButton(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Text(
-                text = text,
+                text = language.translate(text),
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black)
             )
         }

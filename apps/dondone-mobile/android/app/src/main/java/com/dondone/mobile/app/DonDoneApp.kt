@@ -25,8 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dondone.mobile.app.navigation.AppBackAction
@@ -46,6 +46,10 @@ import com.dondone.mobile.core.designsystem.DonDoneToastHost
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.rememberDonDoneToastState
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.ProvideAppLanguage
+import com.dondone.mobile.core.i18n.text
 import com.dondone.mobile.domain.model.DemoInfo
 import com.dondone.mobile.feature.auth.presentation.LoginLoadingScreen
 import com.dondone.mobile.feature.auth.presentation.LoginScreen
@@ -57,30 +61,37 @@ private const val WORKER_REGISTRATION_CODE_MIN_LENGTH = 8
 fun DonDoneApp(
     viewModel: DemoSessionViewModel
 ) {
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
 
-    if (authUiState.isRestoring) {
-        LoginLoadingScreen()
-        return
-    }
+    ProvideAppLanguage(language = appLanguage) {
+        if (authUiState.isRestoring) {
+            LoginLoadingScreen()
+            return@ProvideAppLanguage
+        }
 
-    if (!authUiState.isAuthenticated) {
-        LoginScreen(
-            uiState = authUiState,
-            onLogin = viewModel::login,
-            onSignup = viewModel::signup,
-            onFieldEdited = viewModel::clearAuthError
+        if (!authUiState.isAuthenticated) {
+            LoginScreen(
+                uiState = authUiState,
+                onLogin = viewModel::login,
+                onSignup = viewModel::signup,
+                onFieldEdited = viewModel::clearAuthError
+            )
+            return@ProvideAppLanguage
+        }
+
+        AuthenticatedDonDoneAppShell(
+            viewModel = viewModel,
+            appLanguage = appLanguage
         )
-        return
     }
-
-    AuthenticatedDonDoneAppShell(viewModel = viewModel)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AuthenticatedDonDoneAppShell(
-    viewModel: DemoSessionViewModel
+    viewModel: DemoSessionViewModel,
+    appLanguage: AppLanguage
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
@@ -96,7 +107,7 @@ private fun AuthenticatedDonDoneAppShell(
     var isWorkerRegistrationSheetVisible by rememberSaveable { mutableStateOf(false) }
     var workerRegistrationCodeInput by rememberSaveable { mutableStateOf("") }
     val workerRegistrationCodeValidationMessage =
-        workerRegistrationCodeValidationMessage(workerRegistrationCodeInput)
+        workerRegistrationCodeValidationMessage(workerRegistrationCodeInput, appLanguage)
     val isWorkerRegistrationSavable =
         workerRegistrationCodeInput.isNotBlank() && workerRegistrationCodeValidationMessage == null
 
@@ -104,7 +115,8 @@ private fun AuthenticatedDonDoneAppShell(
         route = currentRoute,
         transferStep = remittance.flowStep,
         transferStatus = remittance.status,
-        isWorkproofDetailVisible = workproofShellState.isDetailVisible
+        isWorkproofDetailVisible = workproofShellState.isDetailVisible,
+        language = appLanguage
     )
     val topBarState = resolveAppTopBarState(
         currentRoute = currentRoute,
@@ -113,7 +125,10 @@ private fun AuthenticatedDonDoneAppShell(
         headerTitle = chrome.headerTitle,
         headerDateText = uiState.demo.toHeaderDateTextOrNull(showDate = chrome.showDate)
     )
-    val rootTabs = currentDestination.toRootTabUiStates(currentRoute)
+    val rootTabs = currentDestination.toRootTabUiStates(
+        currentRoute = currentRoute,
+        language = appLanguage
+    )
 
     fun handleBack() {
         when (
@@ -197,6 +212,7 @@ private fun AuthenticatedDonDoneAppShell(
                     modifier = Modifier.fillMaxSize(),
                     navController = navController,
                     viewModel = viewModel,
+                    appLanguage = appLanguage,
                     workproofResetVersion = workproofShellState.resetVersion,
                     onNavigateToRootTab = { route -> navController.navigateToRootTab(route) },
                     onWorkproofDetailVisibilityChange = workproofShellState.onDetailVisibilityChange,
@@ -220,6 +236,7 @@ private fun AuthenticatedDonDoneAppShell(
 
         if (isWorkerRegistrationSheetVisible) {
             WorkerRegistrationCodeSheet(
+                appLanguage = appLanguage,
                 registrationCode = workerRegistrationCodeInput,
                 validationMessage = workerRegistrationCodeValidationMessage,
                 onRegistrationCodeChange = { nextValue ->
@@ -244,6 +261,7 @@ private fun AuthenticatedDonDoneAppShell(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WorkerRegistrationCodeSheet(
+    appLanguage: AppLanguage,
     registrationCode: String,
     validationMessage: String?,
     onRegistrationCodeChange: (String) -> Unit,
@@ -262,7 +280,7 @@ private fun WorkerRegistrationCodeSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             Text(
-                text = "근로자 등록 코드 입력",
+                text = appLanguage.text(AppTextKeys.ENTER_WORKER_REGISTRATION_CODE),
                 style = MaterialTheme.typography.headlineSmall
             )
             OutlinedTextField(
@@ -273,11 +291,11 @@ private fun WorkerRegistrationCodeSheet(
                     .padding(top = 20.dp),
                 singleLine = true,
                 isError = validationMessage != null,
-                label = { Text("등록 코드") },
-                placeholder = { Text("예: WORKER-AB12-CD34") },
+                label = { Text(appLanguage.text(AppTextKeys.REGISTRATION_CODE)) },
+                placeholder = { Text(appLanguage.text(AppTextKeys.EXAMPLE_WORKER_CODE)) },
                 supportingText = {
                     Text(
-                        text = validationMessage ?: "영문 대문자, 숫자, 하이픈(-)만 입력할 수 있어요.",
+                        text = validationMessage ?: appLanguage.text(AppTextKeys.REGISTRATION_ALLOWED_CHARACTERS),
                         color = if (validationMessage != null) DawnWarning else DawnTextSubtle
                     )
                 }
@@ -288,13 +306,17 @@ private fun WorkerRegistrationCodeSheet(
                     .padding(top = 16.dp, bottom = 12.dp)
             ) {
                 SecondaryActionButton(
-                    text = "닫기",
+                    text = appLanguage.text(AppTextKeys.CLOSE),
                     onClick = onDismiss,
                     enabled = !isSubmitting,
                     modifier = Modifier.weight(1f)
                 )
                 PrimaryActionButton(
-                    text = if (isSubmitting) "등록 중.." else "등록",
+                    text = if (isSubmitting) {
+                        appLanguage.text(AppTextKeys.REGISTERING)
+                    } else {
+                        appLanguage.text(AppTextKeys.REGISTER)
+                    },
                     onClick = onSave,
                     enabled = !isSubmitting && isSaveEnabled,
                     modifier = Modifier
@@ -315,19 +337,20 @@ internal fun normalizeWorkerRegistrationCodeInput(
 }
 
 internal fun workerRegistrationCodeValidationMessage(
-    registrationCode: String
+    registrationCode: String,
+    language: AppLanguage = AppLanguage.KOREAN
 ): String? {
     if (registrationCode.isBlank()) {
         return null
     }
     if (registrationCode.any { !it.isDigit() && it !in 'A'..'Z' && it != '-' }) {
-        return "영문 대문자, 숫자, 하이픈(-)만 입력할 수 있어요."
+        return language.text(AppTextKeys.REGISTRATION_ALLOWED_CHARACTERS)
     }
     if (registrationCode.length < WORKER_REGISTRATION_CODE_MIN_LENGTH) {
-        return "등록 코드는 8자 이상이어야 해요."
+        return language.text(AppTextKeys.REGISTRATION_CODE_MIN)
     }
     if (registrationCode.length > WORKER_REGISTRATION_CODE_MAX_LENGTH) {
-        return "등록 코드는 32자 이하여야 해요."
+        return language.text(AppTextKeys.REGISTRATION_CODE_MAX)
     }
     return null
 }

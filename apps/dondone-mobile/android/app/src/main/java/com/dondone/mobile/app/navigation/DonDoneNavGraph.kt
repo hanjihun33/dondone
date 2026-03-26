@@ -13,6 +13,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.LocalAppLanguage
 import com.dondone.mobile.feature.finance.presentation.AccountManageScreen
 import com.dondone.mobile.feature.finance.presentation.FinanceHomeScreen
 import com.dondone.mobile.feature.finance.presentation.TransactionHistoryDetailScreen
@@ -39,12 +41,14 @@ fun DonDoneNavGraph(
     modifier: Modifier = Modifier,
     navController: NavHostController,
     viewModel: DemoSessionViewModel,
+    appLanguage: AppLanguage,
     workproofResetVersion: Int,
     onNavigateToRootTab: (String) -> Unit,
     onWorkproofDetailVisibilityChange: (Boolean) -> Unit,
     onOpenWorkerRegistrationCode: () -> Unit,
     onShowToast: (String, BadgeTone) -> Unit
 ) {
+    val appLanguage = LocalAppLanguage.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
     val advanceRemoteState by viewModel.advanceRemoteState.collectAsStateWithLifecycle()
@@ -137,6 +141,7 @@ fun DonDoneNavGraph(
         composable(Route.HOME) {
             HomeScreen(
                 uiModel = uiState.toHomeUiModel(
+                    language = appLanguage,
                     workproofActionUiState = workproofActionUiState,
                     wageRemoteState = wageRemoteState,
                     remittanceRemoteState = remittanceRemoteState,
@@ -165,6 +170,7 @@ fun DonDoneNavGraph(
         composable(Route.WORKPROOF) {
             WorkproofScreen(
                 uiModel = uiState.toWorkproofUiModel(
+                    language = appLanguage,
                     actionUiState = workproofActionUiState,
                     remoteState = workproofRemoteState,
                     isAuthenticated = authUiState.isAuthenticated,
@@ -198,6 +204,7 @@ fun DonDoneNavGraph(
                     workproofRemoteState = workproofRemoteState,
                     remittanceRemoteState = remittanceRemoteState,
                     vaultRemoteState = vaultRemoteState,
+                    language = appLanguage,
                     selectedAdvanceAmount = selectedAdvanceAmount,
                     selectedVaultAmount = selectedVaultAmount,
                     selectedVaultActionType = selectedVaultActionType,
@@ -226,7 +233,8 @@ fun DonDoneNavGraph(
             WageScreen(
                 uiModel = uiState.toWageUiModel(
                     remoteState = wageRemoteState,
-                    actionUiState = wageActionUiState
+                    actionUiState = wageActionUiState,
+                    language = appLanguage
                 ),
                 onApplyActualDeposit = viewModel::submitWageDeposit,
                 onRefresh = viewModel::refreshWageRemoteState,
@@ -248,6 +256,7 @@ fun DonDoneNavGraph(
                     remoteState = remittanceRemoteState,
                     actionUiState = remittanceActionUiState,
                     isAuthenticated = authUiState.isAuthenticated,
+                    language = appLanguage,
                     recipientPhoneSearchUiState = recipientPhoneSearchUiState
                 ),
                 actionUiState = remittanceActionUiState,
@@ -283,7 +292,8 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toAccountManageUiModel(
                     remittanceRemoteState = remittanceRemoteState,
                     isAuthenticated = authUiState.isAuthenticated,
-                    recipientPhoneSearchUiState = recipientPhoneSearchUiState
+                    recipientPhoneSearchUiState = recipientPhoneSearchUiState,
+                    language = appLanguage
                 ),
                 actionUiState = remittanceActionUiState,
                 onOpenTransactionHistory = { accountId ->
@@ -301,6 +311,7 @@ fun DonDoneNavGraph(
                 uiModel = uiState.toTransactionHistoryMainUiModel(
                     accountId = accountId,
                     remittanceRemoteState = remittanceRemoteState,
+                    language = appLanguage,
                     isAuthenticated = authUiState.isAuthenticated,
                     overrides = transactionMetadataOverrides
                 ),
@@ -317,6 +328,7 @@ fun DonDoneNavGraph(
                     accountId = accountId,
                     transactionId = transactionId,
                     remittanceRemoteState = remittanceRemoteState,
+                    language = appLanguage,
                     isAuthenticated = authUiState.isAuthenticated,
                     overrides = transactionMetadataOverrides
                 ),
@@ -333,6 +345,7 @@ fun DonDoneNavGraph(
                     accountId = accountId,
                     transactionId = transactionId,
                     remittanceRemoteState = remittanceRemoteState,
+                    language = appLanguage,
                     isAuthenticated = authUiState.isAuthenticated,
                     overrides = transactionMetadataOverrides
                 ),
@@ -348,11 +361,13 @@ fun DonDoneNavGraph(
                     session = authUiState.session,
                     remittanceRemoteState = remittanceRemoteState,
                     workproofPdfCreateUiState = workproofPdfCreateUiState,
+                    language = appLanguage,
                     workproofRemoteState = workproofRemoteState
                 ),
                 workproofPdfFileUiState = workproofPdfFileUiState,
                 launchRequest = menuLaunchRequest,
                 profileUpdateUiState = profileUpdateUiState,
+                selectedLanguage = appLanguage,
                 onOpenWage = { navigateWithinApp(Route.WAGE, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenAccount = { navigateWithinApp(Route.ACCOUNT, onNavigateToRootTab) { target -> navController.navigate(target) } },
                 onOpenWorkproofPdfCreation = {
@@ -365,6 +380,7 @@ fun DonDoneNavGraph(
                 onConsumeLaunchRequest = viewModel::consumeMenuLaunchRequest,
                 onUpdateProfile = viewModel::updateProfile,
                 onClearProfileUpdateMessage = viewModel::clearProfileUpdateMessage,
+                onSelectLanguage = { language -> viewModel.updateAppLanguage(language.code) },
                 onOpenWorkerRegistrationCode = onOpenWorkerRegistrationCode,
                 onLogout = viewModel::logout,
                 onShowToast = onShowToast

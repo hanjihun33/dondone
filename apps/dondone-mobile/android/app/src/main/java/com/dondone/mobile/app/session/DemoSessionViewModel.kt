@@ -31,6 +31,8 @@ import com.dondone.mobile.data.remittance.RemittanceRepository
 import com.dondone.mobile.data.remittance.RemittanceTransferDetailPayload
 import com.dondone.mobile.data.remittance.RemittanceUnauthorizedException
 import com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload
+import com.dondone.mobile.data.settings.AppLanguageStore
+import com.dondone.mobile.data.settings.InMemoryAppLanguageStore
 import com.dondone.mobile.data.vault.BackendVaultRepository
 import com.dondone.mobile.data.vault.VaultActionType
 import com.dondone.mobile.data.vault.VaultCreateTransactionPayload
@@ -56,6 +58,7 @@ import com.dondone.mobile.domain.model.TransactionCategory
 import com.dondone.mobile.domain.model.TransferDestinationMode
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
+import com.dondone.mobile.core.i18n.AppLanguage
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfCreateUiState
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileAction
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileUiState
@@ -104,6 +107,7 @@ class DemoSessionViewModel(
     private val workproofDocumentRepository: WorkproofDocumentRepository = BackendWorkproofDocumentRepository(),
     private val remittanceRepository: RemittanceRepository = BackendRemittanceRepository(),
     private val remittanceCompletionNoticeStore: RemittanceCompletionNoticeStore = InMemoryRemittanceCompletionNoticeStore(),
+    private val appLanguageStore: AppLanguageStore = InMemoryAppLanguageStore(),
     private val vaultRepository: VaultRepository = BackendVaultRepository(),
     private val wageRepository: WageRepository = BackendWageRepository(),
     private val currentLocationProvider: CurrentLocationProvider = appContext?.let(::AndroidCurrentLocationProvider)
@@ -116,6 +120,8 @@ class DemoSessionViewModel(
     private var activeVaultPollingRequestId: String? = null
     private val _uiState = MutableStateFlow(initialState)
     val uiState: StateFlow<DemoState> = _uiState.asStateFlow()
+    private val _appLanguage = MutableStateFlow(appLanguageStore.read())
+    val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
     private val _authUiState = MutableStateFlow(AuthUiState.restoring())
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
     private val _profileUpdateUiState = MutableStateFlow(ProfileUpdateUiState())
@@ -217,6 +223,15 @@ class DemoSessionViewModel(
         if (_authUiState.value.isAuthenticated) {
             refreshWageRemoteState()
         }
+    }
+
+    fun updateAppLanguage(languageCode: String) {
+        val nextLanguage = AppLanguage.fromCode(languageCode)
+        if (_appLanguage.value == nextLanguage) {
+            return
+        }
+        appLanguageStore.save(nextLanguage)
+        _appLanguage.value = nextLanguage
     }
 
     fun selectAccount(accountId: String) {

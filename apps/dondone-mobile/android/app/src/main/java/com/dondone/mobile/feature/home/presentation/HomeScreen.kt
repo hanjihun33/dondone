@@ -50,6 +50,9 @@ import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnSecondary
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
 
 private val HomeCanvas = Color.White
 private val HomeSurface = Color.White
@@ -138,8 +141,10 @@ private fun HomeAccountHero(
     onOpenAccount: () -> Unit,
     onOpenTransfer: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
+
     HomeSectionSurface {
-        HomeSectionHeader(title = "지금 쓸 수 있는 돈")
+        HomeSectionHeader(title = language.text(AppTextKeys.HOME_AVAILABLE_NOW))
 
         HomePressableCard(
             modifier = Modifier.fillMaxWidth(),
@@ -191,7 +196,7 @@ private fun HomeAccountHero(
         }
 
         HomePrimaryButton(
-            text = "송금하기",
+            text = language.text(AppTextKeys.HOME_SEND_MONEY),
             onClick = onOpenTransfer,
             modifier = Modifier.fillMaxWidth()
         )
@@ -281,6 +286,8 @@ private fun HomeActionCalloutBody(
     modifier: Modifier = Modifier,
     message: String
 ) {
+    val language = LocalAppLanguage.current
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -304,7 +311,7 @@ private fun HomeActionCalloutBody(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = "급여 점검",
+                text = language.text(AppTextKeys.WAGE_REVIEW),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                 color = HomeTextPrimary
             )
@@ -326,8 +333,10 @@ private fun HomeWorkSection(
     onClockIn: () -> Unit,
     onClockOut: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
+
     HomeSectionSurface {
-        HomeSectionHeader(title = "오늘 근무")
+        HomeSectionHeader(title = language.text(AppTextKeys.HOME_TODAYS_WORK))
 
         HomePressableCard(
             modifier = Modifier.fillMaxWidth(),
@@ -346,7 +355,7 @@ private fun HomeWorkSection(
                         color = HomeTextMuted
                     )
                     Text(
-                        text = "근무 기록 보기",
+                        text = language.text(AppTextKeys.HOME_VIEW_WORK_RECORDS),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = HomeTextPrimary
                     )
@@ -358,8 +367,8 @@ private fun HomeWorkSection(
             }
 
             if (uiModel.work.showRecordSummary) {
-                HomeKeyValueRow(label = "출근", value = uiModel.work.clockInText)
-                HomeKeyValueRow(label = "퇴근", value = uiModel.work.clockOutText)
+                HomeKeyValueRow(label = language.text(AppTextKeys.HOME_CLOCK_IN), value = uiModel.work.clockInText)
+                HomeKeyValueRow(label = language.text(AppTextKeys.HOME_CLOCK_OUT), value = uiModel.work.clockOutText)
             } else {
                 DonDoneNoticeBanner(
                     title = uiModel.work.noticeTitle ?: uiModel.work.dateText,
@@ -374,13 +383,13 @@ private fun HomeWorkSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 HomePrimaryButton(
-                    text = "출근",
+                    text = language.text(AppTextKeys.HOME_CLOCK_IN),
                     onClick = onClockIn,
                     enabled = uiModel.work.canClockIn && uiModel.work.isWithinWorkplaceRadius,
                     modifier = Modifier.weight(1f)
                 )
                 HomeSoftButton(
-                    text = "퇴근",
+                    text = language.text(AppTextKeys.HOME_CLOCK_OUT),
                     onClick = onClockOut,
                     enabled = uiModel.work.canClockOut,
                     modifier = Modifier.weight(1f)
