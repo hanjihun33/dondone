@@ -100,7 +100,7 @@ fun DemoState.toMenuUiModel(
     session: AuthSession?,
     remittanceRemoteState: RemittanceRemoteState,
     workproofPdfCreateUiState: WorkproofPdfCreateUiState,
-    language: AppLanguage = AppLanguage.fromDefault(),
+    language: AppLanguage = AppLanguage.KOREAN,
     workproofRemoteState: WorkproofRemoteState = WorkproofRemoteState.unauthenticated("")
 ): MenuUiModel {
     fun tr(text: String): String = language.translate(text)
@@ -144,7 +144,7 @@ fun DemoState.toMenuUiModel(
     )
 }
 
-private fun DocumentItem.toMenuDocumentUiModel(language: AppLanguage = AppLanguage.fromDefault()): MenuDocumentUiModel {
+private fun DocumentItem.toMenuDocumentUiModel(language: AppLanguage): MenuDocumentUiModel {
     val accent = toMenuDocumentAccent()
     val isReady = status == DOCUMENT_TYPE_READY
     fun tr(text: String): String = language.translate(text)
@@ -161,7 +161,7 @@ private fun DocumentItem.toMenuDocumentUiModel(language: AppLanguage = AppLangua
     )
 }
 
-private fun WorkproofPdfCreateUiState.toLiveProofDocument(language: AppLanguage = AppLanguage.fromDefault()): MenuDocumentUiModel? {
+private fun WorkproofPdfCreateUiState.toLiveProofDocument(language: AppLanguage): MenuDocumentUiModel? {
     val currentStatus = status ?: return null
     val isActionable = documentId != null && !isFailed
     val statusTone = when (currentStatus) {
@@ -227,12 +227,12 @@ private fun MenuDocumentAccent.statusText(isReady: Boolean): String {
     }
 }
 
-private fun String?.toMenuUpdatedAtText(language: AppLanguage = AppLanguage.fromDefault()): String =
+private fun String?.toMenuUpdatedAtText(language: AppLanguage): String =
     this?.let { language.translate("$MENU_UPDATED_AT_PREFIX$it") } ?: language.translate(MENU_UPDATED_AT_EMPTY)
 
 private fun DemoState.toMenuReceiptUiModel(
     receiptDocument: DocumentItem,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): MenuReceiptUiModel {
     val receiptStatus = remittance.toMenuReceiptStatus()
 
@@ -258,7 +258,7 @@ private fun DemoState.toMenuReceiptUiModel(
 private fun DemoState.toRemoteMenuReceiptUiModel(
     transfer: RemittanceTransferDetailPayload,
     receiptDocument: DocumentItem?,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): MenuReceiptUiModel {
     val receiptStatus = transfer.toMenuReceiptStatus()
     val txHash = transfer.txHash ?: language.text("menu_receipt_missing_hash")
@@ -300,7 +300,7 @@ private fun RemittanceTransferDetailPayload.toMenuReceiptStatus(): MenuReceiptSt
     }
 }
 
-private fun MenuReceiptStatus.statusText(language: AppLanguage = AppLanguage.fromDefault()): String {
+private fun MenuReceiptStatus.statusText(language: AppLanguage): String {
     return when (this) {
         MenuReceiptStatus.Confirmed -> language.text("completed")
         MenuReceiptStatus.Failed -> language.text("menu_receipt_failed")
@@ -308,7 +308,7 @@ private fun MenuReceiptStatus.statusText(language: AppLanguage = AppLanguage.fro
     }
 }
 
-private fun MenuReceiptStatus.statusDetailText(language: AppLanguage = AppLanguage.fromDefault()): String {
+private fun MenuReceiptStatus.statusDetailText(language: AppLanguage): String {
     return when (this) {
         MenuReceiptStatus.Confirmed -> language.text("menu_receipt_confirmed_detail")
         MenuReceiptStatus.Failed -> language.text("menu_receipt_failed_detail")
@@ -316,7 +316,7 @@ private fun MenuReceiptStatus.statusDetailText(language: AppLanguage = AppLangua
     }
 }
 
-private fun MenuReceiptStatus.pendingNoticeText(language: AppLanguage = AppLanguage.fromDefault()): String? {
+private fun MenuReceiptStatus.pendingNoticeText(language: AppLanguage): String? {
     return when (this) {
         MenuReceiptStatus.Pending -> language.text("menu_receipt_pending_notice")
         MenuReceiptStatus.Failed -> language.text("menu_receipt_failed_notice")
@@ -326,7 +326,7 @@ private fun MenuReceiptStatus.pendingNoticeText(language: AppLanguage = AppLangu
 
 private fun DemoState.buildReceiptShareText(
     receiptStatus: MenuReceiptStatus,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): String {
     return buildString {
         append(language.text("menu_share_receipt_title"))
@@ -337,7 +337,7 @@ private fun DemoState.buildReceiptShareText(
         append(language.text("menu_amount_prefix"))
         append(
             if (remittance.destinationMode == TransferDestinationMode.ACCOUNT) {
-                formatKrw(remittance.draftAmountUsd * 1_450)
+                formatKrw(remittance.draftAmountUsd * 1_450, language)
             } else {
                 "${'$'}${remittance.draftAmountUsd} USDC"
             }
@@ -357,7 +357,7 @@ private fun DemoState.buildReceiptShareText(
 private fun DemoState.buildRemoteReceiptShareText(
     transfer: RemittanceTransferDetailPayload,
     receiptStatus: MenuReceiptStatus,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): String {
     return buildString {
         append(language.text("menu_share_receipt_title"))

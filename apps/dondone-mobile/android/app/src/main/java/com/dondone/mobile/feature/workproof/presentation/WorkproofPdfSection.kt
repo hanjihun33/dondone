@@ -433,7 +433,8 @@ internal fun buildWorkproofPdfFileName(startDate: LocalDate, endDate: LocalDate)
 
 internal fun openWorkproofPdfFile(
     context: Context,
-    uri: Uri
+    uri: Uri,
+    language: AppLanguage
 ) {
     runCatching {
         context.startActivity(
@@ -444,14 +445,15 @@ internal fun openWorkproofPdfFile(
             }
         )
     }.onFailure {
-        Toast.makeText(context, AppLanguage.fromDefault().text("workproof_unable_to_open_pdf"), Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, language.text("workproof_unable_to_open_pdf"), Toast.LENGTH_SHORT).show()
     }
 }
 
 internal fun shareWorkproofPdfFile(
     context: Context,
     uri: Uri,
-    fileName: String?
+    fileName: String?,
+    language: AppLanguage
 ) {
     runCatching {
         context.startActivity(
@@ -459,17 +461,17 @@ internal fun shareWorkproofPdfFile(
                 Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TITLE, fileName ?: AppLanguage.fromDefault().text("workproof_work_record_document"))
+                    putExtra(Intent.EXTRA_TITLE, fileName ?: language.text("workproof_work_record_document"))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 },
-                AppLanguage.fromDefault().text("workproof_share_work_record_document")
+                language.text("workproof_share_work_record_document")
             ).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         )
     }.onFailure {
-        Toast.makeText(context, AppLanguage.fromDefault().text("workproof_unable_to_share_pdf"), Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, language.text("workproof_unable_to_share_pdf"), Toast.LENGTH_SHORT).show()
     }
 }
 

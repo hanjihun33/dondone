@@ -1368,7 +1368,7 @@ private fun TransferAccountBottomSheet(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = resolveAccountBadgeText(uiModel.selectedAccountName),
+                text = resolveAccountBadgeText(uiModel.selectedAccountName, language),
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
                 color = Color(0xFF1F2937)
             )
@@ -1643,7 +1643,7 @@ private fun TransferDestinationMode.toRecipientPickerTab(): RecipientPickerTab =
 
 private fun RecipientPickerTab.searchPlaceholder(
     accountPlaceholder: String,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): String =
     if (this == RecipientPickerTab.Account) {
         accountPlaceholder
@@ -1651,7 +1651,7 @@ private fun RecipientPickerTab.searchPlaceholder(
         language.text("transfer_enter_wallet_address")
     }
 
-private fun RecipientPickerTab.emptyStateDescription(language: AppLanguage = AppLanguage.fromDefault()): String =
+private fun RecipientPickerTab.emptyStateDescription(language: AppLanguage): String =
     if (this == RecipientPickerTab.Account) {
         language.text("transfer_search_again_account")
     } else {
@@ -1660,7 +1660,7 @@ private fun RecipientPickerTab.emptyStateDescription(language: AppLanguage = App
 
 private fun RecipientPickerTab.resolveSectionTitle(
     baseTitle: String,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): String =
     when (baseTitle) {
         language.text("transfer_frequent_wallet") -> if (this == RecipientPickerTab.Account) language.text("transfer_frequent_account") else baseTitle
@@ -1707,7 +1707,7 @@ private fun TransferRecipientUiModel.secondaryLabel(selectedTab: RecipientPicker
 
 private fun resolveDestinationSummary(
     uiModel: TransferUiModel,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): TransferDestinationSummary =
     if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
         TransferDestinationSummary(
@@ -1724,7 +1724,7 @@ private fun resolveDestinationSummary(
 private fun resolveAmountStepCopy(
     uiModel: TransferUiModel,
     amountInput: String,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): TransferAmountStepCopy {
     val hasAmountInput = amountInput.isNotBlank() && amountInput != "0"
     val promptText = if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
@@ -1734,7 +1734,7 @@ private fun resolveAmountStepCopy(
     }
     val assistText = language.text("transfer_balance_input_format", uiModel.selectedAccountBalanceText)
     val amountDisplay = when (uiModel.destinationMode) {
-        TransferDestinationMode.ACCOUNT -> amountInput.toIntOrNull()?.let(::formatKrw).orEmpty()
+        TransferDestinationMode.ACCOUNT -> amountInput.toIntOrNull()?.let { formatKrw(it, language) }.orEmpty()
         TransferDestinationMode.WALLET -> amountInput.ifBlank { "0" } + " USDC"
     }
 
@@ -1773,7 +1773,7 @@ private fun convertTransferAmountInput(
 
 private fun resolveTrackerCopy(
     uiModel: TransferUiModel,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): TransferTrackerCopy {
     val destination = resolveDestinationSummary(uiModel, language)
     val statusText = when (uiModel.transferStatus) {
@@ -1804,7 +1804,7 @@ private fun resolveTrackerCopy(
 
 private fun resolveReviewCopy(
     uiModel: TransferUiModel,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): TransferReviewCopy =
     if (uiModel.destinationMode == TransferDestinationMode.ACCOUNT) {
         TransferReviewCopy(
@@ -1828,8 +1828,8 @@ private fun resolveReviewCopy(
         )
     }
 
-private fun resolveAccountBadgeText(accountName: String): String =
-    accountName.trim().take(2).ifBlank { AppLanguage.fromDefault().text("account") }
+private fun resolveAccountBadgeText(accountName: String, language: AppLanguage): String =
+    accountName.trim().take(2).ifBlank { language.text("account") }
 
 private fun appendTransferAmountInput(
     current: String,

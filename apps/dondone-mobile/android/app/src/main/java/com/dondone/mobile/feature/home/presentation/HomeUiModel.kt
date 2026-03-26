@@ -213,8 +213,8 @@ private fun resolveHomeAccountUiModel(
 
     return HomeAccountUiModel(
         titleText = language.text(AppTextKeys.HOME_PRIMARY_ACCOUNT),
-        balanceText = formatKrw(selectedAccount.balance),
-        balanceAmountText = formatKrw(selectedAccount.balance),
+        balanceText = formatKrw(selectedAccount.balance, language),
+        balanceAmountText = formatKrw(selectedAccount.balance, language),
         balanceUnitText = null
     )
 }

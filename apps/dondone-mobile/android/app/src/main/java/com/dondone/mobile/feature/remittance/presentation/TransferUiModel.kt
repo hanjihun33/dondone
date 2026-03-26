@@ -101,7 +101,7 @@ fun DemoState.toTransferUiModel(
     remoteState: RemittanceRemoteState,
     actionUiState: RemittanceActionUiState,
     isAuthenticated: Boolean,
-    language: AppLanguage = AppLanguage.fromDefault(),
+    language: AppLanguage = AppLanguage.KOREAN,
     recipientPhoneSearchUiState: RecipientPhoneSearchUiState = RecipientPhoneSearchUiState()
 ): TransferUiModel {
     val isRemoteMode = isAuthenticated
@@ -174,7 +174,7 @@ fun DemoState.toTransferUiModel(
         isRemoteMode = isRemoteMode,
         selectedAccountName = remoteAccount?.name ?: selectedAccount.name,
         selectedAccountNumber = remoteAccount?.number ?: selectedAccount.number,
-        selectedAccountBalanceText = remoteAccount?.balanceText ?: formatKrw(selectedAccount.balance),
+        selectedAccountBalanceText = remoteAccount?.balanceText ?: formatKrw(selectedAccount.balance, language),
         selectedRecipientName = selectedRecipientName,
         selectedRecipientAccountLabel = selectedRecipient?.let { buildRecipientAccountLabel(it.address) }
             ?: language.text("transfer_select_account"),
@@ -183,7 +183,7 @@ fun DemoState.toTransferUiModel(
         selectedRecipientWalletFullLabel = selectedRecipient?.address ?: language.text("transfer_select_wallet"),
         amountUsd = amountUsd.toString(),
         confirmationAmountText = if (!isRemoteMode && remittance.destinationMode == TransferDestinationMode.ACCOUNT) {
-            formatKrw(amountKrw)
+            formatKrw(amountKrw, language)
         } else {
             "$$amountUsd USDC"
         },
@@ -238,7 +238,7 @@ fun DemoState.toTransferUiModel(
                 id = account.id,
                 name = account.name,
                 number = account.number,
-                balanceText = formatKrw(account.balance),
+                balanceText = formatKrw(account.balance, language),
                 selected = account.id == remittance.selectedAccountId
             )
         },
@@ -248,7 +248,7 @@ fun DemoState.toTransferUiModel(
 
 private fun buildRecipientSections(
     recipients: List<TransferRecipientUiModel>,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): List<TransferRecipientSectionUiModel> {
     if (recipients.isEmpty()) return emptyList()
     if (recipients.size == 1) {
@@ -285,7 +285,7 @@ private fun recipientTone(index: Int): TransferRecipientTone =
 
 private fun resolveRemoteGate(
     remoteState: RemittanceRemoteState,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): TransferRemoteGateUiModel? {
     return when (remoteState.mode) {
         RemittanceRemoteMode.LOADING -> TransferRemoteGateUiModel(
@@ -324,7 +324,7 @@ private fun resolveRemoteGate(
 }
 
 private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload.toReviewNotice(
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): TransferReviewNoticeUiModel? {
     return when (policyCode) {
         "RECENT_RECIPIENT_CONFIRMATION_REQUIRED" -> TransferReviewNoticeUiModel(
@@ -342,7 +342,7 @@ private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload
 }
 
 private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenBalance(
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage
 ): String {
     val normalized = tokenBalanceAtomic.toBigDecimalOrNull()
         ?.movePointLeft(assetDecimals)
@@ -351,7 +351,7 @@ private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.fo
     return "${normalized.stripTrailingZeros().toPlainString()} $assetSymbol"
 }
 
-private fun String.toTrackerDetailText(language: AppLanguage = AppLanguage.fromDefault()): String = when (uppercase(Locale.ROOT)) {
+private fun String.toTrackerDetailText(language: AppLanguage): String = when (uppercase(Locale.ROOT)) {
     "REQUESTED" -> language.text("transfer_request_created")
     "SIGNED" -> language.text("transfer_preparing_signature")
     "BROADCASTED" -> language.text("transfer_waiting_blockchain_result")

@@ -3,7 +3,6 @@ package com.dondone.mobile.core.i18n
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import java.text.NumberFormat
 import java.util.Locale
@@ -38,10 +37,6 @@ fun ProvideAppLanguage(
     language: AppLanguage,
     content: @Composable () -> Unit
 ) {
-    SideEffect {
-        Locale.setDefault(language.locale)
-    }
-
     CompositionLocalProvider(
         LocalAppLanguage provides language,
         content = content

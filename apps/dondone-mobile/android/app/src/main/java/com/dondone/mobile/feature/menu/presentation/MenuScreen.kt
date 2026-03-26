@@ -163,7 +163,7 @@ fun MenuScreen(
         val uri = Uri.parse(fileUri)
         when (action) {
             WorkproofPdfFileAction.OPEN -> openMenuWorkproofPdfFile(context, uri)
-            WorkproofPdfFileAction.SHARE -> shareMenuWorkproofPdfFile(context, uri, workproofPdfFileUiState.fileName)
+            WorkproofPdfFileAction.SHARE -> shareMenuWorkproofPdfFile(context, uri, workproofPdfFileUiState.fileName, language)
         }
         onClearPdfFileState()
     }
@@ -410,7 +410,8 @@ private fun openMenuWorkproofPdfFile(
 private fun shareMenuWorkproofPdfFile(
     context: Context,
     uri: Uri,
-    fileName: String?
+    fileName: String?,
+    language: AppLanguage
 ): Boolean {
     return runCatching {
         context.startActivity(
@@ -418,10 +419,10 @@ private fun shareMenuWorkproofPdfFile(
                 Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TITLE, fileName ?: AppLanguage.fromDefault().text("workproof_work_record_document"))
+                    putExtra(Intent.EXTRA_TITLE, fileName ?: language.text("workproof_work_record_document"))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 },
-                AppLanguage.fromDefault().text("workproof_share_work_record_document")
+                language.text("workproof_share_work_record_document")
             ).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -645,12 +646,12 @@ private fun MenuProfileInfoRow(
     }
 }
 
-private fun String?.toProfileValue(language: AppLanguage = AppLanguage.fromDefault()): String {
+private fun String?.toProfileValue(language: AppLanguage): String {
     val value = this?.trim()
     return if (value.isNullOrBlank()) language.text("none") else value
 }
 
-private fun MenuSessionUiModel.toOrganizationSummary(language: AppLanguage = AppLanguage.fromDefault()): String {
+private fun MenuSessionUiModel.toOrganizationSummary(language: AppLanguage): String {
     val company = companyName?.trim().orEmpty()
     val workplace = workplaceName?.trim().orEmpty()
 

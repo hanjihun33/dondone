@@ -239,7 +239,7 @@ fun DemoState.toFinanceHomeUiModel(
     workproofRemoteState: WorkproofRemoteState? = null,
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
     vaultRemoteState: VaultRemoteState? = null,
-    language: AppLanguage = AppLanguage.fromDefault(),
+    language: AppLanguage = AppLanguage.KOREAN,
     selectedAdvanceAmount: Int? = null,
     selectedVaultAmount: Int? = null,
     selectedVaultActionType: VaultActionType = VaultActionType.DEPOSIT,
@@ -407,7 +407,7 @@ fun DemoState.toFinanceHomeUiModel(
             assetSymbol = latestRemoteRequest.assetSymbol
         )
         usesRemoteAdvance -> "-"
-        else -> formatKrw(advanceSnapshot.requestAmount)
+        else -> formatKrw(advanceSnapshot.requestAmount, language)
     }
     val detailReceiveAmountText = when {
         latestRemoteRequest != null -> latestRemoteRequest.approvedAmountAtomic?.let { approvedAmountAtomic ->
@@ -419,7 +419,7 @@ fun DemoState.toFinanceHomeUiModel(
             )
         } ?: "승인 대기"
         usesRemoteAdvance -> "-"
-        else -> formatKrw(advanceSnapshot.receiveAmount)
+        else -> formatKrw(advanceSnapshot.receiveAmount, language)
     }
     val detailFeeText = when {
         latestRemoteRequest != null -> latestRemoteRequest.approvedAmountAtomic?.let { approvedAmountAtomic ->
@@ -435,7 +435,7 @@ fun DemoState.toFinanceHomeUiModel(
         } ?: "-"
 
         usesRemoteAdvance -> "-"
-        else -> formatKrw(advanceSnapshot.fee)
+        else -> formatKrw(advanceSnapshot.fee, language)
     }
     val currentRequestSummaryAmountLabel = when {
         latestRemoteRequest?.approvedAmountAtomic != null -> language.text("amount_received_this_month")
@@ -451,7 +451,7 @@ fun DemoState.toFinanceHomeUiModel(
             assetDecimals = remoteAssetDecimals,
             assetSymbol = remoteAssetSymbol
         )
-        else -> formatKrw(advanceSnapshot.used)
+        else -> formatKrw(advanceSnapshot.used, language)
     }
     val currentRequestSummaryStatusText = when (latestRemoteRequest?.status) {
         "PAID" -> "지급완료"
@@ -511,7 +511,7 @@ fun DemoState.toFinanceHomeUiModel(
             assetSymbol = remoteAssetSymbol
         )
     } else {
-        formatKrw(remoteAvailableAmount.toInt())
+        formatKrw(remoteAvailableAmount.toInt(), language)
     }
 
     val effectiveSelectedAdvanceAmount = if (usesRemoteAdvance) {
@@ -708,8 +708,8 @@ fun DemoState.toFinanceHomeUiModel(
 
     return FinanceHomeUiModel(
         account = FinanceAccountUiModel(
-            balanceText = formatKrw(selectedAccount.balance),
-            sendableAmountText = formatKrw(remittance.draftAmountUsd * 1_450),
+            balanceText = formatKrw(selectedAccount.balance, language),
+            sendableAmountText = formatKrw(remittance.draftAmountUsd * 1_450, language),
             selectedAccountText = "${selectedAccount.name} · ${selectedAccount.number}"
         ),
         advance = FinanceAdvanceUiModel(
@@ -727,7 +727,7 @@ fun DemoState.toFinanceHomeUiModel(
                     assetSymbol = remoteAssetSymbol
                 )
             } else {
-                formatKrw(remoteAvailableAmount.toInt())
+                formatKrw(remoteAvailableAmount.toInt(), language)
             },
             repaymentDueText = remoteRepaymentDueText,
             statusText = advanceContractState.repaymentTier,
@@ -776,7 +776,7 @@ fun DemoState.toFinanceHomeUiModel(
                         assetSymbol = remoteAssetSymbol
                     )
                 } else {
-                    formatKrw(remoteAvailableAmount.toInt())
+                    formatKrw(remoteAvailableAmount.toInt(), language)
                 },
                 usedText = if (usesRemoteAdvance) {
                     formatAdvanceAmount(
@@ -786,7 +786,7 @@ fun DemoState.toFinanceHomeUiModel(
                         assetSymbol = remoteAssetSymbol
                     )
                 } else {
-                    formatKrw(advanceSnapshot.used)
+                    formatKrw(advanceSnapshot.used, language)
                 },
                 summaryAmountLabel = currentRequestSummaryAmountLabel,
                 summaryAmountText = currentRequestSummaryAmountText,
@@ -871,11 +871,11 @@ fun DemoState.toFinanceHomeUiModel(
                 BadgeTone.Warning
             },
             differenceText = if (isRecorded) {
-                formatKrw(abs(effectiveDifference))
+                formatKrw(abs(effectiveDifference), language)
             } else {
                 "확인 전"
             },
-            estimatedText = formatKrw(effectiveEstimatedTotal),
+            estimatedText = formatKrw(effectiveEstimatedTotal, language),
             actualText = if (isRecorded) formatKrw(wage.actualDeposit) else "미입력",
             hintText = if (isRecorded) {
                 "실입금이 반영돼 있어요. 차이와 근거를 바로 확인할 수 있습니다."
@@ -885,9 +885,9 @@ fun DemoState.toFinanceHomeUiModel(
         ),
         moneySplit = if (isRecorded) {
             MoneySplitUiModel(
-                livingCostText = formatKrw(livingCost),
-                familySendText = formatKrw(familySend),
-                saveAmountText = formatKrw(saveAmount),
+                livingCostText = formatKrw(livingCost, language),
+                familySendText = formatKrw(familySend, language),
+                saveAmountText = formatKrw(saveAmount, language),
                 basisText = "실입금 반영"
             )
         } else {
@@ -904,7 +904,7 @@ fun DemoState.toFinanceHomeUiModel(
                     )
 
                 usesRemoteVault -> tr("미예치")
-                vault.enabled && vault.userDeposit > 0 -> formatKrw(vault.userDeposit)
+                vault.enabled && vault.userDeposit > 0 -> formatKrw(vault.userDeposit, language)
                 else -> tr("미신청")
             },
             showHelperText = usesRemoteVault && remoteStoredUnits > 0 || vault.enabled && vault.userDeposit > 0,
@@ -915,7 +915,7 @@ fun DemoState.toFinanceHomeUiModel(
                     symbol = remoteVaultAssetSymbol
                 )
             } else {
-                formatKrw(vault.accruedInterest)
+                formatKrw(vault.accruedInterest, language)
             },
             aprText = if (usesRemoteVault) {
                 formatApy(remoteVaultSummary!!.interestPreview.apyBps)
@@ -959,7 +959,7 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else {
-                    formatKrw(selectedAccount.balance)
+                    formatKrw(selectedAccount.balance, language)
                 },
                 availableText = if (usesRemoteVault) {
                     val availableAtomic = if (effectiveVaultActionType == VaultActionType.DEPOSIT) {
@@ -973,7 +973,7 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else {
-                    formatKrw(selectedAccount.balance)
+                    formatKrw(selectedAccount.balance, language)
                 },
                 balanceText = if (usesRemoteVault) {
                     formatTokenAmount(
@@ -982,14 +982,14 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else if (vault.userDeposit > 0) {
-                    formatKrw(vault.userDeposit)
+                    formatKrw(vault.userDeposit, language)
                 } else {
-                    formatKrw(effectiveVaultSelectedAmount)
+                    formatKrw(effectiveVaultSelectedAmount, language)
                 },
                 selectedAmountText = if (usesRemoteVault) {
                     "${effectiveVaultSelectedAmount.coerceAtLeast(0)} $remoteVaultAssetSymbol"
                 } else {
-                    formatKrw(effectiveVaultSelectedAmount)
+                    formatKrw(effectiveVaultSelectedAmount, language)
                 },
                 aprText = if (usesRemoteVault) {
                     formatApy(remoteVaultSummary!!.interestPreview.apyBps)
@@ -1003,7 +1003,7 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else {
-                    formatKrw(vault.accruedInterest)
+                    formatKrw(vault.accruedInterest, language)
                 },
                 monthlyInterestText = if (usesRemoteVault) {
                     formatYieldTokenAmount(
@@ -1012,7 +1012,7 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else {
-                    formatKrw(vaultSnapshot.monthlyInterest)
+                    formatKrw(vaultSnapshot.monthlyInterest, language)
                 },
                 dailyInterestText = if (usesRemoteVault) {
                     formatYieldTokenAmount(
@@ -1021,7 +1021,7 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else {
-                    formatKrw(vaultSnapshot.dailyInterest)
+                    formatKrw(vaultSnapshot.dailyInterest, language)
                 },
                 defiMonthlyText = if (usesRemoteVault) {
                     formatYieldTokenAmount(
@@ -1030,12 +1030,12 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else {
-                    formatKrw(defiMonthly)
+                    formatKrw(defiMonthly, language)
                 },
                 feeShareText = if (usesRemoteVault) {
                     "시뮬레이션 제외"
                 } else {
-                    formatKrw(feeShare)
+                    formatKrw(feeShare, language)
                 },
                 totalMonthlyText = if (usesRemoteVault) {
                     formatYieldTokenAmount(
@@ -1044,7 +1044,7 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
                 } else {
-                    formatKrw(defiMonthly + feeShare)
+                    formatKrw(defiMonthly + feeShare, language)
                 },
                 defiRatioText = if (usesRemoteVault) "demo" else "${((1 - vault.advanceRatio) * 100).toInt()}%",
                 advanceRatioText = if (usesRemoteVault) "demo" else "${(vault.advanceRatio * 100).toInt()}%",
@@ -1364,7 +1364,7 @@ private fun formatAdvanceAmount(
     displayKrwAmount: Long?,
     assetDecimals: Int,
     assetSymbol: String,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage = AppLanguage.KOREAN
 ): String {
     val assetText = formatTokenAmount(
         atomic = amountAtomic.toString(),
@@ -1379,7 +1379,7 @@ private fun formatWholeAdvanceUnits(
     amount: Int,
     assetSymbol: String,
     displayKrwAmount: Long,
-    language: AppLanguage = AppLanguage.fromDefault()
+    language: AppLanguage = AppLanguage.KOREAN
 ): String {
     val assetText = "$amount $assetSymbol"
     return if (displayKrwAmount > 0) {
