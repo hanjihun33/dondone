@@ -23,6 +23,7 @@ data class WorkRecord(
     val modified: Boolean,
     val attachments: Int,
     val reflectionStatus: String = "PENDING",
+    val decisionMemo: String? = null,
     val recognizedInTime: String? = null,
     val recognizedOutTime: String? = null
 )

@@ -15,6 +15,7 @@ public record WorkProofRecordListItemResponse(
         Long workedMinutes,
         boolean modified,
         WorkProofReflectionStatus reflectionStatus,
+        String decisionMemo,
         List<String> riskFlags
 ) {
 }

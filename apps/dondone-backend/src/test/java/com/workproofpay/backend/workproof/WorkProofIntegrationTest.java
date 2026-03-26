@@ -440,6 +440,22 @@ class WorkProofIntegrationTest extends PostgresIntegrationTestSupport {
         Assertions.assertEquals(CorrectionReviewReasonCode.LATE_CLOCK_IN_AFTER_SCHEDULE, savedRequest.getReviewReasonCode());
         Assertions.assertEquals(LocalDateTime.of(2026, 3, 10, 9, 15), savedWorkProof.resolveRecognizedClockInAt());
         Assertions.assertEquals(LocalDateTime.of(2026, 3, 10, 18, 10), savedWorkProof.resolveRecognizedClockOutAt());
+
+        mockMvc.perform(get("/api/workproof/records")
+                        .header("Authorization", bearer(tokenFor(worker)))
+                        .param("month", "2026-03")
+                        .param("workplaceId", workplace.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].recordId").value(workProof.getId()))
+                .andExpect(jsonPath("$.data.records[0].reflectionStatus").value("NEEDS_REVIEW"));
+
+        mockMvc.perform(get("/api/workproof/monthly-summary")
+                        .header("Authorization", bearer(tokenFor(worker)))
+                        .param("month", "2026-03")
+                        .param("workplaceId", workplace.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reflection.needsReviewRecordCount").value(1))
+                .andExpect(jsonPath("$.data.reflection.excludedRecordCount").value(0));
     }
 
     @Test

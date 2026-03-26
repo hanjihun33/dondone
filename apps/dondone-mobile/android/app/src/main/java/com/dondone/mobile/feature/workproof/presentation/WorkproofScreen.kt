@@ -268,8 +268,18 @@ fun WorkproofScreen(
                     reasonMenuExpanded = false
                 },
                 onMemoChange = { editMemo = it },
-                onRequestedClockInChange = { requestedClockInText = it },
-                onRequestedClockOutChange = { requestedClockOutText = it },
+                onRequestedClockInChange = {
+                    requestedClockInText = normalizeWorkproofTimeInput(
+                        previousInput = requestedClockInText,
+                        rawInput = it
+                    )
+                },
+                onRequestedClockOutChange = {
+                    requestedClockOutText = normalizeWorkproofTimeInput(
+                        previousInput = requestedClockOutText,
+                        rawInput = it
+                    )
+                },
                 onPickAttachment = { attachmentLauncher.launch(arrayOf("*/*")) },
                 onClearAttachment = { selectedAttachmentName = null },
                 onSave = {

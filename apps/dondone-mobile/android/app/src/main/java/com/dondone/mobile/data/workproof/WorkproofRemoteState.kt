@@ -23,6 +23,7 @@ data class WorkproofRecordPayload(
     val workedMinutes: Long?,
     val modified: Boolean,
     val reflectionStatus: String,
+    val decisionMemo: String?,
     val riskFlags: List<String>
 )
 
