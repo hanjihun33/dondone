@@ -328,6 +328,7 @@ class BackendWorkproofRepository(
             workedMinutes = optLongValue("workedMinutes"),
             modified = getBoolean("modified"),
             reflectionStatus = getString("reflectionStatus"),
+            decisionMemo = optNullableString("decisionMemo"),
             riskFlags = optStringList(getJSONArray("riskFlags"))
         )
     }

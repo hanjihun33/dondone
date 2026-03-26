@@ -7,10 +7,12 @@ import com.dondone.mobile.data.workproof.WorkproofRemotePayload
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.data.workproof.WorkproofWorkplacePayload
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
+import com.dondone.mobile.domain.model.WorkRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 import java.time.YearMonth
 
 class WorkproofUiModelTest {
@@ -116,6 +118,87 @@ class WorkproofUiModelTest {
 
         assertTrue(uiModel.summary.canClockIn)
         assertEquals(null, uiModel.summary.currentLocationStatus)
+    }
+
+    @Test
+    fun `excluded record is labeled rejected`() {
+        val seed = DemoSeedFactory.create()
+        val state = seed.copy(
+            workproof = seed.workproof.copy(
+                records = listOf(
+                    WorkRecord(
+                        id = "WP-REJECTED",
+                        workDate = LocalDate.of(2026, 3, 27),
+                        day = 27,
+                        inTime = "09:00",
+                        outTime = "18:00",
+                        modified = true,
+                        attachments = 0,
+                        reflectionStatus = "EXCLUDED"
+                    )
+                )
+            )
+        )
+
+        val uiModel = state.toWorkproofUiModel()
+
+        assertEquals("반려됨", uiModel.recentRecords.first().statusText)
+        assertEquals(null, uiModel.recentRecords.first().detailText)
+    }
+
+    @Test
+    fun `excluded record shows rejection memo in detail text`() {
+        val seed = DemoSeedFactory.create()
+        val state = seed.copy(
+            workproof = seed.workproof.copy(
+                records = listOf(
+                    WorkRecord(
+                        id = "WP-REJECTED-MEMO",
+                        workDate = LocalDate.of(2026, 3, 27),
+                        day = 27,
+                        inTime = "09:00",
+                        outTime = "18:00",
+                        modified = true,
+                        attachments = 0,
+                        reflectionStatus = "EXCLUDED",
+                        decisionMemo = "증빙이 부족합니다."
+                    )
+                )
+            )
+        )
+
+        val uiModel = state.toWorkproofUiModel()
+
+        assertEquals(
+            "반려 사유: 증빙이 부족합니다.",
+            uiModel.recentRecords.first().detailText
+        )
+    }
+
+    @Test
+    fun `needs review record hides duplicated status detail`() {
+        val seed = DemoSeedFactory.create()
+        val state = seed.copy(
+            workproof = seed.workproof.copy(
+                records = listOf(
+                    WorkRecord(
+                        id = "WP-REVIEW",
+                        workDate = LocalDate.of(2026, 3, 27),
+                        day = 27,
+                        inTime = "09:00",
+                        outTime = "18:00",
+                        modified = true,
+                        attachments = 0,
+                        reflectionStatus = "NEEDS_REVIEW"
+                    )
+                )
+            )
+        )
+
+        val uiModel = state.toWorkproofUiModel()
+
+        assertEquals("검토 중", uiModel.recentRecords.first().statusText)
+        assertEquals(null, uiModel.recentRecords.first().detailText)
     }
 
     private fun remoteContentState(): WorkproofRemoteState {

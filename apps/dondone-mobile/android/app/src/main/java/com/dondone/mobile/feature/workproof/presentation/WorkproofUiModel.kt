@@ -222,24 +222,27 @@ internal fun WorkRecord.toStatusText(): String {
     return when (reflectionStatus) {
         "NEEDS_REVIEW" -> "검토 중"
         "REFLECTED" -> "반영됨"
-        "EXCLUDED" -> "제외됨"
+        "EXCLUDED" -> "반려됨"
         else -> if (!inTime.isRecordedTime() || !outTime.isRecordedTime()) "출근만" else "기록"
     }
 }
 
 internal fun WorkRecord.toDetailText(): String? {
     return when (reflectionStatus) {
-        "NEEDS_REVIEW" -> "검토 상태: 사업장 검토 중"
+        "NEEDS_REVIEW" -> null
         "REFLECTED" -> {
-            val recognizedRange = buildRecognizedTimeRange() ?: return "검토 상태: 반영 완료"
+            val recognizedRange = buildRecognizedTimeRange() ?: return null
             if (recognizedRange == "$inTime - $outTime") {
-                "검토 상태: 반영 완료"
+                null
             } else {
                 "인정 시간: $recognizedRange"
             }
         }
 
-        "EXCLUDED" -> "검토 상태: 제외됨"
+        "EXCLUDED" -> {
+            val rejectMemo = decisionMemo?.takeIf { it.isNotBlank() }
+            rejectMemo?.let { "반려 사유: $it" }
+        }
         else -> null
     }
 }
@@ -258,7 +261,7 @@ internal fun WorkRecord.toAuditReasonText(): String {
     return when (reflectionStatus) {
         "NEEDS_REVIEW" -> "사업장 검토 대기 중"
         "REFLECTED" -> "인정 시간에 반영됨"
-        "EXCLUDED" -> "정산 대상에서 제외됨"
+        "EXCLUDED" -> "사업장에서 반려됨"
         else -> "수정 요청이 접수됨"
     }
 }
