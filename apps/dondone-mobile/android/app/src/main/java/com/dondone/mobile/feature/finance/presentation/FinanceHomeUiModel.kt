@@ -1,6 +1,9 @@
 package com.dondone.mobile.feature.finance.presentation
 
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.text
+import com.dondone.mobile.core.i18n.translate
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.app.session.AdvanceRequestUiState
 import com.dondone.mobile.app.session.AdvanceRequestDetailUiState
@@ -210,10 +213,12 @@ data class MoneySplitUiModel(
 data class FinanceVaultUiModel(
     val latestStatusKey: String?,
     val depositStatusText: String,
+    val showHelperText: Boolean,
     val accruedInterestText: String,
     val aprText: String,
     val helperText: String,
     val latestStatusText: String?,
+    val latestStatusTone: BadgeTone,
     val latestStatusIsError: Boolean,
     val shouldDismissDetailSheet: Boolean,
     val actionText: String,
@@ -234,6 +239,7 @@ fun DemoState.toFinanceHomeUiModel(
     workproofRemoteState: WorkproofRemoteState? = null,
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
     vaultRemoteState: VaultRemoteState? = null,
+    language: AppLanguage = AppLanguage.fromDefault(),
     selectedAdvanceAmount: Int? = null,
     selectedVaultAmount: Int? = null,
     selectedVaultActionType: VaultActionType = VaultActionType.DEPOSIT,
@@ -241,6 +247,8 @@ fun DemoState.toFinanceHomeUiModel(
     advanceRequestDetailUiState: AdvanceRequestDetailUiState = AdvanceRequestDetailUiState(),
     vaultActionUiState: VaultActionUiState = VaultActionUiState()
 ): FinanceHomeUiModel {
+    fun tr(text: String): String = language.translate(text)
+
     val selectedAccount = remittance.selectedAccount()
     val today = LocalDate.now()
     val advanceSnapshot = AdvanceCalculator.calculate(this)
@@ -320,14 +328,15 @@ fun DemoState.toFinanceHomeUiModel(
     val advanceProgress = progressAttendanceDays.coerceAtMost(progressTargetDays) / progressTargetDays.toFloat()
     val effectiveProgressHintText = if (usesRemoteAdvance && hasCurrentAdvanceRequest) {
         if (remoteAvailableAmountAtomic > 0L) {
-            "남은 추가 신청 가능 금액 ${formatAdvanceAmount(
+            "${language.text("remaining_additional_requestable_amount")} ${formatAdvanceAmount(
                 amountAtomic = remoteAvailableAmountAtomic,
                 displayKrwAmount = remoteAvailableDisplayKrwAmount,
                 assetDecimals = remoteAssetDecimals,
-                assetSymbol = remoteAssetSymbol
-            )} · 출근 기록이 더 반영되면 한도가 늘어날 수 있어요."
+                assetSymbol = remoteAssetSymbol,
+                language = language
+            )} · ${language.text("your_limit_can_increase_within_the_same_month_as_more_attendance_is_reflected")}"
         } else {
-            "출근 기록이 더 반영되면 한도가 다시 늘어나요."
+            language.text("your_limit_can_increase_within_the_same_month_as_more_attendance_is_reflected")
         }
     } else {
         ""
@@ -341,9 +350,9 @@ fun DemoState.toFinanceHomeUiModel(
             requests = remoteRequests,
             emptyMessage = when (advanceContractState.surfaceState) {
                 AdvanceSurfaceState.LOADING -> "이력도 함께 불러오는 중이에요."
-                AdvanceSurfaceState.EMPTY -> "이번 달 미리받기 이력이 없어요."
+                AdvanceSurfaceState.EMPTY -> language.text("finance_no_history_this_month")
                 AdvanceSurfaceState.ERROR -> "이력을 다시 불러온 뒤 확인해 주세요."
-                AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> "이번 달 미리받기 이력이 없어요."
+                AdvanceSurfaceState.BLOCKED, AdvanceSurfaceState.SUCCESS -> language.text("finance_no_history_this_month")
             },
             contractRepaymentDueDate = remoteRepaymentDueText
         )
@@ -369,7 +378,7 @@ fun DemoState.toFinanceHomeUiModel(
                 "근무 기준을 불러오는 중이에요."
 
             AdvanceSurfaceState.EMPTY ->
-                "근무 정보가 확인되면 미리받기 근거를 확인할 수 있어요."
+                language.text("finance_check_advance_basis_after_workproof")
 
             AdvanceSurfaceState.ERROR ->
                 "근무 기준을 다시 확인해야 해요."
@@ -429,9 +438,9 @@ fun DemoState.toFinanceHomeUiModel(
         else -> formatKrw(advanceSnapshot.fee)
     }
     val currentRequestSummaryAmountLabel = when {
-        latestRemoteRequest?.approvedAmountAtomic != null -> "이번 달 받은 금액"
-        latestRemoteRequest != null -> "최근 신청 금액"
-        else -> "이번 달 받은 금액"
+        latestRemoteRequest?.approvedAmountAtomic != null -> language.text("amount_received_this_month")
+        latestRemoteRequest != null -> language.text("finance_recent_requested_amount")
+        else -> language.text("amount_received_this_month")
     }
     val currentRequestSummaryAmountText = when {
         latestRemoteRequest?.approvedAmountAtomic != null -> detailReceiveAmountText
@@ -453,37 +462,37 @@ fun DemoState.toFinanceHomeUiModel(
         else -> "-"
     }
     val advanceHeroStateTitleText = if (hasCurrentAdvanceRequest && canRequestAdditional) {
-        "지금 추가 신청할 수 있어요"
+        language.text("finance_can_request_additional_now")
     } else if (hasCurrentAdvanceRequest) {
         when (latestRemoteRequest?.status) {
-            "PAID" -> "이번 달 받은 금액"
-            "PAYING", "APPROVED", "SUBMITTED" -> "지급이 진행 중이에요"
-            "PAYOUT_FAILED" -> "지급 상태를 다시 확인해 주세요"
-            "REJECTED" -> "최근 요청이 반려됐어요"
-            else -> "최근 신청 상태를 확인할 수 있어요"
+            "PAID" -> language.text("amount_received_this_month")
+            "PAYING", "APPROVED", "SUBMITTED" -> language.text("finance_payout_in_progress_now")
+            "PAYOUT_FAILED" -> language.text("finance_check_payout_status_again")
+            "REJECTED" -> language.text("finance_recent_request_rejected")
+            else -> language.text("finance_recent_request_status_available")
         }
     } else {
         advanceContractState.stateTitleText
     }
     val advanceHeroStateBodyText = if (hasCurrentAdvanceRequest && canRequestAdditional) {
-        "남은 한도 안에서 추가로 신청할 수 있어요."
+        language.text("finance_remaining_limit_message")
     } else if (hasCurrentAdvanceRequest) {
         when (latestRemoteRequest?.status) {
             "PAID" -> ""
-            "PAYING", "APPROVED", "SUBMITTED" -> "지급 상태와 정산 예정일을 확인할 수 있어요."
-            "PAYOUT_FAILED" -> "지급 상태를 다시 확인해 주세요."
-            "REJECTED" -> "요청 결과를 다시 확인해 주세요."
-            else -> "이번 회차 상태를 확인할 수 있어요."
+            "PAYING", "APPROVED", "SUBMITTED" -> language.text("finance_check_payout_status_and_due_date")
+            "PAYOUT_FAILED" -> language.text("finance_check_payout_status_again") + "."
+            "REJECTED" -> language.text("finance_check_request_result_again")
+            else -> language.text("finance_check_current_round_status")
         }
     } else {
         advanceContractState.stateBodyText
     }
     val advanceHeroAmountLabel = if (hasCurrentAdvanceRequest && canRequestAdditional) {
-        "추가 신청 가능 금액"
+        language.text("additional_requestable_amount")
     } else if (hasCurrentAdvanceRequest) {
         currentRequestSummaryAmountLabel
     } else {
-        "지금 신청 가능 금액"
+        language.text("finance_available_now_amount")
     }
     val advanceHeroAmountText = if (hasCurrentAdvanceRequest && canRequestAdditional) {
         formatAdvanceAmount(
@@ -562,23 +571,26 @@ fun DemoState.toFinanceHomeUiModel(
     } else {
         null
     }
-    val vaultStatusMessage = remoteLatestVaultTransaction?.toVaultStatusMessage()
+    val vaultStatusMessage = remoteLatestVaultTransaction?.toVaultStatusMessage(language)
         ?: when (vaultRemoteState?.mode) {
             VaultRemoteMode.LOADING -> FinanceVaultStatusMessage(
-                title = "실연동 확인 중",
-                body = "지갑과 예치 상태를 불러오는 중이에요.",
+                title = tr("실연동 확인 중"),
+                body = tr("지갑과 예치 상태를 불러오는 중이에요."),
+                tone = BadgeTone.Info,
                 isError = false
             )
 
             VaultRemoteMode.ERROR -> FinanceVaultStatusMessage(
-                title = "다시 확인 필요",
-                body = vaultRemoteState.errorMessage ?: "예치 상태를 다시 불러와 주세요.",
+                title = tr("다시 확인 필요"),
+                body = vaultRemoteState.errorMessage ?: tr("예치 상태를 다시 불러와 주세요."),
+                tone = BadgeTone.Warning,
                 isError = true
             )
 
             VaultRemoteMode.UNAUTHENTICATED -> FinanceVaultStatusMessage(
-                title = "로그인 필요",
-                body = vaultRemoteState.errorMessage ?: "로그인 후 예치 실연동 데이터를 불러옵니다.",
+                title = tr("로그인 필요"),
+                body = vaultRemoteState.errorMessage ?: tr("로그인 후 예치 실연동 데이터를 불러옵니다."),
+                tone = BadgeTone.Warning,
                 isError = true
             )
 
@@ -727,27 +739,31 @@ fun DemoState.toFinanceHomeUiModel(
             showProgress =
                 advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
                     advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
-            progressTitle = if (hasCurrentAdvanceRequest) "미리받기 잔액" else "다음 한도 구간",
+            progressTitle = if (hasCurrentAdvanceRequest) language.text("finance_advance_balance") else language.text("finance_next_limit_tier"),
             progressValueText =
-                "${progressAttendanceDays.coerceAtMost(progressTargetDays.coerceAtLeast(1))} / ${progressTargetDays.coerceAtLeast(1)} 일",
+                language.text(
+                    "finance_progress_days_format",
+                    progressAttendanceDays.coerceAtMost(progressTargetDays.coerceAtLeast(1)),
+                    progressTargetDays.coerceAtLeast(1)
+                ),
             progress = advanceProgress,
             progressHintText = effectiveProgressHintText,
             progressPrimaryMetricLabel = progressPrimaryMetricLabel,
             progressPrimaryMetricText = progressPrimaryMetricText,
             progressSecondaryMetricLabel = progressSecondaryMetricLabel,
-            progressSecondaryMetricText = progressSecondaryMetricText,
-            actionText = when {
-                canRequestAdditional -> "추가 신청"
-                hasCurrentAdvanceRequest -> "내역 보기"
-                else -> advanceContractState.actionText
-            },
+                progressSecondaryMetricText = progressSecondaryMetricText,
+                actionText = when {
+                    canRequestAdditional -> language.text("finance_additional_request")
+                    hasCurrentAdvanceRequest -> language.text("finance_view_history")
+                    else -> advanceContractState.actionText
+                },
             secondaryActionText = advanceContractState.secondaryActionText,
             detail = FinanceAdvanceDetailUiModel(
                 surfaceState = advanceContractState.surfaceState,
                 hasCurrentRequest = hasCurrentAdvanceRequest,
                 canRequestAdditional = canRequestAdditional,
                 summaryStatusText = currentRequestSummaryStatusText,
-                subtitleText = "이번 달 지급 내역과 남은 한도를 확인할 수 있어요.",
+                subtitleText = language.text("finance_detail_subtitle_current_month"),
                 stateTitleText = advanceHeroStateTitleText,
                 stateBodyText = advanceHeroStateBodyText,
                 noticeTitleText = advanceContractState.noticeTitleText,
@@ -788,10 +804,10 @@ fun DemoState.toFinanceHomeUiModel(
                 disclaimerText = advanceContractState.disclaimerText,
                 canRequest = canRequestAdditional,
                 requestButtonText = when {
-                    advanceRequestUiState.isSubmitting -> "신청 중..."
-                    canRequestAdditional && hasCurrentAdvanceRequest -> "추가 신청"
-                    canRequestAdditional -> "미리받기 신청"
-                    !hasCurrentAdvanceRequest -> "닫기"
+                    advanceRequestUiState.isSubmitting -> language.text("finance_submitting")
+                    canRequestAdditional && hasCurrentAdvanceRequest -> language.text("finance_additional_request")
+                    canRequestAdditional -> language.text("finance_request_advance")
+                    !hasCurrentAdvanceRequest -> language.text("finance_close")
                     else -> advanceContractState.actionText
                 },
                 secondaryActionText = advanceContractState.secondaryActionText,
@@ -887,10 +903,11 @@ fun DemoState.toFinanceHomeUiModel(
                         symbol = remoteVaultAssetSymbol
                     )
 
-                usesRemoteVault -> "미예치"
+                usesRemoteVault -> tr("미예치")
                 vault.enabled && vault.userDeposit > 0 -> formatKrw(vault.userDeposit)
-                else -> "미신청"
+                else -> tr("미신청")
             },
+            showHelperText = usesRemoteVault && remoteStoredUnits > 0 || vault.enabled && vault.userDeposit > 0,
             accruedInterestText = if (usesRemoteVault) {
                 formatTokenAmount(
                     atomic = remoteVaultSummary!!.accruedYieldAtomic,
@@ -906,12 +923,13 @@ fun DemoState.toFinanceHomeUiModel(
                 String.format(Locale.US, "%.1f%%", vault.apr * 100)
             },
             helperText = when {
-                usesRemoteVault && remoteStoredUnits > 0 -> "예치 잔액과 예상 이자를 바로 확인할 수 있어요."
-                usesRemoteVault -> "예치 가능 금액과 예상 이자를 먼저 확인할 수 있어요."
-                vault.enabled && vault.userDeposit > 0 -> "예치 중인 금액과 누적 이자를 확인할 수 있어요."
-                else -> "예치 시작 전 예상 이자와 수익 구성을 먼저 확인할 수 있어요."
+                usesRemoteVault && remoteStoredUnits > 0 -> tr("예치 잔액과 예상 이자를 바로 확인할 수 있어요.")
+                usesRemoteVault -> tr("예치 가능 금액과 예상 이자를 먼저 확인할 수 있어요.")
+                vault.enabled && vault.userDeposit > 0 -> tr("예치 중인 금액과 누적 이자를 확인할 수 있어요.")
+                else -> tr("예치 시작 전 예상 이자와 수익 구성을 먼저 확인할 수 있어요.")
             },
             latestStatusText = vaultStatusMessage?.title,
+            latestStatusTone = vaultStatusMessage?.tone ?: BadgeTone.Info,
             latestStatusIsError = vaultStatusMessage?.isError == true,
             shouldDismissDetailSheet =
                 vaultActionUiState.message != null &&
@@ -1248,6 +1266,7 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
 private data class FinanceVaultStatusMessage(
     val title: String,
     val body: String,
+    val tone: BadgeTone,
     val isError: Boolean
 )
 
@@ -1272,34 +1291,38 @@ private fun normalizeVaultDisclaimer(raw: String): String {
     }
 }
 
-private fun VaultTransactionDetailPayload.toVaultStatusMessage(): FinanceVaultStatusMessage {
-    val actionLabel = if (txType == "WITHDRAW") "출금" else "예치"
+private fun VaultTransactionDetailPayload.toVaultStatusMessage(language: AppLanguage): FinanceVaultStatusMessage {
+    val actionLabel = if (txType == "WITHDRAW") language.translate("출금") else language.translate("예치")
     return when (status) {
         "CONFIRMED" -> FinanceVaultStatusMessage(
-            title = "${actionLabel} 완료",
+            title = "$actionLabel ${language.translate("완료")}",
             body = if (txType == "WITHDRAW") {
-                "지갑 잔액으로 돌아왔어요."
+                language.translate("지갑 잔액으로 돌아왔어요.")
             } else {
-                "지갑 잔액이 예치 잔액으로 반영됐어요."
+                language.translate("지갑 잔액이 예치 잔액으로 반영됐어요.")
             },
+            tone = BadgeTone.Success,
             isError = false
         )
 
         "FAILED", "TIMED_OUT" -> FinanceVaultStatusMessage(
-            title = "${actionLabel} 실패",
-            body = failureCode ?: "${actionLabel}가 완료되지 않았어요. 잠시 후 다시 시도해 주세요.",
+            title = "$actionLabel ${language.translate("실패")}",
+            body = failureCode ?: language.translate("${if (txType == "WITHDRAW") "출금" else "예치"}가 완료되지 않았어요. 잠시 후 다시 시도해 주세요."),
+            tone = BadgeTone.Warning,
             isError = true
         )
 
         "BROADCASTED" -> FinanceVaultStatusMessage(
-            title = "${actionLabel} 확인 대기",
-            body = "체인 전송이 완료돼 확정을 기다리는 중입니다.",
+            title = "$actionLabel ${language.translate("확인 대기")}",
+            body = language.translate("체인 전송이 완료돼 확정을 기다리는 중입니다."),
+            tone = BadgeTone.Info,
             isError = false
         )
 
         else -> FinanceVaultStatusMessage(
-            title = "${actionLabel} 처리 중",
-            body = "요청이 접수돼 서명과 전송을 준비하는 중입니다.",
+            title = "$actionLabel ${language.translate("처리 중")}",
+            body = language.translate("요청이 접수돼 서명과 전송을 준비하는 중입니다."),
+            tone = BadgeTone.Info,
             isError = false
         )
     }
@@ -1340,7 +1363,8 @@ private fun formatAdvanceAmount(
     amountAtomic: Long,
     displayKrwAmount: Long?,
     assetDecimals: Int,
-    assetSymbol: String
+    assetSymbol: String,
+    language: AppLanguage = AppLanguage.fromDefault()
 ): String {
     val assetText = formatTokenAmount(
         atomic = amountAtomic.toString(),
@@ -1348,16 +1372,21 @@ private fun formatAdvanceAmount(
         symbol = assetSymbol
     )
     val approxText = displayKrwAmount?.toInt()?.let(::formatKrw)
-    return if (approxText != null) "$assetText · 약 $approxText" else assetText
+    return if (approxText != null) "$assetText · ${language.text("finance_approx_amount_format", approxText)}" else assetText
 }
 
 private fun formatWholeAdvanceUnits(
     amount: Int,
     assetSymbol: String,
-    displayKrwAmount: Long
+    displayKrwAmount: Long,
+    language: AppLanguage = AppLanguage.fromDefault()
 ): String {
     val assetText = "$amount $assetSymbol"
-    return if (displayKrwAmount > 0) "$assetText · 약 ${formatKrw(displayKrwAmount.toInt())}" else assetText
+    return if (displayKrwAmount > 0) {
+        "$assetText · ${language.text("finance_approx_amount_format", formatKrw(displayKrwAmount.toInt()))}"
+    } else {
+        assetText
+    }
 }
 
 private fun formatAdvanceStatusLabel(status: String, payoutStatus: String?): String = when (status) {

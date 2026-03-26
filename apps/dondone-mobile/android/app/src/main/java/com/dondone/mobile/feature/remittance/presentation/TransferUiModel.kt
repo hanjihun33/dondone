@@ -2,6 +2,8 @@ package com.dondone.mobile.feature.remittance.presentation
 
 import com.dondone.mobile.app.session.RemittanceActionUiState
 import com.dondone.mobile.app.session.RecipientPhoneSearchUiState
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.text
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
@@ -99,6 +101,7 @@ fun DemoState.toTransferUiModel(
     remoteState: RemittanceRemoteState,
     actionUiState: RemittanceActionUiState,
     isAuthenticated: Boolean,
+    language: AppLanguage = AppLanguage.fromDefault(),
     recipientPhoneSearchUiState: RecipientPhoneSearchUiState = RecipientPhoneSearchUiState()
 ): TransferUiModel {
     val isRemoteMode = isAuthenticated
@@ -106,9 +109,9 @@ fun DemoState.toTransferUiModel(
     val remoteAccount = if (isRemoteMode && remotePayload != null) {
         TransferAccountUiModel(
             id = REMITTANCE_WALLET_ID,
-            name = "DonDone 지갑",
+            name = language.text("transfer_dondone_wallet"),
             number = shortenWalletAddress(remotePayload.wallet.walletAddress),
-            balanceText = remotePayload.balance?.formatTokenBalance() ?: "잔액 확인 중",
+            balanceText = remotePayload.balance?.formatTokenBalance(language) ?: language.text("transfer_checking_balance"),
             selected = true
         )
     } else {
@@ -117,7 +120,7 @@ fun DemoState.toTransferUiModel(
 
     val selectedAccount = remittance.selectedAccount()
     val selectedRecipient = remittance.selectedRecipientOrNull()
-    val selectedRecipientName = selectedRecipient?.let { remittance.displayedRecipientName() } ?: "수신자를 선택해 주세요"
+    val selectedRecipientName = selectedRecipient?.let { remittance.displayedRecipientName() } ?: language.text("transfer_select_recipient")
     val amountUsd = remittance.draftAmountUsd
     val amountKrw = amountUsd * 1_450
     val remoteBalanceAtomic = remotePayload?.balance?.tokenBalanceAtomic?.toLongOrNull()
@@ -144,22 +147,23 @@ fun DemoState.toTransferUiModel(
         )
     }
 
-    val remoteGate = if (isRemoteMode) resolveRemoteGate(remoteState) else null
-    val reviewNotice = actionUiState.precheck?.toReviewNotice()
+    val remoteGate = if (isRemoteMode) resolveRemoteGate(remoteState, language) else null
+    val reviewNotice = actionUiState.precheck?.toReviewNotice(language)
     val activeTransfer = remotePayload?.activeTransfer
     val trackerDetailText = when {
         remittance.status == TransferStatus.REVIEWING && actionUiState.isSubmitting ->
-            "송금 요청을 전송하고 있어요."
+            language.text("transfer_sending_request")
 
         remittance.status == TransferStatus.CONFIRMED ->
-            "송금이 정상적으로 완료되었어요."
+            language.text("transfer_completed_detail")
 
         remittance.status == TransferStatus.FAILED -> {
-            activeTransfer?.failureCode?.let { "전송이 실패했어요. 사유 : $it" } ?: "송금을 완료하지 못했어요."
+            activeTransfer?.failureCode?.let { language.text("transfer_failed_with_reason", it) }
+                ?: language.text("transfer_failed_detail")
         }
 
         else ->
-            activeTransfer?.status?.toTrackerDetailText() ?: "송금 진행 상태를 확인하고 있어요."
+            activeTransfer?.status?.toTrackerDetailText(language) ?: language.text("transfer_checking_progress")
     }
 
     return TransferUiModel(
@@ -173,10 +177,10 @@ fun DemoState.toTransferUiModel(
         selectedAccountBalanceText = remoteAccount?.balanceText ?: formatKrw(selectedAccount.balance),
         selectedRecipientName = selectedRecipientName,
         selectedRecipientAccountLabel = selectedRecipient?.let { buildRecipientAccountLabel(it.address) }
-            ?: "계좌를 선택해 주세요",
+            ?: language.text("transfer_select_account"),
         selectedRecipientWalletLabel = selectedRecipient?.let { shortenWalletAddress(it.address) }
-            ?: "받는 지갑을 선택해 주세요",
-        selectedRecipientWalletFullLabel = selectedRecipient?.address ?: "받는 지갑을 선택해 주세요",
+            ?: language.text("transfer_select_wallet"),
+        selectedRecipientWalletFullLabel = selectedRecipient?.address ?: language.text("transfer_select_wallet"),
         amountUsd = amountUsd.toString(),
         confirmationAmountText = if (!isRemoteMode && remittance.destinationMode == TransferDestinationMode.ACCOUNT) {
             formatKrw(amountKrw)
@@ -184,9 +188,9 @@ fun DemoState.toTransferUiModel(
             "$$amountUsd USDC"
         },
         accountStepHintText = if (isRemoteMode) {
-            "DonDone 지갑 잔액으로 dUSDC를 송금해요."
+            language.text("transfer_send_from_wallet_hint")
         } else {
-            "송금할 계좌를 선택해 주세요."
+            language.text("transfer_choose_account_to_send")
         },
         canSubmit = canSubmit,
         showReviewScreen = remittance.status == TransferStatus.REVIEWING && !actionUiState.isSubmitting,
@@ -198,8 +202,8 @@ fun DemoState.toTransferUiModel(
         reviewNotice = reviewNotice,
         trackerDetailText = trackerDetailText,
         trackerTxHashText = activeTransfer?.txHash,
-        recipientScreenTitle = if (isRemoteMode) "받을 지갑을 선택해 주세요" else "받을 계좌를 선택해 주세요",
-        recipientSearchPlaceholderText = if (isRemoteMode) "지갑 주소 검색" else "계좌명 입력",
+        recipientScreenTitle = if (isRemoteMode) language.text("transfer_choose_wallet_to_receive") else language.text("transfer_choose_account_to_receive"),
+        recipientSearchPlaceholderText = if (isRemoteMode) language.text("transfer_search_wallet_address") else language.text("transfer_enter_account_name"),
         showAddRecipientAction = isRemoteMode,
         addRecipientPhoneDirectory = if (isRemoteMode) {
             emptyList()
@@ -238,18 +242,19 @@ fun DemoState.toTransferUiModel(
                 selected = account.id == remittance.selectedAccountId
             )
         },
-        recipientSections = buildRecipientSections(recipientItems)
+        recipientSections = buildRecipientSections(recipientItems, language)
     )
 }
 
 private fun buildRecipientSections(
-    recipients: List<TransferRecipientUiModel>
+    recipients: List<TransferRecipientUiModel>,
+    language: AppLanguage = AppLanguage.fromDefault()
 ): List<TransferRecipientSectionUiModel> {
     if (recipients.isEmpty()) return emptyList()
     if (recipients.size == 1) {
         return listOf(
             TransferRecipientSectionUiModel(
-                title = "최근 수신 지갑",
+                title = language.text("transfer_recent_wallet"),
                 items = recipients
             )
         )
@@ -260,10 +265,10 @@ private fun buildRecipientSections(
 
     return buildList {
         if (frequent.isNotEmpty()) {
-            add(TransferRecipientSectionUiModel(title = "자주 쓰는 지갑", items = frequent))
+            add(TransferRecipientSectionUiModel(title = language.text("transfer_frequent_wallet"), items = frequent))
         }
         if (recent.isNotEmpty()) {
-            add(TransferRecipientSectionUiModel(title = "최근 수신 지갑", items = recent))
+            add(TransferRecipientSectionUiModel(title = language.text("transfer_recent_wallet"), items = recent))
         }
     }
 }
@@ -278,33 +283,36 @@ private fun recipientTone(index: Int): TransferRecipientTone =
         else -> TransferRecipientTone.Teal
     }
 
-private fun resolveRemoteGate(remoteState: RemittanceRemoteState): TransferRemoteGateUiModel? {
+private fun resolveRemoteGate(
+    remoteState: RemittanceRemoteState,
+    language: AppLanguage = AppLanguage.fromDefault()
+): TransferRemoteGateUiModel? {
     return when (remoteState.mode) {
         RemittanceRemoteMode.LOADING -> TransferRemoteGateUiModel(
-            title = "송금 지갑 정보를 불러오는 중",
-            description = "연결된 지갑과 잔액 정보를 확인하고 있어요.",
+            title = language.text("transfer_loading_wallet_info"),
+            description = language.text("transfer_loading_wallet_info_desc"),
             isLoading = true
         )
 
         RemittanceRemoteMode.ERROR -> TransferRemoteGateUiModel(
-            title = "송금 정보를 불러오지 못했어요",
-            description = remoteState.errorMessage ?: "잠시 후 다시 시도해 주세요.",
-            actionText = "다시 시도"
+            title = language.text("transfer_failed_to_load_info"),
+            description = remoteState.errorMessage ?: language.text("workproof_map_error_message_default"),
+            actionText = language.text("transfer_try_again")
         )
 
         RemittanceRemoteMode.CONTENT -> {
             val wallet = remoteState.payload?.wallet ?: return null
             when (wallet.fundingStatus) {
                 "PENDING" -> TransferRemoteGateUiModel(
-                    title = "지갑 준비가 진행 중이에요",
-                    description = "초기 자금 충전이 끝나면 바로 송금할 수 있어요.",
-                    actionText = "상태 확인"
+                    title = language.text("transfer_wallet_preparing"),
+                    description = language.text("transfer_wallet_ready_after_funding"),
+                    actionText = language.text("transfer_check_status")
                 )
 
                 "FAILED" -> TransferRemoteGateUiModel(
-                    title = "지갑 준비에 실패했어요",
-                    description = wallet.fundingFailureReason ?: "잠시 후 다시 시도해 주세요.",
-                    actionText = "다시 시도"
+                    title = language.text("transfer_wallet_preparation_failed"),
+                    description = wallet.fundingFailureReason ?: language.text("workproof_map_error_message_default"),
+                    actionText = language.text("transfer_try_again")
                 )
 
                 else -> null
@@ -315,38 +323,42 @@ private fun resolveRemoteGate(remoteState: RemittanceRemoteState): TransferRemot
     }
 }
 
-private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload.toReviewNotice(): TransferReviewNoticeUiModel? {
+private fun com.dondone.mobile.data.remittance.RemittanceTransferPrecheckPayload.toReviewNotice(
+    language: AppLanguage = AppLanguage.fromDefault()
+): TransferReviewNoticeUiModel? {
     return when (policyCode) {
         "RECENT_RECIPIENT_CONFIRMATION_REQUIRED" -> TransferReviewNoticeUiModel(
-            title = "최근 수정된 수신자예요",
-            description = "지갑 주소를 한 번 더 확인한 뒤 송금해 주세요."
+            title = language.text("transfer_recently_updated_recipient"),
+            description = language.text("transfer_check_wallet_address_again")
         )
 
         "HIGH_AMOUNT_CONFIRMATION_REQUIRED" -> TransferReviewNoticeUiModel(
-            title = "고액 송금 확인이 필요해요",
-            description = "송금 금액과 수신자 정보를 다시 확인해 주세요."
+            title = language.text("transfer_high_amount_confirmation"),
+            description = language.text("transfer_check_amount_recipient_again")
         )
 
         else -> null
     }
 }
 
-private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenBalance(): String {
+private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenBalance(
+    language: AppLanguage = AppLanguage.fromDefault()
+): String {
     val normalized = tokenBalanceAtomic.toBigDecimalOrNull()
         ?.movePointLeft(assetDecimals)
         ?.setScale(2, RoundingMode.DOWN)
-        ?: return "잔액 확인 중"
+        ?: return language.text("transfer_checking_balance")
     return "${normalized.stripTrailingZeros().toPlainString()} $assetSymbol"
 }
 
-private fun String.toTrackerDetailText(): String = when (uppercase(Locale.ROOT)) {
-    "REQUESTED" -> "송금 요청이 생성되었어요."
-    "SIGNED" -> "송금 서명을 준비하고 있어요."
-    "BROADCASTED" -> "블록체인 전송 결과를 기다리고 있어요."
-    "CONFIRMED" -> "송금이 정상적으로 완료되었어요."
-    "FAILED" -> "송금을 완료하지 못했어요."
-    "TIMED_OUT" -> "블록체인 확인 시간이 지연되고 있어요."
-    else -> "송금 진행 상태를 확인하고 있어요."
+private fun String.toTrackerDetailText(language: AppLanguage = AppLanguage.fromDefault()): String = when (uppercase(Locale.ROOT)) {
+    "REQUESTED" -> language.text("transfer_request_created")
+    "SIGNED" -> language.text("transfer_preparing_signature")
+    "BROADCASTED" -> language.text("transfer_waiting_blockchain_result")
+    "CONFIRMED" -> language.text("transfer_confirmed_status_detail")
+    "FAILED" -> language.text("transfer_failed_status_detail")
+    "TIMED_OUT" -> language.text("transfer_timeout_status_detail")
+    else -> language.text("transfer_checking_progress")
 }
 
 private fun shortenWalletAddress(address: String): String {

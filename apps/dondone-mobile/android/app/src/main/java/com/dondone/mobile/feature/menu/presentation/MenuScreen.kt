@@ -82,6 +82,11 @@ import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
+import com.dondone.mobile.core.i18n.translate
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileAction
 import com.dondone.mobile.feature.workproof.presentation.WorkproofPdfFileUiState
 
@@ -119,6 +124,7 @@ fun MenuScreen(
     workproofPdfFileUiState: WorkproofPdfFileUiState,
     launchRequest: MenuLaunchRequest?,
     profileUpdateUiState: ProfileUpdateUiState,
+    selectedLanguage: AppLanguage,
     onOpenWage: () -> Unit,
     onOpenAccount: () -> Unit,
     onOpenWorkproofPdfCreation: () -> Unit,
@@ -128,14 +134,15 @@ fun MenuScreen(
     onConsumeLaunchRequest: () -> Unit,
     onUpdateProfile: (String, String) -> Unit,
     onClearProfileUpdateMessage: () -> Unit,
+    onSelectLanguage: (AppLanguage) -> Unit,
     onOpenWorkerRegistrationCode: () -> Unit,
     onLogout: () -> Unit,
     onShowToast: (String, BadgeTone) -> Unit
 ) {
     val context = LocalContext.current
+    val language = LocalAppLanguage.current
     var activeSheet by rememberSaveable { mutableStateOf<MenuOverlaySheet?>(null) }
     var isLogoutConfirmVisible by rememberSaveable { mutableStateOf(false) }
-    var selectedLanguage by rememberSaveable { mutableStateOf("ko") }
     var selectedDocumentId by remember { mutableStateOf<String?>(null) }
     var awaitingProfileUpdateResult by remember { mutableStateOf(false) }
 
@@ -205,10 +212,10 @@ fun MenuScreen(
     }
 
     val serviceActions = buildList {
-        add(MenuServiceAction("급여 점검", Icons.Default.AttachMoney, onOpenWage))
-        add(MenuServiceAction("계좌 지갑 관리", Icons.Default.AccountBalanceWallet, onOpenAccount))
-        add(MenuServiceAction("문서 생성", Icons.Default.Description, onOpenWorkproofPdfCreation))
-        add(MenuServiceAction("설정", Icons.Default.Settings) { activeSheet = MenuOverlaySheet.Settings })
+        add(MenuServiceAction(language.text(AppTextKeys.WAGE_REVIEW), Icons.Default.AttachMoney, onOpenWage))
+        add(MenuServiceAction(language.text("wallet_management"), Icons.Default.AccountBalanceWallet, onOpenAccount))
+        add(MenuServiceAction(language.text("generate_documents"), Icons.Default.Description, onOpenWorkproofPdfCreation))
+        add(MenuServiceAction(language.text(AppTextKeys.SETTINGS), Icons.Default.Settings) { activeSheet = MenuOverlaySheet.Settings })
     }
 
     Column(
@@ -236,7 +243,7 @@ fun MenuScreen(
         }
         uiModel.fallbackNoticeMessage?.let { message ->
             DonDoneNoticeBanner(
-                title = uiModel.fallbackNoticeTitle ?: "가상 예시 데이터",
+                title = uiModel.fallbackNoticeTitle ?: language.text("demo_sample_data"),
                 message = message
             )
             MenuSectionDivider()
@@ -284,7 +291,7 @@ fun MenuScreen(
         ) {
             MenuSettingsSheet(
                 selectedLanguage = selectedLanguage,
-                onSelectLanguage = { selectedLanguage = it },
+                onSelectLanguage = onSelectLanguage,
                 onDismiss = { activeSheet = null }
             )
         }
@@ -317,7 +324,7 @@ fun MenuScreen(
                 onOpenProofDocument = {
                     val documentId = selectedDocument.documentId
                     if (documentId == null) {
-                        onShowToast("아직 준비된 문서가 없어요.", BadgeTone.Warning)
+                        onShowToast(language.text("menu_open_ready_document_missing"), BadgeTone.Warning)
                     } else {
                         selectedDocumentId = null
                         onOpenWorkproofPdf(documentId)
@@ -326,7 +333,7 @@ fun MenuScreen(
                 onShareProofDocument = {
                     val documentId = selectedDocument.documentId
                     if (documentId == null) {
-                        onShowToast("아직 공유할 문서가 없어요.", BadgeTone.Warning)
+                        onShowToast(language.text("menu_share_ready_document_missing"), BadgeTone.Warning)
                     } else {
                         selectedDocumentId = null
                         onShareWorkproofPdf(documentId)
@@ -353,12 +360,12 @@ fun MenuScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "로그아웃",
+                    text = language.text("log_out"),
                     style = MaterialTheme.typography.titleLarge,
                     color = DawnText
                 )
                 Text(
-                    text = "현재 계정에서 로그아웃할까요?",
+                    text = language.text("menu_logout_confirm_message"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
@@ -367,12 +374,12 @@ fun MenuScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     SecondaryActionButton(
-                        text = "취소",
+                        text = language.text("cancel"),
                         onClick = { isLogoutConfirmVisible = false },
                         modifier = Modifier.weight(1f)
                     )
                     PrimaryActionButton(
-                        text = "로그아웃",
+                        text = language.text("log_out"),
                         onClick = {
                             isLogoutConfirmVisible = false
                             onLogout()
@@ -411,10 +418,10 @@ private fun shareMenuWorkproofPdfFile(
                 Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TITLE, fileName ?: "근무 기록 문서")
+                    putExtra(Intent.EXTRA_TITLE, fileName ?: AppLanguage.fromDefault().text("workproof_work_record_document"))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 },
-                "근무 기록 문서 공유"
+                AppLanguage.fromDefault().text("workproof_share_work_record_document")
             ).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -428,10 +435,11 @@ private fun MenuSessionSection(
     session: MenuSessionUiModel,
     onEditProfile: () -> Unit
 ) {
-    val organizationSummary = session.companyName.toProfileValue()
+    val language = LocalAppLanguage.current
+    val organizationSummary = session.companyName.toProfileValue(language)
 
     MenuSectionSurface {
-        MenuSectionHeader(title = "계정")
+        MenuSectionHeader(title = language.text("account"))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = session.name,
@@ -445,7 +453,7 @@ private fun MenuSessionSection(
             )
         }
         SecondaryActionButton(
-            text = "프로필 수정",
+            text = language.text("edit_profile"),
             onClick = onEditProfile,
             modifier = Modifier.fillMaxWidth()
         )
@@ -456,6 +464,7 @@ private fun MenuSessionSection(
 private fun MenuLogoutSection(
     onLogoutRequest: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
@@ -470,7 +479,7 @@ private fun MenuLogoutSection(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "로그아웃",
+            text = language.text("log_out"),
             style = MaterialTheme.typography.labelLarge,
             color = DawnWarning
         )
@@ -481,8 +490,9 @@ private fun MenuLogoutSection(
 private fun MenuAccountLinkSection(
     onOpenWorkerRegistrationCode: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     MenuSectionSurface {
-        MenuSectionHeader(title = "계정 연동")
+        MenuSectionHeader(title = language.text("account_link"))
         MenuSectionListRow(
             showDivider = false,
             onClick = onOpenWorkerRegistrationCode
@@ -493,12 +503,12 @@ private fun MenuAccountLinkSection(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "근로자 등록 코드 입력",
+                    text = language.text(AppTextKeys.ENTER_WORKER_REGISTRATION_CODE),
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnText
                 )
                 Text(
-                    text = "소속 연동 코드를 등록할 수 있어요.",
+                    text = language.text("you_can_register_your_workplace_link_code"),
                     style = MaterialTheme.typography.labelLarge,
                     color = DawnTextSubtle,
                     maxLines = 1,
@@ -522,20 +532,21 @@ private fun MenuProfileSheet(
     onSubmit: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     var name by remember(session.name) { mutableStateOf(session.name) }
     var phoneNumber by remember(session.phoneNumber) { mutableStateOf(session.phoneNumber.orEmpty()) }
     val readOnlyProfileInfoItems = listOf(
         MenuProfileInfoItem(
-            label = "이메일 주소",
-            value = session.email.toProfileValue()
+            label = language.text("email"),
+            value = session.email.toProfileValue(language)
         ),
         MenuProfileInfoItem(
-            label = "회사",
-            value = session.companyName.toProfileValue()
+            label = language.text("company"),
+            value = session.companyName.toProfileValue(language)
         ),
         MenuProfileInfoItem(
-            label = "근무지",
-            value = session.workplaceName.toProfileValue()
+            label = language.text("workplace"),
+            value = session.workplaceName.toProfileValue(language)
         )
     )
     val canSubmit = !uiState.isSubmitting && name.trim().isNotBlank() && phoneNumber.filter(Char::isDigit).length in 10..11
@@ -548,17 +559,17 @@ private fun MenuProfileSheet(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         MenuSheetHeader(
-            title = "프로필 수정",
-            subtitle = "이름과 휴대폰 번호를 수정할 수 있어요.",
+            title = language.text("edit_profile"),
+            subtitle = language.text("menu_profile_subtitle"),
             onDismiss = onDismiss
         )
-        MenuSheetSection(title = "수정 가능 정보") {
+        MenuSheetSection(title = language.text("editable_information")) {
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                label = { Text("이름") },
+                label = { Text(language.text("name")) },
                 shape = RoundedCornerShape(16.dp)
             )
             OutlinedTextField(
@@ -566,12 +577,12 @@ private fun MenuProfileSheet(
                 value = phoneNumber,
                 onValueChange = { phoneNumber = it },
                 singleLine = true,
-                label = { Text("휴대폰 번호") },
+                label = { Text(language.text("phone_number")) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 shape = RoundedCornerShape(16.dp)
             )
         }
-        MenuSheetSection(title = "읽기 전용 정보") {
+        MenuSheetSection(title = language.text("read_only_information")) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 readOnlyProfileInfoItems.forEachIndexed { index, item ->
                     MenuProfileInfoRow(
@@ -582,7 +593,7 @@ private fun MenuProfileSheet(
             }
         }
         Text(
-            text = "이메일/회사/근무지 정보는 계정 연동 정보라 앱에서 직접 변경할 수 없어요.",
+            text = language.text("menu_readonly_notice"),
             style = MaterialTheme.typography.bodySmall,
             color = DawnTextSubtle
         )
@@ -594,7 +605,7 @@ private fun MenuProfileSheet(
             )
         }
         PrimaryActionButton(
-            text = if (uiState.isSubmitting) "저장 중..." else "저장하기",
+            text = if (uiState.isSubmitting) language.text("saving") else language.text("save"),
             onClick = { onSubmit(name, phoneNumber) },
             enabled = canSubmit,
             modifier = Modifier.fillMaxWidth()
@@ -607,6 +618,7 @@ private fun MenuProfileInfoRow(
     item: MenuProfileInfoItem,
     showDivider: Boolean
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -623,7 +635,7 @@ private fun MenuProfileInfoRow(
         Text(
             text = item.value,
             style = MaterialTheme.typography.bodyLarge,
-            color = if (item.value == MENU_PROFILE_EMPTY_VALUE) DawnTextSubtle else DawnText,
+            color = if (item.value == language.text("none")) DawnTextSubtle else DawnText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -633,17 +645,17 @@ private fun MenuProfileInfoRow(
     }
 }
 
-private fun String?.toProfileValue(): String {
+private fun String?.toProfileValue(language: AppLanguage = AppLanguage.fromDefault()): String {
     val value = this?.trim()
-    return if (value.isNullOrBlank()) MENU_PROFILE_EMPTY_VALUE else value
+    return if (value.isNullOrBlank()) language.text("none") else value
 }
 
-private fun MenuSessionUiModel.toOrganizationSummary(): String {
+private fun MenuSessionUiModel.toOrganizationSummary(language: AppLanguage = AppLanguage.fromDefault()): String {
     val company = companyName?.trim().orEmpty()
     val workplace = workplaceName?.trim().orEmpty()
 
     if (company.isBlank()) {
-        return "소속 정보 없음"
+        return language.text("menu_no_affiliation_info")
     }
     return "$company · $workplace"
 }
@@ -652,8 +664,9 @@ private fun MenuSessionUiModel.toOrganizationSummary(): String {
 private fun MenuServicesSection(
     actions: List<MenuServiceAction>
 ) {
+    val language = LocalAppLanguage.current
     MenuSectionSurface {
-        MenuSectionHeader(title = "서비스")
+        MenuSectionHeader(title = language.text("services"))
 
         actions.forEachIndexed { index, action ->
             MenuServiceActionRow(
@@ -669,13 +682,14 @@ private fun MenuServiceActionRow(
     action: MenuServiceAction,
     showDivider: Boolean
 ) {
+    val language = LocalAppLanguage.current
     MenuSectionListRow(
         showDivider = showDivider,
         onClick = action.onClick
     ) {
         MenuServiceLeadingIcon(icon = action.icon)
         Text(
-            text = action.label,
+            text = language.translate(action.label),
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
@@ -753,6 +767,7 @@ private fun MenuDocumentActionButton(
     primary: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     val background = when {
@@ -799,7 +814,7 @@ private fun MenuDocumentActionButton(
             )
             Spacer(modifier = Modifier.size(6.dp))
             Text(
-                text = text,
+                text = language.translate(text),
                 style = MaterialTheme.typography.labelLarge,
                 color = contentColor,
                 maxLines = 1
@@ -825,8 +840,9 @@ private fun MenuSectionSurface(
 private fun MenuSectionHeader(
     title: String
 ) {
+    val language = LocalAppLanguage.current
     Text(
-        text = title,
+        text = language.translate(title),
         style = MaterialTheme.typography.titleLarge,
         color = DawnText
     )
@@ -845,6 +861,7 @@ private fun MenuSheetHeader(
     subtitle: String? = null,
     onDismiss: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -855,13 +872,13 @@ private fun MenuSheetHeader(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = title,
+                text = language.translate(title),
                 style = MaterialTheme.typography.titleLarge,
                 color = DawnText
             )
             if (!subtitle.isNullOrBlank()) {
                 Text(
-                    text = subtitle,
+                    text = language.translate(subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
@@ -875,7 +892,7 @@ private fun MenuSheetHeader(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "닫기",
+                text = language.translate("닫기"),
                 style = MaterialTheme.typography.labelLarge,
                 color = DawnTextSubtle
             )
@@ -888,13 +905,14 @@ private fun MenuSheetSection(
     title: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         title?.let {
             Text(
-                text = it,
+                text = language.translate(it),
                 style = MaterialTheme.typography.bodyLarge,
                 color = DawnText
             )
@@ -911,6 +929,7 @@ private fun MenuDocumentSheet(
     onOpenClaimFlow: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -930,7 +949,7 @@ private fun MenuDocumentSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "현재 상태", style = MaterialTheme.typography.bodyLarge)
+                Text(text = language.text("current_status"), style = MaterialTheme.typography.bodyLarge)
                 StatusBadge(text = document.statusText, tone = document.statusTone)
             }
             Text(
@@ -940,9 +959,9 @@ private fun MenuDocumentSheet(
             )
             Text(
                 text = when (document.accent) {
-                    MenuDocumentAccent.Proof -> "근무 탭에서 선택한 기간의 출퇴근 기록과 변경 이력을 다시 열고 공유할 수 있는 문서예요."
-                    MenuDocumentAccent.Claim -> "차액 검토 결과를 토대로 신고 준비 흐름으로 이어지는 묶음 문서예요."
-                    MenuDocumentAccent.Receipt -> "최근 테스트넷 송금 내역과 전송 해시를 확인할 수 있는 영수증 문서예요."
+                    MenuDocumentAccent.Proof -> language.text("menu_document_proof_detail")
+                    MenuDocumentAccent.Claim -> language.text("menu_document_claim_detail")
+                    MenuDocumentAccent.Receipt -> language.text("menu_document_receipt_detail")
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnText
@@ -955,7 +974,7 @@ private fun MenuDocumentSheet(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 MenuDocumentActionButton(
-                    text = "공유",
+                    text = language.text("share"),
                     icon = Icons.Default.Share,
                     onClick = onShareProofDocument,
                     enabled = document.statusTone == BadgeTone.Success,
@@ -963,7 +982,7 @@ private fun MenuDocumentSheet(
                     modifier = Modifier.weight(1f)
                 )
                 MenuDocumentActionButton(
-                    text = "열기",
+                    text = language.text("open"),
                     icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     onClick = onOpenProofDocument,
                     enabled = document.statusTone == BadgeTone.Success,
@@ -973,7 +992,7 @@ private fun MenuDocumentSheet(
             }
         } else {
             PrimaryActionButton(
-                text = if (document.accent == MenuDocumentAccent.Claim) "신고 준비" else "확인",
+                text = if (document.accent == MenuDocumentAccent.Claim) language.text("claim_prep") else language.text("view"),
                 onClick = if (document.accent == MenuDocumentAccent.Claim) onOpenClaimFlow else onDismiss,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -990,11 +1009,12 @@ private fun MenuClaimSheet(
     onOpenWage: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     var selectedTone by rememberSaveable { mutableStateOf(ClaimSummaryTone.Default) }
     val summaryText = when (selectedTone) {
-        ClaimSummaryTone.Firm -> "근무 기록과 차액 근거를 바탕으로 접수 사실을 정중하게 정리한 초안입니다. 제출 전에 문장을 한 번 더 다듬어 주세요."
-        ClaimSummaryTone.Short -> "차액과 근거를 짧게 정리해 신고 준비를 빠르게 시작할 수 있도록 요약한 문장입니다."
-        ClaimSummaryTone.Default -> "자동 제출이 아니라 제출 전에 문장과 자료를 빠르게 정리해 보는 데모 단계예요."
+        ClaimSummaryTone.Firm -> language.text("menu_claim_summary_firm")
+        ClaimSummaryTone.Short -> language.text("menu_claim_summary_short")
+        ClaimSummaryTone.Default -> language.text("menu_claim_summary_default")
     }
 
     Column(
@@ -1005,8 +1025,8 @@ private fun MenuClaimSheet(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         MenuSheetHeader(
-            title = "신고 준비",
-            subtitle = "필요한 문서와 접수 경로를 한 화면에서 정리해 둘 수 있어요.",
+            title = language.text("claim_prep"),
+            subtitle = language.text("menu_claim_sheet_subtitle"),
             onDismiss = onDismiss
         )
 
@@ -1019,9 +1039,9 @@ private fun MenuClaimSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "제출 문장 요약", style = MaterialTheme.typography.bodyLarge)
+                    Text(text = language.text("menu_claim_summary_section"), style = MaterialTheme.typography.bodyLarge)
                     SecondaryActionButton(
-                        text = "문장 만들기",
+                        text = language.text("generate_copy"),
                         onClick = { selectedTone = ClaimSummaryTone.Default }
                     )
                 }
@@ -1029,13 +1049,13 @@ private fun MenuClaimSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MenuSheetChip("기본", selectedTone == ClaimSummaryTone.Default) {
+                    MenuSheetChip(language.text("default"), selectedTone == ClaimSummaryTone.Default) {
                         selectedTone = ClaimSummaryTone.Default
                     }
-                    MenuSheetChip("정중하게", selectedTone == ClaimSummaryTone.Firm) {
+                    MenuSheetChip(language.text("formal"), selectedTone == ClaimSummaryTone.Firm) {
                         selectedTone = ClaimSummaryTone.Firm
                     }
-                    MenuSheetChip("짧게", selectedTone == ClaimSummaryTone.Short) {
+                    MenuSheetChip(language.text("short"), selectedTone == ClaimSummaryTone.Short) {
                         selectedTone = ClaimSummaryTone.Short
                     }
                 }
@@ -1045,19 +1065,19 @@ private fun MenuClaimSheet(
                     color = DawnText
                 )
                 SecondaryActionButton(
-                    text = "복사",
+                    text = language.text("copy"),
                     onClick = {},
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    text = "이 문장은 데모용 참고 문장입니다. 실제 제출 전에는 문장과 근거를 다시 확인해 주세요.",
+                    text = language.text("menu_claim_demo_notice"),
                     style = MaterialTheme.typography.labelLarge,
                     color = DawnTextSubtle
                 )
             }
         }
 
-        MenuSheetSection(title = "파일") {
+        MenuSheetSection(title = language.text("files")) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1070,14 +1090,14 @@ private fun MenuClaimSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "문서로 이동",
+                    text = language.text("open_document"),
                     style = MaterialTheme.typography.labelLarge,
                     color = DawnPrimary
                 )
             }
             proofDocument?.let { document ->
                 MenuClaimFileCard(
-                    title = "근무 기록 문서",
+                    title = language.text("work_record_document"),
                     badgeText = document.statusText,
                     badgeTone = document.statusTone,
                     accentBackground = DawnSecondary,
@@ -1101,34 +1121,34 @@ private fun MenuClaimSheet(
             }
         }
 
-        MenuSheetSection(title = "접수 경로 안내") {
+        MenuSheetSection(title = language.text("submission_paths")) {
             MenuClaimPathCard(
-                title = "온라인",
-                description = "온라인 접수 전에는 필요한 항목과 제출 순서를 먼저 확인해 두는 편이 안전해요.",
+                title = language.text("online"),
+                description = language.text("menu_online_submission_desc"),
                 icon = Icons.Default.Language,
                 accentBackground = DawnSecondary,
                 accentColor = DawnPrimaryDeep
             )
             MenuClaimPathCard(
-                title = "전화",
-                description = "상담이나 접수 전에 준비할 문장과 자료를 빠르게 확인할 수 있도록 정리했어요.",
+                title = language.text("phone"),
+                description = language.text("menu_phone_submission_desc"),
                 icon = Icons.Default.Info,
                 accentBackground = Color(0xFFF1F5F9),
                 accentColor = Color(0xFF475569)
             )
             MenuClaimPathCard(
-                title = "방문",
-                description = "방문 접수 전에는 챙길 파일과 전달 순서를 체크해 두세요.",
+                title = language.text("visit"),
+                description = language.text("menu_visit_submission_desc"),
                 icon = Icons.Default.AccountBalanceWallet,
                 accentBackground = DawnSecondary,
                 accentColor = DawnPrimaryDeep
             )
         }
 
-        MenuSheetSection(title = "체크리스트") {
-            MenuChecklistRow(text = "근무 기록 문서 준비")
-            MenuChecklistRow(text = "근거 자료 묶음 준비")
-            MenuChecklistRow(text = "접수 경로 확인(온라인/전화/방문)", isInfo = true)
+        MenuSheetSection(title = language.text("checklist")) {
+            MenuChecklistRow(text = language.text("prepare_work_record_document"))
+            MenuChecklistRow(text = language.text("prepare_evidence_bundle"))
+            MenuChecklistRow(text = language.text("check_submission_path_online_phone_visit"), isInfo = true)
         }
 
         Row(
@@ -1136,19 +1156,19 @@ private fun MenuClaimSheet(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             PrimaryActionButton(
-                text = "근거 자료 묶음 열기",
+                text = language.text("open_evidence_bundle"),
                 onClick = onOpenClaimDocument,
                 modifier = Modifier.weight(1f)
             )
             SecondaryActionButton(
-                text = "차액 화면",
+                text = language.text("difference_screen"),
                 onClick = onOpenWage,
                 modifier = Modifier.weight(1f)
             )
         }
 
         Text(
-            text = "이 안내는 참고용이며 법률 자문이 아닙니다. 필요하면 전문기관 상담도 함께 확인해 주세요.",
+            text = language.text("menu_claim_legal_notice"),
             style = MaterialTheme.typography.labelLarge,
             color = DawnTextSubtle
         )
@@ -1167,6 +1187,7 @@ private fun MenuClaimFileCard(
     onShare: () -> Unit,
     onOpen: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val enabled = badgeTone == BadgeTone.Success
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1198,8 +1219,8 @@ private fun MenuClaimFileCard(
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(text = title, style = MaterialTheme.typography.bodyLarge)
-                        StatusBadge(text = badgeText, tone = badgeTone)
+                        Text(text = language.translate(title), style = MaterialTheme.typography.bodyLarge)
+                        StatusBadge(text = language.translate(badgeText), tone = badgeTone)
                     }
                 }
             }
@@ -1237,6 +1258,7 @@ private fun MenuClaimPathCard(
     accentBackground: Color,
     accentColor: Color
 ) {
+    val language = LocalAppLanguage.current
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -1262,9 +1284,9 @@ private fun MenuClaimPathCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge)
+                Text(text = language.translate(title), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    text = description,
+                    text = language.translate(description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnTextSubtle
                 )
@@ -1282,8 +1304,8 @@ private fun MenuClaimPathCard(
 
 @Composable
 private fun MenuSettingsSheet(
-    selectedLanguage: String,
-    onSelectLanguage: (String) -> Unit,
+    selectedLanguage: AppLanguage,
+    onSelectLanguage: (AppLanguage) -> Unit,
     onDismiss: () -> Unit
 ) {
     Column(
@@ -1292,28 +1314,29 @@ private fun MenuSettingsSheet(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
+        val language = LocalAppLanguage.current
         MenuSheetHeader(
-            title = "설정",
+            title = language.text(AppTextKeys.SETTINGS),
             onDismiss = onDismiss
         )
 
-        MenuSheetSection(title = "언어") {
+        MenuSheetSection(title = language.text("language")) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 MenuLanguageChip(
-                    label = "한국어",
-                    code = "ko",
-                    selected = selectedLanguage == "ko",
-                    onClick = { onSelectLanguage("ko") },
+                    label = AppLanguage.KOREAN.nativeLabel,
+                    code = AppLanguage.KOREAN.code,
+                    selected = selectedLanguage == AppLanguage.KOREAN,
+                    onClick = { onSelectLanguage(AppLanguage.KOREAN) },
                     showDivider = true
                 )
                 MenuLanguageChip(
-                    label = "영어",
-                    code = "en",
-                    selected = selectedLanguage == "en",
-                    onClick = { onSelectLanguage("en") },
+                    label = AppLanguage.ENGLISH.nativeLabel,
+                    code = AppLanguage.ENGLISH.code,
+                    selected = selectedLanguage == AppLanguage.ENGLISH,
+                    onClick = { onSelectLanguage(AppLanguage.ENGLISH) },
                     showDivider = false
                 )
             }
@@ -1326,6 +1349,7 @@ private fun MenuChecklistRow(
     text: String,
     isInfo: Boolean = false
 ) {
+    val language = LocalAppLanguage.current
     val tint = if (isInfo) DawnPrimaryDeep else DawnSuccess
     val icon = if (isInfo) Icons.Default.Info else Icons.Default.CheckCircle
 
@@ -1344,7 +1368,7 @@ private fun MenuChecklistRow(
                 modifier = Modifier.size(18.dp)
             )
             Text(
-                text = text,
+                text = language.translate(text),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnText
@@ -1360,6 +1384,7 @@ private fun MenuSheetChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Surface(
         modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
@@ -1367,7 +1392,7 @@ private fun MenuSheetChip(
         border = BorderStroke(1.dp, if (selected) DawnPrimary else DawnBorder)
     ) {
         Text(
-            text = text,
+            text = language.translate(text),
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
             style = MaterialTheme.typography.labelLarge,
             color = if (selected) DawnPrimaryDeep else DawnTextSubtle
@@ -1383,6 +1408,7 @@ private fun MenuLanguageChip(
     onClick: () -> Unit,
     showDivider: Boolean
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1408,7 +1434,7 @@ private fun MenuLanguageChip(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = label,
+                    text = language.translate(label),
                     style = MaterialTheme.typography.bodyMedium,
                     color = DawnText
                 )

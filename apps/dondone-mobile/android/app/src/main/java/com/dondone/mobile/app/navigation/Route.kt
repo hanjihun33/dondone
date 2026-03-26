@@ -2,6 +2,9 @@ package com.dondone.mobile.app.navigation
 
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.text
 
 data class MainTab(
     val rootRoute: String,
@@ -33,11 +36,11 @@ object Route {
         "finance/account/$accountId/history/$transactionId/edit"
 }
 
-val mainTabs = listOf(
-    MainTab(Route.HOME, "홈"),
-    MainTab(Route.FINANCE_HOME, "금융"),
-    MainTab(Route.WORKPROOF, "근무"),
-    MainTab(Route.MENU, "메뉴")
+fun mainTabs(language: AppLanguage): List<MainTab> = listOf(
+    MainTab(Route.HOME, language.text(AppTextKeys.HOME)),
+    MainTab(Route.FINANCE_HOME, language.text(AppTextKeys.FINANCE)),
+    MainTab(Route.WORKPROOF, language.text(AppTextKeys.WORK)),
+    MainTab(Route.MENU, language.text(AppTextKeys.MENU))
 )
 
 fun isRootRoute(route: String): Boolean = route in setOf(
@@ -58,16 +61,19 @@ fun shouldResetWorkproofUiState(
     nextRoute: String
 ): Boolean = previousRoute == Route.WORKPROOF && nextRoute != Route.WORKPROOF
 
-fun routeTitle(route: String): String = when (route) {
-    Route.WAGE -> "급여 점검"
-    Route.TRANSFER -> "송금"
-    Route.ACCOUNT -> "계좌 지갑"
-    Route.TRANSACTION_HISTORY -> "거래 내역"
-    Route.TRANSACTION_HISTORY_DETAIL -> "거래 상세"
-    Route.TRANSACTION_HISTORY_EDIT -> "거래 수정"
-    Route.WORKPROOF -> "근무"
-    Route.FINANCE_HOME -> "금융"
-    Route.MENU -> "메뉴"
+fun routeTitle(
+    route: String,
+    language: AppLanguage = AppLanguage.fromDefault()
+): String = when (route) {
+    Route.WAGE -> language.text(AppTextKeys.WAGE_REVIEW)
+    Route.TRANSFER -> language.text(AppTextKeys.TRANSFER)
+    Route.ACCOUNT -> language.text(AppTextKeys.WALLET_ACCOUNTS)
+    Route.TRANSACTION_HISTORY -> language.text(AppTextKeys.TRANSACTION_HISTORY)
+    Route.TRANSACTION_HISTORY_DETAIL -> language.text(AppTextKeys.TRANSACTION_DETAILS)
+    Route.TRANSACTION_HISTORY_EDIT -> language.text(AppTextKeys.EDIT_TRANSACTION)
+    Route.WORKPROOF -> language.text(AppTextKeys.WORK)
+    Route.FINANCE_HOME -> language.text(AppTextKeys.FINANCE)
+    Route.MENU -> language.text(AppTextKeys.MENU)
     else -> "DonDone"
 }
 

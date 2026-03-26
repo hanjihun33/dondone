@@ -3,6 +3,8 @@ package com.dondone.mobile.feature.workproof.presentation
 import androidx.compose.ui.graphics.Color
 import com.dondone.mobile.core.designsystem.DawnPrimaryDeep
 import com.dondone.mobile.core.designsystem.DawnText
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.text
 import java.time.format.DateTimeFormatter
 
 internal val WorkproofCanvas = Color.White
@@ -28,5 +30,13 @@ internal val WorkproofMapWorkplacePin = DawnText
 internal val WorkproofMapCurrentPin = DawnPrimaryDeep
 internal val WorkproofPdfPresetSelectedBackground = Color(0xFFF1ECFF)
 internal val WorkproofPdfPresetSelectedBorder = Color(0xFFB89BFF)
-internal val WorkproofWeekdays = listOf("일", "월", "화", "수", "목", "금", "토")
+internal fun workproofWeekdays(language: AppLanguage): List<String> = listOf(
+    language.text("sun"),
+    language.text("mon"),
+    language.text("tue"),
+    language.text("wed"),
+    language.text("thu"),
+    language.text("fri"),
+    language.text("sat")
+)
 internal val WorkproofPdfDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")

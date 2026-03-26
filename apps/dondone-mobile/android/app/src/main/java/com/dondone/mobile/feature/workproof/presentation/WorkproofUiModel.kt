@@ -4,6 +4,9 @@ import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.app.session.WorkproofCurrentLocationStatus
 import com.dondone.mobile.app.session.WorkproofCurrentLocationUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.text
 import com.dondone.mobile.data.workproof.WorkproofRemoteMode
 import com.dondone.mobile.data.workproof.WorkproofRemoteState
 import com.dondone.mobile.domain.calculator.WorkproofCalculator
@@ -13,6 +16,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+
 private const val UnrecordedTime = "-"
 
 enum class WorkproofCalendarTone {
@@ -86,6 +90,7 @@ data class WorkproofUiModel(
 )
 
 fun DemoState.toWorkproofUiModel(
+    language: AppLanguage = AppLanguage.KOREAN,
     actionUiState: WorkproofActionUiState? = null,
     remoteState: WorkproofRemoteState = WorkproofRemoteState.unauthenticated(""),
     isAuthenticated: Boolean = false,
@@ -96,15 +101,11 @@ fun DemoState.toWorkproofUiModel(
     val currentDateText = "${demo.year}-${formatTwoDigits(demo.month)}-${formatTwoDigits(demo.asOfDay)}"
     val clockInText = workproof.today.clockIn?.let { "$currentDateText · $it" } ?: UnrecordedTime
     val clockOutText = workproof.today.clockOut?.let { "$currentDateText · $it" } ?: UnrecordedTime
-    val workStatusText = when {
-        workproof.today.clockOut != null -> "완료"
-        workproof.today.clockIn != null -> "출근만 기록"
-        else -> "준비됨"
-    }
-    val workStatusTone = when (workStatusText) {
-        "완료" -> BadgeTone.Success
-        "출근만 기록" -> BadgeTone.Warning
-        else -> BadgeTone.Info
+
+    val workStatus = when {
+        workproof.today.clockOut != null -> WorkproofDayStatus.COMPLETE
+        workproof.today.clockIn != null -> WorkproofDayStatus.PARTIAL
+        else -> WorkproofDayStatus.READY
     }
     val canSubmitAction = actionUiState?.isSubmitting != true
     val usesFallbackData = remoteState.mode != WorkproofRemoteMode.CONTENT
@@ -136,9 +137,9 @@ fun DemoState.toWorkproofUiModel(
             clockOutText = record.outTime,
             timeText = "${record.inTime} - ${record.outTime}",
             tone = record.toRecordTone(),
-            statusText = record.toStatusText(),
+            statusText = record.toStatusText(language),
             attachmentCount = record.attachments,
-            detailText = audit?.let { "수정 사유: ${it.reason}" } ?: record.toDetailText()
+            detailText = audit?.let { language.text("workproof_modified_reason_value", it.reason) } ?: record.toDetailText(language)
         )
     }
 
@@ -159,10 +160,11 @@ fun DemoState.toWorkproofUiModel(
                     dateText = formatDateText(record.workDate),
                     changeText = record.toAuditChangeText(),
                     attachmentCount = record.attachments,
-                    reasonText = record.toAuditReasonText()
+                    reasonText = record.toAuditReasonText(language)
                 )
             }
     }
+
     return WorkproofUiModel(
         calendarBaseYear = demo.year,
         calendarBaseMonth = demo.month,
@@ -176,8 +178,8 @@ fun DemoState.toWorkproofUiModel(
                 canSubmitAction &&
                 hasUsableCurrentLocation,
             dateText = currentDateText,
-            statusText = workStatusText,
-            statusTone = workStatusTone,
+            statusText = workStatus.toText(language),
+            statusTone = workStatus.toTone(),
             clockInText = clockInText,
             clockOutText = clockOutText,
             workplaceLatitude = workproof.workplaceLatitude,
@@ -192,13 +194,31 @@ fun DemoState.toWorkproofUiModel(
         ),
         recentRecords = recentRecords,
         audits = auditItems,
-        fallbackNoticeTitle = if (usesFallbackData) "가상 예시 데이터" else null,
+        fallbackNoticeTitle = if (usesFallbackData) language.text("workproof_demo_sample_data") else null,
         fallbackNoticeMessage = if (usesFallbackData) {
-            "현재 보이는 근무 기록은 데모 데이터입니다. 회사 등록 후 실제 기록으로 전환됩니다."
+            language.text("workproof_demo_fallback_message")
         } else {
             null
         }
     )
+}
+
+private enum class WorkproofDayStatus {
+    COMPLETE,
+    PARTIAL,
+    READY
+}
+
+private fun WorkproofDayStatus.toText(language: AppLanguage): String = when (this) {
+    WorkproofDayStatus.COMPLETE -> language.text("completed")
+    WorkproofDayStatus.PARTIAL -> language.text(AppTextKeys.HOME_CLOCK_IN_RECORDED)
+    WorkproofDayStatus.READY -> language.text(AppTextKeys.HOME_READY)
+}
+
+private fun WorkproofDayStatus.toTone(): BadgeTone = when (this) {
+    WorkproofDayStatus.COMPLETE -> BadgeTone.Success
+    WorkproofDayStatus.PARTIAL -> BadgeTone.Warning
+    WorkproofDayStatus.READY -> BadgeTone.Info
 }
 
 internal fun WorkRecord.toCalendarTone(): WorkproofCalendarTone {
@@ -218,16 +238,20 @@ internal fun WorkRecord.toRecordTone(): WorkproofRecordTone {
     }
 }
 
-internal fun WorkRecord.toStatusText(): String {
+internal fun WorkRecord.toStatusText(language: AppLanguage): String {
     return when (reflectionStatus) {
-        "NEEDS_REVIEW" -> "검토 중"
-        "REFLECTED" -> "반영됨"
-        "EXCLUDED" -> "반려됨"
-        else -> if (!inTime.isRecordedTime() || !outTime.isRecordedTime()) "출근만" else "기록"
+        "NEEDS_REVIEW" -> language.text("workproof_reviewing")
+        "REFLECTED" -> language.text("workproof_reflected")
+        "EXCLUDED" -> language.text("workproof_rejected")
+        else -> if (!inTime.isRecordedTime() || !outTime.isRecordedTime()) {
+            language.text("workproof_partial_recorded")
+        } else {
+            language.text("workproof_recorded")
+        }
     }
 }
 
-internal fun WorkRecord.toDetailText(): String? {
+internal fun WorkRecord.toDetailText(language: AppLanguage): String? {
     return when (reflectionStatus) {
         "NEEDS_REVIEW" -> null
         "REFLECTED" -> {
@@ -235,14 +259,15 @@ internal fun WorkRecord.toDetailText(): String? {
             if (recognizedRange == "$inTime - $outTime") {
                 null
             } else {
-                "인정 시간: $recognizedRange"
+                language.text("workproof_recognized_time_value", recognizedRange)
             }
         }
 
         "EXCLUDED" -> {
             val rejectMemo = decisionMemo?.takeIf { it.isNotBlank() }
-            rejectMemo?.let { "반려 사유: $it" }
+            rejectMemo?.let { language.text("workproof_rejection_reason_value", it) }
         }
+
         else -> null
     }
 }
@@ -257,12 +282,12 @@ internal fun WorkRecord.toAuditChangeText(): String {
     }
 }
 
-internal fun WorkRecord.toAuditReasonText(): String {
+internal fun WorkRecord.toAuditReasonText(language: AppLanguage): String {
     return when (reflectionStatus) {
-        "NEEDS_REVIEW" -> "사업장 검토 대기 중"
-        "REFLECTED" -> "인정 시간에 반영됨"
-        "EXCLUDED" -> "사업장에서 반려됨"
-        else -> "수정 요청이 접수됨"
+        "NEEDS_REVIEW" -> language.text("workproof_waiting_for_workplace_review")
+        "REFLECTED" -> language.text("workproof_reflected_in_recognized_time")
+        "EXCLUDED" -> language.text("workproof_rejected_by_workplace")
+        else -> language.text("workproof_edit_request_submitted")
     }
 }
 

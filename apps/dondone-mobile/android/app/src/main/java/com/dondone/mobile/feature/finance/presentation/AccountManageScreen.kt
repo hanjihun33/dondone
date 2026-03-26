@@ -54,6 +54,9 @@ import com.dondone.mobile.app.session.RemittanceSubmittingAction
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
+import com.dondone.mobile.core.i18n.translate
 import com.dondone.mobile.feature.recipient.presentation.RecipientWalletAddBottomSheet
 import com.dondone.mobile.feature.recipient.presentation.resolveRecipientSheetErrorMessage
 import com.dondone.mobile.feature.recipient.presentation.shouldCloseRecipientSheetAfterResult
@@ -102,6 +105,7 @@ fun AccountManageScreen(
     onSearchRecipientsByPhone: (String) -> Unit,
     onClearPhoneSearch: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     var activeSheetMode by remember { mutableStateOf<RecipientWalletSheetMode?>(null) }
     var editingRecipientId by remember { mutableStateOf<String?>(null) }
     var awaitingSubmissionAction by remember { mutableStateOf<RemittanceSubmittingAction?>(null) }
@@ -117,12 +121,7 @@ fun AccountManageScreen(
         actionUiState = actionUiState
     )
 
-    LaunchedEffect(
-        awaitingSubmissionAction,
-        actionUiState.isSubmitting,
-        actionUiState.message,
-        actionUiState.isError
-    ) {
+    LaunchedEffect(awaitingSubmissionAction, actionUiState.isSubmitting, actionUiState.message, actionUiState.isError) {
         if (!shouldCloseRecipientSheetAfterResult(awaitingSubmissionAction != null, actionUiState)) {
             return@LaunchedEffect
         }
@@ -157,7 +156,7 @@ fun AccountManageScreen(
                     title = account.name,
                     subtitle = account.number,
                     valueText = account.balanceText,
-                    actionText = if (account.selected) "대표" else "선택",
+                    actionText = if (account.selected) language.text("primary") else language.text("select"),
                     copyText = account.copyNumber,
                     onClick = { onOpenTransactionHistory(account.id) }
                 )
@@ -191,8 +190,8 @@ fun AccountManageScreen(
                     ManageRow(
                         title = wallet.name,
                         subtitle = "${wallet.relationLabel} · ${wallet.address.toShortWalletAddress()}",
-                        valueText = if (wallet.selected) "기본 수신자" else null,
-                        actionText = "수정",
+                        valueText = if (wallet.selected) language.text("primary") else null,
+                        actionText = language.text("edit"),
                         copyText = wallet.address,
                         onClick = {
                             awaitingSubmissionAction = null
@@ -262,9 +261,10 @@ private fun AccountSummary(
     amount: String,
     unit: String?
 ) {
+    val language = LocalAppLanguage.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.bodyMedium,
             color = AccountManageSummaryLabel
         )
@@ -273,12 +273,7 @@ private fun AccountSummary(
                 append(amount)
                 unit?.let {
                     append(" ")
-                    withStyle(
-                        SpanStyle(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 22.sp
-                        )
-                    ) {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Black, fontSize = 22.sp)) {
                         append(it)
                     }
                 }
@@ -296,38 +291,34 @@ private fun ManageSection(
     onActionClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        content = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = language.translate(title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = DawnText
+            )
+            if (actionText != null) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = DawnText
+                    modifier = if (onActionClick != null) Modifier.clickable(onClick = onActionClick) else Modifier,
+                    text = language.translate(actionText),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (onActionClick != null) DawnPrimary else DawnTextSubtle
                 )
-                if (actionText != null) {
-                    Text(
-                        modifier = if (onActionClick != null) {
-                            Modifier.clickable(onClick = onActionClick)
-                        } else {
-                            Modifier
-                        },
-                        text = actionText,
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = if (onActionClick != null) DawnPrimary else DawnTextSubtle
-                    )
-                }
             }
-            content()
         }
-    )
+        content()
+    }
 }
 
 @Composable
@@ -341,6 +332,7 @@ private fun ManageSectionDivider() {
 private fun EmptyRecipientState(
     onAddWallet: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -349,12 +341,12 @@ private fun EmptyRecipientState(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "등록된 수신 지갑이 없어요.",
+            text = language.text("no_recipient_wallet_registered"),
             style = MaterialTheme.typography.bodyMedium,
             color = DawnText
         )
         Text(
-            text = "휴대폰 번호로 먼저 찾고, 없으면 지갑 주소를 직접 입력할 수 있어요.",
+            text = language.text("add_recipient_wallet_helper"),
             style = MaterialTheme.typography.bodySmall,
             color = AccountManageSummaryLabel
         )
@@ -366,7 +358,7 @@ private fun EmptyRecipientState(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "지갑 추가",
+                text = language.text("add_wallet"),
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                 color = DawnPrimary
             )
@@ -383,9 +375,18 @@ private fun ManageRow(
     copyText: String?,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val context = LocalContext.current
     val clipboardManager = remember(context) {
         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    }
+    val translatedSubtitle = remember(subtitle, language) {
+        val parts = subtitle.split(" · ", limit = 2)
+        if (parts.size == 2) {
+            "${language.translate(parts[0])} · ${parts[1]}"
+        } else {
+            language.translate(subtitle)
+        }
     }
 
     Row(
@@ -396,7 +397,7 @@ private fun ManageRow(
                 onLongClick = copyText?.let {
                     {
                         clipboardManager.setPrimaryClip(ClipData.newPlainText("wallet_address", it))
-                        Toast.makeText(context, "지갑 주소를 복사했어요.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, language.text("wallet_address_copied"), Toast.LENGTH_SHORT).show()
                     }
                 }
             )
@@ -423,7 +424,7 @@ private fun ManageRow(
                 )
                 if (valueText != null) {
                     Text(
-                        text = valueText,
+                        text = language.translate(valueText),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = DawnText,
                         maxLines = 1,
@@ -431,7 +432,7 @@ private fun ManageRow(
                     )
                 }
                 Text(
-                    text = subtitle,
+                    text = translatedSubtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = DawnTextSubtle,
                     overflow = TextOverflow.Clip
@@ -448,7 +449,7 @@ private fun ManageRow(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = actionText,
+                    text = language.translate(actionText),
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = AccountManageButtonText
                 )
@@ -460,7 +461,7 @@ private fun ManageRow(
 @Composable
 private fun AccountBadge(title: String) {
     val color = AccountManagePalette[title.hashCode().absoluteValue % AccountManagePalette.size]
-    val badgeText = title.trim().take(1).ifBlank { "•" }
+    val badgeText = title.trim().take(1).ifBlank { "?" }
 
     Box(
         modifier = Modifier
@@ -485,6 +486,7 @@ private fun EditRecipientWalletBottomSheet(
     onDismiss: () -> Unit,
     onSubmit: (String, String, String) -> Unit
 ) {
+    val language = LocalAppLanguage.current
     var alias by remember(recipient.id) { mutableStateOf(recipient.name) }
     var walletAddress by remember(recipient.id) { mutableStateOf(recipient.address) }
     var relation by remember(recipient.id) { mutableStateOf(recipient.relationCode) }
@@ -510,12 +512,12 @@ private fun EditRecipientWalletBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "수신 지갑 수정",
+                text = language.text("edit_recipient_wallet"),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
                 color = DawnText
             )
             Text(
-                text = "표시 이름, 관계, 지갑 주소를 현재 디자인 흐름 안에서 바로 업데이트할 수 있어요.",
+                text = language.text("edit_recipient_wallet_helper"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnTextSubtle
             )
@@ -540,12 +542,12 @@ private fun EditRecipientWalletBottomSheet(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "안내",
+                        text = language.text("notice"),
                         style = MaterialTheme.typography.bodySmall,
                         color = AccountManageSummaryLabel
                     )
                     Text(
-                        text = "지갑 주소를 바꾸면 다음 송금에서 다시 확인 문구가 보일 수 있어요.",
+                        text = language.text("change_visible_next_transfer"),
                         style = MaterialTheme.typography.bodySmall,
                         color = DawnTextSubtle
                     )
@@ -581,7 +583,7 @@ private fun EditRecipientWalletBottomSheet(
                     )
                 } else {
                     Text(
-                        text = "변경 저장하기",
+                        text = language.text("save_changes"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = if (canSubmit) Color.White else AccountManageButtonText
                     )
@@ -589,7 +591,7 @@ private fun EditRecipientWalletBottomSheet(
             }
 
             Text(
-                text = "현재는 테스트넷 데모입니다. 실제 자금 이동이 발생하지 않습니다.",
+                text = language.text("transfer_demo_notice"),
                 style = MaterialTheme.typography.bodySmall,
                 color = AccountManageSummaryLabel
             )
@@ -606,6 +608,7 @@ private fun ManualAddressForm(
     walletAddress: String,
     onWalletAddressChange: (String) -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val addressValid = walletAddress.trim().isLikelyWalletAddress()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -614,7 +617,7 @@ private fun ManualAddressForm(
             value = alias,
             onValueChange = onAliasChange,
             singleLine = true,
-            label = { Text("별칭") },
+            label = { Text(language.text("alias")) },
             shape = RoundedCornerShape(16.dp)
         )
         OutlinedTextField(
@@ -622,14 +625,14 @@ private fun ManualAddressForm(
             value = walletAddress,
             onValueChange = onWalletAddressChange,
             singleLine = true,
-            label = { Text("지갑 주소") },
+            label = { Text(language.text("wallet_address")) },
             placeholder = { Text("0x...") },
             supportingText = {
                 Text(
                     text = if (walletAddress.isBlank() || addressValid) {
-                        "테스트넷 EVM 지갑 주소를 입력해 주세요."
+                        language.text("enter_testnet_evm_wallet_address")
                     } else {
-                        "0x로 시작하는 42자리 주소를 입력해 주세요."
+                        language.text("wallet_address_length_error")
                     },
                     color = if (walletAddress.isBlank() || addressValid) AccountManageSummaryLabel else AccountManageError
                 )
@@ -645,9 +648,10 @@ private fun RelationSelector(
     selectedRelation: String,
     onSelectRelation: (String) -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = "관계",
+            text = language.text("relationship"),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
@@ -675,7 +679,7 @@ private fun RelationSelector(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = label,
+                            text = language.translate(label),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                             color = if (selected) DawnPrimary else DawnTextSubtle
                         )

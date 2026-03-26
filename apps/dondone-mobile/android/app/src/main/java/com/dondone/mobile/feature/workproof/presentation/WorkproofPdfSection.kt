@@ -40,6 +40,11 @@ import com.dondone.mobile.core.designsystem.DonDoneErrorPanel
 import com.dondone.mobile.core.designsystem.DonDoneLoadingPanel
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
+import com.dondone.mobile.core.i18n.translate
 import java.time.LocalDate
 
 @Composable
@@ -56,19 +61,20 @@ internal fun WorkproofPdfDateRangeSheet(
     onGenerate: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "근무 기록 PDF 생성",
+        ) {
+            Text(
+            text = language.text("workproof_generate_pdf"),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
         Text(
-            text = "문서로 정리할 기간을 먼저 선택해 주세요.",
+            text = language.translate("문서로 정리할 기간을 먼저 선택해 주세요."),
             style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
@@ -78,36 +84,36 @@ internal fun WorkproofPdfDateRangeSheet(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             WorkproofPdfPresetChip(
-                label = "이번 달",
+                label = language.text("workproof_this_month"),
                 selected = selectedPreset == WorkproofPdfDatePreset.THIS_MONTH,
                 onClick = { onSelectPreset(WorkproofPdfDatePreset.THIS_MONTH) }
             )
             WorkproofPdfPresetChip(
-                label = "지난 달",
+                label = language.text("workproof_last_month"),
                 selected = selectedPreset == WorkproofPdfDatePreset.LAST_MONTH,
                 onClick = { onSelectPreset(WorkproofPdfDatePreset.LAST_MONTH) }
             )
             WorkproofPdfPresetChip(
-                label = "직접 선택",
+                label = language.text("workproof_custom_range"),
                 selected = selectedPreset == WorkproofPdfDatePreset.CUSTOM,
                 onClick = { onSelectPreset(WorkproofPdfDatePreset.CUSTOM) }
             )
         }
 
         WorkproofPdfDateField(
-            label = "시작일",
+            label = language.text("workproof_start_date"),
             value = formatWorkproofPdfDate(startDate),
             onClick = onOpenStartDatePicker
         )
         WorkproofPdfDateField(
-            label = "종료일",
+            label = language.text("workproof_end_date"),
             value = formatWorkproofPdfDate(endDate),
             onClick = onOpenEndDatePicker
         )
 
         if (!isDateRangeValid) {
             Text(
-                text = "종료일은 시작일보다 빠를 수 없어요.",
+                text = language.text("workproof_end_date_invalid"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
@@ -116,17 +122,17 @@ internal fun WorkproofPdfDateRangeSheet(
         when {
             previewUiState.isLoading -> {
                 DonDoneLoadingPanel(
-                    title = "미리보기 불러오는 중",
-                    message = "선택한 기간의 근무 기록 요약을 확인하고 있어요.",
+                    title = language.text("workproof_loading_preview"),
+                    message = language.text("workproof_loading_preview_message"),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
             previewUiState.errorMessage != null -> {
                 DonDoneErrorPanel(
-                    title = "미리보기를 불러오지 못했어요",
+                    title = language.text("workproof_preview_failed"),
                     message = previewUiState.errorMessage,
-                    actionLabel = "기간 다시 선택",
+                    actionLabel = language.text("workproof_select_period_again"),
                     onAction = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -139,9 +145,9 @@ internal fun WorkproofPdfDateRangeSheet(
 
         if (createUiState.errorMessage != null) {
             DonDoneErrorPanel(
-                title = "문서 생성 요청을 접수하지 못했어요",
+                title = language.text("workproof_failed_to_submit_pdf_request"),
                 message = createUiState.errorMessage,
-                actionLabel = "다시 시도",
+                actionLabel = language.text("workproof_try_again"),
                 onAction = onGenerate,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -149,20 +155,24 @@ internal fun WorkproofPdfDateRangeSheet(
 
         if (createUiState.isSubmitting) {
             DonDoneLoadingPanel(
-                title = "PDF 생성 요청 접수 중",
-                message = "선택한 기간의 근무 기록 문서 생성을 요청하고 있어요.",
+                title = language.text("workproof_submitting_pdf_request"),
+                message = language.text("workproof_submitting_pdf_request_message"),
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
         SecondaryActionButton(
-            text = if (createUiState.isSubmitting) "PDF 생성 요청 중..." else "PDF 생성",
+            text = if (createUiState.isSubmitting) {
+                language.text("workproof_submitting_pdf_request_in_progress")
+            } else {
+                language.text("workproof_generate_pdf")
+            },
             onClick = onGenerate,
             enabled = isDateRangeValid && !createUiState.isSubmitting && previewUiState.preview != null,
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = "선택한 기간 기준 실제 근무 기록 요약을 확인한 뒤 문서를 생성할 수 있어요.",
+            text = language.translate("선택한 기간 기준 실제 근무 기록 요약을 확인한 뒤 문서를 생성할 수 있어요."),
             style = MaterialTheme.typography.bodySmall,
             color = DawnTextSubtle
         )
@@ -174,6 +184,7 @@ internal fun WorkproofPdfDateRangeSheet(
 private fun WorkproofPdfPreviewCard(
     preview: WorkproofPdfPreviewUiModel
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -184,37 +195,37 @@ private fun WorkproofPdfPreviewCard(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "문서 미리보기",
+            text = language.text("workproof_document_preview"),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
         WorkproofKeyValueRow(
-            label = "근무지",
+            label = language.text("workproof_workplace"),
             value = preview.workplaceName
         )
         WorkproofKeyValueRow(
-            label = "선택 기간",
+            label = language.text("workproof_selected_period"),
             value = preview.periodText
         )
         WorkproofKeyValueRow(
-            label = "기록 수",
+            label = language.text("workproof_record_count"),
             value = preview.totalRecordCountText
         )
         WorkproofKeyValueRow(
-            label = "수정 기록",
+            label = language.text("workproof_edited_records"),
             value = preview.editedCountText
         )
         WorkproofKeyValueRow(
-            label = "첨부 수",
+            label = language.text("workproof_attachment_count"),
             value = preview.attachmentCountText
         )
         WorkproofKeyValueRow(
-            label = "총 근무시간",
+            label = language.text("workproof_total_work_hours"),
             value = preview.totalWorkedHoursText
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "문서 포함 항목",
+                text = language.text("workproof_document_includes"),
                 style = MaterialTheme.typography.labelLarge,
                 color = DawnTextSubtle
             )
@@ -233,6 +244,7 @@ private fun WorkproofPdfPresetChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
@@ -246,7 +258,7 @@ private fun WorkproofPdfPresetChip(
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
             color = if (selected) WorkproofRowAccentTint else DawnTextSubtle
         )
@@ -259,9 +271,10 @@ private fun WorkproofPdfDateField(
     value: String,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelLarge,
             color = DawnTextSubtle
         )
@@ -292,17 +305,18 @@ internal fun WorkproofPdfGenerationResultSheet(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val isActionable = createUiState.isActionable
     val isFailed = createUiState.isFailed
     val title = when {
-        isFailed -> "PDF 생성 실패"
-        isActionable -> "PDF 열기 준비 완료"
-        else -> "PDF 생성 요청 완료"
+        isFailed -> language.text("workproof_pdf_generation_failed")
+        isActionable -> language.text("workproof_pdf_ready_to_open")
+        else -> language.text("workproof_pdf_request_submitted")
     }
     val description = when {
-        isFailed -> createUiState.errorMessage ?: "문서 생성에 실패했어요."
-        isActionable -> "열기 또는 공유를 눌러 문서를 확인해 주세요."
-        else -> "선택한 기간의 근무기록 문서를 준비하고 있어요."
+        isFailed -> createUiState.errorMessage ?: language.translate("문서 생성에 실패했어요.")
+        isActionable -> language.translate("열기 또는 공유를 눌러 문서를 확인해 주세요.")
+        else -> language.translate("선택한 기간의 근무기록 문서를 준비하고 있어요.")
     }
 
     Column(
@@ -356,8 +370,8 @@ internal fun WorkproofPdfGenerationResultSheet(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            WorkproofKeyValueRow(label = "선택 기간", value = periodText)
-            WorkproofKeyValueRow(label = "파일명", value = fileName)
+            WorkproofKeyValueRow(label = language.text("workproof_selected_period"), value = periodText)
+            WorkproofKeyValueRow(label = language.text("workproof_file_name"), value = fileName)
             if (createUiState.errorMessage != null) {
                 Text(
                     text = createUiState.errorMessage,
@@ -372,20 +386,20 @@ internal fun WorkproofPdfGenerationResultSheet(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             PrimaryActionButton(
-                text = "열기",
+                text = language.text("workproof_open_pdf"),
                 onClick = onOpen,
                 enabled = isActionable,
                 modifier = Modifier.weight(1f)
             )
             SecondaryActionButton(
-                text = "공유",
+                text = language.text("workproof_share_pdf"),
                 onClick = onShare,
                 enabled = isActionable,
                 modifier = Modifier.weight(1f)
             )
         }
         SecondaryActionButton(
-            text = "닫기",
+            text = language.text(AppTextKeys.CLOSE),
             onClick = onDismiss,
             modifier = Modifier.fillMaxWidth()
         )
@@ -430,7 +444,7 @@ internal fun openWorkproofPdfFile(
             }
         )
     }.onFailure {
-        Toast.makeText(context, "PDF를 열 수 없어요.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, AppLanguage.fromDefault().text("workproof_unable_to_open_pdf"), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -445,17 +459,17 @@ internal fun shareWorkproofPdfFile(
                 Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TITLE, fileName ?: "근무 기록 문서")
+                    putExtra(Intent.EXTRA_TITLE, fileName ?: AppLanguage.fromDefault().text("workproof_work_record_document"))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 },
-                "근무 기록 문서 공유"
+                AppLanguage.fromDefault().text("workproof_share_work_record_document")
             ).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         )
     }.onFailure {
-        Toast.makeText(context, "PDF를 공유할 수 없어요.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, AppLanguage.fromDefault().text("workproof_unable_to_share_pdf"), Toast.LENGTH_SHORT).show()
     }
 }
 

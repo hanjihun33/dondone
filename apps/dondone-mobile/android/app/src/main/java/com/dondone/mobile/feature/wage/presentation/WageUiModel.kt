@@ -2,6 +2,8 @@ package com.dondone.mobile.feature.wage.presentation
 
 import com.dondone.mobile.app.session.WageActionUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.text
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.data.wage.WageRemoteMode
 import com.dondone.mobile.data.wage.WageRemotePayload
@@ -32,6 +34,13 @@ enum class WageMetricIcon {
     TOTAL
 }
 
+enum class WageDifferenceState {
+    PENDING,
+    MATCH,
+    UNDER,
+    OVER
+}
+
 data class WageMetricItemUiModel(
     val label: String,
     val value: String,
@@ -52,6 +61,7 @@ data class WageDepositUiModel(
 )
 
 data class WageDifferenceUiModel(
+    val state: WageDifferenceState,
     val title: String,
     val descriptionText: String,
     val locked: Boolean,
@@ -75,7 +85,8 @@ data class WageUiModel(
 
 fun DemoState.toWageUiModel(
     remoteState: WageRemoteState? = null,
-    actionUiState: WageActionUiState = WageActionUiState()
+    actionUiState: WageActionUiState = WageActionUiState(),
+    language: AppLanguage = AppLanguage.fromDefault()
 ): WageUiModel {
     val surfaceState = when (remoteState?.mode) {
         WageRemoteMode.LOADING -> WageSurfaceState.LOADING
@@ -104,18 +115,23 @@ fun DemoState.toWageUiModel(
     val overtimeHours = ((summary?.overtimeMinutes ?: wage.overtimeHours.toLong() * 60L) / 60L).toInt()
     val nightHours = ((summary?.nightMinutes ?: wage.nightHours.toLong() * 60L) / 60L).toInt()
     val modifiedCount = summary?.modifiedRecordCount ?: workproof.audit.size
-    val differenceStatusText = when {
-        !isRecorded -> "입금 대기"
-        differenceAmount == 0 -> "거의 일치"
-        differenceAmount > 0 -> "부족"
-        else -> "초과"
+    val differenceState = when {
+        !isRecorded -> WageDifferenceState.PENDING
+        differenceAmount == 0 -> WageDifferenceState.MATCH
+        differenceAmount > 0 -> WageDifferenceState.UNDER
+        else -> WageDifferenceState.OVER
     }
-    // Keep tone mapping aligned with the user-facing status text.
-    val statusTone = when (differenceStatusText) {
-        "부족" -> BadgeTone.Warning
-        "초과" -> BadgeTone.Info
-        "거의 일치" -> BadgeTone.Success
-        else -> BadgeTone.Warning
+    val differenceStatusText = when (differenceState) {
+        WageDifferenceState.PENDING -> language.text("wage_record_needed_status")
+        WageDifferenceState.MATCH -> language.text("wage_difference_match_title")
+        WageDifferenceState.UNDER -> language.text("wage_difference_under_title")
+        WageDifferenceState.OVER -> language.text("wage_difference_over_title")
+    }
+    val statusTone = when (differenceState) {
+        WageDifferenceState.MATCH -> BadgeTone.Success
+        WageDifferenceState.OVER -> BadgeTone.Info
+        WageDifferenceState.PENDING,
+        WageDifferenceState.UNDER -> BadgeTone.Warning
     }
     val evidenceLines = buildEvidenceLines(
         state = this,
@@ -123,13 +139,14 @@ fun DemoState.toWageUiModel(
         verification = verification,
         overtimeHours = overtimeHours,
         nightHours = nightHours,
-        modifiedCount = modifiedCount
+        modifiedCount = modifiedCount,
+        language = language
     )
     val surfaceMessage = when (surfaceState) {
-        WageSurfaceState.LOADING -> "급여 데이터를 불러오는 중입니다."
-        WageSurfaceState.UNAUTHENTICATED -> remoteState?.errorMessage ?: "로그인 후 급여 점검을 확인할 수 있습니다."
-        WageSurfaceState.ERROR -> remoteState?.errorMessage ?: "급여 데이터를 다시 불러오지 못했습니다."
-        WageSurfaceState.EMPTY -> remoteState?.errorMessage ?: "표시할 급여 데이터가 없습니다."
+        WageSurfaceState.LOADING -> language.text("wage_loading_message")
+        WageSurfaceState.UNAUTHENTICATED -> remoteState?.errorMessage ?: language.text("wage_login_required_message")
+        WageSurfaceState.ERROR -> remoteState?.errorMessage ?: language.text("wage_error_message")
+        WageSurfaceState.EMPTY -> remoteState?.errorMessage ?: language.text("wage_empty_message")
         WageSurfaceState.CONTENT -> null
     }
 
@@ -139,9 +156,14 @@ fun DemoState.toWageUiModel(
         surfaceActionText = when (surfaceState) {
             WageSurfaceState.ERROR,
             WageSurfaceState.EMPTY -> {
-                if (surfaceMessage.isActiveContractMissingMessage()) "근로계약 확인하기" else "다시 시도"
+                if (surfaceMessage.isActiveContractMissingMessage()) {
+                    language.text("open_menu_registration")
+                } else {
+                    language.text("refresh")
+                }
             }
-            WageSurfaceState.UNAUTHENTICATED -> "로그인 필요"
+
+            WageSurfaceState.UNAUTHENTICATED -> language.text("refresh")
             else -> null
         },
         surfaceActionType = when (surfaceState) {
@@ -153,67 +175,69 @@ fun DemoState.toWageUiModel(
                     WageSurfaceActionType.REFRESH
                 }
             }
+
             WageSurfaceState.UNAUTHENTICATED -> WageSurfaceActionType.REFRESH
             else -> null
         },
-        descriptionText = "실제 입금액을 입력하면 예상 급여와 비교해 차액을 확인할 수 있어요.",
+        descriptionText = language.text("wage_description"),
         deposit = WageDepositUiModel(
             isSubmitting = actionUiState.isSubmittingDeposit,
-            statusText = if (isRecorded) "" else "입금 기록 필요",
+            statusText = if (isRecorded) "" else language.text("wage_record_needed_status"),
             statusTone = if (isRecorded) BadgeTone.Info else BadgeTone.Warning,
-            headerText = if (isRecorded) "" else "실제 입금액을 입력해 주세요",
-            descriptionText = if (isRecorded) {
-                ""
-            } else {
-                "이번 달 실제로 들어온 금액을 입력하면 차액 여부를 바로 확인할 수 있어요."
-            },
+            headerText = if (isRecorded) "" else language.text("wage_enter_actual_deposit"),
+            descriptionText = if (isRecorded) "" else language.text("wage_enter_actual_deposit_desc"),
             metaText = if (isRecorded) {
                 ""
             } else {
-                "급여일 ${summary?.paydayDay ?: wage.paydayDay}일 기준"
+                language.text("wage_payday_basis_format", summary?.paydayDay ?: wage.paydayDay)
             },
-            actualDepositText = formatKrw(actualDeposit),
-            deductionBadgeText = if ((summary?.deductionsKnown ?: wage.deductionsKnown)) "공제 반영" else "공제 여부 확인 전",
+            actualDepositText = formatKrw(actualDeposit, language),
+            deductionBadgeText = if ((summary?.deductionsKnown ?: wage.deductionsKnown)) {
+                language.text("deductions_confirmed")
+            } else {
+                language.text("deductions_unknown")
+            },
             thresholdBadgeText = verification?.threshold?.absoluteWon?.toInt()?.let {
-                "임계값 ${formatKrw(it)}"
+                language.text("threshold_badge_format", formatKrw(it, language))
             } ?: ""
         ),
         overviewItems = listOf(
-            WageMetricItemUiModel(label = "근무일", value = "${workDays}일"),
-            WageMetricItemUiModel(label = "총 시간", value = "${totalHours}시간"),
-            WageMetricItemUiModel(label = "연장/야간", value = "${overtimeHours}/${nightHours}")
+            WageMetricItemUiModel(language.text("work_days"), language.text("days_format", workDays)),
+            WageMetricItemUiModel(language.text("total_hours"), language.text("hours_format", totalHours)),
+            WageMetricItemUiModel(language.text("overtime_night"), language.text("overtime_night_hours_format", overtimeHours, nightHours))
         ),
         estimateItems = listOf(
-            WageMetricItemUiModel("기본급", formatKrw(estimatedBase), icon = WageMetricIcon.BASE),
-            WageMetricItemUiModel("연장 가산", formatKrw(estimatedOvertime), icon = WageMetricIcon.OVERTIME),
-            WageMetricItemUiModel("야간 가산", formatKrw(estimatedNight), icon = WageMetricIcon.NIGHT),
-            WageMetricItemUiModel("추정 합계", formatKrw(estimatedTotal), emphasized = true, icon = WageMetricIcon.TOTAL)
+            WageMetricItemUiModel(language.text("estimated_base_pay"), formatKrw(estimatedBase, language), icon = WageMetricIcon.BASE),
+            WageMetricItemUiModel(language.text("estimated_overtime_pay"), formatKrw(estimatedOvertime, language), icon = WageMetricIcon.OVERTIME),
+            WageMetricItemUiModel(language.text("estimated_night_pay"), formatKrw(estimatedNight, language), icon = WageMetricIcon.NIGHT),
+            WageMetricItemUiModel(language.text("estimated_total_pay"), formatKrw(estimatedTotal, language), emphasized = true, icon = WageMetricIcon.TOTAL)
         ),
         difference = WageDifferenceUiModel(
-            title = when {
-                !isRecorded -> "입금 기록이 먼저 필요합니다"
-                differenceAmount == 0 -> "추정과 실제가 거의 같습니다"
-                differenceAmount > 0 -> "실제 입금액이 추정보다 적습니다"
-                else -> "실제 입금액이 추정보다 많습니다"
+            state = differenceState,
+            title = when (differenceState) {
+                WageDifferenceState.PENDING -> language.text("wage_difference_pending_title")
+                WageDifferenceState.MATCH -> language.text("wage_difference_match_title")
+                WageDifferenceState.UNDER -> language.text("wage_difference_under_title")
+                WageDifferenceState.OVER -> language.text("wage_difference_over_title")
             },
-            descriptionText = when {
-                !isRecorded -> "차액 비교를 하려면 실제 입금액이 필요합니다."
-                differenceAmount == 0 -> "이번 달 급여는 큰 차이 없이 들어온 상태로 보입니다."
-                differenceAmount > 0 -> "누락된 수당이나 공제 반영 여부를 먼저 확인해 보세요."
-                else -> "추가 지급이나 공제 차이로 이런 결과가 나올 수 있습니다."
+            descriptionText = when (differenceState) {
+                WageDifferenceState.PENDING -> language.text("wage_difference_pending_desc")
+                WageDifferenceState.MATCH -> language.text("wage_difference_match_desc")
+                WageDifferenceState.UNDER -> language.text("wage_difference_under_desc")
+                WageDifferenceState.OVER -> language.text("wage_difference_over_desc")
             },
             locked = !isRecorded,
             statusText = differenceStatusText,
             statusTone = statusTone,
             summaryItems = listOf(
-                WageMetricItemUiModel("추정 급여", formatKrw(estimatedTotal)),
-                WageMetricItemUiModel("실제 입금", formatKrw(actualDeposit)),
+                WageMetricItemUiModel(language.text("wage_estimated_wage"), formatKrw(estimatedTotal, language)),
+                WageMetricItemUiModel(language.text("actual_deposit"), formatKrw(actualDeposit, language)),
                 WageMetricItemUiModel(
-                    "차액",
+                    language.text("wage_difference_amount"),
                     when {
-                        differenceAmount > 0 -> "-${formatKrw(abs(differenceAmount))}"
-                        differenceAmount < 0 -> "+${formatKrw(abs(differenceAmount))}"
-                        else -> formatKrw(0)
+                        differenceAmount > 0 -> "-${formatKrw(abs(differenceAmount), language)}"
+                        differenceAmount < 0 -> "+${formatKrw(abs(differenceAmount), language)}"
+                        else -> formatKrw(0, language)
                     },
                     emphasized = true
                 )
@@ -225,7 +249,9 @@ fun DemoState.toWageUiModel(
 
 private fun String?.isActiveContractMissingMessage(): Boolean {
     val message = this ?: return false
-    return message.contains("활성 근로계약")
+    return message.contains("근로계약") ||
+        message.contains("active contract", ignoreCase = true) ||
+        message.contains("employment contract", ignoreCase = true)
 }
 
 private fun buildEvidenceLines(
@@ -234,19 +260,20 @@ private fun buildEvidenceLines(
     verification: WageVerificationDetailPayload?,
     overtimeHours: Int,
     nightHours: Int,
-    modifiedCount: Int
+    modifiedCount: Int,
+    language: AppLanguage
 ): List<String> {
     val remoteEvidence = verification?.evidence
     return buildList {
         payload?.summary?.reasons?.firstOrNull()?.let { reason ->
-            add("가능한 원인: ${reason.title}")
+            add(language.text("evidence_reason_format", reason.title))
         }
-        add("연장 ${remoteEvidence?.overtimeMinutes?.div(60) ?: overtimeHours}시간 반영")
-        add("야간 ${remoteEvidence?.nightMinutes?.div(60) ?: nightHours}시간 반영")
-        add("수정 기록 ${remoteEvidence?.modifiedRecordCount ?: modifiedCount}건 확인")
+        add(language.text("evidence_overtime_format", remoteEvidence?.overtimeMinutes?.div(60) ?: overtimeHours))
+        add(language.text("evidence_night_format", remoteEvidence?.nightMinutes?.div(60) ?: nightHours))
+        add(language.text("evidence_modified_records_format", remoteEvidence?.modifiedRecordCount ?: modifiedCount))
         val relatedCount = verification?.relatedActions?.let {
             listOfNotNull(it.proofPackDocumentId, it.claimKitDocumentId, it.preparationId).size
         } ?: state.documents.size
-        add("연결된 후속 문서/행동 ${relatedCount}건")
+        add(language.text("evidence_related_docs_format", relatedCount))
     }
 }

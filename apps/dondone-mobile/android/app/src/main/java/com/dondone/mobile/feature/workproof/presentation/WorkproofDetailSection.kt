@@ -55,6 +55,10 @@ import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
+import com.dondone.mobile.core.i18n.translate
 import com.dondone.mobile.core.designsystem.pressableScale
 import com.dondone.mobile.core.designsystem.rememberDonDoneGrayRipple
 
@@ -72,6 +76,7 @@ internal fun WorkproofDetailPage(
     onEditRecord: (WorkproofRecordUiModel) -> Unit,
     onOpenPdfCreation: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -89,7 +94,7 @@ internal fun WorkproofDetailPage(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "뒤로",
+                contentDescription = language.text(AppTextKeys.BACK),
                 tint = DawnTextSubtle,
                 modifier = Modifier.size(20.dp)
             )
@@ -125,6 +130,7 @@ private fun WorkproofCalendarCard(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     WorkproofSurfaceCard {
         WorkproofSectionHeader(
             title = "근무 달력",
@@ -146,7 +152,7 @@ private fun WorkproofCalendarCard(
                 icon = {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = "이전 달",
+                        contentDescription = language.text("workproof_previous_month"),
                         tint = DawnTextSubtle,
                         modifier = Modifier.size(28.dp)
                     )
@@ -162,7 +168,7 @@ private fun WorkproofCalendarCard(
                 icon = {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "다음 달",
+                        contentDescription = language.text("workproof_next_month"),
                         tint = DawnTextSubtle,
                         modifier = Modifier.size(28.dp)
                     )
@@ -247,6 +253,7 @@ private fun WorkproofRecentLogsCard(
 private fun WorkproofDocumentCreateHeaderAction(
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     Row(
@@ -282,7 +289,7 @@ private fun WorkproofDocumentCreateHeaderAction(
             )
         }
         Text(
-            text = "문서 생성",
+            text = language.translate("문서 생성"),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
             color = DawnText
         )
@@ -299,6 +306,7 @@ private fun WorkproofDocumentCreateHeaderAction(
 private fun WorkproofAuditCard(
     auditItems: List<WorkproofAuditUiModel>
 ) {
+    val language = LocalAppLanguage.current
     WorkproofSurfaceCard {
         WorkproofSectionHeader(title = "변경 기록")
 
@@ -306,9 +314,9 @@ private fun WorkproofAuditCard(
             WorkproofAuditPreviewRow(
                 uiModel = WorkproofAuditUiModel(
                     dateText = "",
-                    changeText = stringResource(R.string.workproof_empty_audit_title),
+                    changeText = language.translate(stringResource(R.string.workproof_empty_audit_title)),
                     attachmentCount = 0,
-                    reasonText = stringResource(R.string.workproof_empty_audit_description)
+                    reasonText = language.translate(stringResource(R.string.workproof_empty_audit_description))
                 )
             )
         } else {
@@ -474,13 +482,14 @@ internal fun WorkproofSectionHeader(
     title: String,
     trailing: @Composable (() -> Unit)? = null
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = title,
+            text = language.translate(title),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
@@ -493,13 +502,14 @@ internal fun WorkproofKeyValueRow(
     label: String,
     value: String
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
@@ -541,6 +551,7 @@ private fun WorkproofInlineActionButton(
     text: String,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     Box(
@@ -561,7 +572,7 @@ private fun WorkproofInlineActionButton(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = text,
+            text = language.translate(text),
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
@@ -574,6 +585,7 @@ internal fun WorkproofSelectionField(
     isPlaceholder: Boolean,
     onClick: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val interactionSource = remember { MutableInteractionSource() }
 
     Row(
@@ -596,7 +608,7 @@ internal fun WorkproofSelectionField(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = value,
+            text = language.translate(value),
             style = MaterialTheme.typography.bodyLarge,
             color = if (isPlaceholder) DawnTextSubtle else DawnText
         )
@@ -628,6 +640,7 @@ internal fun WorkproofEditSheet(
     onSave: () -> Unit,
     onClose: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val focusManager = LocalFocusManager.current
     val isTimeInputValid = remember(requestedClockInText, requestedClockOutText) {
         requestedClockInText.isValidWorkproofTimeInput() &&
@@ -660,7 +673,7 @@ internal fun WorkproofEditSheet(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = "근무 시간 수정",
+                    text = language.text("workproof_edit_work_hours"),
                     style = MaterialTheme.typography.titleLarge,
                     color = DawnText
                 )
@@ -678,7 +691,7 @@ internal fun WorkproofEditSheet(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "닫기",
+                    text = language.text(AppTextKeys.CLOSE),
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                     color = DawnTextSubtle
                 )
@@ -698,7 +711,7 @@ internal fun WorkproofEditSheet(
                     onValueChange = onRequestedClockInChange,
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    label = { Text(text = "출근") },
+                    label = { Text(text = language.translate("출근")) },
                     placeholder = { Text(text = "09:00") }
                 )
                 OutlinedTextField(
@@ -706,13 +719,13 @@ internal fun WorkproofEditSheet(
                     onValueChange = onRequestedClockOutChange,
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    label = { Text(text = "퇴근") },
+                    label = { Text(text = language.translate("퇴근")) },
                     placeholder = { Text(text = "18:00") }
                 )
             }
             if (!isTimeInputValid && (requestedClockInText.isNotBlank() || requestedClockOutText.isNotBlank())) {
                 Text(
-                    text = "요청 시간은 HH:mm 형식으로 입력해 주세요.",
+                    text = language.translate("요청 시간은 HH:mm 형식으로 입력해 주세요."),
                     style = MaterialTheme.typography.bodySmall,
                     color = WorkproofModifiedText
                 )
@@ -724,7 +737,7 @@ internal fun WorkproofEditSheet(
             Box(modifier = Modifier.fillMaxWidth()) {
                 WorkproofSelectionField(
                     value = if (selectedReasonLabel.isBlank()) {
-                        "선택하세요"
+                        language.text("workproof_select_one")
                     } else {
                         selectedReasonLabel
                     },
@@ -738,7 +751,7 @@ internal fun WorkproofEditSheet(
                 ) {
                     WorkproofEditReasons.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(text = option.label) },
+                            text = { Text(text = language.translate(option.label)) },
                             onClick = { onSelectReason(option) }
                         )
                     }
@@ -758,7 +771,7 @@ internal fun WorkproofEditSheet(
                 textStyle = MaterialTheme.typography.bodyMedium,
                 placeholder = {
                     Text(
-                        text = "추가 메모(선택)",
+                        text = language.text("workproof_additional_memo_optional"),
                         color = DawnTextSubtle
                     )
                 }
@@ -775,23 +788,23 @@ internal fun WorkproofEditSheet(
             ) {
                 SecondaryActionButton(
                     text = if (selectedAttachmentName == null) {
-                        "파일 선택"
+                        language.text("workproof_choose_file")
                     } else {
-                        "다시 선택"
+                        language.text("workproof_choose_again")
                     },
                     onClick = onPickAttachment,
                     modifier = Modifier.weight(1f)
                 )
                 if (selectedAttachmentName != null) {
                     SecondaryActionButton(
-                        text = "제거",
+                        text = language.text("workproof_remove"),
                         onClick = onClearAttachment,
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
             Text(
-                text = selectedAttachmentName ?: "선택된 파일 없음",
+                text = selectedAttachmentName ?: language.text("workproof_no_file_selected"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (selectedAttachmentName == null) DawnTextSubtle else DawnText
             )
@@ -800,7 +813,7 @@ internal fun WorkproofEditSheet(
         Spacer(modifier = Modifier.height(4.dp))
 
         PrimaryActionButton(
-            text = "요청 보내기",
+            text = language.text("workproof_submit_request"),
             onClick = onSave,
             enabled = selectedReasonLabel.isNotBlank() && isTimeInputValid,
             modifier = Modifier.fillMaxWidth()
@@ -815,12 +828,13 @@ private fun WorkproofEditSheetSection(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = title,
+            text = language.translate(title),
             style = MaterialTheme.typography.labelLarge,
             color = DawnText
         )
@@ -902,6 +916,7 @@ private fun WorkproofLegendItem(
     label: String,
     tone: WorkproofCalendarTone
 ) {
+    val language = LocalAppLanguage.current
     val color = when (tone) {
         WorkproofCalendarTone.UNAVAILABLE -> Color.Transparent
         WorkproofCalendarTone.MISSING -> WorkproofMissingBackground
@@ -933,7 +948,7 @@ private fun WorkproofLegendItem(
                 )
         )
         Text(
-            text = label,
+            text = language.translate(label),
             style = MaterialTheme.typography.labelLarge,
             color = DawnTextSubtle
         )
@@ -948,16 +963,18 @@ internal fun isRecordedCalendarTone(tone: WorkproofCalendarTone?): Boolean {
 
 @Composable
 private fun formatAttachmentText(attachmentCount: Int): String {
+    val language = LocalAppLanguage.current
     return if (attachmentCount > 0) {
-        stringResource(R.string.workproof_value_attachment_count, attachmentCount)
+        language.text("workproof_attachment_count_value", attachmentCount)
     } else {
-        stringResource(R.string.workproof_value_attachment_none)
+        language.text("workproof_attachment_none")
     }
 }
 
 @Composable
 private fun formatRecordTimeLine(timeText: String): String {
+    val language = LocalAppLanguage.current
     val parts = timeText.split(" - ")
     if (parts.size != 2) return timeText
-    return stringResource(R.string.workproof_record_time_line, parts[0], parts[1])
+    return language.text("workproof_record_time_line", parts[0], parts[1])
 }

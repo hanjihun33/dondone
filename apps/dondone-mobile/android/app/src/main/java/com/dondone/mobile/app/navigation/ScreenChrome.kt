@@ -1,5 +1,8 @@
 package com.dondone.mobile.app.navigation
 
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.text
 import com.dondone.mobile.domain.model.TransferFlowStep
 import com.dondone.mobile.domain.model.TransferStatus
 
@@ -14,14 +17,15 @@ fun resolveScreenChrome(
     route: String,
     transferStep: TransferFlowStep,
     transferStatus: TransferStatus,
-    isWorkproofDetailVisible: Boolean
+    isWorkproofDetailVisible: Boolean,
+    language: AppLanguage = AppLanguage.fromDefault()
 ): ScreenChrome {
     return if (isRootRoute(route)) {
         ScreenChrome(
             headerTitle = when {
                 route == Route.HOME -> null
                 route == Route.WORKPROOF && isWorkproofDetailVisible -> null
-                else -> routeTitle(route)
+                else -> routeTitle(route, language)
             },
             showRootTabs = true,
             showSettingsAction = false,
@@ -31,7 +35,7 @@ fun resolveScreenChrome(
         )
     } else {
         ScreenChrome(
-            headerTitle = resolveChildHeaderTitle(route, transferStep, transferStatus),
+            headerTitle = resolveChildHeaderTitle(route, transferStep, transferStatus, language),
             showRootTabs = false,
             showSettingsAction = false,
             showDate = route != Route.TRANSFER &&
@@ -44,18 +48,20 @@ fun resolveScreenChrome(
 private fun resolveChildHeaderTitle(
     route: String,
     transferStep: TransferFlowStep,
-    transferStatus: TransferStatus
+    transferStatus: TransferStatus,
+    language: AppLanguage
 ): String? {
     return when (route) {
         Route.WAGE -> null
-        Route.TRANSFER -> resolveTransferHeaderTitle(transferStep, transferStatus)
-        else -> routeTitle(route)
+        Route.TRANSFER -> resolveTransferHeaderTitle(transferStep, transferStatus, language)
+        else -> routeTitle(route, language)
     }
 }
 
 private fun resolveTransferHeaderTitle(
     transferStep: TransferFlowStep,
-    transferStatus: TransferStatus
+    transferStatus: TransferStatus,
+    language: AppLanguage
 ): String? {
     if (
         transferStatus == TransferStatus.SUBMITTED ||
@@ -66,7 +72,7 @@ private fun resolveTransferHeaderTitle(
     }
 
     return when (transferStep) {
-        TransferFlowStep.ACCOUNT -> "계좌 선택"
+        TransferFlowStep.ACCOUNT -> language.text(AppTextKeys.SELECT_ACCOUNT)
         TransferFlowStep.RECIPIENT -> null
         TransferFlowStep.AMOUNT -> null
     }

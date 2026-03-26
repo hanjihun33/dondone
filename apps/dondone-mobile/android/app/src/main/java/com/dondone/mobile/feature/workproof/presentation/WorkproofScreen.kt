@@ -56,6 +56,10 @@ import com.dondone.mobile.core.designsystem.DonDoneNoticeBanner
 import com.dondone.mobile.core.designsystem.PrimaryActionButton
 import com.dondone.mobile.core.designsystem.SecondaryActionButton
 import com.dondone.mobile.core.designsystem.StatusBadge
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
+import com.dondone.mobile.core.i18n.translate
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -84,6 +88,7 @@ fun WorkproofScreen(
     onDetailVisibilityChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
+    val language = LocalAppLanguage.current
     val baseMonth = remember(uiModel.calendarBaseYear, uiModel.calendarBaseMonth) {
         YearMonth.of(uiModel.calendarBaseYear, uiModel.calendarBaseMonth)
     }
@@ -400,9 +405,9 @@ fun WorkproofScreen(
         if (showDetails) {
             WorkproofDetailPage(
                 displayedMonthText = formatMonthText(displayedMonth),
-                calendarCountText = stringResource(R.string.workproof_calendar_recorded_count, recordedDayCount),
+                calendarCountText = language.text("workproof_calendar_recorded_count", recordedDayCount),
                 calendarCells = calendarCells,
-                weekdays = WorkproofWeekdays,
+                weekdays = workproofWeekdays(language),
                 records = displayedRecentRecords,
                 auditItems = displayedAuditItems,
                 onPreviousMonth = { monthOffset -= 1 },
@@ -453,6 +458,7 @@ private fun WorkproofPunchCard(
     onToggleDetails: () -> Unit
 ) {
     val context = LocalContext.current
+    val language = LocalAppLanguage.current
     val canClockIn = uiModel.canClockIn && uiModel.isWithinWorkplaceRadius
     val canClockOut = uiModel.canClockOut
     val showClockInRadiusFeedback = uiModel.canClockIn && !uiModel.isWithinWorkplaceRadius
@@ -471,7 +477,7 @@ private fun WorkproofPunchCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "상세 기록 보기",
+                            contentDescription = language.text("workproof_view_detailed_records"),
                             tint = DawnTextSubtle,
                             modifier = Modifier.size(20.dp)
                         )
@@ -506,7 +512,7 @@ private fun WorkproofPunchCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     PrimaryActionButton(
-                        text = stringResource(R.string.workproof_label_clock_in),
+                        text = language.translate(stringResource(R.string.workproof_label_clock_in)),
                         onClick = onClockIn,
                         enabled = canClockIn,
                         modifier = Modifier.fillMaxWidth()
@@ -519,7 +525,7 @@ private fun WorkproofPunchCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     SecondaryActionButton(
-                        text = stringResource(R.string.workproof_label_clock_out),
+                        text = language.translate(stringResource(R.string.workproof_label_clock_out)),
                         onClick = onClockOut,
                         enabled = canClockOut,
                         modifier = Modifier.fillMaxWidth()
@@ -528,14 +534,14 @@ private fun WorkproofPunchCard(
             }
             uiModel.currentLocationStatus?.let { status ->
                 DonDoneNoticeBanner(
-                    title = stringResource(R.string.workproof_location_banner_title),
+                    title = language.translate(stringResource(R.string.workproof_location_banner_title)),
                     message = workproofCurrentLocationStatusMessage(status)
                 )
             }
             if (uiModel.isUsingFallbackCoordinates) {
                 DonDoneNoticeBanner(
-                    title = "근무지 위치 확인 필요",
-                    message = "근무지 실연동 데이터가 없어 지도 좌표가 실제와 다를 수 있어요."
+                    title = language.text("workproof_workplace_location_check_required"),
+                    message = language.translate("근무지 실연동 데이터가 없어 지도 좌표가 실제와 다를 수 있어요.")
                 )
             }
             HorizontalDivider(color = WorkproofDivider)
@@ -620,13 +626,13 @@ private fun resolveAttachmentName(context: Context, uri: Uri): String {
             return it.getString(nameIndex)
         }
     }
-    return uri.lastPathSegment ?: "선택한 첨부"
+    return uri.lastPathSegment ?: AppLanguage.fromDefault().text("workproof_selected_attachment")
 }
 
 private fun showWorkproofRadiusToast(context: Context) {
     Toast.makeText(
         context,
-        "근무지 반경 밖에서는 출퇴근할 수 없어요.",
+        AppLanguage.fromDefault().text("workproof_outside_workplace_radius"),
         Toast.LENGTH_SHORT
     ).show()
 }

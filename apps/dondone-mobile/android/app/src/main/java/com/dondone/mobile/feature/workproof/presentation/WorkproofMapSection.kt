@@ -54,6 +54,8 @@ import com.dondone.mobile.core.designsystem.DawnBorder
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
 import com.dondone.mobile.core.designsystem.DonDoneErrorPanel
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.translate
 import com.dondone.mobile.core.map.KakaoMapSupport
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.KakaoMapReadyCallback
@@ -72,13 +74,14 @@ internal fun WorkproofWorkplaceMapCard(
     uiModel: WorkproofSummaryUiModel,
     onRefreshCurrentLocation: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val isKakaoMapAvailable = remember {
         KakaoMapSupport.isMapAvailable(BuildConfig.KAKAO_NATIVE_APP_KEY)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
-            text = stringResource(R.string.workproof_location_section_title),
+            text = language.translate(stringResource(R.string.workproof_location_section_title)),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
@@ -103,11 +106,11 @@ internal fun WorkproofWorkplaceMapCard(
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             WorkproofMapLegendItem(
                 color = WorkproofMapCurrentPin,
-                label = stringResource(R.string.workproof_location_legend_current)
+                label = language.translate(stringResource(R.string.workproof_location_legend_current))
             )
             WorkproofMapLegendItem(
                 color = WorkproofMapWorkplacePin,
-                label = stringResource(R.string.workproof_location_legend_workplace)
+                label = language.translate(stringResource(R.string.workproof_location_legend_workplace))
             )
         }
     }
@@ -118,11 +121,12 @@ private fun WorkproofMapFallbackCard(
     hasApiKey: Boolean,
     isRuntimeSupported: Boolean
 ) {
+    val language = LocalAppLanguage.current
     val fallbackBackground = colorResource(R.color.workproof_map_fallback_background)
     val message = when {
-        !hasApiKey -> stringResource(R.string.workproof_map_fallback_missing_key)
-        !isRuntimeSupported -> stringResource(R.string.workproof_map_fallback_runtime_unsupported)
-        else -> stringResource(R.string.workproof_map_fallback_default)
+        !hasApiKey -> language.translate(stringResource(R.string.workproof_map_fallback_missing_key))
+        !isRuntimeSupported -> language.translate(stringResource(R.string.workproof_map_fallback_runtime_unsupported))
+        else -> language.translate(stringResource(R.string.workproof_map_fallback_default))
     }
 
     Box(
@@ -154,6 +158,7 @@ private fun KakaoWorkplaceMapView(
     onRefreshCurrentLocation: () -> Unit
 ) {
     val context = LocalContext.current
+    val language = LocalAppLanguage.current
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -253,9 +258,9 @@ private fun KakaoWorkplaceMapView(
         ) {
             if (mapErrorMessage != null) {
                 DonDoneErrorPanel(
-                    title = stringResource(R.string.workproof_map_error_title),
-                    message = mapErrorMessage ?: stringResource(R.string.workproof_map_error_message_default),
-                    actionLabel = stringResource(R.string.workproof_map_retry),
+                    title = language.translate(stringResource(R.string.workproof_map_error_title)),
+                    message = mapErrorMessage ?: language.translate(stringResource(R.string.workproof_map_error_message_default)),
+                    actionLabel = language.translate(stringResource(R.string.workproof_map_retry)),
                     onAction = {
                         mapErrorMessage = null
                         kakaoMap = null
@@ -330,9 +335,9 @@ private fun KakaoWorkplaceMapView(
         ) {
             Text(
                 text = if (isRefreshingCurrentLocation) {
-                    stringResource(R.string.workproof_location_status_loading)
+                    language.translate(stringResource(R.string.workproof_location_status_loading))
                 } else {
-                    stringResource(R.string.workproof_location_move_pin)
+                    language.translate(stringResource(R.string.workproof_location_move_pin))
                 },
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                 color = if (isRefreshingCurrentLocation) DawnTextSubtle.copy(alpha = 0.7f) else DawnTextSubtle
@@ -345,6 +350,7 @@ private fun KakaoWorkplaceMapView(
 internal fun workproofCurrentLocationStatusMessage(
     status: WorkproofCurrentLocationStatus
 ): String {
+    val language = LocalAppLanguage.current
     val stringRes = when (status) {
         WorkproofCurrentLocationStatus.LOADING -> R.string.workproof_location_status_loading
         WorkproofCurrentLocationStatus.PERMISSION_REQUIRED -> R.string.workproof_location_status_permission_required
@@ -354,7 +360,7 @@ internal fun workproofCurrentLocationStatusMessage(
         WorkproofCurrentLocationStatus.IDLE,
         WorkproofCurrentLocationStatus.READY -> R.string.workproof_location_status_try_again
     }
-    return stringResource(stringRes)
+    return language.translate(stringResource(stringRes))
 }
 
 private fun addWorkproofMapMarkers(

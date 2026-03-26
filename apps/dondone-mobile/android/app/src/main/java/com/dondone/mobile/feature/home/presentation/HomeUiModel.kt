@@ -3,6 +3,9 @@ package com.dondone.mobile.feature.home.presentation
 import com.dondone.mobile.app.session.RemittanceCompletionNoticeUiState
 import com.dondone.mobile.app.session.WorkproofActionUiState
 import com.dondone.mobile.core.designsystem.BadgeTone
+import com.dondone.mobile.core.i18n.AppLanguage
+import com.dondone.mobile.core.i18n.AppTextKeys
+import com.dondone.mobile.core.i18n.text
 import com.dondone.mobile.core.ui.formatKrw
 import com.dondone.mobile.data.auth.AuthSession
 import com.dondone.mobile.data.remittance.RemittanceRemoteMode
@@ -73,6 +76,7 @@ data class HomeUiModel(
 )
 
 fun DemoState.toHomeUiModel(
+    language: AppLanguage = AppLanguage.KOREAN,
     workproofActionUiState: WorkproofActionUiState? = null,
     wageRemoteState: WageRemoteState? = null,
     remittanceRemoteState: RemittanceRemoteState = RemittanceRemoteState.unauthenticated(""),
@@ -89,14 +93,16 @@ fun DemoState.toHomeUiModel(
     val clockIn = workproof.today.clockIn?.let { "$currentDateText · $it" } ?: "-"
     val clockOut = workproof.today.clockOut?.let { "$currentDateText · $it" } ?: "-"
 
+    val isClockedOut = workproof.today.clockOut != null
+    val isClockedInOnly = workproof.today.clockIn != null && workproof.today.clockOut == null
     val workStatusText = when {
-        workproof.today.clockOut != null -> "완료"
-        workproof.today.clockIn != null -> "출근만 기록"
-        else -> "준비됨"
+        isClockedOut -> language.text("completed")
+        isClockedInOnly -> language.text(AppTextKeys.HOME_CLOCK_IN_RECORDED)
+        else -> language.text(AppTextKeys.HOME_READY)
     }
-    val workStatusTone = when (workStatusText) {
-        "완료" -> BadgeTone.Success
-        "출근만 기록" -> BadgeTone.Warning
+    val workStatusTone = when {
+        isClockedOut -> BadgeTone.Success
+        isClockedInOnly -> BadgeTone.Warning
         else -> BadgeTone.Info
     }
 
@@ -107,34 +113,34 @@ fun DemoState.toHomeUiModel(
 
     val nextAction = when {
         !isDepositRecorded && isPaydayUpcoming -> HomeNextActionUiModel(
-            title = "다음 행동",
-            message = "급여일 전에는 이번 달 계획과 미리받기 한도를 먼저 확인해볼까요?",
-            buttonText = "금융 보기",
+            title = language.text(AppTextKeys.HOME_NEXT_STEP),
+            message = language.text(AppTextKeys.HOME_PREPAYDAY_MESSAGE),
+            buttonText = language.text(AppTextKeys.HOME_VIEW_FINANCE),
             actionTarget = HomeActionTarget.FINANCE
         )
 
         !isDepositRecorded -> HomeNextActionUiModel(
-            title = "다음 행동",
-            message = "실제 입금액을 먼저 입력하면 이번 달 돈 상태를 정확히 확인할 수 있어요.",
-            buttonText = "입금 입력하기",
+            title = language.text(AppTextKeys.HOME_NEXT_STEP),
+            message = language.text(AppTextKeys.HOME_ENTER_DEPOSIT_MESSAGE),
+            buttonText = language.text(AppTextKeys.HOME_ENTER_DEPOSIT),
             actionTarget = HomeActionTarget.WAGE
         )
 
         hasDifference -> HomeNextActionUiModel(
-            title = "다음 행동",
-            message = "실제 입금액과 예상 급여에 차이가 있어요.",
-            buttonText = "보기",
+            title = language.text(AppTextKeys.HOME_NEXT_STEP),
+            message = language.text(AppTextKeys.HOME_DIFFERENCE_MESSAGE),
+            buttonText = language.text(AppTextKeys.HOME_VIEW),
             actionTarget = HomeActionTarget.WAGE
         )
 
         else -> HomeNextActionUiModel(
-            title = "다음 행동",
-            message = "현재는 확인이 필요한 차이가 크지 않아 문서/송금 흐름으로 이동할 수 있어요.",
-            buttonText = "금융 보기",
+            title = language.text(AppTextKeys.HOME_NEXT_STEP),
+            message = language.text(AppTextKeys.HOME_SMALL_DIFFERENCE_MESSAGE),
+            buttonText = language.text(AppTextKeys.HOME_VIEW_FINANCE),
             actionTarget = HomeActionTarget.FINANCE
         )
     }
-    val completionBanner = remittanceCompletionNoticeUiState.toHomeCompletionBannerUiModel()
+    val completionBanner = remittanceCompletionNoticeUiState.toHomeCompletionBannerUiModel(language)
     val requiresCompanyRegistration =
         isAuthenticated &&
             workproofRemoteState.mode == WorkproofRemoteMode.EMPTY &&
@@ -144,11 +150,12 @@ fun DemoState.toHomeUiModel(
         account = resolveHomeAccountUiModel(
             selectedAccount = selectedAccount,
             remittanceRemoteState = remittanceRemoteState,
-            isAuthenticated = isAuthenticated
+            isAuthenticated = isAuthenticated,
+            language = language
         ),
         work = HomeWorkUiModel(
-            dateText = if (requiresCompanyRegistration) "회사 등록 필요" else currentDateText,
-            statusText = if (requiresCompanyRegistration) "안내" else workStatusText,
+            dateText = if (requiresCompanyRegistration) language.text(AppTextKeys.HOME_COMPANY_REGISTRATION_REQUIRED) else currentDateText,
+            statusText = if (requiresCompanyRegistration) language.text(AppTextKeys.HOME_NOTICE) else workStatusText,
             statusTone = if (requiresCompanyRegistration) BadgeTone.Info else workStatusTone,
             canClockIn = !requiresCompanyRegistration &&
                 workproof.today.clockIn == null &&
@@ -160,9 +167,9 @@ fun DemoState.toHomeUiModel(
             isWithinWorkplaceRadius = workproof.isWithinWorkplaceRadius(),
             clockInText = clockIn,
             clockOutText = clockOut,
-            noticeTitle = if (requiresCompanyRegistration) "회사 등록 필요" else null,
+            noticeTitle = if (requiresCompanyRegistration) language.text(AppTextKeys.HOME_COMPANY_REGISTRATION_REQUIRED) else null,
             noticeMessage = if (requiresCompanyRegistration) {
-                "등록 코드를 입력하면 실제 근무 데이터가 표시됩니다."
+                language.text(AppTextKeys.HOME_REGISTRATION_CODE_NOTICE)
             } else {
                 null
             },
@@ -180,21 +187,22 @@ fun DemoState.toHomeUiModel(
 private fun resolveHomeAccountUiModel(
     selectedAccount: com.dondone.mobile.domain.model.Account,
     remittanceRemoteState: RemittanceRemoteState,
-    isAuthenticated: Boolean
+    isAuthenticated: Boolean,
+    language: AppLanguage
 ): HomeAccountUiModel {
     if (isAuthenticated) {
         val remotePayload = remittanceRemoteState.payload
         return HomeAccountUiModel(
-            titleText = "대표 지갑",
+            titleText = language.text(AppTextKeys.HOME_PRIMARY_WALLET),
             balanceText = when (remittanceRemoteState.mode) {
-                RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.formatTokenBalanceForHome() ?: "잔액 확인 중"
-                RemittanceRemoteMode.LOADING -> "잔액 확인 중"
-                else -> "지갑 정보 확인 중"
+                RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.formatTokenBalanceForHome(language) ?: language.text(AppTextKeys.HOME_CHECKING_BALANCE)
+                RemittanceRemoteMode.LOADING -> language.text(AppTextKeys.HOME_CHECKING_BALANCE)
+                else -> language.text(AppTextKeys.HOME_CHECKING_WALLET_INFO)
             },
             balanceAmountText = when (remittanceRemoteState.mode) {
-                RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.formatTokenAmountForHome() ?: "잔액 확인 중"
-                RemittanceRemoteMode.LOADING -> "잔액 확인 중"
-                else -> "지갑 정보 확인 중"
+                RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.formatTokenAmountForHome(language) ?: language.text(AppTextKeys.HOME_CHECKING_BALANCE)
+                RemittanceRemoteMode.LOADING -> language.text(AppTextKeys.HOME_CHECKING_BALANCE)
+                else -> language.text(AppTextKeys.HOME_CHECKING_WALLET_INFO)
             },
             balanceUnitText = when (remittanceRemoteState.mode) {
                 RemittanceRemoteMode.CONTENT -> remotePayload?.balance?.assetSymbol
@@ -204,42 +212,48 @@ private fun resolveHomeAccountUiModel(
     }
 
     return HomeAccountUiModel(
-        titleText = "대표 계좌",
+        titleText = language.text(AppTextKeys.HOME_PRIMARY_ACCOUNT),
         balanceText = formatKrw(selectedAccount.balance),
         balanceAmountText = formatKrw(selectedAccount.balance),
         balanceUnitText = null
     )
 }
 
-private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenBalanceForHome(): String {
-    val amount = formatTokenAmountForHome()
-    return if (amount == "잔액 확인 중") amount else "$amount $assetSymbol"
+private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenBalanceForHome(
+    language: AppLanguage
+): String {
+    val amount = formatTokenAmountForHome(language)
+    return if (amount == language.text(AppTextKeys.HOME_CHECKING_BALANCE)) amount else "$amount $assetSymbol"
 }
 
-private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenAmountForHome(): String {
+private fun com.dondone.mobile.data.remittance.RemittanceWalletBalancePayload.formatTokenAmountForHome(
+    language: AppLanguage
+): String {
     val normalized = tokenBalanceAtomic.toBigDecimalOrNull()
         ?.movePointLeft(assetDecimals)
         ?.setScale(2, RoundingMode.DOWN)
-        ?: return "잔액 확인 중"
+        ?: return language.text(AppTextKeys.HOME_CHECKING_BALANCE)
     return normalized.stripTrailingZeros().toPlainString()
 }
 
-private fun RemittanceCompletionNoticeUiState.toHomeCompletionBannerUiModel(): HomeCompletionBannerUiModel? {
+private fun RemittanceCompletionNoticeUiState.toHomeCompletionBannerUiModel(
+    language: AppLanguage
+): HomeCompletionBannerUiModel? {
     if (!isVisible || status == null) {
         return null
     }
 
-    val recipientLabel = recipientName ?: "등록한 수신자"
+    val recipientLabel = recipientName ?: language.text(AppTextKeys.HOME_SAVED_RECIPIENT)
     return when (status) {
         TransferStatus.CONFIRMED -> HomeCompletionBannerUiModel(
-            title = "송금 완료",
-            message = "${recipientLabel}에게 송금이 완료됐어요.",
+            title = language.text(AppTextKeys.HOME_TRANSFER_COMPLETE),
+            message = language.text(AppTextKeys.HOME_TRANSFER_COMPLETE_MESSAGE, recipientLabel),
             tone = BadgeTone.Success
         )
 
         TransferStatus.FAILED -> HomeCompletionBannerUiModel(
-            title = "송금 실패",
-            message = "${recipientLabel}에게 송금을 마치지 못했어요. 잠시 후 다시 시도해 주세요.",
+            title = language.text(AppTextKeys.HOME_TRANSFER_FAILED),
+            message = language.text(AppTextKeys.HOME_TRANSFER_FAILED_MESSAGE, recipientLabel),
             tone = BadgeTone.Warning
         )
 
