@@ -32,6 +32,24 @@ class WorkproofTimeInputTest {
     }
 
     @Test
+    fun `typing a new minute digit after deletion still restores expected time`() {
+        val collapsed = normalizeWorkproofTimeInput(previousInput = "18:00", rawInput = "18:0")
+        val restored = normalizeWorkproofTimeInput(previousInput = collapsed, rawInput = "1805")
+
+        assertEquals("180", collapsed)
+        assertEquals("18:05", restored)
+    }
+
+    @Test
+    fun `editing minute tens digit keeps colon shape`() {
+        val partiallyEdited = normalizeWorkproofTimeInput(previousInput = "18:05", rawInput = "18:5")
+        val restored = normalizeWorkproofTimeInput(previousInput = partiallyEdited, rawInput = "18:35")
+
+        assertEquals("18:5", partiallyEdited)
+        assertEquals("18:35", restored)
+    }
+
+    @Test
     fun `normalized hhmm input becomes valid time`() {
         val normalized = normalizeWorkproofTimeInput(previousInput = "180", rawInput = "1800")
 

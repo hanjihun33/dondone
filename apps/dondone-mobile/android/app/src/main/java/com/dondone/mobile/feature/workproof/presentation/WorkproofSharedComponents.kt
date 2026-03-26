@@ -75,11 +75,11 @@ internal fun normalizeWorkproofTimeInput(
     val isDeleting = sanitized.length < previousInput.length
     val firstColonIndex = sanitized.indexOf(':')
     if (firstColonIndex >= 0) {
-        if (isDeleting && digitsOnly.length < 4) {
-            return digitsOnly
-        }
         val hour = sanitized.substring(0, firstColonIndex).filter(Char::isDigit).take(2)
         val minute = sanitized.substring(firstColonIndex + 1).filter(Char::isDigit).take(2)
+        if (shouldCollapseAutoInsertedColonOnDelete(previousInput, minute, isDeleting)) {
+            return digitsOnly
+        }
         return when {
             hour.isEmpty() && minute.isEmpty() -> ""
             hour.isEmpty() -> minute
@@ -92,6 +92,21 @@ internal fun normalizeWorkproofTimeInput(
         digitsOnly.length < 4 -> digitsOnly
         else -> digitsOnly.take(2) + ":" + digitsOnly.drop(2)
     }
+}
+
+private fun shouldCollapseAutoInsertedColonOnDelete(
+    previousInput: String,
+    minute: String,
+    isDeleting: Boolean
+): Boolean {
+    if (!isDeleting || ':' !in previousInput) {
+        return false
+    }
+    val previousMinute = previousInput.substringAfter(':').filter(Char::isDigit).take(2)
+    if (previousMinute.length != 2 || minute.length != 1) {
+        return false
+    }
+    return minute == previousMinute.dropLast(1)
 }
 
 internal data class WorkproofEditReasonOption(
