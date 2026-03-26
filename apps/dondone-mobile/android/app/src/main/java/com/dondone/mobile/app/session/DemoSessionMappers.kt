@@ -53,6 +53,7 @@ internal fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): Dem
                 modified = record.modified || record.reflectionStatus != "PENDING",
                 attachments = 0,
                 reflectionStatus = record.reflectionStatus,
+                decisionMemo = record.decisionMemo,
                 recognizedInTime = record.recognizedClockInAt?.toLocalTime()?.toString()?.take(5)
                     ?: actualClockIn,
                 recognizedOutTime = record.recognizedClockOutAt?.toLocalTime()?.toString()?.take(5)

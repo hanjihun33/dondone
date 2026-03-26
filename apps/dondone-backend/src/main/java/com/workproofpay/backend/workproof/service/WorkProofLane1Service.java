@@ -2,6 +2,9 @@ package com.workproofpay.backend.workproof.service;
 
 import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
+import com.workproofpay.backend.correction.model.CorrectionRequest;
+import com.workproofpay.backend.correction.model.CorrectionRequestStatus;
+import com.workproofpay.backend.correction.repo.CorrectionRequestRepository;
 import com.workproofpay.backend.employer.model.EmploymentMembership;
 import com.workproofpay.backend.employer.model.EmploymentMembershipStatus;
 import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
@@ -38,6 +41,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -66,6 +70,7 @@ public class WorkProofLane1Service {
     private final WorkplaceRepository workplaceRepository;
     private final WorkContractRepository workContractRepository;
     private final WorkProofRepository workProofRepository;
+    private final CorrectionRequestRepository correctionRequestRepository;
     private final WorkProofLane1DraftValidator draftValidator;
     private final WorkProofMetricsCalculator workProofMetricsCalculator;
 
@@ -162,7 +167,7 @@ public class WorkProofLane1Service {
                 request.longitude(),
                 request.locationLabel()
         ));
-        return toRecordResponse(saved);
+        return toRecordResponse(saved, resolveReflectionStatus(saved), null);
     }
 
     /**
@@ -185,7 +190,7 @@ public class WorkProofLane1Service {
                 request.locationLabel(),
                 outsideAllowedRadius
         );
-        return toRecordResponse(active);
+        return toRecordResponse(active, resolveReflectionStatus(active), null);
     }
 
     /**
@@ -196,15 +201,23 @@ public class WorkProofLane1Service {
         YearMonth targetMonth = parseYearMonth(month);
         getAccessibleWorkplace(userId, workplaceId);
 
-        List<WorkProofRecordListItemResponse> records = workProofRepository
+        List<WorkProof> workProofs = workProofRepository
                 .findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
                         userId,
                         workplaceId,
                         targetMonth.atDay(1),
                         targetMonth.atEndOfMonth()
-                )
-                .stream()
-                .map(this::toRecordListItemResponse)
+                );
+        Map<Long, CorrectionRequest> latestCorrectionRequests = resolveLatestCorrectionRequests(workProofs);
+        List<WorkProofRecordListItemResponse> records = workProofs.stream()
+                .map(workProof -> {
+                    CorrectionRequest latestCorrectionRequest = latestCorrectionRequests.get(workProof.getId());
+                    return toRecordListItemResponse(
+                            workProof,
+                            resolveReflectionStatus(workProof, latestCorrectionRequest == null ? null : latestCorrectionRequest.getStatus()),
+                            resolveDecisionMemo(latestCorrectionRequest)
+                    );
+                })
                 .toList();
 
         return new WorkProofRecordListResponse(targetMonth.toString(), workplaceId, records);
@@ -224,12 +237,13 @@ public class WorkProofLane1Service {
                 targetMonth.atDay(1),
                 targetMonth.atEndOfMonth()
         );
+        Map<Long, WorkProofReflectionStatus> reflectionStatuses = resolveReflectionStatuses(records);
 
         return new WageLane1Snapshot(
                 toCurrentContractResponse(contract),
-                buildMonthlySummary(targetMonth, workplaceId, records),
+                buildMonthlySummary(targetMonth, workplaceId, records, reflectionStatuses),
                 records.stream()
-                        .map(record -> new WageLane1RecordSnapshot(record.getId(), resolveReflectionStatus(record)))
+                        .map(record -> new WageLane1RecordSnapshot(record.getId(), reflectionStatuses.get(record.getId())))
                         .toList()
         );
     }
@@ -241,7 +255,14 @@ public class WorkProofLane1Service {
     public WorkProofRecordResponse getRecord(Long userId, Long recordId) {
         WorkProof workProof = workProofRepository.findByIdAndUserId(recordId, userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.WORKPROOF_NOT_FOUND));
-        return toRecordResponse(workProof);
+        CorrectionRequest latestCorrectionRequest = correctionRequestRepository
+                .findFirstByWorkProofIdOrderByCreatedAtDescIdDesc(workProof.getId())
+                .orElse(null);
+        return toRecordResponse(
+                workProof,
+                resolveReflectionStatus(workProof, latestCorrectionRequest == null ? null : latestCorrectionRequest.getStatus()),
+                resolveDecisionMemo(latestCorrectionRequest)
+        );
     }
 
     /**
@@ -259,26 +280,25 @@ public class WorkProofLane1Service {
                 targetMonth.atEndOfMonth()
         );
 
-        return buildMonthlySummary(targetMonth, workplaceId, records);
+        return buildMonthlySummary(targetMonth, workplaceId, records, resolveReflectionStatuses(records));
     }
 
     private WorkProofMonthlySummaryContractResponse buildMonthlySummary(YearMonth targetMonth,
                                                                        Long workplaceId,
-                                                                       List<WorkProof> records) {
+                                                                       List<WorkProof> records,
+                                                                       Map<Long, WorkProofReflectionStatus> reflectionStatuses) {
         // v1 요약은 reflected record만 급여 계산 입력으로 간주하고, recorded/reflected 차이는 integrity에 남긴다.
-        List<WorkProof> reflected = records.stream().filter(WorkProof::isReflected).toList();
-        List<WorkProof> needsReview = records.stream().filter(record -> !record.isReflected()).toList();
+        List<WorkProof> reflected = filterByReflectionStatus(records, reflectionStatuses, WorkProofReflectionStatus.REFLECTED);
+        List<WorkProof> needsReview = filterByReflectionStatus(records, reflectionStatuses, WorkProofReflectionStatus.NEEDS_REVIEW);
+        List<WorkProof> excluded = filterByReflectionStatus(records, reflectionStatuses, WorkProofReflectionStatus.EXCLUDED);
         int recordedWorkDays = (int) records.stream().map(WorkProof::getWorkDate).distinct().count();
         int reflectedWorkDays = (int) reflected.stream().map(WorkProof::getWorkDate).distinct().count();
         long totalWorkMinutes = reflected.stream().mapToLong(WorkProof::workedMinutes).sum();
         long overtimeMinutes = calculateOvertimeMinutes(reflected);
         long nightMinutes = calculateNightMinutes(reflected);
         int modifiedRecordCount = (int) records.stream().filter(WorkProof::isEdited).count();
-        long pendingMinutes = needsReview.stream()
-                .filter(record -> !record.isReflected())
-                .mapToLong(WorkProof::workedMinutes)
-                .sum();
-        List<String> riskFlags = buildRiskFlags(records);
+        long pendingMinutes = needsReview.stream().mapToLong(WorkProof::workedMinutes).sum();
+        List<String> riskFlags = buildRiskFlags(records, reflectionStatuses);
 
         return new WorkProofMonthlySummaryContractResponse(
                 targetMonth.toString(),
@@ -291,7 +311,7 @@ public class WorkProofLane1Service {
                 new WorkProofMonthlySummaryContractResponse.ReflectionSummary(
                         reflected.size(),
                         needsReview.size(),
-                        0
+                        excluded.size()
                 ),
                 new WorkProofMonthlySummaryContractResponse.IntegritySummary(
                         recordedWorkDays,
@@ -325,12 +345,17 @@ public class WorkProofLane1Service {
         }).sum();
     }
 
-    private List<String> buildRiskFlags(List<WorkProof> records) {
+    private List<String> buildRiskFlags(List<WorkProof> records,
+                                        Map<Long, WorkProofReflectionStatus> reflectionStatuses) {
         java.util.ArrayList<String> flags = new java.util.ArrayList<>();
         if (records.stream().anyMatch(WorkProof::isEdited)) {
             flags.add("MODIFIED_RECORD_PRESENT");
         }
-        if (records.stream().anyMatch(record -> !record.isReflected())) {
+        if (records.stream().anyMatch(record -> {
+            WorkProofReflectionStatus reflectionStatus = reflectionStatuses.get(record.getId());
+            return reflectionStatus == WorkProofReflectionStatus.PENDING
+                    || reflectionStatus == WorkProofReflectionStatus.NEEDS_REVIEW;
+        })) {
             flags.add("PENDING_WORKPROOF_PRESENT");
         }
         if (records.stream().anyMatch(WorkProof::isClockOutOutsideAllowedRadius)) {
@@ -519,7 +544,9 @@ public class WorkProofLane1Service {
         );
     }
 
-    private WorkProofRecordListItemResponse toRecordListItemResponse(WorkProof workProof) {
+    private WorkProofRecordListItemResponse toRecordListItemResponse(WorkProof workProof,
+                                                                     WorkProofReflectionStatus reflectionStatus,
+                                                                     String decisionMemo) {
         return new WorkProofRecordListItemResponse(
                 workProof.getId(),
                 workProof.getWorkDate(),
@@ -530,12 +557,15 @@ public class WorkProofLane1Service {
                 workProof.resolveRecognizedClockOutAt(),
                 resolveWorkedMinutes(workProof),
                 workProof.isEdited(),
-                resolveReflectionStatus(workProof),
+                reflectionStatus,
+                decisionMemo,
                 buildRecordRiskFlags(workProof)
         );
     }
 
-    private WorkProofRecordResponse toRecordResponse(WorkProof workProof) {
+    private WorkProofRecordResponse toRecordResponse(WorkProof workProof,
+                                                     WorkProofReflectionStatus reflectionStatus,
+                                                     String decisionMemo) {
         Workplace workplace = workProof.getWorkplace();
         WorkContract contract = workProof.getContract();
         List<String> riskFlags = buildRecordRiskFlags(workProof);
@@ -568,7 +598,8 @@ public class WorkProofLane1Service {
                 ),
                 workProof.resolveRecognizedClockInAt(),
                 workProof.resolveRecognizedClockOutAt(),
-                resolveReflectionStatus(workProof),
+                reflectionStatus,
+                decisionMemo,
                 resolveWorkedMinutes(workProof),
                 riskFlags,
                 workProof.isEdited(),
@@ -578,6 +609,21 @@ public class WorkProofLane1Service {
     }
 
     private WorkProofReflectionStatus resolveReflectionStatus(WorkProof workProof) {
+        CorrectionRequestStatus latestCorrectionStatus = correctionRequestRepository
+                .findFirstByWorkProofIdOrderByCreatedAtDescIdDesc(workProof.getId())
+                .map(CorrectionRequest::getStatus)
+                .orElse(null);
+        return resolveReflectionStatus(workProof, latestCorrectionStatus);
+    }
+
+    private WorkProofReflectionStatus resolveReflectionStatus(WorkProof workProof,
+                                                              CorrectionRequestStatus latestCorrectionStatus) {
+        if (latestCorrectionStatus == CorrectionRequestStatus.PENDING) {
+            return WorkProofReflectionStatus.NEEDS_REVIEW;
+        }
+        if (latestCorrectionStatus == CorrectionRequestStatus.REJECTED) {
+            return WorkProofReflectionStatus.EXCLUDED;
+        }
         if (workProof.isReflected()) {
             return WorkProofReflectionStatus.REFLECTED;
         }
@@ -585,6 +631,53 @@ public class WorkProofLane1Service {
             return WorkProofReflectionStatus.NEEDS_REVIEW;
         }
         return WorkProofReflectionStatus.PENDING;
+    }
+
+    private Map<Long, WorkProofReflectionStatus> resolveReflectionStatuses(List<WorkProof> workProofs) {
+        if (workProofs.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, CorrectionRequest> latestCorrectionRequests = resolveLatestCorrectionRequests(workProofs);
+        Map<Long, WorkProofReflectionStatus> reflectionStatuses = new LinkedHashMap<>();
+        for (WorkProof workProof : workProofs) {
+            CorrectionRequest latestCorrectionRequest = latestCorrectionRequests.get(workProof.getId());
+            reflectionStatuses.put(
+                    workProof.getId(),
+                    resolveReflectionStatus(workProof, latestCorrectionRequest == null ? null : latestCorrectionRequest.getStatus())
+            );
+        }
+        return Map.copyOf(reflectionStatuses);
+    }
+
+    private Map<Long, CorrectionRequest> resolveLatestCorrectionRequests(List<WorkProof> workProofs) {
+        if (workProofs.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, CorrectionRequest> latestCorrectionRequests = new LinkedHashMap<>();
+        List<Long> workProofIds = workProofs.stream()
+                .map(WorkProof::getId)
+                .toList();
+        for (CorrectionRequest correctionRequest : correctionRequestRepository.findByWorkProofIdInOrderByCreatedAtDescIdDesc(workProofIds)) {
+            latestCorrectionRequests.putIfAbsent(correctionRequest.getWorkProof().getId(), correctionRequest);
+        }
+        return Map.copyOf(latestCorrectionRequests);
+    }
+
+    private String resolveDecisionMemo(CorrectionRequest latestCorrectionRequest) {
+        if (latestCorrectionRequest == null || latestCorrectionRequest.getStatus() != CorrectionRequestStatus.REJECTED) {
+            return null;
+        }
+        return latestCorrectionRequest.getDecisionMemo();
+    }
+
+    private List<WorkProof> filterByReflectionStatus(List<WorkProof> records,
+                                                     Map<Long, WorkProofReflectionStatus> reflectionStatuses,
+                                                     WorkProofReflectionStatus targetStatus) {
+        return records.stream()
+                .filter(record -> reflectionStatuses.get(record.getId()) == targetStatus)
+                .toList();
     }
 
     private Long resolveWorkedMinutes(WorkProof workProof) {

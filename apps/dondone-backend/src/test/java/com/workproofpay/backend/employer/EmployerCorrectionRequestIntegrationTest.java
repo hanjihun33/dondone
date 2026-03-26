@@ -243,7 +243,7 @@ class EmployerCorrectionRequestIntegrationTest {
     }
 
     @Test
-    void rejectCorrectionRequestLeavesWorkProofUntouched() throws Exception {
+    void rejectCorrectionRequestLeavesWorkProofUntouchedAndExcludesWorkerRecordLabel() throws Exception {
         Fixture fixture = createFixture();
 
         mockMvc.perform(post("/api/employer/correction-requests/{requestId}/reject", fixture.rejectableRequest().getId())
@@ -272,11 +272,27 @@ class EmployerCorrectionRequestIntegrationTest {
        assertThat(rejectedRequest.getRejectReasonCode()).isEqualTo("INSUFFICIENT_EVIDENCE");
        assertThat(untouchedWorkProof.getClockInAt()).isEqualTo(fixture.rejectableRequest().getOriginalClockInAt());
        assertThat(untouchedWorkProof.getClockOutAt()).isEqualTo(fixture.rejectableRequest().getOriginalClockOutAt());
-       assertThat(untouchedWorkProof.resolveRecognizedClockInAt()).isEqualTo(fixture.rejectableRequest().getOriginalClockInAt());
-       assertThat(untouchedWorkProof.resolveRecognizedClockOutAt()).isEqualTo(fixture.rejectableRequest().getOriginalClockOutAt());
-       assertThat(workProofAuditLogRepository.countByWorkProofId(fixture.rejectableWorkProof().getId())).isZero();
+        assertThat(untouchedWorkProof.resolveRecognizedClockInAt()).isEqualTo(fixture.rejectableRequest().getOriginalClockInAt());
+        assertThat(untouchedWorkProof.resolveRecognizedClockOutAt()).isEqualTo(fixture.rejectableRequest().getOriginalClockOutAt());
+        assertThat(workProofAuditLogRepository.countByWorkProofId(fixture.rejectableWorkProof().getId())).isZero();
         assertThat(decisionAudits).hasSize(1);
         assertThat(decisionAudits.get(0).getAfterStatus()).isEqualTo(CorrectionRequestStatus.REJECTED);
+
+        mockMvc.perform(get("/api/workproof/records/{recordId}", fixture.rejectableWorkProof().getId())
+                        .header("Authorization", bearer(fixture.rejectableWorker())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recordId").value(fixture.rejectableWorkProof().getId()))
+                .andExpect(jsonPath("$.data.reflectionStatus").value("EXCLUDED"))
+                .andExpect(jsonPath("$.data.decisionMemo").value("Evidence is insufficient"));
+
+        mockMvc.perform(get("/api/workproof/records")
+                        .header("Authorization", bearer(fixture.rejectableWorker()))
+                        .param("month", "2026-03")
+                        .param("workplaceId", fixture.rejectableWorkProof().getWorkplace().getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].recordId").value(fixture.rejectableWorkProof().getId()))
+                .andExpect(jsonPath("$.data.records[0].reflectionStatus").value("EXCLUDED"))
+                .andExpect(jsonPath("$.data.records[0].decisionMemo").value("Evidence is insufficient"));
     }
 
     @Test

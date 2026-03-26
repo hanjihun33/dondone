@@ -18,6 +18,7 @@ public record WorkProofRecordResponse(
         LocalDateTime recognizedClockInAt,
         LocalDateTime recognizedClockOutAt,
         WorkProofReflectionStatus reflectionStatus,
+        String decisionMemo,
         Long workedMinutes,
         List<String> riskFlags,
         boolean modified,
