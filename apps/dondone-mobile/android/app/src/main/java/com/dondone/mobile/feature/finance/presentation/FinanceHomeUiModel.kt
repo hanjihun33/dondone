@@ -253,6 +253,10 @@ fun DemoState.toFinanceHomeUiModel(
     val today = LocalDate.now()
     val advanceSnapshot = AdvanceCalculator.calculate(this)
     val advanceContractState = toAdvanceContractState(remoteState)
+    val localizedAdvanceStateTitleText = localizeAdvanceContractText(advanceContractState.stateTitleText, language)
+    val localizedAdvanceStateBodyText = localizeAdvanceContractText(advanceContractState.stateBodyText, language)
+    val localizedAdvanceNoticeTitleText = localizeAdvanceContractText(advanceContractState.noticeTitleText, language)
+    val localizedAdvanceNoticeBodyText = localizeAdvanceContractText(advanceContractState.noticeBodyText, language)
     val verifiedSnapshot = WorkproofCalculator.verify(this)
     val visibleRecords = WorkproofCalculator.visibleRecords(this)
     val vaultSnapshot = VaultCalculator.calculate(this)
@@ -472,7 +476,7 @@ fun DemoState.toFinanceHomeUiModel(
             else -> language.text("finance_recent_request_status_available")
         }
     } else {
-        advanceContractState.stateTitleText
+        localizedAdvanceStateTitleText.orEmpty()
     }
     val advanceHeroStateBodyText = if (hasCurrentAdvanceRequest && canRequestAdditional) {
         language.text("finance_remaining_limit_message")
@@ -485,7 +489,7 @@ fun DemoState.toFinanceHomeUiModel(
             else -> language.text("finance_check_current_round_status")
         }
     } else {
-        advanceContractState.stateBodyText
+        localizedAdvanceStateBodyText.orEmpty()
     }
     val advanceHeroAmountLabel = if (hasCurrentAdvanceRequest && canRequestAdditional) {
         language.text("additional_requestable_amount")
@@ -734,8 +738,8 @@ fun DemoState.toFinanceHomeUiModel(
             sourceLabelText = advanceContractState.sourceLabelText,
             stateTitleText = advanceHeroStateTitleText,
             stateBodyText = advanceHeroStateBodyText,
-            noticeTitleText = advanceContractState.noticeTitleText,
-            noticeBodyText = advanceContractState.noticeBodyText,
+            noticeTitleText = localizedAdvanceNoticeTitleText,
+            noticeBodyText = localizedAdvanceNoticeBodyText,
             showProgress =
                 advanceContractState.surfaceState != AdvanceSurfaceState.ERROR &&
                     advanceContractState.surfaceState != AdvanceSurfaceState.EMPTY,
@@ -767,8 +771,8 @@ fun DemoState.toFinanceHomeUiModel(
                 subtitleText = language.text("finance_detail_subtitle_current_month"),
                 stateTitleText = advanceHeroStateTitleText,
                 stateBodyText = advanceHeroStateBodyText,
-                noticeTitleText = advanceContractState.noticeTitleText,
-                noticeBodyText = advanceContractState.noticeBodyText,
+                noticeTitleText = localizedAdvanceNoticeTitleText,
+                noticeBodyText = localizedAdvanceNoticeBodyText,
                 availableText = if (usesRemoteAdvance) {
                     formatAdvanceAmount(
                         amountAtomic = remoteAvailableAmountAtomic,
@@ -854,7 +858,7 @@ fun DemoState.toFinanceHomeUiModel(
                     }
                 }
             ),
-            requestDetail = advanceRequestDetailUiState.toUiModel()
+            requestDetail = advanceRequestDetailUiState.toUiModel(language)
         ),
         wage = FinanceWageUiModel(
             statusText = if (!isRecorded) {
@@ -1212,7 +1216,9 @@ private fun buildRemoteAdvanceHistoryItems(
         }
 }
 
-private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetailUiModel {
+private fun AdvanceRequestDetailUiState.toUiModel(
+    language: AppLanguage = AppLanguage.KOREAN
+): FinanceAdvanceRequestDetailUiModel {
     val detailValue = detail
     return FinanceAdvanceRequestDetailUiModel(
         isVisible = isLoading || detailValue != null || errorMessage != null,
@@ -1257,9 +1263,13 @@ private fun AdvanceRequestDetailUiState.toUiModel(): FinanceAdvanceRequestDetail
             )
         } ?: "-",
         snapshotReflectedText = detailValue?.eligibilitySnapshot?.reflectedWorkDays?.let { days ->
-            "${days}일 · ${detailValue.eligibilitySnapshot.reflectedWorkMinutes}분"
+            "${language.text("days_format", days)} · ${
+                language.text("minutes_format", detailValue.eligibilitySnapshot.reflectedWorkMinutes)
+            }"
         } ?: "-",
-        snapshotReviewText = detailValue?.eligibilitySnapshot?.needsReviewRecordCount?.let { "${it}건" } ?: "-",
+        snapshotReviewText = detailValue?.eligibilitySnapshot?.needsReviewRecordCount?.let {
+            language.text("item_count_format", it)
+        } ?: "-",
         errorMessage = errorMessage
     )
 }
@@ -1372,7 +1382,7 @@ private fun formatAdvanceAmount(
         decimals = assetDecimals,
         symbol = assetSymbol
     )
-    val approxText = displayKrwAmount?.toInt()?.let(::formatKrw)
+    val approxText = displayKrwAmount?.toInt()?.let { formatKrw(it, language) }
     return if (approxText != null) "$assetText · ${language.text("finance_approx_amount_format", approxText)}" else assetText
 }
 
@@ -1384,9 +1394,35 @@ private fun formatWholeAdvanceUnits(
 ): String {
     val assetText = "$amount $assetSymbol"
     return if (displayKrwAmount > 0) {
-        "$assetText · ${language.text("finance_approx_amount_format", formatKrw(displayKrwAmount.toInt()))}"
+        "$assetText · ${language.text("finance_approx_amount_format", formatKrw(displayKrwAmount.toInt(), language))}"
     } else {
         assetText
+    }
+}
+
+private fun localizeAdvanceContractText(
+    text: String?,
+    language: AppLanguage
+): String? {
+    if (text == null || language == AppLanguage.KOREAN) {
+        return text
+    }
+
+    val compact = text.replace(" ", "")
+    val count = Regex("""^(\d+)건은아직확인중이라지금가능금액에반영되지않았어요\.?$""")
+        .matchEntire(compact)
+        ?.groupValues
+        ?.get(1)
+        ?.toIntOrNull()
+
+    return when {
+        compact == "지금은미리받기를신청할수없어요" -> language.text("finance_cannot_request_right_now")
+        compact == "미리받기를신청할수있어요" -> language.text("finance_can_request_right_now")
+        compact == "현재가능금액을확인하고신청할수있어요." -> language.text("finance_check_available_amount_and_request")
+        compact == "아직반영되지않은기록이있어요" -> language.text("finance_unreflected_records_notice_title")
+        count != null -> language.text("finance_unreflected_records_notice_body_with_count", count)
+        compact == "확인중인기록은지금가능금액에반영되지않았어요." -> language.text("finance_unreflected_records_notice_body")
+        else -> language.translate(text)
     }
 }
 

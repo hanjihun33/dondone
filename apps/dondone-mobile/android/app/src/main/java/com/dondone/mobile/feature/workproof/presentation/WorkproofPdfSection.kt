@@ -74,7 +74,7 @@ internal fun WorkproofPdfDateRangeSheet(
             color = DawnText
         )
         Text(
-            text = language.translate("문서로 정리할 기간을 먼저 선택해 주세요."),
+            text = language.text("workproof_select_period_first"),
             style = MaterialTheme.typography.bodyMedium,
             color = DawnTextSubtle
         )
@@ -172,7 +172,7 @@ internal fun WorkproofPdfDateRangeSheet(
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = language.translate("선택한 기간 기준 실제 근무 기록 요약을 확인한 뒤 문서를 생성할 수 있어요."),
+            text = language.text("workproof_selected_period_summary_notice"),
             style = MaterialTheme.typography.bodySmall,
             color = DawnTextSubtle
         )
@@ -209,19 +209,19 @@ private fun WorkproofPdfPreviewCard(
         )
         WorkproofKeyValueRow(
             label = language.text("workproof_record_count"),
-            value = preview.totalRecordCountText
+            value = translateWorkproofPreviewValue(preview.totalRecordCountText, language)
         )
         WorkproofKeyValueRow(
             label = language.text("workproof_edited_records"),
-            value = preview.editedCountText
+            value = translateWorkproofPreviewValue(preview.editedCountText, language)
         )
         WorkproofKeyValueRow(
             label = language.text("workproof_attachment_count"),
-            value = preview.attachmentCountText
+            value = translateWorkproofPreviewValue(preview.attachmentCountText, language)
         )
         WorkproofKeyValueRow(
             label = language.text("workproof_total_work_hours"),
-            value = preview.totalWorkedHoursText
+            value = translateWorkproofPreviewValue(preview.totalWorkedHoursText, language)
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -230,11 +230,37 @@ private fun WorkproofPdfPreviewCard(
                 color = DawnTextSubtle
             )
             Text(
-                text = preview.sectionSummaryText,
+                text = translateWorkproofPreviewValue(preview.sectionSummaryText, language),
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnText
             )
         }
+    }
+}
+
+private fun translateWorkproofPreviewValue(
+    raw: String,
+    language: AppLanguage
+): String {
+    if (language == AppLanguage.KOREAN) {
+        return raw
+    }
+
+    val count = Regex("""^(\d+)건$""").matchEntire(raw.trim())?.groupValues?.get(1)?.toIntOrNull()
+    val hoursAndMinutes = Regex("""^(\d+)시간\s+(\d+)분$""").matchEntire(raw.trim())
+    val hoursOnly = Regex("""^(\d+)시간$""").matchEntire(raw.trim())?.groupValues?.get(1)?.toIntOrNull()
+    val minutesOnly = Regex("""^(\d+)분$""").matchEntire(raw.trim())?.groupValues?.get(1)?.toIntOrNull()
+    return when {
+        count != null -> language.text("workproof_item_count", count)
+        hoursAndMinutes != null -> language.text(
+            "workproof_hours_minutes_format",
+            hoursAndMinutes.groupValues[1].toInt(),
+            hoursAndMinutes.groupValues[2].toInt()
+        )
+        hoursOnly != null -> language.text("workproof_hours_only_format", hoursOnly)
+        minutesOnly != null -> language.text("workproof_minutes_only_format", minutesOnly)
+        raw == "출퇴근 기록, 수정 이력, 기간 요약" -> language.text("workproof_section_summary_value")
+        else -> language.translate(raw)
     }
 }
 
@@ -314,9 +340,9 @@ internal fun WorkproofPdfGenerationResultSheet(
         else -> language.text("workproof_pdf_request_submitted")
     }
     val description = when {
-        isFailed -> createUiState.errorMessage ?: language.translate("문서 생성에 실패했어요.")
-        isActionable -> language.translate("열기 또는 공유를 눌러 문서를 확인해 주세요.")
-        else -> language.translate("선택한 기간의 근무기록 문서를 준비하고 있어요.")
+        isFailed -> createUiState.errorMessage ?: language.text("workproof_document_generation_failed_message")
+        isActionable -> language.text("workproof_open_or_share_message")
+        else -> language.text("workproof_preparing_document_message")
     }
 
     Column(
