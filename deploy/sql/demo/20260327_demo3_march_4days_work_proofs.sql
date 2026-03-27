@@ -19,7 +19,8 @@ BEGIN
           AND lower(u.email) = lower(v_user_email)
           AND u.name = v_user_name
     ) THEN
-        RAISE EXCEPTION 'target user mismatch: id=%, email=%, name=%', v_user_id, v_user_email, v_user_name;
+        RAISE NOTICE 'Skipping demo3 reflected work proof seed: target user mismatch (id=%, email=%, name=%)', v_user_id, v_user_email, v_user_name;
+        RETURN;
     END IF;
 
     SELECT em.workplace_id
@@ -32,7 +33,8 @@ BEGIN
      LIMIT 1;
 
     IF v_workplace_id IS NULL THEN
-        RAISE EXCEPTION 'active employment membership not found for user_id=%', v_user_id;
+        RAISE NOTICE 'Skipping demo3 reflected work proof seed: active employment membership not found for user_id=%', v_user_id;
+        RETURN;
     END IF;
 
     SELECT wc.id
@@ -44,7 +46,8 @@ BEGIN
      LIMIT 1;
 
     IF v_contract_id IS NULL THEN
-        RAISE EXCEPTION 'active work contract not found for workplace_id=%', v_workplace_id;
+        RAISE NOTICE 'Skipping demo3 reflected work proof seed: active work contract not found for workplace_id=%', v_workplace_id;
+        RETURN;
     END IF;
 
     SELECT w.name,
