@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 
 public final class AdvancePolicyDefaults {
 
-    public static final int DEFAULT_PAYDAY_DAY = 15;
+    public static final int DEFAULT_PAYDAY_DAY = 31;
     public static final boolean SAME_DAY_ADVANCE_ALLOWED = false;
     public static final int REDUCED_CAP_DAYS_BEFORE_PAYDAY = 7;
     public static final String ASSET_SYMBOL = "dUSDC";

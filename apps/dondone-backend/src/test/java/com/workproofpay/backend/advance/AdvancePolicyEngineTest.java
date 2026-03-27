@@ -207,9 +207,38 @@ class AdvancePolicyEngineTest {
     }
 
     @Test
-    void rollsTargetMonthForwardAfterPayday() {
+    void keepsCurrentMonthOnMonthEndWhenPaydayUsesLastDaySemantics() {
         YearMonth targetMonth = engine.resolveTargetMonth(
                 policy,
+                LocalDate.of(2026, 4, 30),
+                YearMonth.of(2026, 3)
+        );
+
+        assertThat(targetMonth).isEqualTo(YearMonth.of(2026, 4));
+    }
+
+    @Test
+    void rollsTargetMonthForwardAfterExplicitPayday() {
+        com.workproofpay.backend.advance.model.AdvancePolicy fifteenthPolicy =
+                com.workproofpay.backend.advance.model.AdvancePolicy.global(
+                        true,
+                        15,
+                        AdvancePolicyDefaults.SAME_DAY_ADVANCE_ALLOWED,
+                        AdvancePolicyDefaults.REDUCED_CAP_DAYS_BEFORE_PAYDAY,
+                        AdvancePolicyDefaults.ASSET_SYMBOL,
+                        AdvancePolicyDefaults.ASSET_DECIMALS,
+                        AdvancePolicyDefaults.REFERENCE_KRW_PER_ASSET,
+                        AdvancePolicyDefaults.MAX_CAP_DISPLAY_KRW_AMOUNT,
+                        AdvancePolicyDefaults.NEAR_PAYDAY_MAX_CAP_DISPLAY_KRW_AMOUNT,
+                        com.workproofpay.backend.advance.model.AdvanceFeeType.FLAT,
+                        AdvancePolicyDefaults.FLAT_FEE_DISPLAY_KRW_AMOUNT,
+                        com.workproofpay.backend.advance.model.AdvanceSettlementMode.PAYDAY_AUTO_OFFSET,
+                        false,
+                        AdvancePolicyDefaults.DISCLAIMER
+                );
+
+        YearMonth targetMonth = engine.resolveTargetMonth(
+                fifteenthPolicy,
                 LocalDate.of(2026, 3, 26),
                 YearMonth.of(2026, 3)
         );

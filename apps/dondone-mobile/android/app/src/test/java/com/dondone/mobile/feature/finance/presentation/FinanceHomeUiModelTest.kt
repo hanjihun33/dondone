@@ -2,6 +2,8 @@ package com.dondone.mobile.feature.finance.presentation
 
 import com.dondone.mobile.app.session.VaultActionUiState
 import com.dondone.mobile.app.session.VaultMessagePresentation
+import com.dondone.mobile.data.advance.AdvanceEligibilityPayload
+import com.dondone.mobile.data.advance.AdvanceRemoteState
 import com.dondone.mobile.data.demo.DemoSeedFactory
 import com.dondone.mobile.data.remittance.RemittanceRemotePayload
 import com.dondone.mobile.data.remittance.RemittanceRemoteState
@@ -13,11 +15,44 @@ import com.dondone.mobile.data.vault.VaultRemotePayload
 import com.dondone.mobile.data.vault.VaultRemoteState
 import com.dondone.mobile.data.vault.VaultSummaryPayload
 import com.dondone.mobile.data.vault.VaultTransactionDetailPayload
+import java.math.BigDecimal
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class FinanceHomeUiModelTest {
+
+    @Test
+    fun `first remote advance request uses default request CTA instead of additional request`() {
+        val uiModel = DemoSeedFactory.create().toFinanceHomeUiModel(
+            remoteState = AdvanceRemoteState.content(
+                workplaceName = "DonDone Cafe",
+                eligibility = AdvanceEligibilityPayload(
+                    workplaceId = 1L,
+                    assetSymbol = "dUSDC",
+                    assetDecimals = 6,
+                    exchangeRateSnapshot = BigDecimal("1450"),
+                    availableAmountAtomic = 34_000_000L,
+                    availableDisplayKrwAmount = 49_300L,
+                    maxCapAmountAtomic = 34_000_000L,
+                    maxCapDisplayKrwAmount = 49_300L,
+                    currentTierName = "T1",
+                    repaymentTier = "T1",
+                    blockReasonCodes = emptyList(),
+                    noticeReasonCodes = emptyList(),
+                    estimatedFeeAmountAtomic = 0L,
+                    estimatedFeeDisplayKrwAmount = 0L,
+                    estimatedRepaymentDate = "2026-03-31",
+                    disclaimer = "데모 시뮬레이션",
+                    needsReviewRecordCount = 0
+                ),
+                requests = emptyList()
+            )
+        )
+
+        assertEquals("미리받기 신청", uiModel.advance.actionText)
+        assertEquals("미리받기 신청", uiModel.advance.detail.requestButtonText)
+    }
 
     @Test
     fun `remote vault deposit preview uses selected amount when no stored balance`() {

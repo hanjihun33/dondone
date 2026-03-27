@@ -89,11 +89,17 @@ internal class DemoSessionAdvanceHandlers(
         }
 
         val availableAmount = eligibility.availableAmountInWholeAssetUnits
+        val isBelowMinimumRequestUnit =
+            eligibility.availableAmountAtomic > 0L && availableAmount <= 0
         val requestedAmount = (selectedAdvanceAmountFlow.value ?: availableAmount)
             .coerceAtMost(availableAmount)
         if (requestedAmount <= 0) {
             advanceRequestUiStateFlow.value = AdvanceRequestUiState(
-                message = "신청 가능한 금액이 없어요.",
+                message = if (isBelowMinimumRequestUnit) {
+                    "최소 신청 단위는 1 ${eligibility.assetSymbol}예요. 남은 신청 가능 금액이 그보다 적어요."
+                } else {
+                    "신청 가능한 금액이 없어요."
+                },
                 isError = true
             )
             return

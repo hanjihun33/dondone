@@ -750,10 +750,11 @@ fun DemoState.toFinanceHomeUiModel(
             progressHintText = effectiveProgressHintText,
             progressPrimaryMetricLabel = progressPrimaryMetricLabel,
             progressPrimaryMetricText = progressPrimaryMetricText,
-            progressSecondaryMetricLabel = progressSecondaryMetricLabel,
+                progressSecondaryMetricLabel = progressSecondaryMetricLabel,
                 progressSecondaryMetricText = progressSecondaryMetricText,
                 actionText = when {
-                    canRequestAdditional -> language.text("finance_additional_request")
+                    canRequestAdditional && hasCurrentAdvanceRequest -> language.text("finance_additional_request")
+                    canRequestAdditional -> language.text("finance_request_advance")
                     hasCurrentAdvanceRequest -> language.text("finance_view_history")
                     else -> advanceContractState.actionText
                 },

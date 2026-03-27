@@ -480,6 +480,51 @@ class DemoSessionViewModelTest {
     }
 
     @Test
+    fun `request advance shows minimum unit message when remaining amount is below 1 asset`() = runTest {
+        val session = testSession()
+        val authRepository = FakeAuthRepository(restoredSession = session)
+        val remoteState = AdvanceRemoteState.content(
+            workplaceName = "DonDone Cafe",
+            eligibility = com.dondone.mobile.data.advance.AdvanceEligibilityPayload(
+                workplaceId = 1L,
+                assetSymbol = "dUSDC",
+                assetDecimals = 6,
+                exchangeRateSnapshot = BigDecimal("1450"),
+                availableAmountAtomic = 480_000L,
+                availableDisplayKrwAmount = 700L,
+                maxCapAmountAtomic = 34_000_000L,
+                maxCapDisplayKrwAmount = 49_300L,
+                currentTierName = "T1",
+                repaymentTier = "T1",
+                blockReasonCodes = emptyList(),
+                noticeReasonCodes = emptyList(),
+                estimatedFeeAmountAtomic = 0L,
+                estimatedFeeDisplayKrwAmount = 0L,
+                estimatedRepaymentDate = "2026-03-31",
+                disclaimer = "데모 시뮬레이션",
+                needsReviewRecordCount = 0
+            ),
+            requests = emptyList()
+        )
+        val advanceRepository = FakeAdvanceRepository(result = remoteState)
+        val viewModel = DemoSessionViewModel(
+            authRepository = authRepository,
+            advanceRepository = advanceRepository
+        )
+
+        advanceUntilIdle()
+        viewModel.requestAdvance()
+        advanceUntilIdle()
+
+        assertTrue(advanceRepository.createCalls.isEmpty())
+        assertEquals(
+            "최소 신청 단위는 1 dUSDC예요. 남은 신청 가능 금액이 그보다 적어요.",
+            viewModel.advanceRequestUiState.value.message
+        )
+        assertTrue(viewModel.advanceRequestUiState.value.isError)
+    }
+
+    @Test
     fun `open advance detail uses remote detail and caches it`() = runTest {
         val session = testSession()
         val authRepository = FakeAuthRepository(restoredSession = session)

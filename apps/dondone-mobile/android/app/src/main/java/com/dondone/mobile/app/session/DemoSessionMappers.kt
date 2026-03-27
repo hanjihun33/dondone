@@ -32,13 +32,11 @@ private val WorkproofPdfPreviewDateFormatter: DateTimeFormatter = DateTimeFormat
 
 internal fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): DemoState {
     val systemToday = LocalDate.now()
-    val activeRecord = payload.records.firstOrNull { record ->
-        record.status == "CHECKED_IN" && record.checkOutDeviceAt == null
-    }
-    val selectedTodayRecord = activeRecord
-        ?: payload.records.firstOrNull { it.workDate == systemToday }
-        ?: payload.records.firstOrNull()
-    val selectedDate = selectedTodayRecord?.workDate ?: systemToday
+    val todayRecords = payload.records.filter { it.workDate == systemToday }
+    val selectedTodayRecord = todayRecords
+        .firstOrNull { record -> record.status == "CHECKED_IN" && record.checkOutDeviceAt == null }
+        ?: todayRecords.maxByOrNull { it.checkInDeviceAt }
+    val selectedDate = systemToday
     val nextRecords = payload.records
         .sortedByDescending { it.workDate }
         .map { record ->

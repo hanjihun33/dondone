@@ -144,7 +144,7 @@ public class AdvancePolicyEngine {
 
     public YearMonth resolveTargetMonth(AdvancePolicy policy, LocalDate today, YearMonth latestWorkedMonth) {
         YearMonth cycleMonth = YearMonth.from(today);
-        if (today.getDayOfMonth() > policy.getPaydayDay()) {
+        if (today.getDayOfMonth() > effectivePaydayDay(policy, cycleMonth)) {
             cycleMonth = cycleMonth.plusMonths(1);
         }
         if (latestWorkedMonth == null || latestWorkedMonth.isBefore(cycleMonth)) {
@@ -168,7 +168,11 @@ public class AdvancePolicyEngine {
 
     private LocalDate repaymentDate(AdvancePolicy policy, LocalDate today, YearMonth targetMonth) {
         YearMonth repaymentMonth = targetMonth.isBefore(YearMonth.from(today)) ? YearMonth.from(today) : targetMonth;
-        return repaymentMonth.atDay(Math.min(policy.getPaydayDay(), repaymentMonth.lengthOfMonth()));
+        return repaymentMonth.atDay(effectivePaydayDay(policy, repaymentMonth));
+    }
+
+    private int effectivePaydayDay(AdvancePolicy policy, YearMonth month) {
+        return Math.min(policy.getPaydayDay(), month.lengthOfMonth());
     }
 
     private long estimateFeeDisplayKrwAmount(AdvancePolicy policy, long availableDisplayKrwAmount) {
