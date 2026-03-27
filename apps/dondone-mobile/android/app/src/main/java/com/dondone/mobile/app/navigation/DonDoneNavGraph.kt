@@ -15,6 +15,7 @@ import com.dondone.mobile.app.session.DemoSessionViewModel
 import com.dondone.mobile.core.designsystem.BadgeTone
 import com.dondone.mobile.core.i18n.AppLanguage
 import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.translate
 import com.dondone.mobile.feature.finance.presentation.AccountManageScreen
 import com.dondone.mobile.feature.finance.presentation.FinanceHomeScreen
 import com.dondone.mobile.feature.finance.presentation.TransactionHistoryDetailScreen
@@ -89,7 +90,7 @@ fun DonDoneNavGraph(
     LaunchedEffect(remittanceActionUiState.message, remittanceActionUiState.isError) {
         val message = remittanceActionUiState.message ?: return@LaunchedEffect
         onShowToast(
-            message,
+            appLanguage.translate(message),
             if (remittanceActionUiState.isError) BadgeTone.Warning else BadgeTone.Success
         )
         viewModel.clearRemittanceActionMessage()

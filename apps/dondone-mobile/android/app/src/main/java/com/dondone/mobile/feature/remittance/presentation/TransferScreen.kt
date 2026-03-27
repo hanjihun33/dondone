@@ -333,23 +333,34 @@ private fun RecipientStepCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
+                modifier = Modifier.weight(1f),
                 text = uiModel.recipientScreenTitle,
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
-                color = DawnText
+                color = DawnText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             if (uiModel.showAddRecipientAction) {
                 OutlinedButton(
                     onClick = { showCreateRecipientSheet = true },
+                    modifier = Modifier.padding(start = 12.dp),
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(1.dp, TransferRecipientSelectedBorder),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.White,
                         contentColor = DawnPrimary
+                    ),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 14.dp,
+                        vertical = 10.dp
                     )
                 ) {
                     Text(
                         text = language.text("transfer_add_recipient"),
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black)
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
