@@ -30,6 +30,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -819,18 +823,27 @@ private fun FinanceAdvanceBottomSheet(
         if (uiModel.canRequestAdditional && uiModel.amountOptions.isNotEmpty()) {
             FinanceBottomSheetDivider()
             FinanceBottomSheetSection {
-                FinanceBottomSheetHeader(title = language.text("receivable_amount"))
+                FinanceBottomSheetHeader(title = "받을 금액")
+                FinanceAdvanceAmountInput(
+                    selectedAmountValue = uiModel.selectedAmountValue,
+                    maxRequestableAmount = uiModel.maxRequestableAmount,
+                    assetSymbol = uiModel.requestAssetSymbol,
+                    onSelectAmount = {
+                        onClearRequestMessage()
+                        onSelectAmount(it)
+                    }
+                )
+                Text(
+                    text = "빠른 선택",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = FinanceTextMuted
+                )
                 FinanceAmountOptionGrid(
                     options = uiModel.amountOptions,
                     onSelect = {
                         onClearRequestMessage()
                         onSelectAmount(it)
                     }
-                )
-                Text(
-                    text = uiModel.progressHintText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FinanceTextMuted
                 )
                 FinanceKeyValueRow(label = language.text("planned_payout"), value = uiModel.receiveAmountText)
                 FinanceKeyValueRow(label = language.text("fee"), value = uiModel.feeText)
@@ -1621,6 +1634,63 @@ private fun FinanceAmountOptionGrid(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FinanceAdvanceAmountInput(
+    selectedAmountValue: Int,
+    maxRequestableAmount: Int,
+    assetSymbol: String,
+    onSelectAmount: (Int) -> Unit
+) {
+    var inputValue by rememberSaveable(maxRequestableAmount, assetSymbol) {
+        mutableStateOf(selectedAmountValue.takeIf { it > 0 }?.toString().orEmpty())
+    }
+
+    LaunchedEffect(selectedAmountValue) {
+        val normalized = selectedAmountValue.takeIf { it > 0 }?.toString().orEmpty()
+        if (inputValue != normalized) {
+            inputValue = normalized
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = inputValue,
+            onValueChange = { raw ->
+                val digitsOnly = raw.filter { it.isDigit() }.take(6)
+                inputValue = digitsOnly
+                val parsed = digitsOnly.toIntOrNull()?.coerceIn(0, maxRequestableAmount) ?: 0
+                onSelectAmount(parsed)
+            },
+            singleLine = true,
+            label = { Text("신청 금액") },
+            placeholder = { Text("1 이상 정수로 입력") },
+            trailingIcon = {
+                Text(
+                    text = assetSymbol,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = FinanceTextMuted
+                )
+            },
+            supportingText = {
+                Text(
+                    text = "최대 $maxRequestableAmount $assetSymbol",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FinanceTextMuted
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = DawnPrimary,
+                unfocusedBorderColor = DawnBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
+            )
+        )
     }
 }
 
