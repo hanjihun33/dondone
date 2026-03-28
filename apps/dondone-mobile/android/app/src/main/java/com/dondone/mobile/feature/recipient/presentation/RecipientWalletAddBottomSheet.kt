@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import com.dondone.mobile.core.designsystem.DawnPrimary
 import com.dondone.mobile.core.designsystem.DawnText
 import com.dondone.mobile.core.designsystem.DawnTextSubtle
+import com.dondone.mobile.core.i18n.LocalAppLanguage
+import com.dondone.mobile.core.i18n.text
 
 data class RecipientDirectoryContactUiModel(
     val id: String,
@@ -58,15 +60,7 @@ private val RecipientAddAccentSurface = Color(0xFFE9F2FF)
 private val RecipientAddSummaryLabel = Color(0xFF9098A4)
 private val RecipientAddError = Color(0xFFC93C37)
 private val RecipientAddSuccessSurface = Color(0xFFF5F8FC)
-private val RecipientRelationOptions = listOf(
-    "FAMILY" to "가족",
-    "SPOUSE" to "배우자",
-    "PARENT" to "부모",
-    "CHILD" to "자녀",
-    "SIBLING" to "형제자매",
-    "FRIEND" to "친구",
-    "OTHER" to "기타"
-)
+private val RecipientRelationOptions = listOf("FAMILY", "SPOUSE", "PARENT", "CHILD", "SIBLING", "FRIEND", "OTHER")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +77,7 @@ fun RecipientWalletAddBottomSheet(
     onSearchByPhone: (String) -> Unit,
     onClearPhoneSearch: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     var mode by remember { mutableStateOf(AddWalletMode.PHONE) }
     var phoneQuery by remember { mutableStateOf("") }
     var selectedPhoneContactId by remember { mutableStateOf<String?>(null) }
@@ -133,12 +128,12 @@ fun RecipientWalletAddBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "수신 지갑 추가",
+                text = language.text("recipient_add_wallet_title"),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
                 color = DawnText
             )
             Text(
-                text = "휴대폰 번호로 먼저 찾고, 없으면 지갑 주소를 직접 입력할 수 있어요.",
+                text = language.text("recipient_add_wallet_description"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = DawnTextSubtle
             )
@@ -256,7 +251,7 @@ fun RecipientWalletAddBottomSheet(
                     )
                 } else {
                     Text(
-                        text = "지갑 등록하기",
+                        text = language.text("recipient_register_wallet"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = if (canSubmit) Color.White else RecipientAddSummaryLabel
                     )
@@ -273,6 +268,7 @@ private fun AddWalletModeTabs(
     selectedMode: AddWalletMode,
     onSelectMode: (AddWalletMode) -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -282,7 +278,11 @@ private fun AddWalletModeTabs(
     ) {
         AddWalletMode.entries.forEach { mode ->
             val selected = mode == selectedMode
-            val label = if (mode == AddWalletMode.PHONE) "휴대폰 번호로 찾기" else "지갑 주소 직접 입력"
+            val label = if (mode == AddWalletMode.PHONE) {
+                language.text("recipient_find_by_phone")
+            } else {
+                language.text("recipient_enter_wallet_directly")
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -324,22 +324,23 @@ private fun PhoneSearchForm(
     showEmptyState: Boolean,
     onSearch: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = phoneQuery,
             onValueChange = onPhoneQueryChange,
             singleLine = true,
-            label = { Text("휴대폰 번호") },
+            label = { Text(language.text("recipient_phone_number")) },
             placeholder = { Text("01012345678") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             shape = RoundedCornerShape(16.dp)
         )
         Text(
             text = if (isRemoteSearchEnabled) {
-                "등록된 DonDone 회원 지갑을 전화번호로 찾아요."
+                language.text("recipient_find_registered_wallet_by_phone")
             } else {
-                "현재는 DonDone 데모 연락처에서만 찾아요."
+                language.text("recipient_find_in_demo_contacts_only")
             },
             style = MaterialTheme.typography.bodySmall,
             color = RecipientAddSummaryLabel
@@ -365,7 +366,7 @@ private fun PhoneSearchForm(
                     )
                 } else {
                     Text(
-                        text = "번호로 검색",
+                        text = language.text("recipient_search_by_phone_number"),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                         color = if (canSearch) Color.White else RecipientAddSummaryLabel
                     )
@@ -387,13 +388,13 @@ private fun PhoneSearchForm(
                         color = RecipientAddError
                     )
                     Text(
-                        text = "지갑 주소를 알고 있다면 직접 입력으로 바로 등록할 수 있어요.",
+                        text = language.text("recipient_can_register_direct_if_knows_wallet"),
                         style = MaterialTheme.typography.bodySmall,
                         color = DawnTextSubtle
                     )
                     Text(
                         modifier = Modifier.clickable(onClick = onSwitchToManual),
-                        text = "지갑 주소 직접 입력으로 전환",
+                        text = language.text("recipient_switch_to_direct_wallet_input"),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                         color = DawnPrimary
                     )
@@ -408,18 +409,18 @@ private fun PhoneSearchForm(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "일치하는 연락처가 없어요.",
+                        text = language.text("recipient_no_matching_contact"),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = DawnText
                     )
                     Text(
-                        text = "지갑 주소를 알고 있다면 직접 입력으로 바로 등록할 수 있어요.",
+                        text = language.text("recipient_can_register_direct_if_knows_wallet"),
                         style = MaterialTheme.typography.bodySmall,
                         color = DawnTextSubtle
                     )
                     Text(
                         modifier = Modifier.clickable(onClick = onSwitchToManual),
-                        text = "지갑 주소 직접 입력으로 전환",
+                        text = language.text("recipient_switch_to_direct_wallet_input"),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                         color = DawnPrimary
                     )
@@ -462,7 +463,7 @@ private fun PhoneSearchForm(
                             )
                             if (contact.alreadyRegistered) {
                                 Text(
-                                    text = "이미 등록된 지갑",
+                                    text = language.text("recipient_already_registered_wallet"),
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                                     color = RecipientAddError
                                 )
@@ -482,6 +483,7 @@ private fun ManualAddressForm(
     walletAddress: String,
     onWalletAddressChange: (String) -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val addressValid = walletAddress.trim().isLikelyWalletAddress()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -490,7 +492,7 @@ private fun ManualAddressForm(
             value = alias,
             onValueChange = onAliasChange,
             singleLine = true,
-            label = { Text("별칭") },
+            label = { Text(language.text("recipient_alias")) },
             shape = RoundedCornerShape(16.dp)
         )
         OutlinedTextField(
@@ -498,14 +500,14 @@ private fun ManualAddressForm(
             value = walletAddress,
             onValueChange = onWalletAddressChange,
             singleLine = true,
-            label = { Text("지갑 주소") },
+            label = { Text(language.text("recipient_wallet_address")) },
             placeholder = { Text("0x...") },
             supportingText = {
                 Text(
                     text = if (walletAddress.isBlank() || addressValid) {
-                        "테스트넷 EVM 지갑 주소를 입력해 주세요."
+                        language.text("recipient_enter_testnet_evm_wallet")
                     } else {
-                        "0x로 시작하는 42자리 주소를 입력해 주세요."
+                        language.text("recipient_enter_42_char_0x")
                     },
                     color = if (walletAddress.isBlank() || addressValid) {
                         RecipientAddSummaryLabel
@@ -525,9 +527,10 @@ private fun RelationSelector(
     selectedRelation: String,
     onSelectRelation: (String) -> Unit
 ) {
+    val language = LocalAppLanguage.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = "관계",
+            text = language.text("recipient_relationship"),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
             color = DawnText
         )
@@ -536,7 +539,7 @@ private fun RelationSelector(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                row.forEach { (code, label) ->
+                row.forEach { code ->
                     val selected = selectedRelation == code
                     Box(
                         modifier = Modifier
@@ -555,7 +558,7 @@ private fun RelationSelector(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = label,
+                            text = language.text(code.lowercase()),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                             color = if (selected) DawnPrimary else DawnTextSubtle
                         )
@@ -573,6 +576,7 @@ private fun RelationSelector(
 private fun SelectedPhoneContactSummary(
     contact: RecipientDirectoryContactUiModel
 ) {
+    val language = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -581,7 +585,7 @@ private fun SelectedPhoneContactSummary(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = "선택한 연락처",
+            text = language.text("recipient_selected_contact"),
             style = MaterialTheme.typography.bodySmall,
             color = RecipientAddSummaryLabel
         )
