@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -156,6 +157,9 @@ class AdvanceIntegrationTest extends PostgresIntegrationTestSupport {
                 .getContentAsString();
 
         Long requestId = readId(createdBody, "requestId");
+        AdvanceRequest persistedRequest = advanceRequestRepository.findById(requestId).orElseThrow();
+        assertThat(persistedRequest.getCreatedAt()).isNotNull();
+        assertThat(persistedRequest.getUpdatedAt()).isNotNull();
 
         mockMvc.perform(post("/api/advance/requests")
                         .header("Authorization", bearer(token))

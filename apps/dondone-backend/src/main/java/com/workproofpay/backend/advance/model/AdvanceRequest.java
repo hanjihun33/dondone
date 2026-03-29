@@ -1,7 +1,7 @@
 package com.workproofpay.backend.advance.model;
 
 import com.workproofpay.backend.auth.model.User;
-import com.workproofpay.backend.shared.persistence.BaseCreatedEntity;
+import com.workproofpay.backend.shared.persistence.BaseTimeEntity;
 import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.model.Workplace;
 import jakarta.persistence.*;
@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AdvanceRequest extends BaseCreatedEntity {
+public class AdvanceRequest extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
