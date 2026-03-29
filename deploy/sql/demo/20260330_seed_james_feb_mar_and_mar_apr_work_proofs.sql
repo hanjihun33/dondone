@@ -12,12 +12,18 @@ DECLARE
     v_workplace_longitude DOUBLE PRECISION;
 BEGIN
     FOREACH v_user_email IN ARRAY ARRAY[
+        'james@gmail.com',
+        'james2@gmail.com',
+        'james3@gmail.com',
         'james4@gmail.com',
         'james5@gmail.com',
         'james6@gmail.com',
         'james7@gmail.com',
         'james8@gmail.com',
-        'james9@gmail.com'
+        'james9@gmail.com',
+        'james10@gmail.com',
+        'james11@gmail.com',
+        'james12@gmail.com'
     ]
     LOOP
         v_user_id := NULL;
