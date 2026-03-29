@@ -48,7 +48,7 @@ internal fun DemoState.syncRemoteWorkproof(payload: WorkproofRemotePayload): Dem
                 day = record.workDate.dayOfMonth,
                 inTime = actualClockIn,
                 outTime = actualClockOut,
-                modified = record.modified || record.reflectionStatus != "PENDING",
+                modified = record.modified,
                 attachments = 0,
                 reflectionStatus = record.reflectionStatus,
                 decisionMemo = record.decisionMemo,

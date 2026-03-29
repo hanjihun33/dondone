@@ -1972,8 +1972,7 @@ class DemoSessionViewModelTest {
         override suspend fun load(
             accessToken: String,
             month: YearMonth,
-            asOf: LocalDate,
-            paydayDay: Int
+            asOf: LocalDate
         ): WageRemoteState = WageRemoteState.empty("급여 데이터 없음")
 
         override suspend fun createDeposit(

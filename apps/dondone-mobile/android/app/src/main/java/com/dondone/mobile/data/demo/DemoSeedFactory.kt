@@ -5,6 +5,7 @@ import com.dondone.mobile.domain.model.AdvanceData
 import com.dondone.mobile.domain.model.DemoInfo
 import com.dondone.mobile.domain.model.DemoState
 import com.dondone.mobile.domain.model.DocumentItem
+import com.dondone.mobile.domain.model.DEFAULT_CONTRACT_PAYDAY_DAY
 import com.dondone.mobile.domain.model.Recipient
 import com.dondone.mobile.domain.model.RemittanceData
 import com.dondone.mobile.domain.model.TodayWork
@@ -67,7 +68,7 @@ object DemoSeedFactory {
                 nightHours = 6,
                 hourly = 12_000,
                 deductionsKnown = false,
-                paydayDay = 27,
+                paydayDay = DEFAULT_CONTRACT_PAYDAY_DAY,
                 actualDepositRecordedDay = 28,
                 actualDeposit = 1_740_000
             ),

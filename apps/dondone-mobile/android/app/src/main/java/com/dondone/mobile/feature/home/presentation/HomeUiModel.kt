@@ -109,7 +109,7 @@ fun DemoState.toHomeUiModel(
     val remoteSummary = wageRemoteState?.payload?.summary
     val isDepositRecorded = remoteSummary?.actualDepositAmount != null || wage.actualDepositRecordedDay != null
     val hasDifference = remoteSummary?.differenceAmount?.let { it != 0L } ?: (wageEstimate.difference != 0)
-    val isPaydayUpcoming = demo.asOfDay < wage.paydayDay
+    val isPaydayUpcoming = demo.asOfDay < (remoteSummary?.paydayDay ?: wage.paydayDay)
 
     val nextAction = when {
         !isDepositRecorded && isPaydayUpcoming -> HomeNextActionUiModel(
