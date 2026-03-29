@@ -24,12 +24,14 @@ enum class WorkproofCalendarTone {
     MISSING,
     PARTIAL,
     COMPLETE,
+    REVIEW,
     MODIFIED
 }
 
 enum class WorkproofRecordTone {
     DEFAULT,
     ACTIVE,
+    REVIEW,
     MODIFIED
 }
 
@@ -223,6 +225,7 @@ private fun WorkproofDayStatus.toTone(): BadgeTone = when (this) {
 
 internal fun WorkRecord.toCalendarTone(): WorkproofCalendarTone {
     return when {
+        reflectionStatus == "NEEDS_REVIEW" -> WorkproofCalendarTone.REVIEW
         modified -> WorkproofCalendarTone.MODIFIED
         inTime.isRecordedTime() && outTime.isRecordedTime() -> WorkproofCalendarTone.COMPLETE
         inTime.isRecordedTime() || outTime.isRecordedTime() -> WorkproofCalendarTone.PARTIAL
@@ -232,6 +235,7 @@ internal fun WorkRecord.toCalendarTone(): WorkproofCalendarTone {
 
 internal fun WorkRecord.toRecordTone(): WorkproofRecordTone {
     return when {
+        reflectionStatus == "NEEDS_REVIEW" -> WorkproofRecordTone.REVIEW
         modified -> WorkproofRecordTone.MODIFIED
         !inTime.isRecordedTime() || !outTime.isRecordedTime() -> WorkproofRecordTone.ACTIVE
         else -> WorkproofRecordTone.DEFAULT

@@ -1458,8 +1458,7 @@ class DemoSessionViewModel(
         val remoteState = wageRepository.load(
             accessToken = session.accessToken,
             month = currentWageMonth(),
-            asOf = currentWageAsOfDate(),
-            paydayDay = _uiState.value.wage.paydayDay
+            asOf = currentWageAsOfDate()
         )
         applyWageRemoteState(remoteState, verificationId)
     }

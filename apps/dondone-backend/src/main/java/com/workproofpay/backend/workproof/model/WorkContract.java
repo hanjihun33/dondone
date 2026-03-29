@@ -53,6 +53,9 @@ public class WorkContract extends BaseTimeEntity {
     @Column(name = "normalized_hourly_wage", nullable = false, precision = 19, scale = 2)
     private BigDecimal normalizedHourlyWage;
 
+    @Column(name = "payday_day", nullable = false)
+    private Integer paydayDay;
+
     @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;
 
@@ -65,6 +68,7 @@ public class WorkContract extends BaseTimeEntity {
                          Integer dailyWorkMinutes,
                          Integer monthlyWorkMinutes,
                          BigDecimal normalizedHourlyWage,
+                         Integer paydayDay,
                          LocalDate effectiveFrom,
                          LocalDate effectiveTo) {
         this.workplace = workplace;
@@ -73,6 +77,7 @@ public class WorkContract extends BaseTimeEntity {
         this.dailyWorkMinutes = dailyWorkMinutes;
         this.monthlyWorkMinutes = monthlyWorkMinutes;
         this.normalizedHourlyWage = normalizedHourlyWage;
+        this.paydayDay = paydayDay;
         this.effectiveFrom = effectiveFrom;
         this.effectiveTo = effectiveTo;
     }
@@ -83,6 +88,7 @@ public class WorkContract extends BaseTimeEntity {
                                         Integer dailyWorkMinutes,
                                         Integer monthlyWorkMinutes,
                                         BigDecimal normalizedHourlyWage,
+                                        Integer paydayDay,
                                         LocalDate effectiveFrom) {
         return new WorkContract(
                 workplace,
@@ -91,8 +97,28 @@ public class WorkContract extends BaseTimeEntity {
                 dailyWorkMinutes,
                 monthlyWorkMinutes,
                 normalizedHourlyWage,
+                paydayDay,
                 effectiveFrom,
                 null
+        );
+    }
+
+    public static WorkContract activate(Workplace workplace,
+                                        WorkProofPayUnit payUnit,
+                                        BigDecimal basePayAmount,
+                                        Integer dailyWorkMinutes,
+                                        Integer monthlyWorkMinutes,
+                                        BigDecimal normalizedHourlyWage,
+                                        LocalDate effectiveFrom) {
+        return activate(
+                workplace,
+                payUnit,
+                basePayAmount,
+                dailyWorkMinutes,
+                monthlyWorkMinutes,
+                normalizedHourlyWage,
+                31,
+                effectiveFrom
         );
     }
 

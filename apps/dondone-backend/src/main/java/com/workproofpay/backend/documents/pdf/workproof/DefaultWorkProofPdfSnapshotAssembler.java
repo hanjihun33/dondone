@@ -3,6 +3,8 @@ package com.workproofpay.backend.documents.pdf.workproof;
 import com.workproofpay.backend.documents.model.DocumentGenerationRequest;
 import com.workproofpay.backend.documents.model.DocumentType;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
+import com.workproofpay.backend.employer.model.EmploymentMembershipStatus;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.model.WorkProof;
@@ -24,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
     private final WorkplaceRepository workplaceRepository;
     private final WorkProofRepository workProofRepository;
     private final WorkProofAuditLogRepository workProofAuditLogRepository;
+    private final EmploymentMembershipRepository employmentMembershipRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -67,8 +71,7 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
                 : yearMonth.atEndOfMonth();
         Long workplaceId = command.workplaceId() != null ? command.workplaceId() : request.getWorkplaceId();
 
-        Workplace workplace = workplaceRepository.findByIdAndUserId(workplaceId, command.userId())
-                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        Workplace workplace = getAccessibleWorkplace(command.userId(), workplaceId);
 
         List<WorkProof> records = workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
                 command.userId(),
@@ -159,6 +162,28 @@ public class DefaultWorkProofPdfSnapshotAssembler implements WorkProofPdfSnapsho
 
     private boolean isSupportedDocumentType(DocumentType documentType) {
         return documentType == DocumentType.PROOF_PACK || documentType == DocumentType.WORKPROOF_STATEMENT;
+    }
+
+    private Workplace getAccessibleWorkplace(Long userId, Long workplaceId) {
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+                .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        if (Objects.equals(workplace.getUser().getId(), userId) || hasActiveMembership(userId, workplace)) {
+            return workplace;
+        }
+        throw new ApiException(ErrorCode.WORKPLACE_NOT_FOUND);
+    }
+
+    private boolean hasActiveMembership(Long userId, Workplace workplace) {
+        if (workplace.getCompanyId() == null) {
+            return false;
+        }
+        return !employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                userId,
+                workplace.getCompanyId(),
+                workplace.getId(),
+                EmploymentMembershipStatus.ACTIVE,
+                LocalDate.now()
+        ).isEmpty();
     }
 
     private WorkProofPdfSnapshot.DocumentMeta buildMeta(DocumentGenerationRequest request,

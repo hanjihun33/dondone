@@ -7,8 +7,7 @@ interface WageRepository {
     suspend fun load(
         accessToken: String,
         month: YearMonth,
-        asOf: LocalDate,
-        paydayDay: Int
+        asOf: LocalDate
     ): WageRemoteState
 
     suspend fun createDeposit(

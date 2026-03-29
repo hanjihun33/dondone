@@ -15,7 +15,12 @@ import com.dondone.mobile.data.vault.VaultRemotePayload
 import com.dondone.mobile.data.vault.VaultRemoteState
 import com.dondone.mobile.data.vault.VaultSummaryPayload
 import com.dondone.mobile.data.vault.VaultTransactionDetailPayload
+import com.dondone.mobile.data.workproof.WorkproofRemotePayload
+import com.dondone.mobile.data.workproof.WorkproofRemoteState
+import com.dondone.mobile.data.workproof.WorkproofRecordPayload
+import com.dondone.mobile.data.workproof.WorkproofWorkplacePayload
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -52,6 +57,81 @@ class FinanceHomeUiModelTest {
 
         assertEquals("미리받기 신청", uiModel.advance.actionText)
         assertEquals("미리받기 신청", uiModel.advance.detail.requestButtonText)
+    }
+
+    @Test
+    fun `finance calendar separates review and modified tones`() {
+        val uiModel = DemoSeedFactory.create().toFinanceHomeUiModel(
+            remoteState = AdvanceRemoteState.content(
+                workplaceName = "DonDone Cafe",
+                eligibility = AdvanceEligibilityPayload(
+                    workplaceId = 1L,
+                    assetSymbol = "dUSDC",
+                    assetDecimals = 6,
+                    exchangeRateSnapshot = BigDecimal("1450"),
+                    availableAmountAtomic = 34_000_000L,
+                    availableDisplayKrwAmount = 49_300L,
+                    maxCapAmountAtomic = 34_000_000L,
+                    maxCapDisplayKrwAmount = 49_300L,
+                    currentTierName = "T1",
+                    repaymentTier = "T1",
+                    blockReasonCodes = emptyList(),
+                    noticeReasonCodes = emptyList(),
+                    estimatedFeeAmountAtomic = 0L,
+                    estimatedFeeDisplayKrwAmount = 0L,
+                    estimatedRepaymentDate = "2026-03-31",
+                    disclaimer = "데모 시뮬레이션",
+                    needsReviewRecordCount = 1
+                ),
+                requests = emptyList()
+            ),
+            workproofRemoteState = WorkproofRemoteState.content(
+                WorkproofRemotePayload(
+                    workplace = WorkproofWorkplacePayload(
+                        workplaceId = 1L,
+                        name = "DonDone Cafe",
+                        address = "서울시 강남구",
+                        latitude = 37.5,
+                        longitude = 127.0,
+                        allowedRadiusMeters = 100
+                    ),
+                    records = listOf(
+                        WorkproofRecordPayload(
+                            recordId = 1L,
+                            workDate = LocalDate.of(2026, 3, 11),
+                            status = "CLOCK_OUT",
+                            checkInDeviceAt = LocalDateTime.of(2026, 3, 11, 9, 0),
+                            checkOutDeviceAt = LocalDateTime.of(2026, 3, 11, 18, 0),
+                            recognizedClockInAt = LocalDateTime.of(2026, 3, 11, 9, 0),
+                            recognizedClockOutAt = LocalDateTime.of(2026, 3, 11, 18, 0),
+                            workedMinutes = 480L,
+                            modified = false,
+                            reflectionStatus = "NEEDS_REVIEW",
+                            decisionMemo = null,
+                            riskFlags = emptyList()
+                        ),
+                        WorkproofRecordPayload(
+                            recordId = 2L,
+                            workDate = LocalDate.of(2026, 3, 12),
+                            status = "CLOCK_OUT",
+                            checkInDeviceAt = LocalDateTime.of(2026, 3, 12, 9, 0),
+                            checkOutDeviceAt = LocalDateTime.of(2026, 3, 12, 18, 0),
+                            recognizedClockInAt = LocalDateTime.of(2026, 3, 12, 9, 10),
+                            recognizedClockOutAt = LocalDateTime.of(2026, 3, 12, 18, 0),
+                            workedMinutes = 470L,
+                            modified = true,
+                            reflectionStatus = "REFLECTED",
+                            decisionMemo = null,
+                            riskFlags = emptyList()
+                        )
+                    )
+                )
+            )
+        )
+
+        val tonesByDay = uiModel.advance.detail.calendarDays.associateBy({ it.day }, { it.tone })
+        assertEquals(FinanceAdvanceCalendarTone.REVIEW, tonesByDay[11])
+        assertEquals(FinanceAdvanceCalendarTone.MODIFIED, tonesByDay[12])
     }
 
     @Test

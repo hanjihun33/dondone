@@ -19,7 +19,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -217,10 +216,8 @@ public class WageController {
     public ResponseEntity<ApiResponse<WageSummaryResponse>> getSummary(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "yearMonth must follow YYYY-MM") String yearMonth,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
-            @RequestParam long normalizedHourlyWage,
-            @RequestParam(defaultValue = "25") @Min(value = 1, message = "paydayDay must be between 1 and 31") @Max(value = 31, message = "paydayDay must be between 1 and 31") int paydayDay
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf
     ) {
-        return ApiResponse.success(wageService.getSummary(user.userId(), yearMonth, asOf, normalizedHourlyWage, paydayDay));
+        return ApiResponse.success(wageService.getSummary(user.userId(), yearMonth, asOf));
     }
 }

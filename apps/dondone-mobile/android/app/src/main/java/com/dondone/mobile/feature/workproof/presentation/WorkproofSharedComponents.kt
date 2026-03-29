@@ -32,11 +32,13 @@ internal fun WorkproofStatusPill(
     val background = when (tone) {
         WorkproofRecordTone.DEFAULT -> DawnSurfaceAlt
         WorkproofRecordTone.ACTIVE -> Color(0xFFFFF4DD)
+        WorkproofRecordTone.REVIEW -> WorkproofReviewBackground
         WorkproofRecordTone.MODIFIED -> Color(0xFFFFE6EA)
     }
     val color = when (tone) {
         WorkproofRecordTone.DEFAULT -> DawnPrimaryDeep
         WorkproofRecordTone.ACTIVE -> WorkproofPartialText
+        WorkproofRecordTone.REVIEW -> WorkproofReviewText
         WorkproofRecordTone.MODIFIED -> WorkproofModifiedText
     }
 

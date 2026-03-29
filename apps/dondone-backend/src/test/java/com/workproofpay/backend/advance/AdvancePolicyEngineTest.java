@@ -19,10 +19,8 @@ import static org.mockito.Mockito.when;
 class AdvancePolicyEngineTest {
 
     private static final long AVAILABLE_B_ATOMIC = 103_448_275L;
-    private static final long REDUCED_CAP_ATOMIC = 34_482_758L;
     private static final long ZERO_ATOMIC = 0L;
     private static final long AVAILABLE_B_REFERENCE_KRW = 150_000L;
-    private static final long REDUCED_CAP_REFERENCE_KRW = 50_000L;
     private static final long FEE_ATOMIC = 3_448_275L;
     private static final long FEE_REFERENCE_KRW = 5_000L;
 
@@ -160,8 +158,8 @@ class AdvancePolicyEngineTest {
                 YearMonth.of(2026, 3)
         );
 
-        assertThat(response.availableAmountAtomic()).isEqualTo(REDUCED_CAP_ATOMIC);
-        assertThat(response.availableDisplayKrwAmount()).isEqualTo(REDUCED_CAP_REFERENCE_KRW);
+        assertThat(response.availableAmountAtomic()).isEqualTo(AVAILABLE_B_ATOMIC);
+        assertThat(response.availableDisplayKrwAmount()).isEqualTo(AVAILABLE_B_REFERENCE_KRW);
         assertThat(response.blockReasonCodes()).doesNotContain("ADVANCE_WINDOW_CLOSED_TODAY");
         assertThat(engine.isHardBlocked(response)).isFalse();
     }

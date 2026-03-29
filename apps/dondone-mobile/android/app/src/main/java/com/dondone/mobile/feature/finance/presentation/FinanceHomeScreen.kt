@@ -30,6 +30,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -87,9 +91,12 @@ private val FinancePartialText = Color(0xFF6F42D9)
 private val FinanceReflectedBackground = Color(0xFFE9DEFF)
 private val FinanceReflectedBorder = Color(0xFFB89BFF)
 private val FinanceReflectedText = Color(0xFF5E3CC5)
-private val FinanceReviewBackground = Color(0xFFF7E4F4)
-private val FinanceReviewBorder = Color(0xFFD98FD0)
-private val FinanceReviewText = Color(0xFFAA3E96)
+private val FinanceReviewBackground = Color(0xFFFFF4DD)
+private val FinanceReviewBorder = Color(0xFFE7BC62)
+private val FinanceReviewText = Color(0xFFB7791F)
+private val FinanceModifiedBackground = Color(0xFFF7E4F4)
+private val FinanceModifiedBorder = Color(0xFFD98FD0)
+private val FinanceModifiedText = Color(0xFFAA3E96)
 private val FinanceTodayBackground = Color(0xFFF2F3FF)
 private val FinanceTodayBorder = Color(0xFFDDE4FF)
 private val FinanceCalendarDefaultBorder = Color(0xFFF4F6F8)
@@ -810,7 +817,8 @@ private fun FinanceAdvanceBottomSheet(
                         FinanceCalendarLegendItem(label = language.text("not_recorded"), background = Color.White, border = FinanceCalendarDefaultBorder)
                         FinanceCalendarLegendItem(label = language.text("clock_in_only"), background = FinancePartialBackground, border = FinancePartialBorder)
                         FinanceCalendarLegendItem(label = language.text("completed"), background = FinanceReflectedBackground, border = FinanceReflectedBorder)
-                        FinanceCalendarLegendItem(label = language.text("edited"), background = FinanceReviewBackground, border = FinanceReviewBorder)
+                        FinanceCalendarLegendItem(label = language.text("needs_review"), background = FinanceReviewBackground, border = FinanceReviewBorder)
+                        FinanceCalendarLegendItem(label = language.text("edited"), background = FinanceModifiedBackground, border = FinanceModifiedBorder)
                     }
                 }
             }
@@ -819,18 +827,27 @@ private fun FinanceAdvanceBottomSheet(
         if (uiModel.canRequestAdditional && uiModel.amountOptions.isNotEmpty()) {
             FinanceBottomSheetDivider()
             FinanceBottomSheetSection {
-                FinanceBottomSheetHeader(title = language.text("receivable_amount"))
+                FinanceBottomSheetHeader(title = "받을 금액")
+                FinanceAdvanceAmountInput(
+                    selectedAmountValue = uiModel.selectedAmountValue,
+                    maxRequestableAmount = uiModel.maxRequestableAmount,
+                    assetSymbol = uiModel.requestAssetSymbol,
+                    onSelectAmount = {
+                        onClearRequestMessage()
+                        onSelectAmount(it)
+                    }
+                )
+                Text(
+                    text = "빠른 선택",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = FinanceTextMuted
+                )
                 FinanceAmountOptionGrid(
                     options = uiModel.amountOptions,
                     onSelect = {
                         onClearRequestMessage()
                         onSelectAmount(it)
                     }
-                )
-                Text(
-                    text = uiModel.progressHintText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FinanceTextMuted
                 )
                 FinanceKeyValueRow(label = language.text("planned_payout"), value = uiModel.receiveAmountText)
                 FinanceKeyValueRow(label = language.text("fee"), value = uiModel.feeText)
@@ -1625,6 +1642,63 @@ private fun FinanceAmountOptionGrid(
 }
 
 @Composable
+private fun FinanceAdvanceAmountInput(
+    selectedAmountValue: Int,
+    maxRequestableAmount: Int,
+    assetSymbol: String,
+    onSelectAmount: (Int) -> Unit
+) {
+    var inputValue by rememberSaveable(maxRequestableAmount, assetSymbol) {
+        mutableStateOf(selectedAmountValue.takeIf { it > 0 }?.toString().orEmpty())
+    }
+
+    LaunchedEffect(selectedAmountValue) {
+        val normalized = selectedAmountValue.takeIf { it > 0 }?.toString().orEmpty()
+        if (inputValue != normalized) {
+            inputValue = normalized
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = inputValue,
+            onValueChange = { raw ->
+                val digitsOnly = raw.filter { it.isDigit() }.take(6)
+                inputValue = digitsOnly
+                val parsed = digitsOnly.toIntOrNull()?.coerceIn(0, maxRequestableAmount) ?: 0
+                onSelectAmount(parsed)
+            },
+            singleLine = true,
+            label = { Text("신청 금액") },
+            placeholder = { Text("1 이상 정수로 입력") },
+            trailingIcon = {
+                Text(
+                    text = assetSymbol,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = FinanceTextMuted
+                )
+            },
+            supportingText = {
+                Text(
+                    text = "최대 $maxRequestableAmount $assetSymbol",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FinanceTextMuted
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = DawnPrimary,
+                unfocusedBorderColor = DawnBorder,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
+            )
+        )
+    }
+}
+
+@Composable
 private fun FinanceAdvanceCalendarGrid(days: List<FinanceAdvanceCalendarDayUiModel>) {
     val displayedMonth = YearMonth.now()
     val today = LocalDate.now()
@@ -1679,27 +1753,31 @@ private fun FinanceAdvanceCalendarGrid(days: List<FinanceAdvanceCalendarDayUiMod
                     val backgroundColor = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialBackground
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBackground
-                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBackground
+                        FinanceAdvanceCalendarTone.REVIEW -> FinanceReviewBackground
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceModifiedBackground
                         FinanceAdvanceCalendarTone.TODAY -> FinanceTodayBackground
                         FinanceAdvanceCalendarTone.DEFAULT -> Color.Transparent
                     }
                     val borderColor = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialBorder
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBorder
-                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBorder
+                        FinanceAdvanceCalendarTone.REVIEW -> FinanceReviewBorder
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceModifiedBorder
                         FinanceAdvanceCalendarTone.TODAY -> FinanceTodayBorder
                         FinanceAdvanceCalendarTone.DEFAULT -> Color.Transparent
                     }
                     val textColor = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialText
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedText
-                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewText
+                        FinanceAdvanceCalendarTone.REVIEW -> FinanceReviewText
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceModifiedText
                         FinanceAdvanceCalendarTone.TODAY -> DawnPrimary
                         FinanceAdvanceCalendarTone.DEFAULT -> if (day.day > today.dayOfMonth) FinanceCalendarInactiveText else FinanceAdvanceSheetDefaultText
                     }
                     val shape = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL,
                         FinanceAdvanceCalendarTone.COMPLETE,
+                        FinanceAdvanceCalendarTone.REVIEW,
                         FinanceAdvanceCalendarTone.MODIFIED,
                         FinanceAdvanceCalendarTone.TODAY -> CircleShape
                         FinanceAdvanceCalendarTone.DEFAULT -> RoundedCornerShape(999.dp)

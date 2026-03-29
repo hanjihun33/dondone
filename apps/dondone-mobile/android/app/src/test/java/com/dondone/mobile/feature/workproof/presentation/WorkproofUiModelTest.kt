@@ -199,6 +199,8 @@ class WorkproofUiModelTest {
 
         assertEquals("검토 중", uiModel.recentRecords.first().statusText)
         assertEquals(null, uiModel.recentRecords.first().detailText)
+        assertEquals(WorkproofRecordTone.REVIEW, uiModel.recentRecords.first().tone)
+        assertEquals(WorkproofCalendarTone.REVIEW, uiModel.calendarDayTones[27])
     }
 
     private fun remoteContentState(): WorkproofRemoteState {

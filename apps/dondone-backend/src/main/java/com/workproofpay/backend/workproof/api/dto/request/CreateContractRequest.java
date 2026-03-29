@@ -1,6 +1,8 @@
 package com.workproofpay.backend.workproof.api.dto.request;
 
 import com.workproofpay.backend.workproof.model.WorkProofPayUnit;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -25,6 +27,18 @@ public record CreateContractRequest(
         @Positive(message = "monthlyWorkMinutes must be greater than 0")
         Integer monthlyWorkMinutes,
 
+        @Min(value = 1, message = "paydayDay must be between 1 and 31")
+        @Max(value = 31, message = "paydayDay must be between 1 and 31")
+        Integer paydayDay,
+
         LocalDate effectiveFrom
 ) {
+    public CreateContractRequest(Long workplaceId,
+                                 WorkProofPayUnit payUnit,
+                                 BigDecimal basePayAmount,
+                                 Integer dailyWorkMinutes,
+                                 Integer monthlyWorkMinutes,
+                                 LocalDate effectiveFrom) {
+        this(workplaceId, payUnit, basePayAmount, dailyWorkMinutes, monthlyWorkMinutes, null, effectiveFrom);
+    }
 }

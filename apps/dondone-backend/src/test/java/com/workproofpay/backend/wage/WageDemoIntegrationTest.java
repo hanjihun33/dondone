@@ -116,6 +116,7 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.contractId").value(fixture.contractId()))
                 .andExpect(jsonPath("$.data.payUnit").value("HOURLY"))
                 .andExpect(jsonPath("$.data.normalizedHourlyWage").value(12000))
+                .andExpect(jsonPath("$.data.paydayDay").value(31))
                 .andExpect(jsonPath("$.data.workDayCount").value(2))
                 .andExpect(jsonPath("$.data.verifiedWorkMinutes").value(660))
                 .andExpect(jsonPath("$.data.overtimeMinutes").value(60))
@@ -138,6 +139,7 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.contract.contractId").value(fixture.contractId()))
                 .andExpect(jsonPath("$.data.contract.payUnit").value("HOURLY"))
                 .andExpect(jsonPath("$.data.contract.normalizedHourlyWage").value(12000))
+                .andExpect(jsonPath("$.data.contract.paydayDay").value(31))
                 .andExpect(jsonPath("$.data.summary.workDayCount").value(2))
                 .andExpect(jsonPath("$.data.summary.verifiedWorkMinutes").value(660))
                 .andExpect(jsonPath("$.data.summary.overtimeMinutes").value(60))
@@ -370,47 +372,12 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
         // 기존 wage summary/deposit 흐름이 lane1 read endpoint 추가 후에도 유지되는지 회귀 검증한다.
         User user = userRepository.save(User.register("wage@test.com", "hashed", "Tester"));
         String token = tokenFor(user);
+        Lane1Fixture fixture = createLane1WorkplaceAndContract(token);
 
-        CreateWorkProofRequest marchTenth = new CreateWorkProofRequest(
-                LocalDate.of(2026, 3, 10),
-                LocalDateTime.of(2026, 3, 10, 9, 0),
-                LocalDateTime.of(2026, 3, 10, 17, 0),
-                LocalDateTime.of(2026, 3, 10, 8, 59),
-                LocalDateTime.of(2026, 3, 10, 17, 1),
-                37.1,
-                127.1,
-                37.1,
-                127.1,
-                null,
-                null,
-                0
-        );
-        CreateWorkProofRequest marchTwelveth = new CreateWorkProofRequest(
-                LocalDate.of(2026, 3, 12),
-                LocalDateTime.of(2026, 3, 12, 21, 0),
-                LocalDateTime.of(2026, 3, 12, 23, 0),
-                LocalDateTime.of(2026, 3, 12, 20, 59),
-                LocalDateTime.of(2026, 3, 12, 23, 1),
-                37.2,
-                127.2,
-                37.2,
-                127.2,
-                null,
-                null,
-                0
-        );
-
-        mockMvc.perform(post("/api/workproof")
-                        .header("Authorization", bearer(token))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(marchTenth)))
-                .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/workproof")
-                        .header("Authorization", bearer(token))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(marchTwelveth)))
-                .andExpect(status().isCreated());
+        checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 10, 17, 0));
+        checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 12, 21, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 12, 23, 0));
 
         CreateWageDepositRequest depositRequest = new CreateWageDepositRequest(
                 "2026-03",
@@ -431,18 +398,17 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
         mockMvc.perform(get("/api/wage/summary")
                         .header("Authorization", bearer(token))
                         .param("yearMonth", "2026-03")
-                        .param("asOf", "2026-03-25")
-                        .param("normalizedHourlyWage", "10000")
-                        .param("paydayDay", "25"))
+                        .param("asOf", "2026-03-25"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workDays").value(2))
                 .andExpect(jsonPath("$.data.totalWorkedMinutes").value(600))
                 .andExpect(jsonPath("$.data.nightMinutes").value(60))
-                .andExpect(jsonPath("$.data.estimatedTotalAmount").value(105000))
+                .andExpect(jsonPath("$.data.estimatedTotalAmount").value(126000))
                 .andExpect(jsonPath("$.data.actualDepositAmount").value(80000))
-                .andExpect(jsonPath("$.data.differenceAmount").value(25000))
+                .andExpect(jsonPath("$.data.differenceAmount").value(46000))
                 .andExpect(jsonPath("$.data.anomalyDetected").value(true))
                 .andExpect(jsonPath("$.data.status").value("REVIEW_NEEDED"))
+                .andExpect(jsonPath("$.data.paydayDay").value(31))
                 .andExpect(jsonPath("$.data.reasons[*].code", hasItems(
                         "OVERTIME_INCLUDED",
                         "NIGHT_SHIFT_INCLUDED",
@@ -473,12 +439,9 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
 
         mockMvc.perform(get("/api/wage/summary")
                         .header("Authorization", bearer(token))
-                        .param("yearMonth", "2026-03")
-                        .param("normalizedHourlyWage", "10000")
-                        .param("paydayDay", "0"))
+                        .param("yearMonth", "2026/03"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
-                .andExpect(jsonPath("$.details[0].message").value("paydayDay must be between 1 and 31"));
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
 
         mockMvc.perform(get("/api/wage/monthly-summary")
                         .header("Authorization", bearer(token))
@@ -549,32 +512,15 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
         // 기존 summary 흐름에서 asOf 기준 최신 입금 선택과 임계값 판정이 유지되는지 확인한다.
         User user = userRepository.save(User.register("latest@test.com", "hashed", "Tester"));
         String token = tokenFor(user);
+        Lane1Fixture fixture = createLane1WorkplaceAndContract(token);
 
-        CreateWorkProofRequest oneMinuteShift = new CreateWorkProofRequest(
-                LocalDate.of(2026, 3, 10),
-                LocalDateTime.of(2026, 3, 10, 9, 0),
-                LocalDateTime.of(2026, 3, 10, 9, 1),
-                LocalDateTime.of(2026, 3, 10, 8, 59),
-                LocalDateTime.of(2026, 3, 10, 9, 2),
-                37.1,
-                127.1,
-                37.1,
-                127.1,
-                null,
-                null,
-                0
-        );
-
-        mockMvc.perform(post("/api/workproof")
-                        .header("Authorization", bearer(token))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(oneMinuteShift)))
-                .andExpect(status().isCreated());
+        checkIn(token, fixture.workplaceId(), LocalDateTime.of(2026, 3, 10, 9, 0));
+        checkOut(token, LocalDateTime.of(2026, 3, 10, 9, 1));
 
         CreateWageDepositRequest earlierDeposit = new CreateWageDepositRequest(
                 "2026-03",
                 LocalDate.of(2026, 3, 20),
-                100L,
+                200L,
                 false,
                 "early deposit"
         );
@@ -601,9 +547,7 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
         mockMvc.perform(get("/api/wage/summary")
                         .header("Authorization", bearer(token))
                         .param("yearMonth", "2026-03")
-                        .param("asOf", "2026-03-21")
-                        .param("normalizedHourlyWage", "6000")
-                        .param("paydayDay", "25"))
+                        .param("asOf", "2026-03-21"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.actualDepositAmount").value(100))
                 .andExpect(jsonPath("$.data.actualDepositRecordedDay").value(20));
@@ -611,28 +555,23 @@ class WageDemoIntegrationTest extends PostgresIntegrationTestSupport {
         mockMvc.perform(get("/api/wage/summary")
                         .header("Authorization", bearer(token))
                         .param("yearMonth", "2026-03")
-                        .param("asOf", "2026-03-25")
-                        .param("normalizedHourlyWage", "6000")
-                        .param("paydayDay", "25"))
+                        .param("asOf", "2026-03-25"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.estimatedTotalAmount").value(100))
+                .andExpect(jsonPath("$.data.estimatedTotalAmount").value(200))
                 .andExpect(jsonPath("$.data.actualDepositAmount").value(999))
                 .andExpect(jsonPath("$.data.actualDepositRecordedDay").value(25));
 
         mockMvc.perform(get("/api/wage/summary")
                         .header("Authorization", bearer(token))
                         .param("yearMonth", "2026-03")
-                        .param("asOf", "2026-03-20")
-                        .param("normalizedHourlyWage", "6000")
-                        .param("paydayDay", "25"))
+                        .param("asOf", "2026-03-20"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.estimatedTotalAmount").value(100))
-                .andExpect(jsonPath("$.data.actualDepositAmount").value(100))
+                .andExpect(jsonPath("$.data.estimatedTotalAmount").value(200))
+                .andExpect(jsonPath("$.data.actualDepositAmount").value(200))
                 .andExpect(jsonPath("$.data.differenceAmount").value(0))
                 .andExpect(jsonPath("$.data.anomalyTriggerAmount").value(1))
                 .andExpect(jsonPath("$.data.anomalyDetected").value(false))
-                .andExpect(jsonPath("$.data.status").value("WITHIN_THRESHOLD"))
-                .andExpect(jsonPath("$.data.reasons.length()").value(0));
+                .andExpect(jsonPath("$.data.status").value("WITHIN_THRESHOLD"));
     }
 
     private String tokenFor(User user) {

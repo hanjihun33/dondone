@@ -13,6 +13,7 @@ public record CurrentContractResponse(
         Integer dailyWorkMinutes,
         Integer monthlyWorkMinutes,
         BigDecimal normalizedHourlyWage,
+        Integer paydayDay,
         LocalDate effectiveFrom,
         LocalDate effectiveTo,
         boolean isActive

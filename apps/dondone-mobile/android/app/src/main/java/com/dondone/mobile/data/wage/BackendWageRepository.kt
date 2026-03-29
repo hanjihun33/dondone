@@ -29,8 +29,7 @@ class BackendWageRepository(
     override suspend fun load(
         accessToken: String,
         month: YearMonth,
-        asOf: LocalDate,
-        paydayDay: Int
+        asOf: LocalDate
     ): WageRemoteState = withContext(Dispatchers.IO) {
         if (accessToken.isBlank()) {
             return@withContext WageRemoteState.unauthenticated(WAGE_LOGIN_MESSAGE)
@@ -44,9 +43,7 @@ class BackendWageRepository(
             val summary = fetchLegacySummary(
                 accessToken = accessToken,
                 month = month,
-                asOf = asOf,
-                normalizedHourlyWage = monthlySummary.normalizedHourlyWage,
-                paydayDay = paydayDay
+                asOf = asOf
             )
 
             WageRemoteState.content(
@@ -233,18 +230,14 @@ class BackendWageRepository(
     private fun fetchLegacySummary(
         accessToken: String,
         month: YearMonth,
-        asOf: LocalDate,
-        normalizedHourlyWage: Long,
-        paydayDay: Int
+        asOf: LocalDate
     ): WageLegacySummaryPayload {
         val request = authorizedRequestBuilder(
             accessToken = accessToken,
             url =
                 "${BackendApiSupport.baseUrl}/api/wage/summary" +
                     "?yearMonth=$month" +
-                    "&asOf=$asOf" +
-                    "&normalizedHourlyWage=$normalizedHourlyWage" +
-                    "&paydayDay=$paydayDay"
+                    "&asOf=$asOf"
         )
             .get()
             .build()

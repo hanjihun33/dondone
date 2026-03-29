@@ -1,8 +1,11 @@
 package com.workproofpay.backend.documents.service;
 
+import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.documents.model.DocumentGenerationRequest;
 import com.workproofpay.backend.documents.model.DocumentType;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
+import com.workproofpay.backend.employer.model.EmploymentMembershipStatus;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.model.WorkProof;
@@ -15,8 +18,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -27,15 +32,17 @@ public class DefaultWorkproofDocumentService implements WorkproofDocumentService
     private static final String DUPLICATE_REQUEST_CONSTRAINT = "uk_document_generation_requests_user_type_key";
 
     private final DocumentGenerationRequestRepository documentGenerationRequestRepository;
+    private final UserRepository userRepository;
     private final WorkplaceRepository workplaceRepository;
     private final WorkProofRepository workProofRepository;
+    private final EmploymentMembershipRepository employmentMembershipRepository;
 
     @Override
     @Transactional(readOnly = true)
     public WorkproofDocumentPreviewResult preview(Long userId, WorkproofDocumentPreviewQuery query) {
         validateQuery(query);
 
-        Workplace workplace = getOwnedWorkplace(userId, query.workplaceId());
+        Workplace workplace = getAccessibleWorkplace(userId, query.workplaceId());
 
         List<WorkProof> records = workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
                 userId,
@@ -74,9 +81,9 @@ public class DefaultWorkproofDocumentService implements WorkproofDocumentService
             throw new ApiException(ErrorCode.DOCUMENT_DUPLICATE_REQUEST);
         }
 
-        Workplace workplace = getOwnedWorkplace(userId, command.workplaceId());
+        Workplace workplace = getAccessibleWorkplace(userId, command.workplaceId());
         DocumentGenerationRequest requestToSave = DocumentGenerationRequest.queueWorkproofStatement(
-                workplace.getUser(),
+                userRepository.findById(userId).orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND)),
                 command.workplaceId(),
                 command.startDate(),
                 command.endDate(),
@@ -137,9 +144,26 @@ public class DefaultWorkproofDocumentService implements WorkproofDocumentService
         ));
     }
 
-    private Workplace getOwnedWorkplace(Long userId, Long workplaceId) {
-        return workplaceRepository.findByIdAndUserId(workplaceId, userId)
+    private Workplace getAccessibleWorkplace(Long userId, Long workplaceId) {
+        Workplace workplace = workplaceRepository.findById(workplaceId)
                 .orElseThrow(() -> new ApiException(ErrorCode.WORKPLACE_NOT_FOUND));
+        if (Objects.equals(workplace.getUser().getId(), userId) || hasActiveMembership(userId, workplace)) {
+            return workplace;
+        }
+        throw new ApiException(ErrorCode.WORKPLACE_NOT_FOUND);
+    }
+
+    private boolean hasActiveMembership(Long userId, Workplace workplace) {
+        if (workplace.getCompanyId() == null) {
+            return false;
+        }
+        return !employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                userId,
+                workplace.getCompanyId(),
+                workplace.getId(),
+                EmploymentMembershipStatus.ACTIVE,
+                LocalDate.now()
+        ).isEmpty();
     }
 
     private PreviewMetrics summarize(List<WorkProof> records) {

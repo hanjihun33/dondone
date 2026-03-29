@@ -51,6 +51,7 @@ enum class FinanceAdvanceCalendarTone {
     DEFAULT,
     PARTIAL,
     COMPLETE,
+    REVIEW,
     MODIFIED,
     TODAY
 }
@@ -127,6 +128,9 @@ data class FinanceAdvanceDetailUiModel(
     val secondaryActionText: String?,
     val requestFeedbackText: String?,
     val requestFeedbackIsError: Boolean,
+    val selectedAmountValue: Int,
+    val maxRequestableAmount: Int,
+    val requestAssetSymbol: String,
     val amountOptions: List<FinanceAmountOptionUiModel>,
     val historyItems: List<FinanceAdvanceHistoryUiModel>,
     val calendarDays: List<FinanceAdvanceCalendarDayUiModel>
@@ -523,16 +527,6 @@ fun DemoState.toFinanceHomeUiModel(
     } else {
         selectedAdvanceAmount ?: advanceSnapshot.requestAmount
     }
-    val advanceAmountOptions = buildAmountOptions(
-        available = if (usesRemoteAdvance) remoteAvailableAmount.toInt() else advanceSnapshot.available,
-        selected = effectiveSelectedAdvanceAmount,
-        presets = if (usesRemoteAdvance) listOf(10, 25, 50, 100) else listOf(50_000, 100_000, 150_000, 200_000),
-        labelFormatter = if (usesRemoteAdvance) {
-            { amount -> "$amount $remoteAssetSymbol" }
-        } else {
-            ::formatKrw
-        }
-    )
     val selectedRequestText = if (usesRemoteAdvance && advanceContractState.canRequest) {
         formatWholeAdvanceUnits(
             amount = effectiveSelectedAdvanceAmount,
@@ -818,15 +812,21 @@ fun DemoState.toFinanceHomeUiModel(
                 secondaryActionText = advanceContractState.secondaryActionText,
                 requestFeedbackText = advanceRequestUiState.message,
                 requestFeedbackIsError = advanceRequestUiState.isError,
+                selectedAmountValue = effectiveSelectedAdvanceAmount,
+                maxRequestableAmount = if (usesRemoteAdvance) remoteAvailableAmount.toInt() else advanceSnapshot.available,
+                requestAssetSymbol = if (usesRemoteAdvance) remoteAssetSymbol else "원",
                 amountOptions = if (canRequestAdditional && usesRemoteAdvance) {
-                    buildAmountOptions(
+                    buildQuickAmountOptions(
                         available = remoteAvailableAmount.toInt(),
                         selected = effectiveSelectedAdvanceAmount,
-                        presets = listOf(10, 25, 50, 100),
                         labelFormatter = { amount -> "$amount $remoteAssetSymbol" }
                     )
                 } else if (canRequestAdditional) {
-                    advanceAmountOptions
+                    buildQuickAmountOptions(
+                        available = advanceSnapshot.available,
+                        selected = effectiveSelectedAdvanceAmount,
+                        labelFormatter = ::formatKrw
+                    )
                 } else {
                     emptyList()
                 },
@@ -837,7 +837,8 @@ fun DemoState.toFinanceHomeUiModel(
                         val tone = when {
                             today.year == demo.year && today.monthValue == demo.month && day == today.dayOfMonth ->
                                 FinanceAdvanceCalendarTone.TODAY
-                            record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.MODIFIED
+                            record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.REVIEW
+                            record?.modified == true -> FinanceAdvanceCalendarTone.MODIFIED
                             record?.reflectionStatus == "REFLECTED" -> FinanceAdvanceCalendarTone.COMPLETE
                             record != null -> FinanceAdvanceCalendarTone.PARTIAL
                             else -> FinanceAdvanceCalendarTone.DEFAULT
@@ -849,6 +850,7 @@ fun DemoState.toFinanceHomeUiModel(
                         val record = recordedDays[day]
                         val tone = when {
                             day == demo.asOfDay -> FinanceAdvanceCalendarTone.TODAY
+                            record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.REVIEW
                             record?.modified == true -> FinanceAdvanceCalendarTone.MODIFIED
                             record != null && record.outTime != "-" -> FinanceAdvanceCalendarTone.COMPLETE
                             record != null -> FinanceAdvanceCalendarTone.PARTIAL
@@ -1086,6 +1088,34 @@ private fun nextAdvanceProgressTargetDays(attendanceDays: Int): Int = when {
     else -> 20
 }
 
+private fun buildQuickAmountOptions(
+    available: Int,
+    selected: Int,
+    labelFormatter: (Int) -> String = ::formatKrw
+): List<FinanceAmountOptionUiModel> {
+    if (available <= 0) return emptyList()
+
+    val rawOptions = linkedSetOf<Int>()
+    if (selected in 1..available) {
+        rawOptions += selected
+    }
+    buildAdaptiveQuickPresets(available).forEach { amount ->
+        if (amount in 1..available) rawOptions += amount
+    }
+    rawOptions += available
+
+    return rawOptions
+        .sorted()
+        .takeLast(4)
+        .map { amount ->
+            FinanceAmountOptionUiModel(
+                amount = amount,
+                label = labelFormatter(amount),
+                selected = amount == selected
+            )
+        }
+}
+
 private fun buildAmountOptions(
     available: Int,
     selected: Int,
@@ -1115,6 +1145,34 @@ private fun buildAmountOptions(
                 selected = amount == selected
             )
         }
+}
+
+private fun buildAdaptiveQuickPresets(available: Int): List<Int> {
+    if (available <= 0) return emptyList()
+    val step = when {
+        available <= 10 -> 1
+        available <= 30 -> 5
+        available <= 100 -> 10
+        available <= 300 -> 25
+        else -> 50
+    }
+    val quarter = snapQuickAmount((available * 0.25f).toInt(), step, available)
+    val half = snapQuickAmount((available * 0.5f).toInt(), step, available)
+    val threeQuarter = snapQuickAmount((available * 0.75f).toInt(), step, available)
+    return linkedSetOf(quarter, half, threeQuarter, available).filter { it in 1..available }
+}
+
+private fun snapQuickAmount(
+    rawAmount: Int,
+    step: Int,
+    available: Int
+): Int {
+    val bounded = rawAmount.coerceIn(1, available)
+    if (step <= 1) {
+        return bounded
+    }
+    val snapped = (bounded / step) * step
+    return snapped.coerceAtLeast(step).coerceAtMost(available)
 }
 
 private fun pickClosestAmountOption(

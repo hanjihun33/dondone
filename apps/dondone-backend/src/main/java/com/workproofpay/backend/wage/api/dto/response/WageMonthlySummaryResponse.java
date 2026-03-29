@@ -24,6 +24,8 @@ public record WageMonthlySummaryResponse(
         WorkProofPayUnit payUnit,
         @Schema(description = "Normalized hourly wage used as the estimate basis", example = "12000")
         BigDecimal normalizedHourlyWage,
+        @Schema(description = "Configured payday day from the current contract", example = "31")
+        Integer paydayDay,
         @Schema(description = "Number of worked days included in the month summary", example = "20")
         int workDayCount,
         @Schema(description = "Total reflected worked minutes surfaced via the upstream monthly summary", example = "9600")
@@ -49,6 +51,7 @@ public record WageMonthlySummaryResponse(
                 contract.contractId(),
                 contract.payUnit(),
                 contract.normalizedHourlyWage(),
+                contract.paydayDay(),
                 summary.workDayCount(),
                 summary.integrity().verifiedMinutes(),
                 summary.overtimeMinutes(),

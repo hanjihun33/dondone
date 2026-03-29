@@ -4,6 +4,8 @@ import com.workproofpay.backend.auth.model.User;
 import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.documents.model.DocumentGenerationRequest;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
+import com.workproofpay.backend.employer.model.EmploymentMembership;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.support.PostgresIntegrationTestSupport;
 import com.workproofpay.backend.workproof.model.WorkContract;
 import com.workproofpay.backend.workproof.model.WorkProof;
@@ -51,12 +53,16 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private EmploymentMembershipRepository employmentMembershipRepository;
+
     @BeforeEach
     void setUp() {
         documentGenerationRequestRepository.deleteAll();
         workProofAuditLogRepository.deleteAll();
         workProofRepository.deleteAll();
         workContractRepository.deleteAll();
+        employmentMembershipRepository.deleteAll();
         workplaceRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -338,5 +344,78 @@ class WorkProofPdfSnapshotAssemblerIntegrationTest extends PostgresIntegrationTe
 
         assertThat(snapshot.workplace().address()).isEqualTo("Seoul Somewhere 1");
         assertThat(snapshot.workplace().name()).isEqualTo("Proof Pack Cafe");
+    }
+
+    @Test
+    void assemblesSnapshotForMembershipAccessibleWorkplace() {
+        User employer = userRepository.saveAndFlush(User.registerEmployer("pdf-owner@test.com", "hashed", "Owner"));
+        User worker = userRepository.saveAndFlush(User.register("pdf-worker@test.com", "hashed", "Worker", "010-5555-6666"));
+        Workplace workplace = workplaceRepository.saveAndFlush(Workplace.create(
+                employer,
+                10L,
+                "Membership Cafe",
+                "Seoul Somewhere 3",
+                "Front door",
+                37.5,
+                127.0,
+                150
+        ));
+        employmentMembershipRepository.saveAndFlush(
+                EmploymentMembership.create(worker.getId(), 10L, workplace.getId(), LocalDate.of(2026, 3, 1))
+        );
+        WorkContract contract = workContractRepository.saveAndFlush(WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(12_000),
+                480,
+                10_560,
+                BigDecimal.valueOf(12_000),
+                LocalDate.of(2026, 3, 1)
+        ));
+
+        WorkProof record = WorkProof.checkIn(
+                worker,
+                workplace,
+                contract,
+                LocalDateTime.of(2026, 3, 12, 9, 0),
+                LocalDateTime.of(2026, 3, 12, 9, 1),
+                37.5,
+                127.0,
+                "Front door"
+        );
+        record.completeCheckOut(
+                LocalDateTime.of(2026, 3, 12, 18, 0),
+                LocalDateTime.of(2026, 3, 12, 18, 1),
+                37.5,
+                127.0,
+                "Front door",
+                false
+        );
+        workProofRepository.saveAndFlush(record);
+
+        DocumentGenerationRequest request = documentGenerationRequestRepository.saveAndFlush(
+                DocumentGenerationRequest.queueWorkproofStatement(
+                        worker,
+                        workplace.getId(),
+                        LocalDate.of(2026, 3, 1),
+                        LocalDate.of(2026, 3, 31),
+                        "membership-statement-key"
+                )
+        );
+
+        WorkProofPdfSnapshot snapshot = assembler.assemble(new WorkProofPdfAssembleCommand(
+                worker.getId(),
+                request.getId(),
+                request.getRequestId(),
+                workplace.getId(),
+                request.getStartDate(),
+                request.getEndDate(),
+                ZoneId.of("Asia/Seoul"),
+                Locale.KOREA
+        ));
+
+        assertThat(snapshot.worker().name()).isEqualTo("Worker");
+        assertThat(snapshot.workplace().name()).isEqualTo("Membership Cafe");
+        assertThat(snapshot.records()).hasSize(1);
     }
 }
