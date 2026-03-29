@@ -112,6 +112,7 @@ private val FinanceWeekdays = listOf("일", "월", "화", "수", "목", "금", "
 fun FinanceHomeScreen(
     uiModel: FinanceHomeUiModel,
     onRefreshAdvance: () -> Unit,
+    onRefreshVault: () -> Unit,
     onSelectAdvanceAmount: (Int) -> Unit,
     onRequestAdvance: () -> Unit,
     onClearAdvanceMessage: () -> Unit,
@@ -140,10 +141,11 @@ fun FinanceHomeScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, onRefreshAdvance) {
+    DisposableEffect(lifecycleOwner, onRefreshAdvance, onRefreshVault) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 onRefreshAdvance()
+                onRefreshVault()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
