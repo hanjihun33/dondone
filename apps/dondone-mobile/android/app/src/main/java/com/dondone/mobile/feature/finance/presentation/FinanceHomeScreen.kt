@@ -35,6 +35,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -107,6 +111,7 @@ private val FinanceWeekdays = listOf("일", "월", "화", "수", "목", "금", "
 @Composable
 fun FinanceHomeScreen(
     uiModel: FinanceHomeUiModel,
+    onRefreshAdvance: () -> Unit,
     onSelectAdvanceAmount: (Int) -> Unit,
     onRequestAdvance: () -> Unit,
     onClearAdvanceMessage: () -> Unit,
@@ -119,6 +124,7 @@ fun FinanceHomeScreen(
     onOpenWorkproof: () -> Unit,
     onOpenWorkerRegistrationCode: () -> Unit
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
     val advanceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val advanceRequestDetailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val vaultSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -131,6 +137,18 @@ fun FinanceHomeScreen(
     LaunchedEffect(uiModel.vault.shouldDismissDetailSheet) {
         if (uiModel.vault.shouldDismissDetailSheet) {
             showVaultSheet = false
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, onRefreshAdvance) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                onRefreshAdvance()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

@@ -213,6 +213,7 @@ fun DonDoneNavGraph(
                     advanceRequestDetailUiState = advanceRequestDetailUiState,
                     vaultActionUiState = vaultActionUiState
                 ),
+                onRefreshAdvance = viewModel::refreshAdvanceRemoteState,
                 onSelectAdvanceAmount = viewModel::selectAdvanceAmount,
                 onRequestAdvance = viewModel::requestAdvance,
                 onClearAdvanceMessage = viewModel::clearAdvanceRequestMessage,
