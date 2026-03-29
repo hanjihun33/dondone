@@ -1,6 +1,6 @@
 DO $$
 DECLARE
-    v_user_email TEXT := 'david003@gmail.com';
+    v_user_email TEXT := 'david001@gmail.com';
     v_user_id BIGINT;
 
     v_workplace_id BIGINT;
@@ -18,7 +18,7 @@ BEGIN
      LIMIT 1;
 
     IF v_user_id IS NULL THEN
-        RAISE NOTICE 'Skipping david work proof seed: user not found for email=%', v_user_email;
+        RAISE NOTICE 'Skipping david work proof reset seed: user not found for email=%', v_user_email;
         RETURN;
     END IF;
 
@@ -32,7 +32,7 @@ BEGIN
      LIMIT 1;
 
     IF v_workplace_id IS NULL THEN
-        RAISE NOTICE 'Skipping david work proof seed: active employment membership not found for user_id=%', v_user_id;
+        RAISE NOTICE 'Skipping david work proof reset seed: active employment membership not found for user_id=%', v_user_id;
         RETURN;
     END IF;
 
@@ -45,7 +45,7 @@ BEGIN
      LIMIT 1;
 
     IF v_contract_id IS NULL THEN
-        RAISE NOTICE 'Skipping david work proof seed: active work contract not found for workplace_id=%', v_workplace_id;
+        RAISE NOTICE 'Skipping david work proof reset seed: active work contract not found for workplace_id=%', v_workplace_id;
         RETURN;
     END IF;
 
@@ -61,6 +61,10 @@ BEGIN
            v_workplace_longitude
       FROM workplaces w
      WHERE w.id = v_workplace_id;
+
+    DELETE FROM work_proofs
+     WHERE user_id = v_user_id
+       AND work_date BETWEEN DATE '2026-02-01' AND DATE '2026-03-31';
 
     INSERT INTO work_proofs (
         user_id,
@@ -173,13 +177,7 @@ BEGIN
             (DATE '2026-03-24', TIMESTAMP '2026-03-24 09:00:00', TIMESTAMP '2026-03-24 17:00:00', 'david 2026-03~04 cycle reflected work proof', NULL, 0),
             (DATE '2026-03-25', TIMESTAMP '2026-03-25 09:00:00', TIMESTAMP '2026-03-25 17:00:00', 'david 2026-03~04 cycle reflected work proof', NULL, 0),
             (DATE '2026-03-26', TIMESTAMP '2026-03-26 09:00:00', TIMESTAMP '2026-03-26 17:00:00', 'david 2026-03~04 cycle reflected work proof', NULL, 0)
-    ) AS item(work_date, clock_in_at, clock_out_at, memo, edit_reason, attachment_count)
-    WHERE NOT EXISTS (
-        SELECT 1
-          FROM work_proofs wp
-         WHERE wp.user_id = v_user_id
-           AND wp.work_date = item.work_date
-    );
+    ) AS item(work_date, clock_in_at, clock_out_at, memo, edit_reason, attachment_count);
 
-    RAISE NOTICE 'Inserted david reflected work proofs for cycles 2026-02~03 (22 days) and 2026-03~04 (19 days before 2026-03-29).';
+    RAISE NOTICE 'Reset and inserted david reflected work proofs for cycles 2026-02~03 (22 days) and 2026-03~04 (19 days before 2026-03-29).';
 END $$;
