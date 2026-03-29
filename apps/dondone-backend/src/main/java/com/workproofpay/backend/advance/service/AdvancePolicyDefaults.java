@@ -10,12 +10,12 @@ public final class AdvancePolicyDefaults {
 
     public static final int DEFAULT_PAYDAY_DAY = 31;
     public static final boolean SAME_DAY_ADVANCE_ALLOWED = false;
-    public static final int REDUCED_CAP_DAYS_BEFORE_PAYDAY = 7;
+    public static final int REDUCED_CAP_DAYS_BEFORE_PAYDAY = 0;
     public static final String ASSET_SYMBOL = "dUSDC";
     public static final int ASSET_DECIMALS = 6;
     public static final BigDecimal REFERENCE_KRW_PER_ASSET = BigDecimal.valueOf(1_450L);
     public static final long MAX_CAP_DISPLAY_KRW_AMOUNT = 300_000L;
-    public static final long NEAR_PAYDAY_MAX_CAP_DISPLAY_KRW_AMOUNT = 50_000L;
+    public static final long NEAR_PAYDAY_MAX_CAP_DISPLAY_KRW_AMOUNT = MAX_CAP_DISPLAY_KRW_AMOUNT;
     public static final long FLAT_FEE_DISPLAY_KRW_AMOUNT = 5_000L;
     public static final String DISCLAIMER = "미리받기 금액은 반영된 근무 기록 기준의 데모 시뮬레이션입니다. 실제 금융 서비스 제공을 의미하지 않습니다.";
 

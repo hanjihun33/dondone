@@ -1,10 +1,14 @@
 package com.workproofpay.backend.documents.service;
 
 import com.workproofpay.backend.auth.model.User;
+import com.workproofpay.backend.auth.repo.UserRepository;
 import com.workproofpay.backend.documents.model.DocumentGenerationRequest;
 import com.workproofpay.backend.documents.model.DocumentGenerationStatus;
 import com.workproofpay.backend.documents.model.DocumentType;
 import com.workproofpay.backend.documents.repo.DocumentGenerationRequestRepository;
+import com.workproofpay.backend.employer.model.EmploymentMembership;
+import com.workproofpay.backend.employer.model.EmploymentMembershipStatus;
+import com.workproofpay.backend.employer.repo.EmploymentMembershipRepository;
 import com.workproofpay.backend.shared.exception.ApiException;
 import com.workproofpay.backend.shared.exception.ErrorCode;
 import com.workproofpay.backend.workproof.model.WorkContract;
@@ -37,10 +41,16 @@ class DefaultWorkproofDocumentServiceTest {
     private DocumentGenerationRequestRepository documentGenerationRequestRepository;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private WorkplaceRepository workplaceRepository;
 
     @Mock
     private WorkProofRepository workProofRepository;
+
+    @Mock
+    private EmploymentMembershipRepository employmentMembershipRepository;
 
     private DefaultWorkproofDocumentService service;
 
@@ -48,15 +58,19 @@ class DefaultWorkproofDocumentServiceTest {
     void setUp() {
         service = new DefaultWorkproofDocumentService(
                 documentGenerationRequestRepository,
+                userRepository,
                 workplaceRepository,
-                workProofRepository
+                workProofRepository,
+                employmentMembershipRepository
         );
     }
 
     @Test
     void previewSummarizesPeriodRecords() {
         User user = User.register("preview@test.com", "hashed", "Preview User");
+        setField(user, User.class, "id", 1L);
         Workplace workplace = Workplace.create(user, "Preview Cafe", "Seoul", "Gate", 37.5, 127.0, 150);
+        setField(workplace, Workplace.class, "id", 2L);
         WorkContract contract = WorkContract.activate(
                 workplace,
                 WorkProofPayUnit.HOURLY,
@@ -116,7 +130,7 @@ class DefaultWorkproofDocumentServiceTest {
                 true
         );
 
-        when(workplaceRepository.findByIdAndUserId(2L, 1L)).thenReturn(Optional.of(workplace));
+        when(workplaceRepository.findById(2L)).thenReturn(Optional.of(workplace));
         when(workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
                 1L,
                 2L,
@@ -147,9 +161,12 @@ class DefaultWorkproofDocumentServiceTest {
     @Test
     void createQueuesWorkproofStatementRequest() {
         User user = User.register("create@test.com", "hashed", "Create User");
+        setField(user, User.class, "id", 1L);
         Workplace workplace = Workplace.create(user, "Create Cafe", "Seoul", "Gate", 37.5, 127.0, 150);
+        setField(workplace, Workplace.class, "id", 2L);
 
-        when(workplaceRepository.findByIdAndUserId(2L, 1L)).thenReturn(Optional.of(workplace));
+        when(workplaceRepository.findById(2L)).thenReturn(Optional.of(workplace));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(documentGenerationRequestRepository.existsByUserIdAndDocumentTypeAndIdempotencyKey(
                 1L,
                 DocumentType.WORKPROOF_STATEMENT,
@@ -179,6 +196,116 @@ class DefaultWorkproofDocumentServiceTest {
     }
 
     @Test
+    void createQueuesWorkproofStatementForWorkerEvenWhenWorkplaceOwnedByEmployer() {
+        User employer = User.registerEmployer("boss@test.com", "hashed", "Boss");
+        setField(employer, User.class, "id", 9L);
+        User worker = User.register("worker@test.com", "hashed", "Worker");
+        setField(worker, User.class, "id", 1L);
+        Workplace workplace = Workplace.create(employer, 10L, "Member Cafe", "Seoul", "Gate", 37.5, 127.0, 150);
+        setField(workplace, Workplace.class, "id", 2L);
+
+        when(workplaceRepository.findById(2L)).thenReturn(Optional.of(workplace));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(worker));
+        when(employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                1L,
+                10L,
+                2L,
+                EmploymentMembershipStatus.ACTIVE,
+                LocalDate.now()
+        )).thenReturn(List.of(EmploymentMembership.create(1L, 10L, 2L, LocalDate.now().minusDays(10))));
+        when(documentGenerationRequestRepository.existsByUserIdAndDocumentTypeAndIdempotencyKey(
+                1L,
+                DocumentType.WORKPROOF_STATEMENT,
+                "workproof-2"
+        )).thenReturn(false);
+        when(documentGenerationRequestRepository.saveAndFlush(any(DocumentGenerationRequest.class)))
+                .thenAnswer(invocation -> {
+                    DocumentGenerationRequest saved = invocation.getArgument(0);
+                    setId(saved, 43L);
+                    return saved;
+                });
+
+        WorkproofDocumentAcceptedResult result = service.create(
+                1L,
+                new CreateWorkproofDocumentCommand(
+                        DocumentType.WORKPROOF_STATEMENT,
+                        2L,
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 1, 31),
+                        "workproof-2"
+                )
+        );
+
+        assertEquals(DocumentType.WORKPROOF_STATEMENT, result.documentType());
+        assertEquals(DocumentGenerationStatus.QUEUED, result.status());
+        assertEquals("/api/documents/43/download", result.documentUrl());
+    }
+
+    @Test
+    void previewAllowsMembershipAccessibleWorkplace() {
+        User employer = User.registerEmployer("boss@test.com", "hashed", "Boss");
+        setField(employer, User.class, "id", 9L);
+        User worker = User.register("worker@test.com", "hashed", "Worker");
+        setField(worker, User.class, "id", 1L);
+        Workplace workplace = Workplace.create(employer, 10L, "Member Cafe", "Seoul", "Gate", 37.5, 127.0, 150);
+        setField(workplace, Workplace.class, "id", 2L);
+        WorkContract contract = WorkContract.activate(
+                workplace,
+                WorkProofPayUnit.HOURLY,
+                BigDecimal.valueOf(12_000),
+                480,
+                10_560,
+                BigDecimal.valueOf(12_000),
+                LocalDate.of(2026, 1, 1)
+        );
+        WorkProof reflected = WorkProof.checkIn(
+                worker,
+                workplace,
+                contract,
+                LocalDateTime.of(2026, 1, 10, 9, 0),
+                LocalDateTime.of(2026, 1, 10, 9, 0),
+                37.5,
+                127.0,
+                "Gate"
+        );
+        reflected.completeCheckOut(
+                LocalDateTime.of(2026, 1, 10, 18, 0),
+                LocalDateTime.of(2026, 1, 10, 18, 0),
+                37.5,
+                127.0,
+                "Gate",
+                false
+        );
+
+        when(workplaceRepository.findById(2L)).thenReturn(Optional.of(workplace));
+        when(employmentMembershipRepository.findActiveWorkerMembershipByScope(
+                1L,
+                10L,
+                2L,
+                EmploymentMembershipStatus.ACTIVE,
+                LocalDate.now()
+        )).thenReturn(List.of(EmploymentMembership.create(1L, 10L, 2L, LocalDate.now().minusDays(10))));
+        when(workProofRepository.findByUserIdAndWorkplaceIdAndWorkDateBetweenOrderByWorkDateDescClockInAtDesc(
+                1L,
+                2L,
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 1, 31)
+        )).thenReturn(List.of(reflected));
+
+        WorkproofDocumentPreviewResult result = service.preview(
+                1L,
+                new WorkproofDocumentPreviewQuery(
+                        2L,
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 1, 31)
+                )
+        );
+
+        assertEquals("Member Cafe", result.workplaceName());
+        assertEquals(1, result.totalRecordCount());
+    }
+
+    @Test
     void rejectsInvalidPreviewDateRange() {
         ApiException exception = assertThrows(ApiException.class, () -> service.preview(
                 1L,
@@ -199,6 +326,16 @@ class DefaultWorkproofDocumentServiceTest {
             field.set(request, id);
         } catch (ReflectiveOperationException e) {
             throw new AssertionError("Failed to set document request id for test", e);
+        }
+    }
+
+    private void setField(Object target, Class<?> type, String fieldName, Object value) {
+        try {
+            var field = type.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to set %s on %s for test".formatted(fieldName, type.getSimpleName()), e);
         }
     }
 }
