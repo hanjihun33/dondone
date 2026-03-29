@@ -51,6 +51,7 @@ enum class FinanceAdvanceCalendarTone {
     DEFAULT,
     PARTIAL,
     COMPLETE,
+    REVIEW,
     MODIFIED,
     TODAY
 }
@@ -836,7 +837,8 @@ fun DemoState.toFinanceHomeUiModel(
                         val tone = when {
                             today.year == demo.year && today.monthValue == demo.month && day == today.dayOfMonth ->
                                 FinanceAdvanceCalendarTone.TODAY
-                            record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.MODIFIED
+                            record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.REVIEW
+                            record?.modified == true -> FinanceAdvanceCalendarTone.MODIFIED
                             record?.reflectionStatus == "REFLECTED" -> FinanceAdvanceCalendarTone.COMPLETE
                             record != null -> FinanceAdvanceCalendarTone.PARTIAL
                             else -> FinanceAdvanceCalendarTone.DEFAULT
@@ -848,6 +850,7 @@ fun DemoState.toFinanceHomeUiModel(
                         val record = recordedDays[day]
                         val tone = when {
                             day == demo.asOfDay -> FinanceAdvanceCalendarTone.TODAY
+                            record?.reflectionStatus == "NEEDS_REVIEW" -> FinanceAdvanceCalendarTone.REVIEW
                             record?.modified == true -> FinanceAdvanceCalendarTone.MODIFIED
                             record != null && record.outTime != "-" -> FinanceAdvanceCalendarTone.COMPLETE
                             record != null -> FinanceAdvanceCalendarTone.PARTIAL

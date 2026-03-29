@@ -218,6 +218,7 @@ private fun WorkproofCalendarCard(
             WorkproofLegendItem(label = "미기록", tone = WorkproofCalendarTone.MISSING)
             WorkproofLegendItem(label = "출근만", tone = WorkproofCalendarTone.PARTIAL)
             WorkproofLegendItem(label = "완료", tone = WorkproofCalendarTone.COMPLETE)
+            WorkproofLegendItem(label = "확인 필요", tone = WorkproofCalendarTone.REVIEW)
             WorkproofLegendItem(label = "수정", tone = WorkproofCalendarTone.MODIFIED)
         }
     }
@@ -858,6 +859,7 @@ private fun WorkproofCalendarCell(
         WorkproofCalendarTone.MISSING -> WorkproofMissingBackground
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBackground
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBackground
+        WorkproofCalendarTone.REVIEW -> WorkproofReviewBackground
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBackground
     }
     val border = when (uiModel.tone) {
@@ -866,6 +868,7 @@ private fun WorkproofCalendarCell(
         WorkproofCalendarTone.MISSING -> WorkproofMissingBorder
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBorder
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBorder
+        WorkproofCalendarTone.REVIEW -> WorkproofReviewBorder
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBorder
     }
     val textColor = when (uiModel.tone) {
@@ -874,6 +877,7 @@ private fun WorkproofCalendarCell(
         WorkproofCalendarTone.MISSING -> WorkproofMissingText
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialText
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteText
+        WorkproofCalendarTone.REVIEW -> WorkproofReviewText
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedText
     }
 
@@ -922,6 +926,7 @@ private fun WorkproofLegendItem(
         WorkproofCalendarTone.MISSING -> WorkproofMissingBackground
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBackground
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBackground
+        WorkproofCalendarTone.REVIEW -> WorkproofReviewBackground
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBackground
     }
     val border = when (tone) {
@@ -929,6 +934,7 @@ private fun WorkproofLegendItem(
         WorkproofCalendarTone.MISSING -> WorkproofGhostBorder
         WorkproofCalendarTone.PARTIAL -> WorkproofPartialBorder
         WorkproofCalendarTone.COMPLETE -> WorkproofCompleteBorder
+        WorkproofCalendarTone.REVIEW -> WorkproofReviewBorder
         WorkproofCalendarTone.MODIFIED -> WorkproofModifiedBorder
     }
 
@@ -957,6 +963,7 @@ private fun WorkproofLegendItem(
 
 internal fun isRecordedCalendarTone(tone: WorkproofCalendarTone?): Boolean {
     return tone == WorkproofCalendarTone.PARTIAL ||
+        tone == WorkproofCalendarTone.REVIEW ||
         tone == WorkproofCalendarTone.COMPLETE ||
         tone == WorkproofCalendarTone.MODIFIED
 }

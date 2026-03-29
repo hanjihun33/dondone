@@ -91,9 +91,12 @@ private val FinancePartialText = Color(0xFF6F42D9)
 private val FinanceReflectedBackground = Color(0xFFE9DEFF)
 private val FinanceReflectedBorder = Color(0xFFB89BFF)
 private val FinanceReflectedText = Color(0xFF5E3CC5)
-private val FinanceReviewBackground = Color(0xFFF7E4F4)
-private val FinanceReviewBorder = Color(0xFFD98FD0)
-private val FinanceReviewText = Color(0xFFAA3E96)
+private val FinanceReviewBackground = Color(0xFFFFF4DD)
+private val FinanceReviewBorder = Color(0xFFE7BC62)
+private val FinanceReviewText = Color(0xFFB7791F)
+private val FinanceModifiedBackground = Color(0xFFF7E4F4)
+private val FinanceModifiedBorder = Color(0xFFD98FD0)
+private val FinanceModifiedText = Color(0xFFAA3E96)
 private val FinanceTodayBackground = Color(0xFFF2F3FF)
 private val FinanceTodayBorder = Color(0xFFDDE4FF)
 private val FinanceCalendarDefaultBorder = Color(0xFFF4F6F8)
@@ -814,7 +817,8 @@ private fun FinanceAdvanceBottomSheet(
                         FinanceCalendarLegendItem(label = language.text("not_recorded"), background = Color.White, border = FinanceCalendarDefaultBorder)
                         FinanceCalendarLegendItem(label = language.text("clock_in_only"), background = FinancePartialBackground, border = FinancePartialBorder)
                         FinanceCalendarLegendItem(label = language.text("completed"), background = FinanceReflectedBackground, border = FinanceReflectedBorder)
-                        FinanceCalendarLegendItem(label = language.text("edited"), background = FinanceReviewBackground, border = FinanceReviewBorder)
+                        FinanceCalendarLegendItem(label = language.text("needs_review"), background = FinanceReviewBackground, border = FinanceReviewBorder)
+                        FinanceCalendarLegendItem(label = language.text("edited"), background = FinanceModifiedBackground, border = FinanceModifiedBorder)
                     }
                 }
             }
@@ -1749,27 +1753,31 @@ private fun FinanceAdvanceCalendarGrid(days: List<FinanceAdvanceCalendarDayUiMod
                     val backgroundColor = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialBackground
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBackground
-                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBackground
+                        FinanceAdvanceCalendarTone.REVIEW -> FinanceReviewBackground
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceModifiedBackground
                         FinanceAdvanceCalendarTone.TODAY -> FinanceTodayBackground
                         FinanceAdvanceCalendarTone.DEFAULT -> Color.Transparent
                     }
                     val borderColor = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialBorder
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedBorder
-                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewBorder
+                        FinanceAdvanceCalendarTone.REVIEW -> FinanceReviewBorder
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceModifiedBorder
                         FinanceAdvanceCalendarTone.TODAY -> FinanceTodayBorder
                         FinanceAdvanceCalendarTone.DEFAULT -> Color.Transparent
                     }
                     val textColor = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL -> FinancePartialText
                         FinanceAdvanceCalendarTone.COMPLETE -> FinanceReflectedText
-                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceReviewText
+                        FinanceAdvanceCalendarTone.REVIEW -> FinanceReviewText
+                        FinanceAdvanceCalendarTone.MODIFIED -> FinanceModifiedText
                         FinanceAdvanceCalendarTone.TODAY -> DawnPrimary
                         FinanceAdvanceCalendarTone.DEFAULT -> if (day.day > today.dayOfMonth) FinanceCalendarInactiveText else FinanceAdvanceSheetDefaultText
                     }
                     val shape = when (day.tone) {
                         FinanceAdvanceCalendarTone.PARTIAL,
                         FinanceAdvanceCalendarTone.COMPLETE,
+                        FinanceAdvanceCalendarTone.REVIEW,
                         FinanceAdvanceCalendarTone.MODIFIED,
                         FinanceAdvanceCalendarTone.TODAY -> CircleShape
                         FinanceAdvanceCalendarTone.DEFAULT -> RoundedCornerShape(999.dp)
