@@ -45,6 +45,7 @@ public class DefaultWorkContractProvisioner implements WorkContractProvisioner {
                             dailyWorkMinutes,
                             monthlyWorkMinutes,
                             normalizedHourlyWage,
+                            properties.getPaydayDay(),
                             effectiveFrom.plusDays(properties.getEffectiveFromOffsetDays())
                     ));
                 });

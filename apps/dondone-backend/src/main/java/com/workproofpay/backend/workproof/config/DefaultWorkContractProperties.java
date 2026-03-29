@@ -13,6 +13,7 @@ public class DefaultWorkContractProperties {
     private BigDecimal basePayAmount = BigDecimal.valueOf(12_000);
     private Integer dailyWorkMinutes = 480;
     private Integer monthlyWorkMinutes = 12_540;
+    private Integer paydayDay = 31;
     private int effectiveFromOffsetDays = 0;
 
     public boolean isEnabled() {
@@ -53,6 +54,14 @@ public class DefaultWorkContractProperties {
 
     public void setMonthlyWorkMinutes(Integer monthlyWorkMinutes) {
         this.monthlyWorkMinutes = monthlyWorkMinutes;
+    }
+
+    public Integer getPaydayDay() {
+        return paydayDay;
+    }
+
+    public void setPaydayDay(Integer paydayDay) {
+        this.paydayDay = paydayDay;
     }
 
     public int getEffectiveFromOffsetDays() {

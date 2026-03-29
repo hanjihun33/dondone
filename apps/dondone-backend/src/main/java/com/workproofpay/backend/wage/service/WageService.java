@@ -104,6 +104,22 @@ public class WageService {
     @Transactional(readOnly = true)
     public WageSummaryResponse getSummary(Long userId,
                                           String yearMonth,
+                                          LocalDate asOf) {
+        CurrentContractResponse contract = workProofLane1Service.getPrimaryCurrentContract(userId);
+        WorkProofMonthlyMetrics metrics = workProofService.getMonthlyMetrics(userId, yearMonth, asOf);
+        WageDeposit latestDeposit = findLatestDeposit(userId, metrics.yearMonth(), metrics.asOf());
+        WageSummaryCalculator.WageSummarySnapshot snapshot =
+                wageSummaryCalculator.summarize(
+                        metrics,
+                        contract.normalizedHourlyWage().longValue(),
+                        latestDeposit
+                );
+        return WageSummaryResponse.from(metrics, snapshot, contract.paydayDay(), REFERENCE_ONLY_DISCLAIMER);
+    }
+
+    @Transactional(readOnly = true)
+    public WageSummaryResponse getSummary(Long userId,
+                                          String yearMonth,
                                           LocalDate asOf,
                                           long normalizedHourlyWage,
                                           int paydayDay) {

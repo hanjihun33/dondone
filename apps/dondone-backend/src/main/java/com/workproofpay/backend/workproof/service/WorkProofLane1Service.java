@@ -58,6 +58,7 @@ public class WorkProofLane1Service {
     private static final String AGGREGATE_RISK_FLAG_CHECK_OUT_OUTSIDE_RADIUS_PRESENT = "CHECK_OUT_OUTSIDE_RADIUS_PRESENT";
     // PRD에서 월 기준 시간이 고정되기 전까지는 작은 기본값으로 유지한다.
     private static final int DEFAULT_MONTHLY_WORK_MINUTES = 12_540;
+    private static final int DEFAULT_PAYDAY_DAY = 31;
     private static final double EARTH_RADIUS_METERS = 6_371_000d;
     private static final String TEMPORARY_WORKPLACE_NAME = "SSAFY (임시)";
     private static final String TEMPORARY_WORKPLACE_ADDRESS = "광주광역시 광산구 하남산단 6번로 107";
@@ -124,6 +125,7 @@ public class WorkProofLane1Service {
                 resolveDailyWorkMinutes(request),
                 resolveMonthlyWorkMinutes(request),
                 calculateNormalizedHourlyWage(request),
+                resolvePaydayDay(request),
                 request.effectiveFrom() != null ? request.effectiveFrom() : LocalDate.now()
         ));
         return toCurrentContractResponse(saved);
@@ -136,6 +138,17 @@ public class WorkProofLane1Service {
     public CurrentContractResponse getCurrentContract(Long userId, Long workplaceId) {
         getAccessibleWorkplace(userId, workplaceId);
         return toCurrentContractResponse(getActiveContract(workplaceId, ErrorCode.ACTIVE_CONTRACT_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public CurrentContractResponse getPrimaryCurrentContract(Long userId) {
+        return findAccessibleWorkplaces(userId).stream()
+                .filter(workplace -> workContractRepository.existsByWorkplaceIdAndEffectiveToIsNull(workplace.getId()))
+                .findFirst()
+                .map(workplace -> toCurrentContractResponse(
+                        getActiveContract(workplace.getId(), ErrorCode.ACTIVE_CONTRACT_NOT_FOUND)
+                ))
+                .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_CONTRACT_NOT_FOUND));
     }
 
     /**
@@ -374,6 +387,24 @@ public class WorkProofLane1Service {
 
     // 고용주 등록 기능이 들어오기 전까지는 lane 1 출퇴근 흐름이 끊기지 않도록 임시 근무지를 보장한다.
     private List<Workplace> getOrCreateSelectableWorkplaces(Long userId) {
+        List<Workplace> accessibleWorkplaces = findAccessibleWorkplaces(userId);
+        if (!accessibleWorkplaces.isEmpty()) {
+            return accessibleWorkplaces;
+        }
+
+        Workplace temporary = workplaceRepository.save(Workplace.create(
+                findUser(userId),
+                TEMPORARY_WORKPLACE_NAME,
+                TEMPORARY_WORKPLACE_ADDRESS,
+                TEMPORARY_WORKPLACE_MAP_LABEL,
+                TEMPORARY_WORKPLACE_LATITUDE,
+                TEMPORARY_WORKPLACE_LONGITUDE,
+                DEFAULT_ALLOWED_RADIUS_METERS
+        ));
+        return List.of(temporary);
+    }
+
+    private List<Workplace> findAccessibleWorkplaces(Long userId) {
         LinkedHashMap<Long, Workplace> accessibleWorkplaces = new LinkedHashMap<>();
 
         workplaceRepository.findByUserIdOrderByCreatedAtDesc(userId)
@@ -394,20 +425,7 @@ public class WorkProofLane1Service {
                     .forEach(workplace -> accessibleWorkplaces.putIfAbsent(workplace.getId(), workplace));
         }
 
-        if (!accessibleWorkplaces.isEmpty()) {
-            return List.copyOf(accessibleWorkplaces.values());
-        }
-
-        Workplace temporary = workplaceRepository.save(Workplace.create(
-                findUser(userId),
-                TEMPORARY_WORKPLACE_NAME,
-                TEMPORARY_WORKPLACE_ADDRESS,
-                TEMPORARY_WORKPLACE_MAP_LABEL,
-                TEMPORARY_WORKPLACE_LATITUDE,
-                TEMPORARY_WORKPLACE_LONGITUDE,
-                DEFAULT_ALLOWED_RADIUS_METERS
-        ));
-        return List.of(temporary);
+        return List.copyOf(accessibleWorkplaces.values());
     }
 
     private Workplace getOwnedWorkplace(Long userId, Long workplaceId) {
@@ -502,6 +520,10 @@ public class WorkProofLane1Service {
         return request.monthlyWorkMinutes() != null ? request.monthlyWorkMinutes() : DEFAULT_MONTHLY_WORK_MINUTES;
     }
 
+    private Integer resolvePaydayDay(CreateContractRequest request) {
+        return request.paydayDay() != null ? request.paydayDay() : DEFAULT_PAYDAY_DAY;
+    }
+
     // DAILY/MONTHLY 계약도 Wage에서 같은 기준으로 비교할 수 있게 시간당 단가로 정규화한다.
     private BigDecimal calculateNormalizedHourlyWage(CreateContractRequest request) {
         return switch (request.payUnit()) {
@@ -538,6 +560,7 @@ public class WorkProofLane1Service {
                 contract.getDailyWorkMinutes(),
                 contract.getMonthlyWorkMinutes(),
                 contract.getNormalizedHourlyWage(),
+                contract.getPaydayDay(),
                 contract.getEffectiveFrom(),
                 contract.getEffectiveTo(),
                 contract.isActive()
