@@ -43,6 +43,8 @@ public record WageEstimateResponse(
             Integer monthlyWorkMinutes,
             @Schema(description = "Normalized hourly wage derived from the contract", example = "12000")
             BigDecimal normalizedHourlyWage,
+            @Schema(description = "Configured payday day from the contract", example = "31")
+            Integer paydayDay,
             @Schema(description = "Contract effective start date", example = "2026-03-01")
             LocalDate effectiveFrom,
             @Schema(description = "Whether the contract is currently active", example = "true")
@@ -56,6 +58,7 @@ public record WageEstimateResponse(
                     contract.dailyWorkMinutes(),
                     contract.monthlyWorkMinutes(),
                     contract.normalizedHourlyWage(),
+                    contract.paydayDay(),
                     contract.effectiveFrom(),
                     contract.isActive()
             );
