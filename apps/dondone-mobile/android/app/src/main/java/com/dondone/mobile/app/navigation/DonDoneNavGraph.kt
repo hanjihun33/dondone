@@ -151,6 +151,7 @@ fun DonDoneNavGraph(
                     session = authUiState.session,
                     workproofRemoteState = workproofRemoteState
                 ),
+                onRefreshRemittance = viewModel::refreshRemittanceRemoteStateSilentlyIfAuthenticated,
                 onOpenTransfer = {
                     if (viewModel.openTransferFlow()) {
                         navigateWithinApp(Route.TRANSFER, onNavigateToRootTab) { target ->
@@ -271,7 +272,7 @@ fun DonDoneNavGraph(
                 onAddRecipient = viewModel::addRecipientFromTransfer,
                 onSearchRecipientsByPhone = viewModel::searchRecipientsByPhone,
                 onClearPhoneSearch = viewModel::clearRecipientPhoneSearch,
-                onRefreshRemittance = viewModel::refreshRemittanceRemoteState,
+                onRefreshRemittance = viewModel::refreshRemittanceRemoteStateSilentlyIfAuthenticated,
                 onChangeRecipient = viewModel::showRecipientStepFromAmount,
                 onChangeAccountFromAmount = viewModel::showAccountStepFromAmount,
                 onSubmitTransfer = viewModel::submitTransfer,
