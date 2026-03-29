@@ -94,6 +94,11 @@ private enum class RemittanceRemoteLoadMode {
     SILENT_REFRESH
 }
 
+private enum class AdvanceRemoteLoadMode {
+    INITIAL,
+    SILENT_REFRESH
+}
+
 private enum class VaultRemoteLoadMode {
     INITIAL,
     SILENT_REFRESH
@@ -196,7 +201,7 @@ class DemoSessionViewModel(
         advanceRequestUiStateFlow = _advanceRequestUiState,
         advanceRequestDetailUiStateFlow = _advanceRequestDetailUiState,
         unauthenticatedMessage = ADVANCE_REMOTE_LOGIN_MESSAGE,
-        loadAdvanceRemoteState = ::loadAdvanceRemoteState,
+        loadAdvanceRemoteState = { session -> loadAdvanceRemoteState(session) },
         mergeAdvanceRequestDetail = ::mergeAdvanceRequestDetail,
         expireSession = ::expireSession
     )
@@ -1241,6 +1246,13 @@ class DemoSessionViewModel(
         advanceHandlers.refreshAdvanceRemoteState()
     }
 
+    fun refreshAdvanceRemoteStateSilentlyIfAuthenticated() {
+        val session = _authUiState.value.session ?: return
+        viewModelScope.launch {
+            loadAdvanceRemoteState(session, AdvanceRemoteLoadMode.SILENT_REFRESH)
+        }
+    }
+
     fun refreshWorkproofRemoteState() {
         val session = _authUiState.value.session
         if (session == null) {
@@ -1293,6 +1305,13 @@ class DemoSessionViewModel(
 
         viewModelScope.launch {
             loadVaultRemoteState(session)
+        }
+    }
+
+    fun refreshVaultRemoteStateSilentlyIfAuthenticated() {
+        val session = _authUiState.value.session ?: return
+        viewModelScope.launch {
+            refreshVaultRemoteStateSilently(session)
         }
     }
 
@@ -1430,9 +1449,15 @@ class DemoSessionViewModel(
         loadVaultRemoteState(session)
     }
 
-    private suspend fun loadAdvanceRemoteState(session: AuthSession) {
+    private suspend fun loadAdvanceRemoteState(
+        session: AuthSession,
+        mode: AdvanceRemoteLoadMode = AdvanceRemoteLoadMode.INITIAL
+    ) {
         val previousState = _advanceRemoteState.value
-        _advanceRemoteState.value = AdvanceRemoteState.loading()
+        val hasPreviousContent = previousState.mode == AdvanceRemoteMode.CONTENT
+        if (mode == AdvanceRemoteLoadMode.INITIAL || !hasPreviousContent) {
+            _advanceRemoteState.value = AdvanceRemoteState.loading()
+        }
         val remoteState = advanceRepository.load(session.accessToken)
         if (!remoteState.isAuthenticated) {
             clearAuthenticatedState(
@@ -1440,6 +1465,13 @@ class DemoSessionViewModel(
                     remoteState.errorMessage ?: "세션이 만료되어 다시 로그인해 주세요."
                 )
             )
+            return
+        }
+        if (
+            mode == AdvanceRemoteLoadMode.SILENT_REFRESH &&
+            remoteState.mode == AdvanceRemoteMode.ERROR &&
+            hasPreviousContent
+        ) {
             return
         }
         _advanceRemoteState.value = remoteState
